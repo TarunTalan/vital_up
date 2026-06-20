@@ -6,8 +6,13 @@ import 'package:vital_up/core/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize dependency injection (database, network, storage, etc.)
-  await di.initDependencies();
+  try {
+    // Initialize dependency injection (database, network, storage, etc.)
+    await di.initDependencies();
+  } catch (e, stackTrace) {
+    debugPrint('INITIALIZATION ERROR: $e');
+    debugPrint(stackTrace.toString());
+  }
   
   runApp(const MyApp());
 }

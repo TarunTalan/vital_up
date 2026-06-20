@@ -5,6 +5,7 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -31,7 +32,11 @@ Future<void> initDependencies() async {
 
   // 4. Local Database (Isar)
   final isarService = IsarService();
-  await isarService.init();
+  try {
+    await isarService.init();
+  } catch (e) {
+    logger.e('Failed to initialize Isar database: $e');
+  }
   sl.registerLazySingleton<IsarService>(() => isarService);
 
   // 5. Network (Dio client)
@@ -41,4 +46,7 @@ Future<void> initDependencies() async {
         secureStorage: sl<FlutterSecureStorage>(),
         logger: sl<Logger>(),
       ));
+
+  // 6. Blocs / Cubits
+  sl.registerFactory(() => AuthCubit());
 }
