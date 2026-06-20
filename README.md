@@ -1,0 +1,2 @@
+# VitalUp
+VitalUp is a comprehensive health and wellness platform that helps users build sustainable habits through activity tracking, nutrition logging, mindful routines, and personalised coaching. It combines real-time data with manual entries, smart reminders, and an AI-powered health coach to deliver tailored insights and motivation
