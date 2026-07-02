@@ -18,6 +18,9 @@ class AuthTextField extends StatefulWidget {
   final bool showValidation;
   final int maxLength;
   final bool showRequirementsInfo;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final Iterable<String>? autofillHints;
 
   const AuthTextField({
     super.key,
@@ -35,6 +38,9 @@ class AuthTextField extends StatefulWidget {
     this.showValidation = false,
     this.maxLength = 1000,
     this.showRequirementsInfo = false,
+    this.textInputAction,
+    this.onSubmitted,
+    this.autofillHints,
   });
 
   @override
@@ -64,6 +70,9 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     _focusNode.addListener(() {
       setState(() {
         _focused = _focusNode.hasFocus;
+        if (!_focused) {
+          _showRequirements = false;
+        }
       });
       if (!_focusNode.hasFocus && widget.validate != null) {
         widget.validate!();
@@ -206,7 +215,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
         Text(
           widget.label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: _focused ? const Color(0xFF149CB3) : colors.onSurface,
+                color: colors.onSurface,
               ),
         ),
         SizedBox(height: AppTheme.responsiveHeight(context, 6.0)),
@@ -241,6 +250,9 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                               focusNode: _focusNode,
                               obscureText: widget.isPassword && !_passwordVisible,
                               keyboardType: widget.keyboardType,
+                              textInputAction: widget.textInputAction,
+                              onSubmitted: widget.onSubmitted,
+                              autofillHints: widget.autofillHints,
                               maxLines: widget.singleLine ? 1 : null,
                               enableInteractiveSelection: !widget.isPassword, // Disable copy/paste menu on password
                               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -361,12 +373,12 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
           ],
         ),
         SizedBox(height: AppTheme.responsiveHeight(context, 5.0)),
-        SizedBox(
-          height: 16.0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 16.0,
                 child: Text(
                   hasError ? showErrText : '',
                   maxLines: 1,
@@ -379,20 +391,20 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                       ),
                 ),
               ),
-              if (showForgotRow)
-                GestureDetector(
-                  onTap: widget.onForgotPassword,
-                  child: Text(
-                    'Forgot password?',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: colors.onSurface,
-                          decoration: TextDecoration.underline,
-                          fontSize: 11.0,
-                        ),
-                  ),
+            ),
+            if (showForgotRow)
+              GestureDetector(
+                onTap: widget.onForgotPassword,
+                child: Text(
+                  'Forgot password?',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: colors.onSurface,
+                        decoration: TextDecoration.underline,
+                        fontSize: 13.0,
+                      ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ],
     );
@@ -462,6 +474,8 @@ class AuthEmailField extends StatelessWidget {
   final String? error;
   final VoidCallback? validate;
   final String placeholder;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const AuthEmailField({
     super.key,
@@ -471,6 +485,8 @@ class AuthEmailField extends StatelessWidget {
     this.error,
     this.validate,
     this.placeholder = 'Enter your email id',
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -483,6 +499,9 @@ class AuthEmailField extends StatelessWidget {
       error: error,
       validate: validate,
       keyboardType: TextInputType.emailAddress,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autofillHints: const [AutofillHints.email],
     );
   }
 }
@@ -494,6 +513,8 @@ class AuthUsernameField extends StatelessWidget {
   final String? error;
   final VoidCallback? validate;
   final String placeholder;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const AuthUsernameField({
     super.key,
@@ -503,6 +524,8 @@ class AuthUsernameField extends StatelessWidget {
     this.error,
     this.validate,
     this.placeholder = 'Enter your name',
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -515,6 +538,9 @@ class AuthUsernameField extends StatelessWidget {
       error: error,
       validate: validate,
       maxLength: 20,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autofillHints: const [AutofillHints.username],
     );
   }
 }
@@ -530,6 +556,8 @@ class AuthPasswordField extends StatelessWidget {
   final bool showValidation;
   final String placeholder;
   final bool showRequirementsInfo;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const AuthPasswordField({
     super.key,
@@ -543,6 +571,8 @@ class AuthPasswordField extends StatelessWidget {
     this.showValidation = false,
     this.placeholder = 'Enter password',
     this.showRequirementsInfo = false,
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -560,6 +590,11 @@ class AuthPasswordField extends StatelessWidget {
       keyboardType: TextInputType.visiblePassword,
       showValidation: showValidation,
       showRequirementsInfo: showRequirementsInfo,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autofillHints: [
+        showForgot ? AutofillHints.password : AutofillHints.newPassword
+      ],
     );
   }
 }
@@ -572,6 +607,8 @@ class AuthNumberField extends StatelessWidget {
   final VoidCallback? validate;
   final bool showValidation;
   final String placeholder;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const AuthNumberField({
     super.key,
@@ -582,6 +619,8 @@ class AuthNumberField extends StatelessWidget {
     this.validate,
     this.showValidation = false,
     this.placeholder = 'Enter Otp',
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -596,6 +635,9 @@ class AuthNumberField extends StatelessWidget {
       validate: validate,
       keyboardType: TextInputType.number,
       showValidation: showValidation,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autofillHints: const [AutofillHints.oneTimeCode],
     );
   }
 }
