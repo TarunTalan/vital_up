@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_header.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -123,6 +124,7 @@ class _OtpScreenState extends State<OtpScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: AuthBackground(
+          style: AuthBackgroundStyle.blobs,
           child: BlocConsumer<AuthCubit, AuthState>(
             listener: (context, state) {
               if (state is AuthForgotPasswordOtpVerified) {
@@ -167,7 +169,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               ),
                               Expanded(
                                 child: SingleChildScrollView(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                  padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
                                   child: Column(
                                     children: [
                                       const SizedBox(height: 40),
@@ -195,18 +197,21 @@ class _OtpScreenState extends State<OtpScreen> {
                                               }
                                             },
                                             child: Container(
-                                              width: 46,
-                                              height: 46,
+                                              // Figma OTP box: 52×52dp
+                                              width: AppTheme.inputHeight,
+                                              height: AppTheme.inputHeight,
                                               decoration: BoxDecoration(
                                                 border: Border.all(
                                                   color: state is AuthError || freezeMessage != null
                                                       ? colors.error
                                                       : _focusNodes[index].hasFocus && !isLocked
                                                           ? colors.primary
-                                                          : colors.outline,
-                                                  width: _focusNodes[index].hasFocus && !isLocked ? 2 : 1,
+                                                          : (Theme.of(context).extension<VitalUpColors>()?.inputBorder ?? AppTheme.lightCustomColors.inputBorder!),
+                                                  width: _focusNodes[index].hasFocus && !isLocked
+                                                      ? AppTheme.borderWidthFocused
+                                                      : AppTheme.borderWidthDefault,
                                                 ),
-                                                borderRadius: BorderRadius.circular(16),
+                                                borderRadius: BorderRadius.circular(AppTheme.inputRadius),
                                                 color: state is AuthError || freezeMessage != null
                                                     ? colors.surface
                                                     : _controllers[index].text.isNotEmpty
@@ -221,9 +226,10 @@ class _OtpScreenState extends State<OtpScreen> {
                                                 textAlign: TextAlign.center,
                                                 maxLength: index == 0 ? 6 : 1, // First text field allows pasting 6 digit code
                                                 enabled: !isLocked && !isLoading,
-                                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                                // Figma: 26sp w500 for OTP digit
+                                                style: Theme.of(context).textTheme.displayMedium?.copyWith(
                                                       color: colors.onSurface,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight: FontWeight.w500,
                                                     ),
                                                 showCursor: true,
                                                 cursorColor: colors.primary,
@@ -288,56 +294,41 @@ class _OtpScreenState extends State<OtpScreen> {
                                         builder: (context, timerSnapshot) {
                                           final secondsLeft = timerSnapshot.data ?? 0;
                                           final isResendEnabled = secondsLeft <= 0 && !isLocked && !isLoading;
-      
+
                                           return SizedBox(
                                             width: double.infinity,
-                                            height: 48,
-                                            child: OutlinedButton(
-                                              onPressed: isResendEnabled
-                                                  ? () {
-                                                      for (var controller in _controllers) {
-                                                        controller.clear();
-                                                      }
-                                                      _focusNodes[0].requestFocus();
-                                                      cubit.clearOtpError();
-      
-                                                      if (widget.flow == 'signup') {
-                                                        cubit.resendOTP(
-                                                          token: _currentToken,
-                                                          email: widget.email,
-                                                          onSuccess: () {},
-                                                          onError: (_) {},
-                                                        );
-                                                      } else {
-                                                        cubit.resendForgotPassword(
-                                                          currentToken: _currentToken,
-                                                          onSuccess: (newToken) {
-                                                            setState(() {
-                                                              _currentToken = newToken;
-                                                            });
-                                                          },
-                                                          onError: (_) {},
-                                                        );
-                                                      }
-                                                    }
-                                                  : null,
-                                              style: OutlinedButton.styleFrom(
-                                                side: BorderSide(color: colors.outline, width: 1.0),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(18),
-                                                ),
-                                                backgroundColor: Colors.transparent,
-                                                elevation: 0,
-                                              ),
-                                              child: Text(
-                                                isResendEnabled
-                                                    ? 'Resend OTP'
-                                                    : 'Resend OTP in ${secondsLeft}s',
-                                                style: TextStyle(
-                                                  color: isResendEnabled ? colors.primary : colors.onTertiary,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
+                                            height: AppTheme.buttonHeight,
+                                            child: SecondaryAuthButton(
+                                              enabled: isResendEnabled,
+                                              onTap: () {
+                                                for (var controller in _controllers) {
+                                                  controller.clear();
+                                                }
+                                                _focusNodes[0].requestFocus();
+                                                cubit.clearOtpError();
+
+                                                if (widget.flow == 'signup') {
+                                                  cubit.resendOTP(
+                                                    token: _currentToken,
+                                                    email: widget.email,
+                                                    onSuccess: () {},
+                                                    onError: (_) {},
+                                                  );
+                                                } else {
+                                                  cubit.resendForgotPassword(
+                                                    currentToken: _currentToken,
+                                                    onSuccess: (newToken) {
+                                                      setState(() {
+                                                        _currentToken = newToken;
+                                                      });
+                                                    },
+                                                    onError: (_) {},
+                                                  );
+                                                }
+                                              },
+                                              label: isResendEnabled
+                                                  ? 'Resend OTP'
+                                                  : 'Resend OTP in ${secondsLeft}s',
                                             ),
                                           );
                                         },

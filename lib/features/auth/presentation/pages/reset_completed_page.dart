@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/widgets/animated_tick.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_header.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class ResetCompletedPage extends StatefulWidget {
   const ResetCompletedPage({super.key});
@@ -41,18 +42,19 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: AuthBackground(
+          style: AuthBackgroundStyle.ellipses,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
               child: Column(
                 children: [
                   AuthHeader(
-                    headerText: 'Reset Password',
+                    headerText: 'Password Changed',
                     onBackClick: () => context.goNamed('login'),
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
                       child: Column(
                         children: [
                           const SizedBox(height: 28),

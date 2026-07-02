@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_header.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -37,6 +38,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: AuthBackground(
+          style: AuthBackgroundStyle.ellipses,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
@@ -48,7 +50,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
                       child: Column(
                         children: [
                           const SizedBox(height: 28),

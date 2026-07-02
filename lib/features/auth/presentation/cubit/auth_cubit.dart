@@ -191,7 +191,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
     final error = _getPasswordValidationError(_password);
     if (error != null) {
-      _passwordErrorController.add(error);
+      _passwordErrorController.add('Password does not meet requirements');
       return false;
     }
     _passwordErrorController.add(null);
