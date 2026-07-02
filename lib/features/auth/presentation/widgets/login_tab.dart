@@ -44,6 +44,7 @@ class LoginTab extends StatelessWidget {
                             return AuthUsernameField(
                               value: usernameSnapshot.data ?? '',
                               label: 'Username or Email Id',
+                              textInputAction: TextInputAction.next,
                               onChange: (val) {
                                 final filtered =
                                     val.replaceAll(RegExp(r'[^A-Za-z0-9._@]'), '');
@@ -68,6 +69,10 @@ class LoginTab extends StatelessWidget {
                             return AuthPasswordField(
                               value: passwordSnapshot.data ?? '',
                               label: 'Password',
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) {
+                                cubit.signIn(onSuccess: onSignedIn);
+                              },
                               onChange: cubit.onPasswordChange,
                               error: errorSnapshot.data,
                               onForgotPassword: () => context.push('/forgot-password'),

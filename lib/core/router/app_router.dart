@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
 import 'package:vital_up/features/auth/presentation/pages/onboarding_page.dart';
 import 'package:vital_up/features/auth/presentation/pages/forgot_password_page.dart';
@@ -17,20 +19,29 @@ class AppRouter {
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => OnboardingPage(
-          onFinish: () => context.goNamed('login'),
-          onGoogleSignInSuccess: () => context.goNamed('dashboard'),
-        ),
+        builder: (context, state) {
+          context.read<AuthCubit>().clearAllFields();
+          return OnboardingPage(
+            onFinish: () => context.goNamed('login'),
+            onGoogleSignInSuccess: () => context.goNamed('dashboard'),
+          );
+        },
       ),
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) {
+          context.read<AuthCubit>().clearAllFields();
+          return const LoginPage();
+        },
       ),
       GoRoute(
         path: '/forgot-password',
         name: 'forgot-password',
-        builder: (context, state) => const ForgotPasswordPage(),
+        builder: (context, state) {
+          context.read<AuthCubit>().clearAllFields();
+          return const ForgotPasswordPage();
+        },
       ),
       GoRoute(
         path: '/verify-otp',
@@ -51,6 +62,7 @@ class AppRouter {
         name: 'reset-password',
         builder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
+          context.read<AuthCubit>().clearAllFields();
           return ResetPasswordPage(resetToken: token);
         },
       ),

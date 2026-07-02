@@ -121,8 +121,10 @@ class _OtpScreenState extends State<OtpScreen> {
         if (didPop) return;
         context.goNamed('login');
       },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.blobs,
           child: BlocConsumer<AuthCubit, AuthState>(
@@ -347,6 +349,7 @@ class _OtpScreenState extends State<OtpScreen> {
               );
             },
           ),
+        ),
         ),
       ),
     );

@@ -21,8 +21,8 @@ class ResetPasswordPage extends StatefulWidget {
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   void dispose() {
-    // Clean fields on exit
-    context.read<AuthCubit>().clearResetFields();
+    // Clean fields and errors on exit
+    context.read<AuthCubit>().clearAllFields();
     super.dispose();
   }
 
@@ -37,8 +37,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         if (didPop) return;
         context.goNamed('login');
       },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
           child: Center(
@@ -75,6 +77,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                   return AuthPasswordField(
                                     value: passwordSnapshot.data ?? '',
                                     label: 'New Password',
+                                    textInputAction: TextInputAction.next,
                                     onChange: cubit.onPasswordChange,
                                     error: errorSnapshot.data,
                                     showForgot: false,
@@ -97,6 +100,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                   return AuthTextField(
                                     value: confirmPasswordSnapshot.data ?? '',
                                     label: 'Confirm Password',
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) {
+                                      cubit.resetPassword(
+                                        resetToken: widget.resetToken,
+                                        onSuccess: () {},
+                                      );
+                                    },
+                                    autofillHints: const [AutofillHints.newPassword],
                                     onChange: cubit.onConfirmPasswordChange,
                                     placeholder: 'Re-enter password',
                                     isPassword: true,
@@ -147,6 +158,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

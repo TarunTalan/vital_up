@@ -20,6 +20,31 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _termsAccepted = false;
   String? _termsError;
 
+  void _submit(AuthCubit cubit) {
+    final isUsernameValid = cubit.validateUsernameSignup();
+    final isEmailValid = cubit.validateEmail();
+    final isPasswordValid = cubit.validatePassword();
+    final isConfirmValid = cubit.validateConfirmPassword();
+    final isTermsValid = _termsAccepted;
+
+    if (!isTermsValid) {
+      setState(() {
+        _termsError = 'Please accept the terms & conditions';
+      });
+    }
+
+    if (!isUsernameValid || !isEmailValid || !isPasswordValid || !isConfirmValid || !isTermsValid) {
+      return;
+    }
+
+    cubit.signUpWithOTP(
+      onOTPSent: (token) {
+        widget.onOTPSent(token, cubit.emailVal);
+      },
+      onError: (_) {},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<AuthCubit>();
@@ -52,6 +77,8 @@ class _SignupScreenState extends State<SignupScreen> {
                               value: usernameSnapshot.data ?? '',
                               label: 'Username',
                               placeholder: 'Enter your name',
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.username],
                               onChange: (val) {
                                 final filtered = val.replaceAll(RegExp(r'[^A-Za-z0-9._]'), '');
                                 cubit.onUsernameSignupChange(filtered);
@@ -75,7 +102,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           builder: (context, errorSnapshot) {
                             return AuthEmailField(
                               value: emailSnapshot.data ?? '',
-                               label: 'Email Id',
+                              label: 'Email Id',
+                              textInputAction: TextInputAction.next,
                               onChange: cubit.onEmailChange,
                               error: errorSnapshot.data,
                               validate: cubit.validateEmail,
@@ -97,6 +125,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             return AuthPasswordField(
                               value: passwordSnapshot.data ?? '',
                               label: 'Password',
+                              textInputAction: TextInputAction.next,
                               onChange: cubit.onPasswordChange,
                               error: errorSnapshot.data,
                               showForgot: false,
@@ -120,6 +149,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             return AuthTextField(
                               value: confirmPasswordSnapshot.data ?? '',
                               label: 'Confirm Password',
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _submit(cubit),
+                              autofillHints: const [AutofillHints.newPassword],
                               onChange: cubit.onConfirmPasswordChange,
                               placeholder: 'Re-enter your password',
                               isPassword: true,
@@ -151,7 +183,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                         Expanded(
+                        Expanded(
                           child: GestureDetector(
                             onTap: () {
                               showDialog(
@@ -202,12 +234,11 @@ class _SignupScreenState extends State<SignupScreen> {
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: colors.error,
                                   fontSize: 11.0,
-                                  ),
+                                ),
                           ),
                         ),
                       ),
-                                       const Spacer(),
-                    // Sign Up Action Button
+                    const Spacer(),
                     BlocBuilder<AuthCubit, AuthState>(
                       builder: (context, state) {
                         final isLoading = state is AuthLoading;
@@ -215,30 +246,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         return PrimaryAuthButton(
                           label: 'Sign up',
                           isLoading: isLoading,
-                          onTap: () {
-                            final isUsernameValid = cubit.validateUsernameSignup();
-                            final isEmailValid = cubit.validateEmail();
-                            final isPasswordValid = cubit.validatePassword();
-                            final isConfirmValid = cubit.validateConfirmPassword();
-                            final isTermsValid = _termsAccepted;
-
-                            if (!isTermsValid) {
-                              setState(() {
-                                _termsError = 'Please accept the terms & conditions';
-                              });
-                            }
-
-                            if (!isUsernameValid || !isEmailValid || !isPasswordValid || !isConfirmValid || !isTermsValid) {
-                              return;
-                            }
-
-                            cubit.signUpWithOTP(
-                              onOTPSent: (token) {
-                                widget.onOTPSent(token, cubit.emailVal);
-                              },
-                              onError: (_) {},
-                            );
-                          },
+                          onTap: () => _submit(cubit),
                         );
                       },
                     ),

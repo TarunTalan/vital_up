@@ -26,6 +26,7 @@ class _LoginPageState extends State<LoginPage>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
+      FocusManager.instance.primaryFocus?.unfocus();
       setState(() => _selectedTab = _tabController.index);
       context.read<AuthCubit>().reset();
     });
@@ -34,6 +35,7 @@ class _LoginPageState extends State<LoginPage>
   @override
   void dispose() {
     _tabController.dispose();
+    context.read<AuthCubit>().clearAllFields();
     super.dispose();
   }
 
@@ -58,8 +60,10 @@ class _LoginPageState extends State<LoginPage>
         if (didPop) return;
         context.goNamed('onboarding');
       },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
         body: AuthBackground(
           // Figma login screen: floating cyan + mint ellipses
           style: AuthBackgroundStyle.ellipses,
@@ -140,6 +144,7 @@ class _LoginPageState extends State<LoginPage>
               ),
             ),
           ),
+        ),
         ),
       ),
     );

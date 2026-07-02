@@ -19,8 +19,8 @@ class ForgotPasswordPage extends StatefulWidget {
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   void dispose() {
-    // Clear errors when leaving this page
-    context.read<AuthCubit>().clearErrorsOnly();
+    // Clear fields and errors when leaving this page
+    context.read<AuthCubit>().clearAllFields();
     super.dispose();
   }
 
@@ -35,8 +35,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         if (didPop) return;
         context.goNamed('login');
       },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
           child: Center(
@@ -73,6 +75,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                   return AuthEmailField(
                                     value: emailSnapshot.data ?? '',
                                     label: 'Email ID',
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) {
+                                      cubit.requestForgotPassword(onSuccess: () {});
+                                    },
                                     onChange: cubit.onEmailChange,
                                     error: errorSnapshot.data,
                                     validate: cubit.validateEmail,
@@ -119,6 +125,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

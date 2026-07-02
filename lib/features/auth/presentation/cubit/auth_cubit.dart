@@ -715,6 +715,22 @@ class AuthCubit extends Cubit<AuthState> {
     clearErrorsOnly();
   }
 
+  void clearAllFields() {
+    _usernameLogin = '';
+    _password = '';
+    _email = '';
+    _usernameSignup = '';
+    _confirmPassword = '';
+    _usernameLoginController.add('');
+    _passwordController.add('');
+    _emailController.add('');
+    _usernameSignupController.add('');
+    _confirmPasswordController.add('');
+    _isUsernameAvailableController.add(null);
+    clearErrorsOnly();
+    emit(AuthInitial());
+  }
+
   // Failure tracking helpers matching AuthViewModel.kt
   bool _isEmailFrozen(String email) {
     final key = email.toLowerCase();
