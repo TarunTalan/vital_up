@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
-import 'package:vital_up/features/auth/presentation/widgets/ellipse_background.dart';
 
+/// Top header for auth screens: back arrow + left-aligned page title.
+/// Background decoration is handled by the parent [AuthBackground].
 class AuthHeader extends StatelessWidget {
   final String headerText;
   final VoidCallback onBackClick;
@@ -14,36 +16,36 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.transparent,
-      child: Stack(
-        alignment: Alignment.center,
+    final hPad = AppTheme.hPadding;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleFontSize = (screenWidth * 0.08).clamp(24.0, 36.0);
+
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const EllipseBackground(height: 140),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: BackIcon(onClick: onBackClick),
-                  ),
-                ),
-                Text(
-                  headerText,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-              ],
+          // Back arrow row
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 8.0),
+            child: BackIcon(onClick: onBackClick),
+          ),
+          // Page title — Figma: 36sp w600 #1C1C1C, centered
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: Text(
+                headerText,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: titleFontSize,
+                    ),
+              ),
             ),
           ),
+          const SizedBox(height: 4),
         ],
       ),
     );
