@@ -45,6 +45,7 @@ dependencies:
 
   # Network & API
   dio: ^5.5.0
+  supabase_flutter: ^2.5.4
 
   # Offline DB & Storage
   isar_community: ^3.3.2

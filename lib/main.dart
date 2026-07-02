@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/config/supabase_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
+    // Initialize Supabase
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      publishableKey: SupabaseConfig.publishableKey,
+    );
+
     // Initialize dependency injection (database, network, storage, etc.)
     await di.initDependencies();
   } catch (e, stackTrace) {
@@ -22,13 +34,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'VitalUp',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      routerConfig: AppRouter.router,
+    return BlocProvider(
+      create: (context) => sl<AuthCubit>()..checkSession(),
+      child: MaterialApp.router(
+        title: 'VitalUp',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
+        routerConfig: AppRouter.router,
+      ),
     );
   }
 }

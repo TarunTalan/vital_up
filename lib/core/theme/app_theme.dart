@@ -240,16 +240,14 @@ class AppTheme {
         primary: buttonLightColor,
         secondary: headerLightColor,
         tertiary: tabLightColor,
-        background: bgLightColor,
         surface: errorTextFieldLightColor,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onTertiary: grayTextColor,
-        onBackground: textLightColor,
         onSurface: textFieldTextLightColor,
         outline: outlineLightColor,
         error: errorLightColor,
-        surfaceVariant: Color(0x1A1C1C1C), // Color(rgb(28, 28, 28)).copy(alpha = 0.1f)
+        surfaceContainerHighest: Color(0x1A1C1C1C), // Color(rgb(28, 28, 28)).copy(alpha = 0.1f)
         surfaceBright: surfaceFocusedLightColor,
       ),
       textTheme: _textTheme.apply(
@@ -280,17 +278,15 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: buttonDarkColor,
         secondary: headerDarkColor,
-        tertiary: Colors.transparent, // Color.Unspecified
-        background: bgDarkColor,
+        tertiary: Colors.transparent,
         surface: errorTextFieldDarkColor,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onTertiary: grayTextDarkColor,
-        onBackground: textDarkColor,
         onSurface: textFieldTextDarkColor,
         outline: outlineDarkColor,
         error: errorDarkColor,
-        surfaceVariant: Color(0x1AFEFEFE), // Color(rgb(254, 254, 254)).copy(alpha = 0.1f)
+        surfaceContainerHighest: Color(0x1AFEFEFE), // Color(rgb(254, 254, 254)).copy(alpha = 0.1f)
         surfaceBright: surfaceFocusedDarkColor,
       ),
       textTheme: _textTheme.apply(

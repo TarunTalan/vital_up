@@ -5,7 +5,14 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_local_data_source_impl.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source_impl.dart';
+import 'package:vital_up/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -43,10 +50,22 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<Dio>(() => Dio());
   sl.registerLazySingleton<DioClient>(() => DioClient(
         dio: sl<Dio>(),
-        secureStorage: sl<FlutterSecureStorage>(),
         logger: sl<Logger>(),
       ));
 
-  // 6. Blocs / Cubits
-  sl.registerFactory(() => AuthCubit());
+  // 6. Auth Clean Architecture Layers
+  sl.registerLazySingleton<SupabaseClient>(() => Supabase.instance.client);
+  
+  sl.registerLazySingleton<AuthLocalDataSource>(
+    () => AuthLocalDataSourceImpl(secureStorage: sl<FlutterSecureStorage>()),
+  );
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+  );
+  sl.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(remoteDataSource: sl<AuthRemoteDataSource>(), localDataSource: sl<AuthLocalDataSource>()),
+  );
+
+  // 7. Blocs / Cubits
+  sl.registerFactory(() => AuthCubit(authRepository: sl<AuthRepository>()));
 }
