@@ -79,3 +79,23 @@ void showSmoothSnackBar(
     ),
   );
 }
+
+/// Show a consistent success snackbar with the cyan primary theme color.
+void showSuccessSnackBar(BuildContext context, String message) {
+  showSmoothSnackBar(
+    context,
+    message: message,
+    iconColor: const Color(0xFF19C3E0),
+    icon: Icons.check_circle_outline_rounded,
+  );
+}
+
+/// Show a consistent error snackbar with the red error theme color.
+void showErrorSnackBar(BuildContext context, String message) {
+  showSmoothSnackBar(
+    context,
+    message: message,
+    iconColor: const Color(0xFFC33E36),
+    icon: Icons.error_outline_rounded,
+  );
+}

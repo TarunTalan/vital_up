@@ -7,6 +7,9 @@ import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
+import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/config/supabase_config.dart';
@@ -55,6 +58,30 @@ class MyApp extends StatelessWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         routerConfig: AppRouter.router,
+        builder: (context, child) {
+          return MultiBlocListener(
+            listeners: [
+              BlocListener<AuthCubit, AuthState>(
+                listener: (context, state) {
+                  if (state is AuthError) {
+                    showErrorSnackBar(context, state.message);
+                  }
+                },
+              ),
+              BlocListener<OnboardingCubit, OnboardingData>(
+                listenWhen: (previous, current) => previous.status != current.status,
+                listener: (context, state) {
+                  if (state.status == SubmissionStatus.error && state.errorMessage != null) {
+                    showErrorSnackBar(context, state.errorMessage!);
+                  } else if (state.status == SubmissionStatus.success) {
+                    showSuccessSnackBar(context, 'Health profile completed successfully!');
+                  }
+                },
+              ),
+            ],
+            child: child ?? const SizedBox(),
+          );
+        },
       ),
     );
   }
