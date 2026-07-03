@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 
@@ -36,7 +37,7 @@ class DashboardPage extends StatelessWidget {
               tooltip: 'Logout',
               onPressed: () {
                 // Show a confirmation dialog
-                showDialog(
+                showSmoothDialog(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Logout'),
