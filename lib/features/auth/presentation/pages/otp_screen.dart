@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -96,8 +97,12 @@ class _OtpScreenState extends State<OtpScreen>
   void dispose() {
     // Clear all fields and state in the Cubit when this screen is dismissed
     context.read<AuthCubit>().clearAllFields();
-    for (var c in _controllers) c.dispose();
-    for (var n in _focusNodes) n.dispose();
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    for (var n in _focusNodes) {
+      n.dispose();
+    }
     _shakeController.dispose();
     super.dispose();
   }
@@ -115,8 +120,12 @@ class _OtpScreenState extends State<OtpScreen>
   }
 
   void _resetBoxes() {
-    for (var c in _controllers) c.text = '\u200B';
-    for (int i = 0; i < _otpLength; i++) _isBoxFilled[i] = false;
+    for (var c in _controllers) {
+      c.text = '\u200B';
+    }
+    for (int i = 0; i < _otpLength; i++) {
+      _isBoxFilled[i] = false;
+    }
     setState(() => _hasError = false);
     FocusScope.of(context).unfocus();
   }
@@ -155,8 +164,18 @@ class _OtpScreenState extends State<OtpScreen>
         otp: otp,
         token: _currentToken,
         email: widget.email,
-        onSuccess: () {
+        onSuccess: () async {
           if (!mounted) return;
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+              child: VitalUpLoader(),
+            ),
+          );
+          await Future.delayed(const Duration(seconds: 2));
+          if (!mounted) return;
+          Navigator.of(context).pop(); // Close loader
           context.goNamed('dashboard');
         },
         onError: (_) => _triggerShake(),

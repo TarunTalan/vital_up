@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
@@ -81,38 +82,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
         listener: (context, state) {
           if (!context.mounted) return;
           if (state is AuthError) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: const Color(0xFF1C1C1C), // Modern elegant dark slate
-                elevation: 4.0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16.0), // RoundedCornerShape matching textfields
-                ),
-                margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                content: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      color: colors.error,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        state.message,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: Colors.white,
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            showSmoothSnackBar(
+              context,
+              message: state.message,
+              iconColor: colors.error,
+              icon: Icons.error_outline_rounded,
             );
             context.read<AuthCubit>().reset();
           } else if (state is AuthAuthenticated) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -133,7 +134,20 @@ class _LoginPageState extends State<LoginPage>
                         controller: _tabController,
                         children: [
                           LoginTab(
-                            onSignedIn: () => context.goNamed('dashboard'),
+                            onSignedIn: () async {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => const Center(
+                                  child: VitalUpLoader(),
+                                ),
+                              );
+                              await Future.delayed(const Duration(seconds: 2));
+                              if (context.mounted) {
+                                Navigator.of(context).pop(); // Close loader
+                                context.goNamed('dashboard');
+                              }
+                            },
                           ),
                           SignupScreen(
                             onOTPSent: (token, email) {

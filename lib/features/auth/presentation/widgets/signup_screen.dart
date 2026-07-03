@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
@@ -33,7 +34,7 @@ class _SignupScreenState extends State<SignupScreen> {
       });
     }
 
-    if (!isUsernameValid || !isEmailValid || isPasswordValid == false || !isTermsValid) {
+    if (!isUsernameValid || !isEmailValid || !isPasswordValid || !isTermsValid) {
       return;
     }
 
@@ -184,7 +185,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
-                              showDialog(
+                              showSmoothDialog(
                                 context: context,
                                 barrierDismissible: true,
                                 builder: (context) => TermsAndConditionsDialog(
