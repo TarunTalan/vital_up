@@ -46,6 +46,7 @@ class OnboardingLayout extends StatelessWidget {
   final bool nextEnabled;
   final bool showSkip;
   final bool fullBleedChild;
+  final double titleTopSpace;
   final double titleBottomSpace;
   final Widget child;
 
@@ -60,6 +61,7 @@ class OnboardingLayout extends StatelessWidget {
     this.nextEnabled = true,
     this.showSkip = true,
     this.fullBleedChild = false,
+    this.titleTopSpace = 24.0,
     this.titleBottomSpace = 40.0,
     required this.child,
   });
@@ -126,7 +128,7 @@ class OnboardingLayout extends StatelessWidget {
                         SliverToBoxAdapter(
                           child: Column(
                             children: [
-                              const SizedBox(height: 24.0),
+                              SizedBox(height: titleTopSpace),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
                                 child: Text(

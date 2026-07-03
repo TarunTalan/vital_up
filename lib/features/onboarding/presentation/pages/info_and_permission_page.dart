@@ -41,13 +41,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
             onSkip: widget.onSkip ?? () {},
             nextLabel: "Done",
             onNext: () {
-              if (!shareAnonymous && !healthReminders && !syncDevices) {
-                setState(() {
-                  showErrors = true;
-                });
-              } else {
-                widget.onNext?.call();
-              }
+              widget.onNext?.call();
             },
           ),
         ),
@@ -93,7 +87,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                   ),
                   const SizedBox(height: OnboardingStyle.titleSubtitleSpacing),
                   Text(
-                    "We collect only what’s needed to support your wellness — nothing more.",
+                    "We only collect what's needed for your wellness.",
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
@@ -106,9 +100,9 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                     context: context,
                     title: "What we collect",
                     items: [
-                      _InfoItem('assets/icons/Stethoscope.svg', Icons.medical_services, "Health details you choose to share"),
-                      _InfoItem('assets/icons/Watch.svg', Icons.watch, "Data from your device (only if you connect one)"),
-                      _InfoItem('assets/icons/settings.svg', Icons.settings, "App preferences you control"),
+                      _InfoItem('assets/icons/Stethoscope.svg', Icons.medical_services, "Health details you share"),
+                      _InfoItem('assets/icons/Watch.svg', Icons.watch, "Data from connected devices"),
+                      _InfoItem('assets/icons/settings.svg', Icons.settings, "Your app preferences"),
                     ],
                   ),
                   
@@ -119,9 +113,9 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                     context: context,
                     title: "What we do NOT do",
                     items: [
-                      _InfoItem('assets/icons/tick.svg', Icons.check, "We do not sell your data", iconSize: 12.0),
-                      _InfoItem('assets/icons/tick.svg', Icons.check, "We do not post anything without asking", iconSize: 12.0),
-                      _InfoItem('assets/icons/tick.svg', Icons.check, "We do not contact anyone without your consent", iconSize: 12.0),
+                      _InfoItem('assets/icons/tick.svg', Icons.check, "Never sell your data", iconSize: 12.0),
+                      _InfoItem('assets/icons/tick.svg', Icons.check, "Never post without asking", iconSize: 12.0),
+                      _InfoItem('assets/icons/tick.svg', Icons.check, "Never contact anyone without consent", iconSize: 12.0),
                     ],
                   ),
                   
@@ -133,7 +127,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                   const SizedBox(height: OnboardingStyle.sectionSpacingSmall * 2),
                   
                   const NoteRow(
-                    text: "We never collect anything without your permission.",
+                    text: "We collect nothing without your permission.",
                   ),
                   
                   const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
@@ -243,8 +237,8 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
           const SizedBox(height: 2.0),
           
           _ToggleRow(
-            title: "Share anonymous data to improve the app",
-            subtitle: "Help us make the app better for everyone",
+            title: "Share anonymous data",
+            subtitle: "Help improve the app for everyone",
             checked: shareAnonymous,
             addTopDivider: false,
             onChanged: (val) {
@@ -256,8 +250,8 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
           ),
           
           _ToggleRow(
-            title: "Receive health reminders",
-            subtitle: "Get gentle notifications for your wellness",
+            title: "Health reminders",
+            subtitle: "Get gentle wellness notifications",
             checked: healthReminders,
             onChanged: (val) {
               setState(() {
@@ -268,8 +262,8 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
           ),
           
           _ToggleRow(
-            title: "Sync data with connected devices",
-            subtitle: "Automatically update from your wearables",
+            title: "Sync with connected devices",
+            subtitle: "Auto-update from your wearables",
             checked: syncDevices,
             onChanged: (val) {
               setState(() {

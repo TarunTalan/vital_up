@@ -38,7 +38,7 @@ class _WeightPageState extends State<WeightPage> {
         setState(() => _showErrors = false);
         context.goNamed('health-bpm');
       },
-      title: "First, let's get to know you",
+      title: "How much do you weigh?",
       subtitle: "This helps us calculate your BMI accurately.",
       nextEnabled: true,
       fullBleedChild: true,

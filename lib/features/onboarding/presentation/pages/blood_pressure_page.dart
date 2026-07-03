@@ -56,7 +56,7 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
         widget.onNext?.call();
       },
       title: "Let’s check your blood pressure",
-      subtitle: "This helps us understand how smoothly blood flows in your body.",
+      subtitle: "This helps us monitor your cardiovascular health.",
       nextEnabled: true,
       child: Column(
         children: [

@@ -46,7 +46,7 @@ class _SleepPageState extends State<SleepPage> {
         widget.onNext?.call();
       },
       title: "How much do you usually sleep?",
-      subtitle: "This helps us suggest goals that feel right for your daily life.",
+      subtitle: "This helps us suggest a healthy rest schedule for you.",
       nextEnabled: sleep != null,
       fullBleedChild: true,
       titleBottomSpace: 20.0,

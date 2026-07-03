@@ -47,7 +47,7 @@ class _OxLevelPageState extends State<OxLevelPage> {
         widget.onNext?.call();
       },
       title: "Let’s check your oxygen level",
-      subtitle: "This tells us how well your body is getting oxygen.",
+      subtitle: "This helps us monitor your respiratory health.",
       nextEnabled: true,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

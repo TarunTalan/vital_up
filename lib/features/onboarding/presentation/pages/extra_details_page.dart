@@ -59,16 +59,16 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
         _saveData();
         widget.onNext?.call();
       },
-      title: "A little more about you",
-      subtitle: "This helps us give you safer and more relevant wellness tips.",
+      title: "Any extra details?",
+      subtitle: "This helps us tailor your experience.",
       nextEnabled: true,
-      titleBottomSpace: 16.0,
+      titleBottomSpace: 40.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
             OnboardingTextField(
-              label: "Do you have any ongoing health conditions?",
+              label: "Any ongoing health conditions?",
               value: healthConditions,
               onChange: (val) {
                 setState(() {
@@ -82,7 +82,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
             const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
             
             OnboardingTextField(
-              label: "Are you taking any regular medicines?",
+              label: "Any regular medicines?",
               value: medicines,
               onChange: (val) {
                 setState(() {
@@ -96,7 +96,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
             const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
             
             OnboardingTextField(
-              label: "Do you have any allergies?",
+              label: "Any allergies?",
               value: allergies,
               onChange: (val) {
                 setState(() {
@@ -110,7 +110,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
             const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
             
             Text(
-              "Do you currently smoke?",
+              "Do you smoke?",
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 fontSize: OnboardingStyle.labelFontSize,
                 color: Theme.of(context).colorScheme.onSurface,
