@@ -28,8 +28,10 @@ class _LoginPageState extends State<LoginPage>
       if (_tabController.indexIsChanging) return;
       FocusManager.instance.primaryFocus?.unfocus();
       setState(() => _selectedTab = _tabController.index);
-      context.read<AuthCubit>().reset();
+      context.read<AuthCubit>().clearAllFields();
     });
+    // Clear all fields on entry
+    context.read<AuthCubit>().clearAllFields();
   }
 
   @override
@@ -58,7 +60,11 @@ class _LoginPageState extends State<LoginPage>
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        context.goNamed('onboarding');
+        if (MediaQuery.of(context).viewInsets.bottom > 0.0) {
+          FocusScope.of(context).unfocus();
+        } else {
+          context.goNamed('onboarding');
+        }
       },
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
@@ -82,11 +88,11 @@ class _LoginPageState extends State<LoginPage>
 
                     // Tab switcher — Figma: shape 18dp, padding (16, 12, 16, 12)
                     Padding(
-                      padding: EdgeInsets.only(
+                      padding: const EdgeInsets.only(
                         left: 16.0,
-                        top: AppTheme.responsiveHeight(context, 8.0),
+                        top: 20.0,
                         right: 16.0,
-                        bottom: AppTheme.responsiveHeight(context, 8.0),
+                        bottom: 20.0,
                       ),
                       child: Container(
                         height: 56,

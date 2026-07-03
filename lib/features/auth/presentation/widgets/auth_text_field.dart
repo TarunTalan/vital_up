@@ -21,6 +21,9 @@ class AuthTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final Iterable<String>? autofillHints;
+  final bool enabled;
+  final bool? isAvailable;
+  final bool isChecking;
 
   const AuthTextField({
     super.key,
@@ -41,6 +44,9 @@ class AuthTextField extends StatefulWidget {
     this.textInputAction,
     this.onSubmitted,
     this.autofillHints,
+    this.enabled = true,
+    this.isAvailable,
+    this.isChecking = false,
   });
 
   @override
@@ -74,7 +80,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
           _showRequirements = false;
         }
       });
-      if (!_focusNode.hasFocus && widget.validate != null) {
+      if (!_focusNode.hasFocus && widget.error == null && widget.validate != null) {
         widget.validate!();
       }
     });
@@ -184,7 +190,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     final baseColor = const Color(0xFFD8D8D8);
     // rgba(216, 216, 216, 0.3) to allow background blobs to blur through
     final containerColor = baseColor.withValues(alpha: 0.3);
-    final isAvailable = widget.error?.toLowerCase().contains('available') ?? false;
+    final isAvailable = widget.isAvailable == true;
 
     // Border color: rgba(20, 156, 179, 1) when focused; green for success, red for error, else rgba(216, 216, 216, 1)
     final borderColor = isAvailable
@@ -202,9 +208,11 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
         ? 'Password must be at least 8 characters'
         : null;
 
-    final showErrText = widget.error ?? localPasswordError;
+    final showErrText = isAvailable
+        ? 'Username is available'
+        : (widget.error ?? localPasswordError);
 
-    final hasError = showErrText != null && showErrText.isNotEmpty;
+    final hasError = isAvailable || (showErrText != null && showErrText.isNotEmpty);
     final showForgotRow = widget.isPassword && widget.showForgot && widget.onForgotPassword != null;
 
     final inputHeight = AppTheme.responsiveInputHeight(context);
@@ -248,6 +256,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                             child: TextField(
                               controller: _controller,
                               focusNode: _focusNode,
+                              enabled: widget.enabled,
                               obscureText: widget.isPassword && !_passwordVisible,
                               keyboardType: widget.keyboardType,
                               textInputAction: widget.textInputAction,
@@ -326,6 +335,28 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                               }
                             },
                           ),
+                        ] else ...[
+                          if (widget.isChecking)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 8.0),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF149CB3)),
+                                ),
+                              ),
+                            )
+                          else if (isAvailable)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 8.0),
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF2E7D32),
+                                size: 20,
+                              ),
+                            ),
                         ],
                       ],
                     ),
@@ -360,11 +391,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                           ),
                         ),
                         const SizedBox(height: 6),
-                        _buildBullet('Password must contain at least 8 characters'),
-                        _buildBullet('Include at least one uppercase letter (A-Z).'),
-                        _buildBullet('Include at least one lowercase letter (a-z).'),
-                        _buildBullet('Include at least one number (0-9).'),
-                        _buildBullet('Include at least one special character.'),
+                        _buildBullet('Password must be at least 8 characters'),
                       ],
                     ),
                   ),
@@ -380,7 +407,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
               child: SizedBox(
                 height: 16.0,
                 child: Text(
-                  hasError ? showErrText : '',
+                  hasError ? (showErrText ?? '') : '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -476,6 +503,7 @@ class AuthEmailField extends StatelessWidget {
   final String placeholder;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final bool enabled;
 
   const AuthEmailField({
     super.key,
@@ -487,6 +515,7 @@ class AuthEmailField extends StatelessWidget {
     this.placeholder = 'Enter your email id',
     this.textInputAction,
     this.onSubmitted,
+    this.enabled = true,
   });
 
   @override
@@ -502,6 +531,7 @@ class AuthEmailField extends StatelessWidget {
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
       autofillHints: const [AutofillHints.email],
+      enabled: enabled,
     );
   }
 }
@@ -515,6 +545,11 @@ class AuthUsernameField extends StatelessWidget {
   final String placeholder;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final bool enabled;
+  final int maxLength;
+
+  final bool? isAvailable;
+  final bool isChecking;
 
   const AuthUsernameField({
     super.key,
@@ -526,6 +561,10 @@ class AuthUsernameField extends StatelessWidget {
     this.placeholder = 'Enter your name',
     this.textInputAction,
     this.onSubmitted,
+    this.enabled = true,
+    this.maxLength = 20,
+    this.isAvailable,
+    this.isChecking = false,
   });
 
   @override
@@ -537,10 +576,13 @@ class AuthUsernameField extends StatelessWidget {
       placeholder: placeholder,
       error: error,
       validate: validate,
-      maxLength: 20,
+      maxLength: maxLength,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
       autofillHints: const [AutofillHints.username],
+      enabled: enabled,
+      isAvailable: isAvailable,
+      isChecking: isChecking,
     );
   }
 }
@@ -558,6 +600,7 @@ class AuthPasswordField extends StatelessWidget {
   final bool showRequirementsInfo;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final bool enabled;
 
   const AuthPasswordField({
     super.key,
@@ -573,6 +616,7 @@ class AuthPasswordField extends StatelessWidget {
     this.showRequirementsInfo = false,
     this.textInputAction,
     this.onSubmitted,
+    this.enabled = true,
   });
 
   @override
@@ -595,6 +639,7 @@ class AuthPasswordField extends StatelessWidget {
       autofillHints: [
         showForgot ? AutofillHints.password : AutofillHints.newPassword
       ],
+      enabled: enabled,
     );
   }
 }

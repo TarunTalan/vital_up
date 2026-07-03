@@ -37,7 +37,7 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        context.goNamed('login');
+        context.goNamed('dashboard');
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -50,37 +50,52 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
                 children: [
                   AuthHeader(
                     headerText: 'Password Changed',
-                    onBackClick: () => context.goNamed('login'),
+                    onBackClick: () => context.goNamed('dashboard'),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 28),
-                          Text(
-                            'Your password has been changed successfully.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: colors.onSurface,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 20.0),
+                                    Text(
+                                      'Your password has been changed successfully.',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: colors.onSurface,
+                                          ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                    AnimatedTick(
+                                      play: _playAnimation,
+                                      totalSize: 115,
+                                      tickSize: 55,
+                                    ),
+                                    const Spacer(),
+                                    PrimaryAuthButton(
+                                      label: 'Go to Dashboard',
+                                      isLoading: false,
+                                      onTap: () {
+                                        context.goNamed('dashboard');
+                                      },
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                  ],
                                 ),
-                            textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 40),
-                          AnimatedTick(
-                            play: _playAnimation,
-                            totalSize: 115,
-                            tickSize: 55,
-                          ),
-                          const SizedBox(height: 40),
-                          PrimaryAuthButton(
-                            label: 'Back to Login',
-                            isLoading: false,
-                            onTap: () {
-                              context.goNamed('login');
-                            },
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ],

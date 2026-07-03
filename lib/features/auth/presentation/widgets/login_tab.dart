@@ -17,22 +17,25 @@ class LoginTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<AuthCubit>();
+    final state = context.watch<AuthCubit>().state;
+    final isLoading = state is AuthLoading;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight,
-            ),
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: IntrinsicHeight(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.hPadding,
+                ),
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20.0),
                     // Username Input Block
                     StreamBuilder<String>(
                       stream: cubit.usernameLoginStream,
@@ -46,18 +49,21 @@ class LoginTab extends StatelessWidget {
                               label: 'Username or Email Id',
                               textInputAction: TextInputAction.next,
                               onChange: (val) {
-                                final filtered =
-                                    val.replaceAll(RegExp(r'[^A-Za-z0-9._@]'), '');
+                                final filtered = val.replaceAll(
+                                  RegExp(r'[^A-Za-z0-9._@]'),
+                                  '',
+                                );
                                 cubit.onUsernameLoginChange(filtered);
                               },
                               error: errorSnapshot.data,
-                              validate: cubit.validateUsernameLogin,
+                              enabled: !isLoading,
+                              maxLength: 254,
                             );
                           },
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 16.0),
                     // Password Input Block
                     StreamBuilder<String>(
                       stream: cubit.passwordStream,
@@ -71,11 +77,14 @@ class LoginTab extends StatelessWidget {
                               label: 'Password',
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) {
+                                FocusScope.of(context).unfocus();
                                 cubit.signIn(onSuccess: onSignedIn);
                               },
                               onChange: cubit.onPasswordChange,
                               error: errorSnapshot.data,
-                              onForgotPassword: () => context.push('/forgot-password'),
+                              onForgotPassword: () =>
+                                  context.push('/forgot-password'),
+                              enabled: !isLoading,
                             );
                           },
                         );
@@ -91,16 +100,18 @@ class LoginTab extends StatelessWidget {
                           label: 'Login',
                           isLoading: isLoading,
                           onTap: () {
+                            FocusScope.of(context).unfocus();
                             cubit.signIn(onSuccess: onSignedIn);
                           },
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 20.0),
                   ],
                 ),
               ),
             ),
+          ),
           ),
         );
       },

@@ -79,11 +79,39 @@ class _OnboardingPageState extends State<OnboardingPage> {
       backgroundColor: colors.surface,
       body: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
+          if (!context.mounted) return;
           if (state is AuthError) {
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
-                backgroundColor: colors.error,
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: const Color(0xFF1C1C1C), // Modern elegant dark slate
+                elevation: 4.0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0), // RoundedCornerShape matching textfields
+                ),
+                margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                content: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: colors.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        state.message,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: Colors.white,
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
             context.read<AuthCubit>().reset();
@@ -204,6 +232,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           PrimaryAuthButton(
                             label: 'Get Started',
                             isLoading: false,
+                            enabled: !isLoading,
                             onTap: widget.onFinish,
                           ),
                           const SizedBox(height: smallSpacing),

@@ -18,6 +18,13 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
+  void initState() {
+    super.initState();
+    // Clear fields and errors when entering this page
+    context.read<AuthCubit>().clearAllFields();
+  }
+
+  @override
   void dispose() {
     // Clear fields and errors when leaving this page
     context.read<AuthCubit>().clearAllFields();
@@ -27,13 +34,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<AuthCubit>();
+    final state = context.watch<AuthCubit>().state;
+    final isLoading = state is AuthLoading;
     final colors = Theme.of(context).colorScheme;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        context.goNamed('login');
+        if (MediaQuery.of(context).viewInsets.bottom > 0.0) {
+          FocusScope.of(context).unfocus();
+        } else {
+          context.goNamed('login');
+        }
       },
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
@@ -51,74 +64,91 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     onBackClick: () => context.goNamed('login'),
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 28),
-                          Text(
-                            'Please enter your registered email to receive a verification code.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: colors.onSurface,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 20.0),
+                                    Text(
+                                      'Please enter your registered email to receive a verification code.',
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: colors.onSurface,
+                                          ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                    // Email Input Block
+                                    StreamBuilder<String>(
+                                      stream: cubit.emailStream,
+                                      initialData: cubit.emailVal,
+                                      builder: (context, emailSnapshot) {
+                                        return StreamBuilder<String?>(
+                                          stream: cubit.emailErrorStream,
+                                          builder: (context, errorSnapshot) {
+                                            return AuthEmailField(
+                                              value: emailSnapshot.data ?? '',
+                                              label: 'Email ID',
+                                              textInputAction: TextInputAction.done,
+                                              onSubmitted: (_) {
+                                                FocusScope.of(context).unfocus();
+                                                cubit.requestForgotPassword(
+                                                  onSuccess: (token) {
+                                                    if (!context.mounted) return;
+                                                    context.push(
+                                                      '/verify-otp?email=${cubit.emailVal}&token=$token&flow=forgot',
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                              onChange: cubit.onEmailChange,
+                                              error: errorSnapshot.data,
+                                              validate: cubit.validateEmail,
+                                              enabled: !isLoading,
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                    const Spacer(),
+                                    // Action Button
+                                    BlocBuilder<AuthCubit, AuthState>(
+                                      builder: (context, state) {
+                                        final isLoading = state is AuthLoading;
+                
+                                        return PrimaryAuthButton(
+                                          label: 'Send',
+                                          isLoading: isLoading,
+                                          onTap: () {
+                                            FocusScope.of(context).unfocus();
+                                            cubit.requestForgotPassword(
+                                              onSuccess: (token) {
+                                                if (!context.mounted) return;
+                                                context.push(
+                                                  '/verify-otp?email=${cubit.emailVal}&token=$token&flow=forgot',
+                                                );
+                                              },
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                  ],
                                 ),
-                            textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 28),
-                          // Email Input Block
-                          StreamBuilder<String>(
-                            stream: cubit.emailStream,
-                            initialData: cubit.emailVal,
-                            builder: (context, emailSnapshot) {
-                              return StreamBuilder<String?>(
-                                stream: cubit.emailErrorStream,
-                                builder: (context, errorSnapshot) {
-                                  return AuthEmailField(
-                                    value: emailSnapshot.data ?? '',
-                                    label: 'Email ID',
-                                    textInputAction: TextInputAction.done,
-                                    onSubmitted: (_) {
-                                      cubit.requestForgotPassword(onSuccess: () {});
-                                    },
-                                    onChange: cubit.onEmailChange,
-                                    error: errorSnapshot.data,
-                                    validate: cubit.validateEmail,
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 28),
-                          // Action Button
-                          BlocConsumer<AuthCubit, AuthState>(
-                            listener: (context, state) {
-                              if (state is AuthForgotPasswordOtpSent) {
-                                context.push(
-                                  '/verify-otp?email=${state.email}&token=${state.token}&flow=forgot',
-                                );
-                              } else if (state is AuthError) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(state.message),
-                                    backgroundColor: colors.error,
-                                  ),
-                                );
-                                cubit.reset();
-                              }
-                            },
-                            builder: (context, state) {
-                              final isLoading = state is AuthLoading;
-      
-                              return PrimaryAuthButton(
-                                label: 'Send',
-                                isLoading: isLoading,
-                                onTap: () {
-                                  cubit.requestForgotPassword(onSuccess: () {});
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ],

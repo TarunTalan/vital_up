@@ -21,10 +21,10 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _termsError;
 
   void _submit(AuthCubit cubit) {
+    FocusScope.of(context).unfocus();
     final isUsernameValid = cubit.validateUsernameSignup();
     final isEmailValid = cubit.validateEmail();
     final isPasswordValid = cubit.validatePassword();
-    final isConfirmValid = cubit.validateConfirmPassword();
     final isTermsValid = _termsAccepted;
 
     if (!isTermsValid) {
@@ -33,7 +33,7 @@ class _SignupScreenState extends State<SignupScreen> {
       });
     }
 
-    if (!isUsernameValid || !isEmailValid || !isPasswordValid || !isConfirmValid || !isTermsValid) {
+    if (!isUsernameValid || !isEmailValid || isPasswordValid == false || !isTermsValid) {
       return;
     }
 
@@ -48,6 +48,8 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<AuthCubit>();
+    final state = context.watch<AuthCubit>().state;
+    final isLoading = state is AuthLoading;
     final colors = Theme.of(context).colorScheme;
     final vColors = Theme.of(context).extension<VitalUpColors>();
 
@@ -64,7 +66,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
                 child: Column(
                   children: [
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 20.0),
                     // Username Input Block
                     StreamBuilder<String>(
                       stream: cubit.usernameSignupStream,
@@ -73,25 +75,43 @@ class _SignupScreenState extends State<SignupScreen> {
                         return StreamBuilder<String?>(
                           stream: cubit.usernameErrorSignupStream,
                           builder: (context, errorSnapshot) {
-                            return AuthTextField(
-                              value: usernameSnapshot.data ?? '',
-                              label: 'Username',
-                              placeholder: 'Enter your name',
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.username],
-                              onChange: (val) {
-                                final filtered = val.replaceAll(RegExp(r'[^A-Za-z0-9._]'), '');
-                                cubit.onUsernameSignupChange(filtered);
+                            return StreamBuilder<bool?>(
+                              stream: cubit.isUsernameAvailableStream,
+                              initialData: null,
+                              builder: (context, availableSnapshot) {
+                                return StreamBuilder<bool>(
+                                  stream: cubit.isCheckingUsernameStream,
+                                  initialData: false,
+                                  builder: (context, checkingSnapshot) {
+                                    final isChecking = checkingSnapshot.data ?? false;
+                                    final isAvailable = availableSnapshot.data;
+
+                                    return AuthTextField(
+                                      value: usernameSnapshot.data ?? '',
+                                      label: 'Username',
+                                      placeholder: 'Enter your name',
+                                      textInputAction: TextInputAction.next,
+                                      autofillHints: const [AutofillHints.username],
+                                      onChange: (val) {
+                                        final filtered = val.replaceAll(RegExp(r'[^A-Za-z0-9._]'), '');
+                                        cubit.onUsernameSignupChange(filtered);
+                                      },
+                                      error: errorSnapshot.data,
+                                      isAvailable: isAvailable,
+                                      isChecking: isChecking,
+                                      validate: cubit.validateUsernameSignup,
+                                      maxLength: 20,
+                                      enabled: !isLoading,
+                                    );
+                                  },
+                                );
                               },
-                              error: errorSnapshot.data,
-                              validate: cubit.validateUsernameSignup,
-                              maxLength: 20,
                             );
                           },
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 16.0),
                     // Email Input Block
                     StreamBuilder<String>(
                       stream: cubit.emailStream,
@@ -108,12 +128,13 @@ class _SignupScreenState extends State<SignupScreen> {
                               error: errorSnapshot.data,
                               validate: cubit.validateEmail,
                               placeholder: 'Enter your email id',
+                              enabled: !isLoading,
                             );
                           },
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 16.0),
                     // Password Input Block
                     StreamBuilder<String>(
                       stream: cubit.passwordStream,
@@ -125,45 +146,20 @@ class _SignupScreenState extends State<SignupScreen> {
                             return AuthPasswordField(
                               value: passwordSnapshot.data ?? '',
                               label: 'Password',
-                              textInputAction: TextInputAction.next,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _submit(cubit),
                               onChange: cubit.onPasswordChange,
                               error: errorSnapshot.data,
                               showForgot: false,
                               validate: cubit.validatePassword,
                               placeholder: 'Enter password',
-                              showRequirementsInfo: true,
+                              enabled: !isLoading,
                             );
                           },
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
-                    // Confirm Password Input Block
-                    StreamBuilder<String>(
-                      stream: cubit.confirmPasswordStream,
-                      initialData: cubit.confirmPasswordVal,
-                      builder: (context, confirmPasswordSnapshot) {
-                        return StreamBuilder<String?>(
-                          stream: cubit.confirmPasswordErrorStream,
-                          builder: (context, errorSnapshot) {
-                            return AuthTextField(
-                              value: confirmPasswordSnapshot.data ?? '',
-                              label: 'Confirm Password',
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _submit(cubit),
-                              autofillHints: const [AutofillHints.newPassword],
-                              onChange: cubit.onConfirmPasswordChange,
-                              placeholder: 'Re-enter your password',
-                              isPassword: true,
-                              error: errorSnapshot.data,
-                              showForgot: false,
-                              validate: cubit.validateConfirmPassword,
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 20.0),
                     // Terms and Conditions checkbox row
                     Row(
                       children: [
@@ -172,12 +168,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           height: 24,
                           child: Checkbox(
                             value: _termsAccepted,
-                            onChanged: (val) {
-                              setState(() {
-                                _termsAccepted = val ?? false;
-                                if (_termsAccepted) _termsError = null;
-                              });
-                            },
+                            onChanged: isLoading
+                                ? null
+                                : (val) {
+                                    setState(() {
+                                      _termsAccepted = val ?? false;
+                                      if (_termsAccepted) _termsError = null;
+                                    });
+                                  },
                             activeColor: colors.primary,
                             checkColor: Colors.white,
                           ),
@@ -205,16 +203,16 @@ class _SignupScreenState extends State<SignupScreen> {
                               text: TextSpan(
                                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                       color: vColors?.grayText ?? AppTheme.lightCustomColors.grayText,
-                                      fontSize: 13.0,
+                                      fontSize: 14.0,
                                     ),
                                 children: [
-                                  const TextSpan(text: 'I agree to the '),
+                                  const TextSpan(text: 'I have read and agree with the '),
                                   TextSpan(
-                                    text: 'Terms & Conditions',
+                                    text: 'terms and conditions',
                                     style: TextStyle(
                                       color: vColors?.termsLink ?? AppTheme.lightCustomColors.termsLink,
                                       decoration: TextDecoration.underline,
-                                      fontSize: 13.0,
+                                      fontSize: 14.0,
                                     ),
                                   ),
                                 ],
@@ -250,7 +248,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         );
                       },
                     ),
-                    SizedBox(height: AppTheme.responsiveHeight(context, 12.0)),
+                    const SizedBox(height: 20.0),
                   ],
                 ),
               ),
