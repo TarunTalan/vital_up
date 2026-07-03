@@ -57,7 +57,7 @@ class LoginTab extends StatelessWidget {
                               },
                               error: errorSnapshot.data,
                               enabled: !isLoading,
-                              maxLength: 254,
+                              maxLength: 250,
                             );
                           },
                         );

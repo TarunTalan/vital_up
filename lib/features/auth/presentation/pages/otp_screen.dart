@@ -176,7 +176,7 @@ class _OtpScreenState extends State<OtpScreen>
           await Future.delayed(const Duration(seconds: 2));
           if (!mounted) return;
           Navigator.of(context).pop(); // Close loader
-          context.goNamed('dashboard');
+          context.goNamed('health-onboarding');
         },
         onError: (_) => _triggerShake(),
       );

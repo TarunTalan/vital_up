@@ -256,7 +256,7 @@ class AppTheme {
   static const double buttonHeight = 52.0;
   /// Default border radius for inputs and buttons
   static const double inputRadius = 16.0;
-  static const double buttonRadius = 18.0;
+  static const double buttonRadius = 16.0;
   /// Input border width (unfocused / focused)
   static const double borderWidthDefault = 1.0;
   static const double borderWidthFocused = 2.0;

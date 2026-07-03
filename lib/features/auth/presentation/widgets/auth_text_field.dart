@@ -24,6 +24,8 @@ class AuthTextField extends StatefulWidget {
   final bool enabled;
   final bool? isAvailable;
   final bool isChecking;
+  final bool reserveErrorSpace;
+  final bool autofocus;
 
   const AuthTextField({
     super.key,
@@ -47,6 +49,8 @@ class AuthTextField extends StatefulWidget {
     this.enabled = true,
     this.isAvailable,
     this.isChecking = false,
+    this.reserveErrorSpace = true,
+    this.autofocus = false,
   });
 
   @override
@@ -145,8 +149,8 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     } else if (widget.keyboardType == TextInputType.number) {
       filtered = input.replaceAll(RegExp(r'[^0-9]'), '');
     } else {
-      // Disallow spaces and non-printable characters for generic fields
-      filtered = input.replaceAll(RegExp(r'[^\x21-\x7E]'), '');
+      // Disallow control characters and newlines, but allow spaces and standard text
+      filtered = input.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
     }
 
     return filtered.length > maxLen ? filtered.substring(0, maxLen) : filtered;
@@ -226,7 +230,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                 color: colors.onSurface,
               ),
         ),
-        SizedBox(height: AppTheme.responsiveHeight(context, 6.0)),
+        const SizedBox(height: 6.0),
         Stack(
           clipBehavior: Clip.none,
           children: [
@@ -256,6 +260,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                             child: TextField(
                               controller: _controller,
                               focusNode: _focusNode,
+                              autofocus: widget.autofocus,
                               enabled: widget.enabled,
                               obscureText: widget.isPassword && !_passwordVisible,
                               keyboardType: widget.keyboardType,
@@ -399,40 +404,86 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
               ),
           ],
         ),
-        SizedBox(height: AppTheme.responsiveHeight(context, 5.0)),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 16.0,
-                child: Text(
-                  hasError ? (showErrText ?? '') : '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: (isAvailable && !widget.isPassword)
-                            ? const Color(0xFF2E7D32)
-                            : colors.error,
-                        fontSize: 11.0,
+        if (widget.reserveErrorSpace)
+          Column(
+            children: [
+              SizedBox(height: AppTheme.responsiveHeight(context, 5.0)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      showErrText ?? ' ', // Reserve vertical space with a blank space
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: (isAvailable && !widget.isPassword)
+                                ? const Color(0xFF2E7D32)
+                                : colors.error,
+                            fontSize: 11.0,
+                          ),
+                    ),
+                  ),
+                  if (showForgotRow)
+                    GestureDetector(
+                      onTap: widget.onForgotPassword,
+                      child: Text(
+                        'Forgot password?',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: colors.onSurface,
+                              decoration: TextDecoration.underline,
+                              fontSize: 13.0,
+                            ),
                       ),
-                ),
+                    ),
+                ],
               ),
-            ),
-            if (showForgotRow)
-              GestureDetector(
-                onTap: widget.onForgotPassword,
-                child: Text(
-                  'Forgot password?',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: colors.onSurface,
-                        decoration: TextDecoration.underline,
-                        fontSize: 13.0,
-                      ),
-                ),
-              ),
-          ],
-        ),
+            ],
+          )
+        else
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: (hasError || showForgotRow)
+                ? Padding(
+                    padding: EdgeInsets.only(top: AppTheme.responsiveHeight(context, 5.0)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (hasError)
+                          Expanded(
+                            child: Text(
+                              showErrText ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: (isAvailable && !widget.isPassword)
+                                        ? const Color(0xFF2E7D32)
+                                        : colors.error,
+                                    fontSize: 11.0,
+                                  ),
+                            ),
+                          )
+                        else
+                          const Spacer(),
+                        if (showForgotRow)
+                          GestureDetector(
+                            onTap: widget.onForgotPassword,
+                            child: Text(
+                              'Forgot password?',
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: colors.onSurface,
+                                    decoration: TextDecoration.underline,
+                                    fontSize: 13.0,
+                                  ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity, height: 0),
+          ),
       ],
     );
   }
@@ -504,6 +555,7 @@ class AuthEmailField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
+  final int maxLength;
 
   const AuthEmailField({
     super.key,
@@ -516,6 +568,7 @@ class AuthEmailField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.enabled = true,
+    this.maxLength = 250,
   });
 
   @override
@@ -532,6 +585,7 @@ class AuthEmailField extends StatelessWidget {
       onSubmitted: onSubmitted,
       autofillHints: const [AutofillHints.email],
       enabled: enabled,
+      maxLength: maxLength,
     );
   }
 }
