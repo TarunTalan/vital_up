@@ -20,7 +20,6 @@ class AppRouter {
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) {
-          context.read<AuthCubit>().clearAllFields();
           return OnboardingPage(
             onFinish: () => context.goNamed('login'),
             onGoogleSignInSuccess: () => context.goNamed('dashboard'),
@@ -31,7 +30,6 @@ class AppRouter {
         path: '/login',
         name: 'login',
         builder: (context, state) {
-          context.read<AuthCubit>().clearAllFields();
           return const LoginPage();
         },
       ),
@@ -39,7 +37,6 @@ class AppRouter {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) {
-          context.read<AuthCubit>().clearAllFields();
           return const ForgotPasswordPage();
         },
       ),
@@ -62,7 +59,6 @@ class AppRouter {
         name: 'reset-password',
         builder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
-          context.read<AuthCubit>().clearAllFields();
           return ResetPasswordPage(resetToken: token);
         },
       ),

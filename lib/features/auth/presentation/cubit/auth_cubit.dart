@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:vital_up/features/auth/domain/entities/user_entity.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'auth_state.dart';
 
@@ -14,71 +16,59 @@ class AuthCubit extends Cubit<AuthState> {
   final StreamController<String> _passwordController = StreamController<String>.broadcast();
   final StreamController<String> _emailController = StreamController<String>.broadcast();
   final StreamController<String> _usernameSignupController = StreamController<String>.broadcast();
-  final StreamController<String> _confirmPasswordController = StreamController<String>.broadcast();
 
   // Field Errors State Controllers
   final StreamController<String?> _usernameErrorLoginController = StreamController<String?>.broadcast();
   final StreamController<String?> _passwordErrorController = StreamController<String?>.broadcast();
   final StreamController<String?> _emailErrorController = StreamController<String?>.broadcast();
   final StreamController<String?> _usernameErrorSignupController = StreamController<String?>.broadcast();
-  final StreamController<String?> _confirmPasswordErrorController = StreamController<String?>.broadcast();
   final StreamController<String?> _otpErrorController = StreamController<String?>.broadcast();
 
   // Checking state
   final StreamController<bool> _isCheckingUsernameController = StreamController<bool>.broadcast();
   final StreamController<bool?> _isUsernameAvailableController = StreamController<bool?>.broadcast();
 
-  // Timers & Lockout State Controllers
+  // Resend Timer Controllers
   final StreamController<int> _registrationOtpResendTimerController = StreamController<int>.broadcast();
   final StreamController<int> _forgotOtpResendTimerController = StreamController<int>.broadcast();
-  final StreamController<bool> _isOtpLockedController = StreamController<bool>.broadcast();
-  final StreamController<int> _freezeTimeRemainingController = StreamController<int>.broadcast();
 
   // Current values cache
   String _usernameLogin = '';
   String _password = '';
   String _email = '';
   String _usernameSignup = '';
-  String _confirmPassword = '';
 
   // Active timers & debounces
   Timer? _registrationTimer;
   Timer? _forgotTimer;
-  Timer? _freezeTimer;
   Timer? _debounceTimer;
 
-  // Lockout parameters
-  bool _isOtpLocked = false;
-  int _freezeTimeRemaining = 0;
   int _registrationResendSecs = 0;
   int _forgotResendSecs = 0;
 
-  // Failure trackers
-  final Map<String, int> _otpFailCounts = {};
-  final Set<String> _frozenEmails = {};
-  final Map<String, DateTime> _freezeTimestamps = {};
+  // Tracks the last known username availability result (null = unknown/pending)
+  bool? _isUsernameAvailable;
+  String? _lastUsernameError;
 
-  static const int maxForgotOtpAttempts = 3;
-  static const int freezeDurationSeconds = 5 * 60; // 5 minutes lockout
+  // Attempt counter — UX only (no client-side lockout; Supabase enforces rate limits)
+  final Map<String, int> _otpFailCounts = {};
+  static const int _maxOtpAttempts = 3;
 
   // Getters for UI exposure
   String get usernameLoginVal => _usernameLogin;
   String get passwordVal => _password;
   String get emailVal => _email;
   String get usernameSignupVal => _usernameSignup;
-  String get confirmPasswordVal => _confirmPassword;
 
   Stream<String> get usernameLoginStream => _usernameLoginController.stream;
   Stream<String> get passwordStream => _passwordController.stream;
   Stream<String> get emailStream => _emailController.stream;
   Stream<String> get usernameSignupStream => _usernameSignupController.stream;
-  Stream<String> get confirmPasswordStream => _confirmPasswordController.stream;
 
   Stream<String?> get usernameErrorLoginStream => _usernameErrorLoginController.stream;
   Stream<String?> get passwordErrorStream => _passwordErrorController.stream;
   Stream<String?> get emailErrorStream => _emailErrorController.stream;
   Stream<String?> get usernameErrorSignupStream => _usernameErrorSignupController.stream;
-  Stream<String?> get confirmPasswordErrorStream => _confirmPasswordErrorController.stream;
   Stream<String?> get otpErrorStream => _otpErrorController.stream;
 
   Stream<bool> get isCheckingUsernameStream => _isCheckingUsernameController.stream;
@@ -86,27 +76,29 @@ class AuthCubit extends Cubit<AuthState> {
 
   Stream<int> get registrationOtpResendTimerStream => _registrationOtpResendTimerController.stream;
   Stream<int> get forgotOtpResendTimerStream => _forgotOtpResendTimerController.stream;
-  Stream<bool> get isOtpLockedStream => _isOtpLockedController.stream;
-  Stream<int> get freezeTimeRemainingStream => _freezeTimeRemainingController.stream;
+
+  int get registrationResendSecs => _registrationResendSecs;
+  int get forgotResendSecs => _forgotResendSecs;
 
   // Value change handlers
   void onUsernameLoginChange(String val) {
     _usernameLogin = val;
     _usernameLoginController.add(val);
     _usernameErrorLoginController.add(null);
+    _passwordErrorController.add(null);
   }
 
   void onPasswordChange(String val) {
     _password = val;
     _passwordController.add(val);
     _passwordErrorController.add(null);
+    _usernameErrorLoginController.add(null);
   }
 
   void onEmailChange(String val) {
     _email = val;
     _emailController.add(val);
     _emailErrorController.add(null);
-    _updateFreezeState();
   }
 
   void onUsernameSignupChange(String val) {
@@ -114,6 +106,8 @@ class AuthCubit extends Cubit<AuthState> {
     _usernameSignupController.add(val);
     _usernameErrorSignupController.add(null);
     _isUsernameAvailableController.add(null);
+    _isUsernameAvailable = null; // Reset — new input invalidates previous check
+    _lastUsernameError = null; // Reset error on typing
 
     // Debounced username availability checks
     _debounceTimer?.cancel();
@@ -124,22 +118,33 @@ class AuthCubit extends Cubit<AuthState> {
     });
   }
 
-  void onConfirmPasswordChange(String val) {
-    _confirmPassword = val;
-    _confirmPasswordController.add(val);
-    _confirmPasswordErrorController.add(null);
-  }
-
-  // Validation functions matching AuthViewModel.kt
+  // Validation functions matching AuthViewModel
   bool validateUsernameLogin() {
-    if (_usernameLogin.trim().isEmpty) {
-      _usernameErrorLoginController.add('Username is required');
+    final val = _usernameLogin.trim();
+    if (val.isEmpty) {
+      _usernameErrorLoginController.add('Username or Email is required');
       return false;
     }
-    if (_usernameLogin.length < 3 || _usernameLogin.length > 20) {
-      _usernameErrorLoginController.add('Invalid username');
+    
+    bool isFormatValid = true;
+    if (val.contains('@')) {
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      if (!emailRegex.hasMatch(val) || val.length > 254) {
+        isFormatValid = false;
+      }
+    } else {
+      final usernameRegex = RegExp(r'^[A-Za-z0-9._]+$');
+      if (val.length < 3 || val.length > 20 || !usernameRegex.hasMatch(val)) {
+        isFormatValid = false;
+      }
+    }
+
+    if (!isFormatValid) {
+      _usernameErrorLoginController.add('');
+      _passwordErrorController.add('Invalid credentials.');
       return false;
     }
+
     _usernameErrorLoginController.add(null);
     return true;
   }
@@ -191,23 +196,10 @@ class AuthCubit extends Cubit<AuthState> {
     }
     final error = _getPasswordValidationError(_password);
     if (error != null) {
-      _passwordErrorController.add('Password does not meet requirements');
+      _passwordErrorController.add(error);
       return false;
     }
     _passwordErrorController.add(null);
-    return true;
-  }
-
-  bool validateConfirmPassword() {
-    if (_confirmPassword.isEmpty) {
-      _confirmPasswordErrorController.add('Please confirm your password');
-      return false;
-    }
-    if (_confirmPassword != _password) {
-      _confirmPasswordErrorController.add('Passwords do not match');
-      return false;
-    }
-    _confirmPasswordErrorController.add(null);
     return true;
   }
 
@@ -217,7 +209,8 @@ class AuthCubit extends Cubit<AuthState> {
       return false;
     }
     if (_password.length < 8 || _password.length > 16) {
-      _passwordErrorController.add('Invalid password');
+      _usernameErrorLoginController.add('');
+      _passwordErrorController.add('Invalid credentials.');
       return false;
     }
     _passwordErrorController.add(null);
@@ -225,21 +218,8 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   String? _getPasswordValidationError(String password) {
-    if (password.length < 8 || password.length > 16) {
-      return 'Password must be between 8 and 16 characters';
-    }
-    if (!password.contains(RegExp(r'[A-Z]'))) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!password.contains(RegExp(r'[a-z]'))) {
-      return 'Password must contain at least one lowercase letter';
-    }
-    if (!password.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one digit';
-    }
-    // Special character matching any printable non-alphanumeric character
-    if (!password.contains(RegExp(r'[^\w\s]'))) {
-      return 'Password must contain at least one special character';
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters';
     }
     return null;
   }
@@ -249,7 +229,6 @@ class AuthCubit extends Cubit<AuthState> {
     _passwordErrorController.add(null);
     _emailErrorController.add(null);
     _usernameErrorSignupController.add(null);
-    _confirmPasswordErrorController.add(null);
     _otpErrorController.add(null);
   }
 
@@ -267,9 +246,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   void clearResetFields() {
     _password = '';
-    _confirmPassword = '';
     _passwordController.add('');
-    _confirmPasswordController.add('');
     clearErrorsOnly();
   }
 
@@ -277,36 +254,66 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> _checkUsernameAvailability(String username) async {
     _isCheckingUsernameController.add(true);
     _usernameErrorSignupController.add(null);
+    _isUsernameAvailable = null; // Reset while checking
 
     final result = await _authRepository.checkUsernameAvailability(username);
     result.fold(
       (failure) {
         if (_usernameSignup == username) {
-          _usernameErrorSignupController.add(failure.message);
+          _isUsernameAvailable = false;
+          final mappedMessage = _mapFailureToMessage(failure.message);
+          _lastUsernameError = mappedMessage;
+          _usernameErrorSignupController.add(mappedMessage);
           _isUsernameAvailableController.add(false);
         }
       },
-      (successMessage) {
+      (_) {
         if (_usernameSignup == username) {
+          _isUsernameAvailable = true;
+          _usernameErrorSignupController.add(null); // Clear error — username is free
           _isUsernameAvailableController.add(true);
-          _usernameErrorSignupController.add(successMessage);
         }
       },
     );
     _isCheckingUsernameController.add(false);
   }
 
+  String _sanitizeRawErrorMessage(String message) {
+    // Extract nested message text if inside exception string formats
+    // e.g. "AuthApiException(message: XYZ, statusCode: ...)"
+    final messageRegExp = RegExp(r'(?:message:\s*|message\s*=\s*|message:\s*")([^",\)]+)');
+    final match = messageRegExp.firstMatch(message);
+    if (match != null) {
+      return match.group(1)?.trim() ?? message;
+    }
+    return message;
+  }
+
   // Auth Operations
   String _mapFailureToMessage(String originalMessage) {
-    final msg = originalMessage.toLowerCase();
+    final origLower = originalMessage.toLowerCase();
     
-    if (msg.contains('socketexception') || 
-        msg.contains('network') || 
-        msg.contains('connection') || 
-        msg.contains('handshake') || 
-        msg.contains('failed host lookup') ||
-        msg.contains('clientexception')) {
+    // Check network errors on the original raw message FIRST to give it absolute priority!
+    if (origLower.contains('socketexception') || 
+        origLower.contains('network') || 
+        origLower.contains('connection') || 
+        origLower.contains('handshake') || 
+        origLower.contains('failed host lookup') ||
+        origLower.contains('clientexception')) {
       return 'No internet connection. Please check your network.';
+    }
+
+    final cleanMsg = _sanitizeRawErrorMessage(originalMessage);
+    final msg = cleanMsg.toLowerCase();
+
+    if (msg.contains('cancelled') || msg.contains('canceled')) {
+      return 'Google sign-in was cancelled.';
+    }
+
+    if (msg.contains('missing id token') || 
+        msg.contains('missing_id_token') || 
+        msg.contains('failed: missing')) {
+      return 'Google authentication failed. Please try again.';
     }
     
     if (msg.contains('rate limit') || 
@@ -314,13 +321,22 @@ class AuthCubit extends Cubit<AuthState> {
         msg.contains('too_many_requests')) {
       return 'Too many attempts. Please try again in a few minutes.';
     }
+
+    if (msg.contains('security purposes') || msg.contains('request this after')) {
+      final match = RegExp(r'\d+').firstMatch(cleanMsg);
+      if (match != null) {
+        final seconds = match.group(0);
+        return 'Please wait ${seconds}s before requesting a new OTP.';
+      }
+      return 'Please wait before requesting a new OTP.';
+    }
     
     if (msg.contains('invalid login credentials') || 
         msg.contains('invalid_credentials') ||
         msg.contains('username or password') ||
         msg.contains('no account exist') ||
         msg.contains('invalid username or password')) {
-      return 'Incorrect username/email or password.';
+      return 'Invalid credentials.';
     }
     
     if (msg.contains('email not confirmed') || 
@@ -335,6 +351,19 @@ class AuthCubit extends Cubit<AuthState> {
         msg.contains('email already registered')) {
       return 'This email is already registered.';
     }
+
+    if (msg.contains('not registered') || 
+        msg.contains('please sign up') || 
+        msg.contains('no user found')) {
+      return 'Email is not registered. Please sign up.';
+    }
+
+    if (msg.contains('should be different from') ||
+        msg.contains('different from the old') ||
+        msg.contains('must be different') ||
+        msg.contains('same as old')) {
+      return 'New password must be different from your old password.';
+    }
     
     if (msg.contains('password should be') || 
         msg.contains('weak password') ||
@@ -342,23 +371,31 @@ class AuthCubit extends Cubit<AuthState> {
       return 'Password is too weak. Please check password requirements.';
     }
     
-    if (msg.contains('invalid token') || 
-        msg.contains('invalid otp') ||
-        msg.contains('otp_expired') ||
-        msg.contains('expired token') ||
-        msg.contains('token expired') ||
-        msg.contains('otp has expired') ||
-        msg.contains('incorrect verification code') ||
-        msg.contains('invalid confirmation code')) {
-      if (msg.contains('expired')) {
-        return 'The verification code has expired. Please request a new one.';
-      }
-      return 'Incorrect verification code. Please check and try again.';
+    if (msg.contains('token') ||
+        msg.contains('otp') ||
+        msg.contains('verification') ||
+        msg.contains('confirmation') ||
+        msg.contains('code') ||
+        msg.contains('expired')) {
+      return 'Invalid or expired OTP. Please check and try again.';
     }
 
-    if (originalMessage.isNotEmpty) {
-      if (originalMessage.length < 60 && !originalMessage.contains('{') && !originalMessage.contains('[')) {
-        return originalMessage;
+    if (cleanMsg.isNotEmpty) {
+      final hasTechnicalTerms = msg.contains('exception') || 
+                                msg.contains('error') || 
+                                msg.contains('database') || 
+                                msg.contains('rls') || 
+                                msg.contains('row-level') || 
+                                msg.contains('postgres') || 
+                                msg.contains('supabase') || 
+                                msg.contains('null') || 
+                                msg.contains('api') || 
+                                msg.contains('sdk') ||
+                                msg.contains('statuscode') ||
+                                msg.contains('failed');
+                                
+      if (cleanMsg.length < 60 && !hasTechnicalTerms && !cleanMsg.contains('{') && !cleanMsg.contains('[')) {
+        return cleanMsg;
       }
     }
     
@@ -374,14 +411,19 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        if (userFriendlyMessage.contains('username/email') || userFriendlyMessage.contains('password')) {
-          _passwordErrorController.add(userFriendlyMessage);
+        if (userFriendlyMessage.toLowerCase().contains('incorrect') ||
+            userFriendlyMessage.toLowerCase().contains('credentials') ||
+            userFriendlyMessage.toLowerCase().contains('username/email') ||
+            userFriendlyMessage.toLowerCase().contains('password')) {
+          // Highlight both fields in red, but display the text below the password field
+          _usernameErrorLoginController.add('');
+          _passwordErrorController.add('Invalid credentials.');
         } else if (userFriendlyMessage.contains('verify')) {
           _usernameErrorLoginController.add(userFriendlyMessage);
         } else {
           _passwordErrorController.add(userFriendlyMessage);
         }
-        emit(AuthError(userFriendlyMessage));
+        emit(AuthInitial());
       },
       (user) {
         emit(AuthAuthenticated(user));
@@ -394,10 +436,10 @@ class AuthCubit extends Cubit<AuthState> {
     required Function(String token) onOTPSent,
     required Function(String error) onError,
   }) async {
-    final emailVal = _email.trim().toLowerCase();
-    if (_isEmailFrozen(emailVal)) {
-      const msg = 'Registration temporarily disabled for this email. Try again later';
-      _emailErrorController.add(msg);
+    // Guard: block if username availability check hasn't passed
+    if (_isUsernameAvailable != true) {
+      final msg = _lastUsernameError ?? 'Please wait for username check or choose an available username.';
+      _usernameErrorSignupController.add(msg);
       onError(msg);
       return;
     }
@@ -408,18 +450,25 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        
-        if (userFriendlyMessage.contains('already registered') || userFriendlyMessage.contains('email')) {
+        final msgLower = failure.message.toLowerCase();
+
+        if (msgLower.contains('already registered') ||
+            msgLower.contains('user already registered') ||
+            msgLower.contains('email already') ||
+            msgLower.contains('already in use')) {
           _emailErrorController.add(userFriendlyMessage);
           onError(userFriendlyMessage);
-        } else if (failure.message.toLowerCase().contains('username')) {
+        } else if (msgLower.contains('username')) {
           _usernameErrorSignupController.add(userFriendlyMessage);
+          onError(userFriendlyMessage);
+        } else if (msgLower.contains('password')) {
+          _passwordErrorController.add(userFriendlyMessage);
           onError(userFriendlyMessage);
         } else {
           _emailErrorController.add(userFriendlyMessage);
           onError(userFriendlyMessage);
         }
-        emit(AuthError(userFriendlyMessage));
+        emit(AuthInitial());
       },
       (token) {
         emit(AuthOtpSent(token: token, email: _email));
@@ -436,16 +485,10 @@ class AuthCubit extends Cubit<AuthState> {
     required Function() onSuccess,
     required Function(String err) onError,
   }) async {
-    final emailVal = email.trim().toLowerCase();
-    if (_isEmailFrozen(emailVal)) {
-      const msg = 'Registration disabled. Try again later';
+    if (otp.length != 6) {
+      const msg = 'Please enter all 6 digits';
       _otpErrorController.add(msg);
       onError(msg);
-      return;
-    }
-
-    if (otp.length != 6) {
-      onError('Please enter complete 6 digit OTP');
       return;
     }
 
@@ -459,31 +502,32 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         emit(AuthOtpSent(token: token, email: email));
-        _incrementOtpFail(emailVal);
+        final key = email.trim().toLowerCase();
+        _otpFailCounts[key] = (_otpFailCounts[key] ?? 0) + 1;
+        final used = _otpFailCounts[key] ?? 1;
+        final remaining = (_maxOtpAttempts - used).clamp(0, _maxOtpAttempts);
 
-        final remaining = maxForgotOtpAttempts - (_otpFailCounts[emailVal] ?? 0);
-        String attemptsMessage;
-        
-        if (remaining > 0) {
-          final errorMsg = _mapFailureToMessage(failure.message);
-          if (errorMsg.contains('expired')) {
-            attemptsMessage = '$errorMsg ($remaining attempts left)';
-          } else {
-            attemptsMessage = 'Incorrect code. ($remaining attempts left)';
-          }
-        } else {
-          attemptsMessage = 'Registration disabled. Try again in 5:00';
-          _isOtpLocked = true;
-          _isOtpLockedController.add(true);
-          _startFreezeTimer(emailVal);
-        }
+        final errorMsg = _mapFailureToMessage(failure.message);
+        final attemptsMessage = remaining > 0
+            ? '$errorMsg ($remaining ${remaining == 1 ? 'attempt' : 'attempts'} left)'
+            : errorMsg;
 
         _otpErrorController.add(attemptsMessage);
         onError(attemptsMessage);
       },
       (_) {
-        _resetOtpFail(emailVal);
-        emit(AuthOtpVerified());
+        _otpFailCounts.remove(email.trim().toLowerCase());
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        if (currentUser != null) {
+          final user = UserEntity(
+            id: currentUser.id,
+            email: currentUser.email ?? email,
+            displayName: currentUser.userMetadata?['username'] ?? email.split('@')[0],
+          );
+          emit(AuthAuthenticated(user));
+        } else {
+          emit(AuthOtpVerified());
+        }
         stopRegistrationResendTimer();
         onSuccess();
       },
@@ -496,10 +540,8 @@ class AuthCubit extends Cubit<AuthState> {
     required Function() onSuccess,
     required Function(String err) onError,
   }) async {
-    final emailVal = email.trim().toLowerCase();
-    _resetOtpFail(emailVal);
-    _isOtpLocked = false;
-    _isOtpLockedController.add(false);
+    // Reset attempt count on resend — fresh code, fresh slate
+    _otpFailCounts.remove(email.trim().toLowerCase());
 
     emit(AuthLoading());
     final result = await _authRepository.resendRegistrationOTP(
@@ -522,14 +564,8 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  Future<void> requestForgotPassword({required Function() onSuccess}) async {
+  Future<void> requestForgotPassword({required Function(String token) onSuccess}) async {
     if (!validateEmail()) return;
-
-    final emailVal = _email.trim().toLowerCase();
-    if (_isEmailFrozen(emailVal)) {
-      emit(AuthError('Too many failed attempts. Forgot password is temporarily disabled for this email.'));
-      return;
-    }
 
     emit(AuthLoading());
     final result = await _authRepository.requestForgotPassword(_email);
@@ -537,11 +573,17 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        emit(AuthError(userFriendlyMessage));
+        if (userFriendlyMessage.contains('not registered') || 
+            userFriendlyMessage.contains('sign up')) {
+          _emailErrorController.add(userFriendlyMessage);
+          emit(AuthInitial());
+        } else {
+          emit(AuthError(userFriendlyMessage));
+        }
       },
       (token) {
         emit(AuthForgotPasswordOtpSent(token: token, email: _email));
-        onSuccess();
+        onSuccess(token);
         startForgotResendTimer();
       },
     );
@@ -549,21 +591,14 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> verifyForgotPassword({
     required String code,
-    required Function() onSuccess,
+    required Function(String resetToken) onSuccess,
     required Function(String err) onError,
     required String token,
   }) async {
-    final emailVal = _email.trim().toLowerCase();
-    if (_isEmailFrozen(emailVal)) {
-      const msg = 'Too many failed attempts. Try again later.';
-      _passwordErrorController.add(msg);
-      onError(msg);
-      return;
-    }
-
     if (code.length != 6) {
-      _passwordErrorController.add('Please enter a valid 6-digit OTP');
-      onError('Please enter a valid 6-digit OTP');
+      const msg = 'Please enter all 6 digits';
+      _otpErrorController.add(msg);
+      onError(msg);
       return;
     }
 
@@ -577,33 +612,24 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         emit(AuthForgotPasswordOtpSent(token: token, email: _email));
-        _incrementOtpFail(emailVal);
+        final key = _email.trim().toLowerCase();
+        _otpFailCounts[key] = (_otpFailCounts[key] ?? 0) + 1;
+        final used = _otpFailCounts[key] ?? 1;
+        final remaining = (_maxOtpAttempts - used).clamp(0, _maxOtpAttempts);
 
-        final remaining = maxForgotOtpAttempts - (_otpFailCounts[emailVal] ?? 0);
-        String attemptsMessage;
-        
-        if (remaining > 0) {
-          final errorMsg = _mapFailureToMessage(failure.message);
-          if (errorMsg.contains('expired')) {
-            attemptsMessage = '$errorMsg ($remaining attempts left)';
-          } else {
-            attemptsMessage = 'Incorrect code. ($remaining attempts left)';
-          }
-        } else {
-          attemptsMessage = 'Too many failed attempts. Please try again later.';
-          _isOtpLocked = true;
-          _isOtpLockedController.add(true);
-          _startFreezeTimer(emailVal);
-        }
+        final errorMsg = _mapFailureToMessage(failure.message);
+        final attemptsMessage = remaining > 0
+            ? '$errorMsg ($remaining ${remaining == 1 ? 'attempt' : 'attempts'} left)'
+            : errorMsg;
 
-        _passwordErrorController.add(attemptsMessage);
+        _otpErrorController.add(attemptsMessage);
         onError(attemptsMessage);
       },
       (resetToken) {
-        _resetOtpFail(emailVal);
+        _otpFailCounts.remove(_email.trim().toLowerCase());
         emit(AuthForgotPasswordOtpVerified(token: resetToken, email: _email));
         stopForgotResendTimer();
-        onSuccess();
+        onSuccess(resetToken);
       },
     );
   }
@@ -613,13 +639,8 @@ class AuthCubit extends Cubit<AuthState> {
     required Function(String err) onError,
     required String currentToken,
   }) async {
-    final emailVal = _email.trim().toLowerCase();
-    if (_isEmailFrozen(emailVal)) {
-      const msg = 'Forgot password is temporarily disabled for this email.';
-      _emailErrorController.add(msg);
-      onError(msg);
-      return;
-    }
+    // Reset attempt count on resend — fresh code, fresh slate
+    _otpFailCounts.remove(_email.trim().toLowerCase());
 
     emit(AuthLoading());
     final result = await _authRepository.resendForgotPasswordOTP(
@@ -631,7 +652,7 @@ class AuthCubit extends Cubit<AuthState> {
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
         emit(AuthForgotPasswordOtpSent(token: currentToken, email: _email));
-        _passwordErrorController.add(userFriendlyMessage);
+        _otpErrorController.add(userFriendlyMessage);
         onError(userFriendlyMessage);
       },
       (newToken) {
@@ -646,7 +667,7 @@ class AuthCubit extends Cubit<AuthState> {
     required String resetToken,
     required Function() onSuccess,
   }) async {
-    if (!validatePassword() || !validateConfirmPassword()) return;
+    if (!validatePassword()) return;
 
     emit(AuthLoading());
     final result = await _authRepository.resetPassword(
@@ -657,7 +678,8 @@ class AuthCubit extends Cubit<AuthState> {
     result.fold(
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        emit(AuthError(userFriendlyMessage));
+        _passwordErrorController.add(userFriendlyMessage);
+        emit(AuthInitial());
       },
       (_) {
         emit(AuthPasswordResetSuccess());
@@ -672,7 +694,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authRepository.signInWithGoogle();
 
     result.fold(
-      (failure) => emit(AuthError(failure.message)),
+      (failure) => emit(AuthError(_mapFailureToMessage(failure.message))),
       (user) {
         emit(AuthAuthenticated(user));
         onSuccess();
@@ -720,98 +742,21 @@ class AuthCubit extends Cubit<AuthState> {
     _password = '';
     _email = '';
     _usernameSignup = '';
-    _confirmPassword = '';
     _usernameLoginController.add('');
     _passwordController.add('');
     _emailController.add('');
     _usernameSignupController.add('');
-    _confirmPasswordController.add('');
     _isUsernameAvailableController.add(null);
     clearErrorsOnly();
     emit(AuthInitial());
   }
 
-  // Failure tracking helpers matching AuthViewModel.kt
-  bool _isEmailFrozen(String email) {
-    final key = email.toLowerCase();
-    if (!_frozenEmails.contains(key)) return false;
-
-    final freezeTime = _freezeTimestamps[key];
-    if (freezeTime == null) return false;
-
-    final elapsed = DateTime.now().difference(freezeTime).inSeconds;
-    if (elapsed >= freezeDurationSeconds) {
-      _frozenEmails.remove(key);
-      _freezeTimestamps.remove(key);
-      _otpFailCounts.remove(key);
-      _updateFreezeState();
-      return false;
-    }
-    return true;
-  }
-
-  void _incrementOtpFail(String email) {
-    final key = email.toLowerCase();
-    _otpFailCounts[key] = (_otpFailCounts[key] ?? 0) + 1;
-
-    if ((_otpFailCounts[key] ?? 0) >= maxForgotOtpAttempts) {
-      _frozenEmails.add(key);
-      _freezeTimestamps[key] = DateTime.now();
-      _isOtpLocked = true;
-      _isOtpLockedController.add(true);
-      _startFreezeTimer(key);
-    }
-    _updateFreezeState();
-  }
-
-  void _resetOtpFail(String email) {
-    final key = email.toLowerCase();
-    _otpFailCounts.remove(key);
-    _frozenEmails.remove(key);
-    _freezeTimestamps.remove(key);
-    _isOtpLocked = false;
-    _isOtpLockedController.add(false);
-    _freezeTimer?.cancel();
-    _updateFreezeState();
-  }
-
-  void _updateFreezeState() {
-    final emailVal = _email.trim().toLowerCase();
-    _isOtpLocked = _isEmailFrozen(emailVal);
-    _isOtpLockedController.add(_isOtpLocked);
-  }
-
-  void _startFreezeTimer(String email) {
-    _freezeTimer?.cancel();
-    _freezeTimeRemaining = freezeDurationSeconds;
-    _freezeTimeRemainingController.add(_freezeTimeRemaining);
-
-    _freezeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final key = email.toLowerCase();
-      if (_isEmailFrozen(key)) {
-        final freezeTime = _freezeTimestamps[key];
-        if (freezeTime != null) {
-          final elapsed = DateTime.now().difference(freezeTime).inSeconds;
-          final remaining = (freezeDurationSeconds - elapsed).clamp(0, freezeDurationSeconds);
-          _freezeTimeRemaining = remaining;
-          _freezeTimeRemainingController.add(remaining);
-
-          if (remaining <= 0) {
-            _resetOtpFail(key);
-            timer.cancel();
-          }
-        }
-      } else {
-        _resetOtpFail(key);
-        timer.cancel();
-      }
-    });
-  }
+  // No client-side freeze helpers — Supabase enforces server-side rate limits.
 
   // Timer Management helpers
   void startRegistrationResendTimer() {
     _registrationTimer?.cancel();
-    _registrationResendSecs = 30;
+    _registrationResendSecs = 60;
     _registrationOtpResendTimerController.add(_registrationResendSecs);
 
     _registrationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -830,7 +775,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   void startForgotResendTimer() {
     _forgotTimer?.cancel();
-    _forgotResendSecs = 30;
+    _forgotResendSecs = 60;
     _forgotOtpResendTimerController.add(_forgotResendSecs);
 
     _forgotTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -853,22 +798,17 @@ class AuthCubit extends Cubit<AuthState> {
     _passwordController.close();
     _emailController.close();
     _usernameSignupController.close();
-    _confirmPasswordController.close();
     _usernameErrorLoginController.close();
     _passwordErrorController.close();
     _emailErrorController.close();
     _usernameErrorSignupController.close();
-    _confirmPasswordErrorController.close();
     _otpErrorController.close();
     _isCheckingUsernameController.close();
     _isUsernameAvailableController.close();
     _registrationOtpResendTimerController.close();
     _forgotOtpResendTimerController.close();
-    _isOtpLockedController.close();
-    _freezeTimeRemainingController.close();
     _registrationTimer?.cancel();
     _forgotTimer?.cancel();
-    _freezeTimer?.cancel();
     _debounceTimer?.cancel();
     return super.close();
   }
