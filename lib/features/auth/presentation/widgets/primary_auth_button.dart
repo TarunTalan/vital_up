@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
 /// Primary CTA button — cyan background, dark text (Figma: #19C3E0 bg, #0C0C0C text).
@@ -12,6 +13,7 @@ class PrimaryAuthButton extends StatelessWidget {
   final Color? containerColor;
   final Color? contentColor;
   final Color? borderColor;
+  final bool showRightArrow;
 
   const PrimaryAuthButton({
     super.key,
@@ -22,6 +24,7 @@ class PrimaryAuthButton extends StatelessWidget {
     this.containerColor,
     this.contentColor,
     this.borderColor,
+    this.showRightArrow = false,
   });
 
   @override
@@ -53,6 +56,7 @@ class PrimaryAuthButton extends StatelessWidget {
               foregroundColor: fgColor,
               disabledBackgroundColor: bgColor, // never triggered but kept as safety
               elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
                 side: BorderSide(
@@ -70,11 +74,26 @@ class PrimaryAuthButton extends StatelessWidget {
                       valueColor: AlwaysStoppedAnimation<Color>(fgColor),
                     ),
                   )
-                : Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: fgColor,
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: fgColor,
+                            ),
+                      ),
+                      if (showRightArrow) ...[
+                        const SizedBox(width: 8.0),
+                        SvgPicture.asset(
+                          'assets/icons/right_arrow.svg',
+                          width: 16,
+                          height: 16,
+                          colorFilter: ColorFilter.mode(fgColor, BlendMode.srcIn),
                         ),
+                      ],
+                    ],
                   ),
           ),
         ),
@@ -92,6 +111,9 @@ class SecondaryAuthButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
   final Color? disabledTextColor;
+  final Color? containerColor;
+  final Color? contentColor;
+  final Color? borderColor;
 
   const SecondaryAuthButton({
     super.key,
@@ -100,16 +122,20 @@ class SecondaryAuthButton extends StatelessWidget {
     this.isLoading = false,
     this.enabled = true,
     this.disabledTextColor,
+    this.containerColor,
+    this.contentColor,
+    this.borderColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final vColors = Theme.of(context).extension<VitalUpColors>();
 
-    final bgColor =
+    final bgColor = containerColor ??
         vColors?.secondaryButtonBg ?? AppTheme.lightCustomColors.secondaryButtonBg!;
-    final fgColor =
+    final fgColor = contentColor ??
         vColors?.secondaryButtonText ?? AppTheme.lightCustomColors.secondaryButtonText!;
+    final bdColor = borderColor ?? fgColor.withValues(alpha: 0.5);
 
     final canTap = enabled && !isLoading;
     // Disabled during countdown or loading: show at 0.5 opacity
@@ -128,8 +154,9 @@ class SecondaryAuthButton extends StatelessWidget {
               backgroundColor: bgColor,
               foregroundColor: fgColor,
               elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
               side: BorderSide(
-                color: fgColor.withValues(alpha: 0.5),
+                color: bdColor,
                 width: AppTheme.borderWidthDefault,
               ),
               shape: RoundedRectangleBorder(

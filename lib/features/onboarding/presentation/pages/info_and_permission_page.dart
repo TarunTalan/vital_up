@@ -2,6 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
 class InfoAndPermissionPage extends StatefulWidget {
@@ -28,20 +32,38 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
+    return BlocConsumer<OnboardingCubit, OnboardingData>(
+      listenWhen: (previous, current) => previous.status != current.status,
+      listener: (context, state) {
+        if (state.status == SubmissionStatus.success) {
+          context.go('/dashboard');
+        } else if (state.status == SubmissionStatus.error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.errorMessage ?? 'An error occurred')),
+          );
+        }
+      },
+      builder: (context, state) {
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Scaffold(
         extendBodyBehindAppBar: true,
         bottomNavigationBar: Padding(
           padding: const EdgeInsets.only(
             top: 16.0,
             bottom: OnboardingStyle.bottomBarPaddingBottom,
           ),
-          child: OnboardingBottomBar(
-            onSkip: widget.onSkip ?? () {},
-            nextLabel: "Done",
-            onNext: () {
-              widget.onNext?.call();
+          child: BlocBuilder<OnboardingCubit, OnboardingData>(
+            builder: (context, state) {
+              return OnboardingBottomBar(
+                onSkip: widget.onSkip ?? () {},
+                nextLabel: state.status == SubmissionStatus.submitting ? "Saving..." : "Done",
+                onNext: state.status == SubmissionStatus.submitting 
+                  ? () {} 
+                  : () {
+                      context.read<OnboardingCubit>().submitOnboardingDataToBackend();
+                    },
+              );
             },
           ),
         ),
@@ -140,6 +162,8 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
           ],
         ),
       ),
+    );
+    },
     );
   }
 

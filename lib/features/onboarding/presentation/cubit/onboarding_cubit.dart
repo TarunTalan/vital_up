@@ -1,11 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/onboarding_data.dart';
 import '../../data/datasources/onboarding_data_store.dart';
-
+import '../../domain/repositories/onboarding_repository.dart';
 class OnboardingCubit extends Cubit<OnboardingData> {
   final OnboardingDataStore _onboardingDataStore;
+  final OnboardingRepository _onboardingRepository;
 
-  OnboardingCubit(this._onboardingDataStore) : super(const OnboardingData()) {
+  OnboardingCubit(this._onboardingDataStore, this._onboardingRepository) : super(const OnboardingData()) {
     _loadSavedData();
   }
 
@@ -156,5 +157,24 @@ class OnboardingCubit extends Cubit<OnboardingData> {
   Future<void> clearData() async {
     emit(const OnboardingData());
     await _onboardingDataStore.clearOnboardingData();
+  }
+
+  Future<void> submitOnboardingDataToBackend() async {
+    emit(state.copyWith(status: SubmissionStatus.submitting, errorMessage: null));
+
+    final result = await _onboardingRepository.submitOnboardingData(state);
+
+    result.fold(
+      (failure) {
+        emit(state.copyWith(
+          status: SubmissionStatus.error,
+          errorMessage: failure.message,
+        ));
+      },
+      (_) async {
+        await completeOnboarding(); // Mark locally as completed
+        emit(state.copyWith(status: SubmissionStatus.success));
+      },
+    );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+enum SubmissionStatus { initial, submitting, success, error }
+
 class OnboardingData extends Equatable {
   final String fullName;
   final String dob;
@@ -19,6 +21,8 @@ class OnboardingData extends Equatable {
   final String activity;
   final String sleep;
   final String currentStep;
+  final SubmissionStatus status;
+  final String? errorMessage;
 
   const OnboardingData({
     this.fullName = "",
@@ -39,6 +43,8 @@ class OnboardingData extends Equatable {
     this.activity = "",
     this.sleep = "",
     this.currentStep = "loading",
+    this.status = SubmissionStatus.initial,
+    this.errorMessage,
   });
 
   OnboardingData copyWith({
@@ -60,6 +66,8 @@ class OnboardingData extends Equatable {
     String? activity,
     String? sleep,
     String? currentStep,
+    SubmissionStatus? status,
+    String? errorMessage,
   }) {
     return OnboardingData(
       fullName: fullName ?? this.fullName,
@@ -80,6 +88,8 @@ class OnboardingData extends Equatable {
       activity: activity ?? this.activity,
       sleep: sleep ?? this.sleep,
       currentStep: currentStep ?? this.currentStep,
+      status: status ?? this.status,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
@@ -103,5 +113,7 @@ class OnboardingData extends Equatable {
         activity,
         sleep,
         currentStep,
+        status,
+        errorMessage,
       ];
 }

@@ -15,6 +15,10 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/data/datasources/shared_preferences_onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
+import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
+import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -76,5 +80,11 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<OnboardingDataStore>(
     () => SharedPreferencesOnboardingDataStore(sl<SharedPreferences>()),
   );
-  sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>()));
+  sl.registerLazySingleton<OnboardingRemoteDataSource>(
+    () => OnboardingRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+  );
+  sl.registerLazySingleton<OnboardingRepository>(
+    () => OnboardingRepositoryImpl(remoteDataSource: sl<OnboardingRemoteDataSource>()),
+  );
+  sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
 }
