@@ -246,6 +246,9 @@ class OnboardingBottomBar extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onSkip();
                 },
+                containerColor: Colors.transparent,
+                borderColor: const Color.fromRGBO(216, 216, 216, 1),
+                contentColor: Theme.of(context).colorScheme.onSurface,
               ),
             )
           else
@@ -260,6 +263,7 @@ class OnboardingBottomBar extends StatelessWidget {
               },
               enabled: nextEnabled,
               isLoading: false,
+              showRightArrow: true,
             ),
           ),
         ],
