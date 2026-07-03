@@ -12,6 +12,9 @@ import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source_
 import 'package:vital_up/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
+import 'package:vital_up/features/onboarding/data/datasources/shared_preferences_onboarding_data_store.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -68,4 +71,10 @@ Future<void> initDependencies() async {
 
   // 7. Blocs / Cubits
   sl.registerFactory(() => AuthCubit(authRepository: sl<AuthRepository>()));
+  
+  // 8. Onboarding
+  sl.registerLazySingleton<OnboardingDataStore>(
+    () => SharedPreferencesOnboardingDataStore(sl<SharedPreferences>()),
+  );
+  sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>()));
 }

@@ -6,6 +6,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/config/supabase_config.dart';
@@ -42,8 +43,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => sl<AuthCubit>()..checkSession(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
+        BlocProvider(create: (context) => sl<OnboardingCubit>()),
+      ],
       child: MaterialApp.router(
         title: 'VitalUp',
         debugShowCheckedModeBanner: false,

@@ -164,6 +164,11 @@ class _SplashPageState extends State<SplashPage>
   void _checkSessionAndNavigate() {
     if (!mounted || !_animationCompleted) return;
 
+    // FOR TESTING: Go straight to health onboarding
+    context.goNamed('health-onboarding');
+    return;
+
+    /*
     final state = context.read<AuthCubit>().state;
 
     // Do not navigate if database session check is still running
@@ -176,6 +181,7 @@ class _SplashPageState extends State<SplashPage>
     } else {
       context.goNamed('onboarding');
     }
+    */
   }
 
   @override
