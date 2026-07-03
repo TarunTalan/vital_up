@@ -33,6 +33,7 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final animationDuration = const Duration(milliseconds: 600);
 
     return PopScope(
       canPop: false,
@@ -44,86 +45,91 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
         backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
-          child: _showContent
-              ? Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 500),
-                    child: Column(
-                      children: [
-                        AuthHeader(
-                          headerText: 'Password Changed',
-                          onBackClick: () => context.goNamed('dashboard'),
-                        ),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return SingleChildScrollView(
-                                physics: const ClampingScrollPhysics(),
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    minHeight: constraints.maxHeight,
-                                  ),
-                                  child: IntrinsicHeight(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: AppTheme.hPadding,
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          const SizedBox(height: 20.0),
-                                          Text(
-                                            'Your password has been changed successfully.',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color: colors.onSurface,
-                                                ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          const SizedBox(height: 20.0),
-                                          const AnimatedTick(
-                                            play: false,
-                                            completed: true,
-                                            totalSize: 115,
-                                            tickSize: 55,
-                                          ),
-                                          const Spacer(),
-                                          PrimaryAuthButton(
-                                            label: 'Go to Dashboard',
-                                            isLoading: false,
-                                            onTap: () {
-                                              context.goNamed('dashboard');
-                                            },
-                                          ),
-                                          const SizedBox(height: 20.0),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Column(
+                children: [
+                  AnimatedOpacity(
+                    opacity: _showContent ? 1.0 : 0.0,
+                    duration: animationDuration,
+                    child: AuthHeader(
+                      headerText: 'Password Changed',
+                      onBackClick: () => context.goNamed('dashboard'),
                     ),
                   ),
-                )
-              : Center(
-                  child: AnimatedTick(
-                    play: _playAnimation,
-                    totalSize: 115,
-                    tickSize: 55,
-                    onFinished: () {
-                      if (mounted) {
-                        setState(() {
-                          _showContent = true;
-                        });
-                      }
-                    },
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppTheme.hPadding,
+                                ),
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 20.0),
+                                    AnimatedOpacity(
+                                      opacity: _showContent ? 1.0 : 0.0,
+                                      duration: animationDuration,
+                                      child: Text(
+                                        'Your password has been changed successfully.',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: colors.onSurface,
+                                            ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                    // The tick is always rendered in its final spot
+                                    AnimatedTick(
+                                      play: _playAnimation,
+                                      completed: _showContent,
+                                      totalSize: 115,
+                                      tickSize: 55,
+                                      onFinished: () {
+                                        if (mounted) {
+                                          setState(() {
+                                            _showContent = true;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                    const Spacer(),
+                                    AnimatedOpacity(
+                                      opacity: _showContent ? 1.0 : 0.0,
+                                      duration: animationDuration,
+                                      child: PrimaryAuthButton(
+                                        label: 'Go to Dashboard',
+                                        isLoading: false,
+                                        onTap: () {
+                                          context.goNamed('dashboard');
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20.0),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
