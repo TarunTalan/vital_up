@@ -486,6 +486,28 @@ class AppTheme {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.windows: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.linux: FadeSlidePageTransitionsBuilder(),
+        },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1C1C1C),
+        elevation: 4.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 13.0,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 
@@ -529,6 +551,95 @@ class AppTheme {
         elevation: 0,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.windows: FadeSlidePageTransitionsBuilder(),
+          TargetPlatform.linux: FadeSlidePageTransitionsBuilder(),
+        },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1C1C1C),
+        elevation: 4.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 13.0,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class FadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
+  const FadeSlidePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // Subtle entry slide from right to left
+    final slideIn = Tween<Offset>(
+      begin: const Offset(0.12, 0.0), // Subtle movement for premium look
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+
+    // Primary fade in
+    final fadeIn = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    ));
+
+    // Subtle exit slide to the left when another screen is pushed
+    final slideOut = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(-0.06, 0.0), // Parallax effect
+    ).animate(CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+
+    // Fade out when covered
+    final fadeOut = Tween<double>(
+      begin: 1.0,
+      end: 0.6,
+    ).animate(CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    ));
+
+    return SlideTransition(
+      position: slideIn,
+      child: FadeTransition(
+        opacity: fadeIn,
+        child: SlideTransition(
+          position: slideOut,
+          child: FadeTransition(
+            opacity: fadeOut,
+            child: child,
+          ),
+        ),
       ),
     );
   }
