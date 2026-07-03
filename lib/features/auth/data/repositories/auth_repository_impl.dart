@@ -85,6 +85,25 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       if (response.status == 200) {
+        final session = Supabase.instance.client.auth.currentSession;
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        
+        if (session != null && currentUser != null) {
+          await _localDataSource.saveAccessToken(session.accessToken);
+          await _localDataSource.saveRefreshToken(session.refreshToken ?? '');
+          
+          final user = UserEntity(
+            id: currentUser.id,
+            email: currentUser.email ?? email,
+            displayName: currentUser.userMetadata?['username'] ?? email.split('@')[0],
+          );
+          
+          await _localDataSource.saveUser(jsonEncode({
+            'id': user.id,
+            'email': user.email,
+            'displayName': user.displayName,
+          }));
+        }
         return const Right(null);
       } else {
         return Left(ServerFailure(response.message));
@@ -230,6 +249,11 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       // 2. Perform native device sign-in
+      // Clear previous cached session first to force the Google Account Chooser dialog
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+      
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         return Left(ServerFailure('Google sign-in cancelled by user'));

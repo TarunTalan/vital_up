@@ -68,6 +68,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<RegistrationResponse> register(RegistrationRequest request) async {
     try {
+      // 1. Check if the email is already registered in profiles
+      final existingEmail = await _supabaseClient
+          .from('profiles')
+          .select('email')
+          .eq('email', request.email.trim())
+          .maybeSingle();
+
+      if (existingEmail != null) {
+        throw const AuthException('This email is already registered.');
+      }
+
+      // 2. Check if the username is already taken (extra safety guard)
+      final existingUsername = await _supabaseClient
+          .from('profiles')
+          .select('username')
+          .eq('username', request.username.trim())
+          .maybeSingle();
+
+      if (existingUsername != null) {
+        throw const AuthException('Username is already taken.');
+      }
+
       await _supabaseClient.auth.signUp(
         email: request.email,
         password: request.password,
@@ -88,11 +110,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<OTPValidationResponse> validateRegistration(ValidateRegistrationRequest request) async {
     try {
-      await _supabaseClient.auth.verifyOTP(
+      final authResponse = await _supabaseClient.auth.verifyOTP(
         type: OtpType.signup,
         token: request.otp,
         email: request.email,
       );
+
+      // After OTP confirmation the user is fully created in auth.users.
+      // Upsert their profile so the profiles table is always consistent
+      // (username uniqueness checks rely on this table).
+      final userId = authResponse.user?.id;
+      final username = authResponse.user?.userMetadata?['username'] as String?;
+      if (userId != null && username != null) {
+        await _supabaseClient.from('profiles').upsert({
+          'id': userId,
+          'username': username,
+          'email': request.email,
+        });
+      }
 
       return OTPValidationResponse(
         data: null,
@@ -150,6 +185,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) async {
     try {
+      // 1. Check if the email exists in profiles table
+      final profile = await _supabaseClient
+          .from('profiles')
+          .select('email')
+          .eq('email', request.email)
+          .maybeSingle();
+
+      if (profile == null) {
+        throw const AuthException('Email is not registered. Please sign up.');
+      }
+
+      // 2. Proceed with resetPasswordForEmail
       await _supabaseClient.auth.resetPasswordForEmail(request.email);
       
       return ForgotPasswordResponse(
