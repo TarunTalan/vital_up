@@ -23,21 +23,26 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  -- Insert into profiles based on auth.users metadata
-  INSERT INTO public.profiles (id, username, email)
-  VALUES (
-    NEW.id,
-    NEW.raw_user_meta_data->>'username',
-    NEW.email
-  );
+  -- Only insert/upsert into profiles if the email is confirmed!
+  IF NEW.email_confirmed_at IS NOT NULL AND NEW.raw_user_meta_data->>'username' IS NOT NULL THEN
+    INSERT INTO public.profiles (id, username, email)
+    VALUES (
+      NEW.id,
+      NEW.raw_user_meta_data->>'username',
+      NEW.email
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      username = EXCLUDED.username,
+      email = EXCLUDED.email;
+  END IF;
   RETURN NEW;
 END;
 $$;
 
--- 5. Attach the Trigger to auth.users
+-- 5. Attach the Trigger to auth.users (fires on both insert and updates to catch confirmation)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
+  AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- 6. RPC Function to look up email by username (used for Username Login!)
