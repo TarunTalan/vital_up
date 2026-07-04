@@ -10,21 +10,21 @@ abstract class Failure extends Equatable {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure([String message = 'A server error occurred. Please try again later.']) : super(message);
+  const ServerFailure([super.message = 'A server error occurred. Please try again later.']);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([String message = 'Failed to load local data.']) : super(message);
+  const CacheFailure([super.message = 'Failed to load local data.']);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([String message = 'No internet connection. Please check your network settings.']) : super(message);
+  const NetworkFailure([super.message = 'No internet connection. Please check your network settings.']);
 }
 
 class DatabaseFailure extends Failure {
-  const DatabaseFailure([String message = 'Local database operation failed.']) : super(message);
+  const DatabaseFailure([super.message = 'Local database operation failed.']);
 }
 
 class ValidationFailure extends Failure {
-  const ValidationFailure([String message = 'Invalid input details provided.']) : super(message);
+  const ValidationFailure([super.message = 'Invalid input details provided.']);
 }
