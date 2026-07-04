@@ -65,6 +65,8 @@ dependencies:
   google_fonts: ^8.1.0
   flutter_svg: ^2.0.10+1
   google_sign_in: ^6.2.1
+  geolocator: ^13.0.2
+  pedometer: ^4.0.2
 
 dev_dependencies:
   flutter_test:
