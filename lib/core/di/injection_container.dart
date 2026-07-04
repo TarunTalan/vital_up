@@ -20,6 +20,13 @@ import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_
 import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/location_tracking_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/step_counter_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/location_tracking_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/step_counter_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
+import 'package:vital_up/features/activity_tracking/presentation/cubit/activity_tracking_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -87,4 +94,24 @@ Future<void> initDependencies() async {
     () => OnboardingRepositoryImpl(remoteDataSource: sl<OnboardingRemoteDataSource>()),
   );
   sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
+
+  // 9. Activity tracking
+  sl.registerLazySingleton<LocationTrackingRepository>(
+    () => LocationTrackingRepositoryImpl(),
+  );
+  sl.registerLazySingleton<StepCounterRepository>(
+    () => StepCounterRepositoryImpl(),
+  );
+  sl.registerLazySingleton(
+    () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetLiveStepsStream(sl<StepCounterRepository>()),
+  );
+  sl.registerFactory(
+    () => ActivityTrackingCubit(
+      getLiveLocationStream: sl<GetLiveLocationStream>(),
+      getLiveStepsStream: sl<GetLiveStepsStream>(),
+    ),
+  );
 }

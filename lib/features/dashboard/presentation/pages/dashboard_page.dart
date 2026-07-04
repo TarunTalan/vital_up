@@ -6,7 +6,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+// import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -58,13 +58,13 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
       0 => const _HomeTab(),
-      1 => FoodScannerPage(
-          onBack: () => setState(() => _selectedIndex = 0),
-          onNavigateToDetail: (imagePath) => context.pushNamed(
-            'food-detail',
-            extra: imagePath,
-          ),
-        ),
+      // 1 => FoodScannerPage(
+      //     onBack: () => setState(() => _selectedIndex = 0),
+      //     onNavigateToDetail: (imagePath) => context.pushNamed(
+      //       'food-detail',
+      //       extra: imagePath,
+      //     ),
+      //   ),
       2 => const _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',
@@ -177,24 +177,25 @@ class _HomeTab extends StatelessWidget {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
-                  children: const [
-                    _MetricChip(
+                  children: [
+                    const _MetricChip(
                       label: 'Steps',
                       iconAsset: 'assets/icons/active.svg',
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Water',
                       iconAsset: 'assets/icons/drop.svg',
                     ),
                     _MetricChip(
                       label: 'Workout',
                       iconAsset: 'assets/icons/moderate.svg',
+                      onTap: () => context.pushNamed('activity-tracking'),
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Mood',
                       iconAsset: 'assets/icons/smile.svg',
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Sleep',
                       iconAsset: 'assets/icons/sleep.svg',
                     ),
@@ -281,10 +282,12 @@ class _InsightCard extends StatelessWidget {
 class _MetricChip extends StatelessWidget {
   final String label;
   final String iconAsset;
+  final VoidCallback? onTap;
 
   const _MetricChip({
     required this.label,
     required this.iconAsset,
+    this.onTap,
   });
 
   @override
@@ -292,44 +295,49 @@ class _MetricChip extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 9),
-      padding: const EdgeInsets.symmetric(vertical: 17),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.74),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 9),
+        padding: const EdgeInsets.symmetric(vertical: 17),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.74),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: SvgPicture.asset(
-                iconAsset,
-                width: 22,
-                height: 22,
-                colorFilter: ColorFilter.mode(colors.primary, BlendMode.srcIn),
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  iconAsset,
+                  width: 22,
+                  height: 22,
+                  colorFilter:
+                      ColorFilter.mode(colors.primary, BlendMode.srcIn),
+                ),
               ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            label,
-            style: textTheme.labelMedium?.copyWith(
-              fontSize: 12,
-              color: const Color(0xFF111111),
+            const Spacer(),
+            Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(
+                fontSize: 12,
+                color: const Color(0xFF111111),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
