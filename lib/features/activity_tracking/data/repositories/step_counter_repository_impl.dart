@@ -9,6 +9,6 @@ class StepCounterRepositoryImpl implements StepCounterRepository {
     return Pedometer.stepCountStream.map((event) {
       baseline ??= event.steps;
       return event.steps - baseline!;
-    }).handleError((_) => 0);
+    }).handleError((_) {});
   }
 }

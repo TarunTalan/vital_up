@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:geolocator/geolocator.dart' hide ActivityType;
@@ -29,10 +30,31 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
     TrackPoint? lastAccepted;
     TrackPoint? lastSmoothed;
 
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 2,
-    );
+    final LocationSettings settings;
+    if (Platform.isIOS) {
+      settings = AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
+        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else if (Platform.isAndroid) {
+      settings = AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'VitalUp Active Workout',
+          notificationText: 'Tracking your workout in the background',
+          enableWakeLock: true,
+        ),
+      );
+    } else {
+      settings = const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
+      );
+    }
 
     return Geolocator.getPositionStream(locationSettings: settings)
         .map((position) => TrackPoint(
