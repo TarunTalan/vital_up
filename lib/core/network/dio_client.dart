@@ -1,19 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 
 class DioClient {
   final Dio _dio;
-  final FlutterSecureStorage _secureStorage;
   final Logger _logger;
 
   DioClient({
-    required Dio dio,
-    required FlutterSecureStorage secureStorage,
-    required Logger logger,
-  })  : _dio = dio,
-        _secureStorage = secureStorage,
-        _logger = logger {
+    required this._dio,
+    required this._logger,
+  }) {
     _setupInterceptors();
   }
 
@@ -21,8 +17,8 @@ class DioClient {
 
   void _setupInterceptors() {
     _dio.options = BaseOptions(
-      // Configure with local server IP or standard base endpoint
-      baseUrl: 'http://localhost:8080/api/v1', 
+      // Configure with vitalup dev backend endpoint
+      baseUrl: 'https://vitalup.dev/api/v1/', 
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {
@@ -34,8 +30,8 @@ class DioClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Read secure JWT token
-          final token = await _secureStorage.read(key: 'access_token');
+          // Read secure JWT token directly from Supabase session (it handles refreshing natively)
+          final token = Supabase.instance.client.auth.currentSession?.accessToken;
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -46,7 +42,7 @@ class DioClient {
           _logger.i('Response: [${response.statusCode}] ${response.requestOptions.path}');
           return handler.next(response);
         },
-        onError: (DioException error, handler) {
+        onError: (DioException error, handler) async {
           _logger.e('Error: [${error.response?.statusCode}] ${error.message}');
           return handler.next(error);
         },

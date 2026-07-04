@@ -1,5 +1,10 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vital_up/core/database/collections/user_profile_cache.dart';
+import 'package:vital_up/core/database/collections/step_log_cache.dart';
+import 'package:vital_up/core/database/collections/heart_rate_log_cache.dart';
+import 'package:vital_up/core/database/collections/sleep_log_cache.dart';
+import 'package:vital_up/core/database/collections/water_log_cache.dart';
 
 class IsarService {
   late final Isar isar;
@@ -7,11 +12,16 @@ class IsarService {
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
     
-    // We open Isar with schemas. Initially this list is empty. 
-    // As we add features (e.g. step logs, sleep history), we register their schemas here.
     isar = await Isar.open(
-      [],
+      [
+        UserProfileCacheSchema,
+        StepLogCacheSchema,
+        HeartRateLogCacheSchema,
+        SleepLogCacheSchema,
+        WaterLogCacheSchema,
+      ],
       directory: dir.path,
     );
   }
 }
+

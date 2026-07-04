@@ -5,6 +5,21 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_local_data_source_impl.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source_impl.dart';
+import 'package:vital_up/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
+import 'package:vital_up/features/onboarding/data/datasources/shared_preferences_onboarding_data_store.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
+import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
+import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -31,14 +46,45 @@ Future<void> initDependencies() async {
 
   // 4. Local Database (Isar)
   final isarService = IsarService();
-  await isarService.init();
+  try {
+    await isarService.init();
+  } catch (e) {
+    logger.e('Failed to initialize Isar database: $e');
+  }
   sl.registerLazySingleton<IsarService>(() => isarService);
 
   // 5. Network (Dio client)
   sl.registerLazySingleton<Dio>(() => Dio());
   sl.registerLazySingleton<DioClient>(() => DioClient(
         dio: sl<Dio>(),
-        secureStorage: sl<FlutterSecureStorage>(),
         logger: sl<Logger>(),
       ));
+
+  // 6. Auth Clean Architecture Layers
+  sl.registerLazySingleton<SupabaseClient>(() => Supabase.instance.client);
+  
+  sl.registerLazySingleton<AuthLocalDataSource>(
+    () => AuthLocalDataSourceImpl(secureStorage: sl<FlutterSecureStorage>()),
+  );
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+  );
+  sl.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(remoteDataSource: sl<AuthRemoteDataSource>(), localDataSource: sl<AuthLocalDataSource>()),
+  );
+
+  // 7. Blocs / Cubits
+  sl.registerFactory(() => AuthCubit(authRepository: sl<AuthRepository>()));
+  
+  // 8. Onboarding
+  sl.registerLazySingleton<OnboardingDataStore>(
+    () => SharedPreferencesOnboardingDataStore(sl<SharedPreferences>()),
+  );
+  sl.registerLazySingleton<OnboardingRemoteDataSource>(
+    () => OnboardingRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+  );
+  sl.registerLazySingleton<OnboardingRepository>(
+    () => OnboardingRepositoryImpl(remoteDataSource: sl<OnboardingRemoteDataSource>()),
+  );
+  sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
 }
