@@ -26,7 +26,18 @@ import 'package:vital_up/features/activity_tracking/domain/repositories/location
 import 'package:vital_up/features/activity_tracking/domain/repositories/step_counter_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
-import 'package:vital_up/features/activity_tracking/presentation/cubit/activity_tracking_cubit.dart';
+import 'package:vital_up/core/database/drift_database.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/activity_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/start_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/pause_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/resume_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_save_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_session_history.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_session_stream.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -95,23 +106,56 @@ Future<void> initDependencies() async {
   );
   sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
 
-  // 9. Activity tracking
+  // 9. Activity tracking (Drift DB and Repositories)
+  final driftDb = AppDatabase();
+  sl.registerLazySingleton<AppDatabase>(() => driftDb);
+
+  sl.registerLazySingleton<ActivityRepository>(
+    () => ActivityRepositoryImpl(sl<AppDatabase>()),
+  );
+  sl.registerLazySingleton<MapTileRepository>(
+    () => MapTileRepositoryImpl(),
+  );
+
   sl.registerLazySingleton<LocationTrackingRepository>(
     () => LocationTrackingRepositoryImpl(),
   );
   sl.registerLazySingleton<StepCounterRepository>(
     () => StepCounterRepositoryImpl(),
   );
+
+  // Use cases
   sl.registerLazySingleton(
     () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
   );
   sl.registerLazySingleton(
     () => GetLiveStepsStream(sl<StepCounterRepository>()),
   );
+  sl.registerLazySingleton(
+    () => StartTrackingSession(sl<LocationTrackingRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => PauseTrackingSession(),
+  );
+  sl.registerLazySingleton(
+    () => ResumeTrackingSession(),
+  );
+  sl.registerLazySingleton(
+    () => StopAndSaveSession(sl<ActivityRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSessionHistory(sl<ActivityRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
+  );
+
+  // Bloc
   sl.registerFactory(
-    () => ActivityTrackingCubit(
+    () => ActivityTrackingBloc(
       getLiveLocationStream: sl<GetLiveLocationStream>(),
       getLiveStepsStream: sl<GetLiveStepsStream>(),
+      stopAndSaveSession: sl<StopAndSaveSession>(),
     ),
   );
 }
