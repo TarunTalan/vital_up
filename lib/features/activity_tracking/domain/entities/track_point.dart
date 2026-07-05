@@ -4,6 +4,7 @@ class TrackPoint {
   final DateTime timestamp;
   final double accuracy;
   final double speed;
+  final double altitude;
 
   const TrackPoint({
     required this.latitude,
@@ -11,5 +12,6 @@ class TrackPoint {
     required this.timestamp,
     required this.accuracy,
     required this.speed,
+    required this.altitude,
   });
 }
