@@ -45,3 +45,5 @@ class UpdateSteps extends ActivityTrackingEvent {
 }
 
 class TickTimer extends ActivityTrackingEvent {}
+
+class ResetTracking extends ActivityTrackingEvent {}
