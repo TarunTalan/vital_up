@@ -6,6 +6,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
@@ -35,18 +36,25 @@ class _ActivityTrackingView extends StatefulWidget {
 
 class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   bool _isOfflineMapReady = false;
-  bool _isCheckingOfflineMap = true;
   bool _isDownloadingMap = false;
   double _mapDownloadProgress = 0.0;
+  bool _isUiVisible = true;
+  bool _isLocked = true;
 
   mbx.MapboxMap? _mapboxMap;
   mbx.PolylineAnnotationManager? _polylineAnnotationManager;
-  mbx.PointAnnotationManager? _pointAnnotationManager;
+  mbx.CircleAnnotationManager? _circleAnnotationManager;
+  mbx.CircleAnnotationManager? _startPointAnnotationManager;
+
+  TrackPoint? _currentPosition;
+  TrackPoint? _startPoint;
+  StreamSubscription<Position>? _positionSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkOfflineMap();
+    _startLocationUpdates();
   }
 
   Future<void> _checkOfflineMap() async {
@@ -55,9 +63,49 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     if (mounted) {
       setState(() {
         _isOfflineMapReady = exists;
-        _isCheckingOfflineMap = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startLocationUpdates() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission != LocationPermission.always &&
+        permission != LocationPermission.whileInUse) {
+      return;
+    }
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((position) {
+      if (mounted) {
+        final point = TrackPoint(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timestamp: position.timestamp,
+          accuracy: position.accuracy,
+          speed: position.speed.isFinite ? position.speed : 0,
+        );
+        setState(() {
+          _currentPosition = point;
+        });
+        _updatePuck(point);
+      }
+    });
   }
 
   Future<void> _downloadOfflineMap() async {
@@ -126,22 +174,99 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
+  void _showSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'SETTINGS',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _OfflineMapIcon(
+                  isReady: _isOfflineMapReady,
+                  isDownloading: _isDownloadingMap,
+                  progress: _mapDownloadProgress,
+                  onTap: () {},
+                ),
+                title: Text(
+                  _isOfflineMapReady
+                      ? 'Offline map ready'
+                      : _isDownloadingMap
+                      ? 'Downloading offline map…'
+                      : 'Download offline map',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: _isOfflineMapReady
+                    ? null
+                    : const Text('Keep tracking your route without signal'),
+                onTap: _isOfflineMapReady || _isDownloadingMap
+                    ? null
+                    : () {
+                  Navigator.of(sheetContext).pop();
+                  _downloadOfflineMap();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _onMapCreated(mbx.MapboxMap map) async {
     _mapboxMap = map;
-    
+
     // Set map style
     await map.loadStyleURI(mbx.MapboxStyles.MAPBOX_STREETS);
 
+    // Move compass to top right, at roughly 60% height of screen
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    await map.compass.updateSettings(mbx.CompassSettings(
+      position: mbx.OrnamentPosition.TOP_RIGHT,
+      marginTop: screenHeight * 0.6,
+      marginRight: 12,
+    ));
+
+    // Hide scale bar
+    await map.scaleBar.updateSettings(mbx.ScaleBarSettings(enabled: false));
+
     // Create annotation managers
     _polylineAnnotationManager = await map.annotations.createPolylineAnnotationManager();
-    _pointAnnotationManager = await map.annotations.createPointAnnotationManager();
+    _circleAnnotationManager = await map.annotations.createCircleAnnotationManager();
+    _startPointAnnotationManager = await map.annotations.createCircleAnnotationManager();
 
-    // Center camera on user's current location initially
+    // Center camera on user's current location initially with appropriate zoom
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-      _centerCamera(position.latitude, position.longitude);
+      _centerCamera(position.latitude, position.longitude, zoom: 16.0);
+
+      // Update initial position puck
+      final point = TrackPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        timestamp: position.timestamp,
+        accuracy: position.accuracy,
+        speed: position.speed.isFinite ? position.speed : 0,
+      );
+      setState(() {
+        _currentPosition = point;
+      });
+      _updatePuck(point);
     } catch (_) {}
   }
 
@@ -159,23 +284,48 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     ));
   }
 
-  void _updatePuck(TrackPoint? point) {
-    if (_pointAnnotationManager == null || point == null) return;
+  void _updateStartPoint(TrackPoint? point) {
+    if (_startPointAnnotationManager == null || point == null) return;
 
-    _pointAnnotationManager!.deleteAll();
+    _startPointAnnotationManager!.deleteAll();
 
-    _pointAnnotationManager!.create(mbx.PointAnnotationOptions(
+    _startPointAnnotationManager!.create(mbx.CircleAnnotationOptions(
       geometry: mbx.Point(coordinates: mbx.Position(point.longitude, point.latitude)),
-      iconColor: const Color(0xFF3BB5C8).toARGB32(),
-      iconSize: 1.5,
+      circleRadius: 10.0,
+      circleColor: const Color(0xFFFF5722).toARGB32(),
+      circleStrokeWidth: 3.0,
+      circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
     ));
   }
 
-  void _centerCamera(double lat, double lng) {
+  void _updatePuck(TrackPoint? point) {
+    if (_circleAnnotationManager == null || point == null) return;
+
+    _circleAnnotationManager!.deleteAll();
+
+    _circleAnnotationManager!.create(mbx.CircleAnnotationOptions(
+      geometry: mbx.Point(coordinates: mbx.Position(point.longitude, point.latitude)),
+      circleRadius: 8.0,
+      circleColor: const Color(0xFF3BB5C8).toARGB32(),
+      circleStrokeWidth: 2.0,
+      circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
+    ));
+  }
+
+  void _centerCamera(double lat, double lng, {double? zoom}) {
     _mapboxMap?.setCamera(mbx.CameraOptions(
       center: mbx.Point(coordinates: mbx.Position(lng, lat)),
-      zoom: 15.0,
+      zoom: zoom,
     ));
+  }
+
+  void _clearMapAnnotations() {
+    _polylineAnnotationManager?.deleteAll();
+    _circleAnnotationManager?.deleteAll();
+    _startPointAnnotationManager?.deleteAll();
+    setState(() {
+      _startPoint = null;
+    });
   }
 
   @override
@@ -187,21 +337,50 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             SnackBar(content: Text(state.message)),
           );
         } else if (state is TrackingInProgress) {
+          // Set start point on first track point
+          if (_startPoint == null && state.routePoints.isNotEmpty) {
+            setState(() {
+              _startPoint = state.routePoints.first;
+              _isLocked = true; // Lock when tracking actually begins
+            });
+            _updateStartPoint(state.routePoints.first);
+          }
           _updateRoute(state.routePoints);
           if (state.routePoints.isNotEmpty) {
             _updatePuck(state.routePoints.last);
-            _centerCamera(state.routePoints.last.latitude, state.routePoints.last.longitude);
           }
         } else if (state is TrackingPaused) {
+          // Stay unlocked or locked as per user preference
           _updateRoute(state.routePoints);
           if (state.routePoints.isNotEmpty) {
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingCompleted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Workout saved successfully!')),
+          final bloc = context.read<ActivityTrackingBloc>();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ActivityCompletionPage(
+                session: state.session,
+                onNewActivity: () {
+                  bloc.add(ResetTracking());
+                  Navigator.of(context).pop();
+                },
+                onBack: () {
+                  bloc.add(ResetTracking());
+                  Navigator.of(context).pop();
+                },
+                onViewHistory: () {
+                  bloc.add(ResetTracking());
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.pop();
+                },
+              ),
+            ),
           );
-          Navigator.of(context).pop();
+        } else if (state is TrackingIdle) {
+          // Clear map annotations when reset
+          _clearMapAnnotations();
         }
       },
       builder: (context, state) {
@@ -211,209 +390,169 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         double distanceMeters = 0.0;
         int calories = 0;
         int avgPace = 0;
-        int steps = 0;
-        bool stepCountReliable = true;
 
         if (state is TrackingInProgress) {
           elapsed = state.elapsed;
           distanceMeters = state.distanceMeters;
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
-          steps = state.steps;
-          stepCountReliable = state.stepCountReliable;
         } else if (state is TrackingPaused) {
           elapsed = state.elapsed;
           distanceMeters = state.distanceMeters;
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
-          steps = state.steps;
-          stepCountReliable = state.stepCountReliable;
+        } else if (state is TrackingCompleted) {
+          elapsed = Duration(seconds: state.session.totalDurationSeconds);
+          distanceMeters = state.session.totalDistanceMeters;
+          calories = state.session.calories;
+          avgPace = state.session.avgPaceSecondsPerKm;
         }
 
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
+        return PopScope(
+          canPop: state is TrackingIdle || state is TrackingCompleted,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Stop the activity to exit')),
+              );
+            }
+          },
+          child: Scaffold(
+            backgroundColor: Colors.white,
+            body: Stack(
               children: [
-                _TopStats(
-                  elapsed: elapsed,
-                  distanceMeters: distanceMeters,
-                  calories: calories,
-                  avgPace: avgPace,
-                  steps: steps,
-                  stepCountReliable: stepCountReliable,
-                  onBack: () => Navigator.of(context).pop(),
+                // Map fills the background
+                Positioned.fill(
+                  child: mbx.MapWidget(
+                    key: const ValueKey("mapWidget"),
+                    onMapCreated: _onMapCreated,
+                    onTapListener: (context) {
+                      if (mounted) {
+                        setState(() {
+                          _isUiVisible = !_isUiVisible;
+                        });
+                      }
+                    },
+                  ),
                 ),
-                Expanded(
-                  child: Stack(
+
+                // Back Button (only in Idle)
+                if (state is TrackingIdle)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: _RoundIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Top Stats Overlay
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: state is TrackingIdle ? 56 : 12,
+                      ),
+                      child: _TopStats(
+                        elapsed: elapsed,
+                        distanceMeters: distanceMeters,
+                        calories: calories,
+                        avgPace: avgPace,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Bottom controls and Zoom Reset Button
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Positioned.fill(
-                        child: mbx.MapWidget(
-                          key: const ValueKey("mapWidget"),
-                          onMapCreated: _onMapCreated,
+                      AnimatedOpacity(
+                        opacity: _isUiVisible ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: IgnorePointer(
+                          ignoring: !_isUiVisible,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12, bottom: 12),
+                            child: _ZoomResetButton(
+                              onPressed: () {
+                                if (_currentPosition != null) {
+                                  _centerCamera(
+                                    _currentPosition!.latitude,
+                                    _currentPosition!.longitude,
+                                    zoom: 16.0,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
                         ),
                       ),
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        top: 16,
-                        child: _OfflineMapStatus(
-                          isChecking: _isCheckingOfflineMap,
-                          isReady: _isOfflineMapReady,
-                          isDownloading: _isDownloadingMap,
-                          progress: _mapDownloadProgress,
-                          onDownload: _downloadOfflineMap,
-                        ),
-                      ),
-                      Positioned(
-                        left: 24,
-                        right: 24,
-                        bottom: 28,
-                        child: Column(
-                          children: [
-                            _ActivitySelector(
-                              selected: state.activityType,
-                              enabled: state is TrackingIdle,
-                              onSelected: (type) => bloc.add(SelectActivityType(type)),
+                      AnimatedOpacity(
+                        opacity: _isUiVisible ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: IgnorePointer(
+                          ignoring: !_isUiVisible,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (state is TrackingIdle) ...[
+                                  _ActivitySelector(
+                                    selected: state.activityType,
+                                    enabled: true,
+                                    onSelected: (type) => bloc.add(SelectActivityType(type)),
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
+                                _StartPauseControl(
+                                  state: state,
+                                  isLocked: _isLocked,
+                                  onLockToggle: (locked) {
+                                    setState(() {
+                                      _isLocked = locked;
+                                    });
+                                  },
+                                  onStart: () => bloc.add(StartTracking()),
+                                  onPause: () => bloc.add(PauseTracking()),
+                                  onResume: () => bloc.add(ResumeTracking()),
+                                  onStop: () => bloc.add(StopAndSaveTracking()),
+                                  onSettingsTap: () => _showSettingsSheet(),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            _StartPauseControl(
-                              state: state,
-                              onStart: () => bloc.add(StartTracking()),
-                              onPause: () => bloc.add(PauseTracking()),
-                              onResume: () => bloc.add(ResumeTracking()),
-                              onStop: () => bloc.add(StopAndSaveTracking()),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _OfflineMapStatus extends StatelessWidget {
-  final bool isChecking;
-  final bool isReady;
-  final bool isDownloading;
-  final double progress;
-  final VoidCallback onDownload;
-
-  const _OfflineMapStatus({
-    required this.isChecking,
-    required this.isReady,
-    required this.isDownloading,
-    required this.progress,
-    required this.onDownload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (isReady) {
-      return const _MapStatusPill(
-        icon: Icons.offline_pin_rounded,
-        label: 'Offline map ready',
-        color: Color(0xFF47B85A),
-      );
-    }
-
-    if (isChecking) {
-      return const _MapStatusPill(
-        icon: Icons.map_rounded,
-        label: 'Checking offline map',
-        color: Color(0xFF777777),
-      );
-    }
-
-    if (isDownloading) {
-      return _MapStatusPill(
-        icon: Icons.downloading_rounded,
-        label: 'Caching map ${((progress.clamp(0.0, 1.0)) * 100).toStringAsFixed(0)}%',
-        color: const Color(0xFF2BC7D8),
-      );
-    }
-
-    return Material(
-      color: Colors.white.withValues(alpha: 0.92),
-      elevation: 2,
-      child: InkWell(
-        onTap: onDownload,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.download_for_offline_rounded, size: 20, color: Colors.black),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Track now. Tap to cache map for offline use.',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }
-
-class _MapStatusPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _MapStatusPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          border: Border.all(color: const Color(0xFFE3E3E3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _TopStats extends StatelessWidget {
@@ -421,86 +560,73 @@ class _TopStats extends StatelessWidget {
   final double distanceMeters;
   final int calories;
   final int avgPace;
-  final int steps;
-  final bool stepCountReliable;
-  final VoidCallback onBack;
 
   const _TopStats({
     required this.elapsed,
     required this.distanceMeters,
     required this.calories,
     required this.avgPace,
-    required this.steps,
-    required this.stepCountReliable,
-    required this.onBack,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(22, 12, 22, 20),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_rounded, size: 30),
-              ),
-              const Spacer(),
-              const Text(
-                'VITALUP',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  fontSize: 18,
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.gps_fixed_rounded, color: Color(0xFF47B85A)),
-            ],
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(height: 18),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Text(
             _formatDuration(elapsed),
             style: const TextStyle(
-              fontSize: 58,
+              fontSize: 40,
               fontWeight: FontWeight.w900,
-              height: 0.95,
+              height: 1.0,
               color: Colors.black,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           const Text(
             'DURATION',
             style: TextStyle(
-              color: Color(0xFF777777),
-              fontSize: 15,
-              letterSpacing: 5,
-              fontWeight: FontWeight.w500,
+              color: Color(0xFF9A9A9A),
+              fontSize: 10,
+              letterSpacing: 2.5,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 28),
-          Wrap(
-            runSpacing: 18,
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _StatBlock(
-                value: (distanceMeters / 1000).toStringAsFixed(2),
-                label: 'DISTANCE (KM)',
+              Expanded(
+                child: _StatColumn(
+                  value: (distanceMeters / 1000).toStringAsFixed(2),
+                  label: 'DISTANCE (KM)',
+                ),
               ),
-              _StatBlock(
-                value: calories.toString(),
-                label: 'CALORIES (CAL)',
+              Expanded(
+                child: _StatColumn(
+                  value: calories.toString(),
+                  label: 'CALORIES (CAL)',
+                ),
               ),
-              _StatBlock(
-                value: _formatPace(avgPace),
-                label: 'AVG. PACE (MIN/KM)',
-              ),
-              _StatBlock(
-                value: steps.toString(),
-                label: stepCountReliable ? 'STEPS' : 'STEPS (EST.)',
-                reliable: stepCountReliable,
+              Expanded(
+                child: _StatColumn(
+                  value: _formatPace(avgPace),
+                  label: 'AVG. PACE (MIN/KM)',
+                ),
               ),
             ],
           ),
@@ -510,45 +636,75 @@ class _TopStats extends StatelessWidget {
   }
 }
 
-class _StatBlock extends StatelessWidget {
+class _StatColumn extends StatelessWidget {
   final String value;
   final String label;
-  final bool reliable;
 
-  const _StatBlock({
+  const _StatColumn({
     required this.value,
     required this.label,
-    this.reliable = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: MediaQuery.sizeOf(context).width / 2 - 22,
-      child: Column(
-        children: [
-          Text(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
             value,
             maxLines: 1,
-            style: TextStyle(
-              fontSize: 35,
+            style: const TextStyle(
+              fontSize: 22,
               fontWeight: FontWeight.w900,
-              color: reliable ? Colors.black : const Color(0xFF777777),
+              height: 1.0,
+              color: Colors.black,
             ),
           ),
-          const SizedBox(height: 5),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: reliable ? const Color(0xFF777777) : const Color(0xFF9A9A9A),
-              fontSize: 13,
-              letterSpacing: 2.4,
-              fontWeight: FontWeight.w500,
-            ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          label,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF9A9A9A),
+            fontSize: 9,
+            letterSpacing: 0.6,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _RoundIconButton({
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 4,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          child: Icon(icon, color: Colors.black, size: 18),
+        ),
       ),
     );
   }
@@ -575,26 +731,24 @@ class _ActivitySelector extends StatelessWidget {
           enabled: enabled,
           onTap: () => onSelected(ActivityType.walk),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         _ActivityButton(
           icon: Icons.directions_run_rounded,
           selected: selected == ActivityType.run,
           enabled: enabled,
           onTap: () => onSelected(ActivityType.run),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         _ActivityButton(
           icon: Icons.directions_bike_rounded,
           selected: selected == ActivityType.cycle,
           enabled: enabled,
           onTap: () => onSelected(ActivityType.cycle),
         ),
-        const SizedBox(width: 14),
-        _ActivityButton(
-          icon: Icons.more_horiz_rounded,
-          selected: false,
-          enabled: false,
-          onTap: () {},
+        const SizedBox(width: 8),
+        _MoreActivitiesButton(
+          enabled: enabled,
+          onSelected: onSelected,
         ),
       ],
     );
@@ -620,7 +774,7 @@ class _ActivityButton extends StatelessWidget {
       child: InkWell(
         onTap: enabled ? onTap : null,
         child: Container(
-          height: 58,
+          height: 52,
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
@@ -628,7 +782,76 @@ class _ActivityButton extends StatelessWidget {
               width: selected ? 2 : 1,
             ),
           ),
-          child: Icon(icon, size: 30, color: Colors.black),
+          child: Icon(icon, size: 22, color: Colors.black),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreActivitiesButton extends StatelessWidget {
+  final bool enabled;
+  final ValueChanged<ActivityType> onSelected;
+
+  const _MoreActivitiesButton({
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: enabled ? () {
+          // Show dialog with additional activity options
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('More Activities'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.directions_walk_rounded),
+                    title: const Text('Walking'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(ActivityType.walk);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.directions_run_rounded),
+                    title: const Text('Running'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(ActivityType.run);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.directions_bike_rounded),
+                    title: const Text('Cycling'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(ActivityType.cycle);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        } : null,
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(
+              color: const Color(0xFFE3E3E3),
+              width: 1,
+            ),
+          ),
+          child: const Center(
+            child: Icon(Icons.more_horiz_rounded, size: 22, color: Colors.black),
+          ),
         ),
       ),
     );
@@ -637,98 +860,468 @@ class _ActivityButton extends StatelessWidget {
 
 class _StartPauseControl extends StatelessWidget {
   final ActivityTrackingState state;
+  final bool isLocked;
+  final ValueChanged<bool> onLockToggle;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onStop;
+  final VoidCallback onSettingsTap;
 
   const _StartPauseControl({
     required this.state,
+    required this.isLocked,
+    required this.onLockToggle,
     required this.onStart,
     required this.onPause,
     required this.onResume,
     required this.onStop,
+    required this.onSettingsTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isIdle = state is TrackingIdle;
+    final isIdle = state is TrackingIdle || state is TrackingCompleted;
     final isInProgress = state is TrackingInProgress;
+
+    if (isIdle) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Music integration coming soon')),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.black, width: 1),
+                shape: const RoundedRectangleBorder(),
+                backgroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+              ),
+              child: const Icon(Icons.music_note_rounded, color: Colors.black, size: 20),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: onStart,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'START',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
+                        ),
+                        Text(
+                          state.activityType.label.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Icon(Icons.arrow_forward_rounded, size: 22),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: onSettingsTap,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.black, width: 1),
+                shape: const RoundedRectangleBorder(),
+                backgroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+              ),
+              child: const Icon(Icons.settings_rounded, color: Colors.black, size: 20),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (isLocked) {
+      return SlidingButton(
+        label: 'SLIDE TO UNLOCK',
+        onTriggered: () => onLockToggle(false),
+      );
+    }
 
     return Row(
       children: [
-        if (!isIdle) ...[
-          SizedBox(
-            width: 82,
-            height: 70,
-            child: OutlinedButton(
-              onPressed: onStop,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.black, width: 2),
-                shape: const RoundedRectangleBorder(),
-                backgroundColor: Colors.white,
-              ),
-              child: const Icon(Icons.stop_rounded, color: Colors.black, size: 32),
+        SizedBox(
+          width: 60,
+          height: 52,
+          child: OutlinedButton(
+            onPressed: onStop,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.black, width: 2),
+              shape: const RoundedRectangleBorder(),
+              backgroundColor: Colors.white,
             ),
+            child: const Icon(Icons.stop_rounded, color: Colors.black, size: 24),
           ),
-          const SizedBox(width: 14),
-        ],
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: SizedBox(
-            height: 70,
-            child: isIdle
+            height: 52,
+            child: isInProgress
                 ? FilledButton(
-                    onPressed: onStart,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: const RoundedRectangleBorder(),
+              onPressed: onPause,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.pause_rounded, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'PAUSE',
+                    style: TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w900,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'START ${state.activityType.label.toUpperCase()}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            letterSpacing: 2,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_rounded, size: 34),
-                      ],
+                  ),
+                ],
+              ),
+            )
+                : FilledButton(
+              onPressed: onResume,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'RESUME',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w900,
                     ),
-                  )
-                : isInProgress
-                    ? SlidingButton(
-                        label: 'SLIDE TO PAUSE',
-                        onTriggered: onPause,
-                      )
-                    : FilledButton(
-                        onPressed: onResume,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          shape: const RoundedRectangleBorder(),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'RESUME ${state.activityType.label.toUpperCase()}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                letterSpacing: 2,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const Icon(Icons.arrow_forward_rounded, size: 34),
-                          ],
-                        ),
-                      ),
+                  ),
+                  const Icon(Icons.arrow_forward_rounded, size: 24),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 52,
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => onLockToggle(true),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.black, width: 1),
+              shape: const RoundedRectangleBorder(),
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Icon(Icons.lock_rounded, color: Colors.black, size: 20),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Full screen shown after an activity is stopped and saved. Displays the
+/// finished session's stats with a back button in the top-left corner.
+class ActivityCompletionPage extends StatelessWidget {
+  final ActivitySession session;
+  final VoidCallback onBack;
+  final VoidCallback onNewActivity;
+  final VoidCallback onViewHistory;
+
+  const ActivityCompletionPage({
+    super.key,
+    required this.session,
+    required this.onBack,
+    required this.onNewActivity,
+    required this.onViewHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) onBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
+                child: _RoundIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  onPressed: onBack,
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                  child: _CompletionStats(
+                    elapsed: Duration(seconds: session.totalDurationSeconds),
+                    distanceMeters: session.totalDistanceMeters,
+                    calories: session.calories,
+                    avgPace: session.avgPaceSecondsPerKm,
+                    steps: session.steps,
+                    stepCountReliable: session.stepCountReliable,
+                    activityType: session.activityType,
+                    onNewActivity: onNewActivity,
+                    onViewHistory: onViewHistory,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompletionStats extends StatelessWidget {
+  final Duration elapsed;
+  final double distanceMeters;
+  final int calories;
+  final int avgPace;
+  final int steps;
+  final bool stepCountReliable;
+  final ActivityType activityType;
+  final VoidCallback onNewActivity;
+  final VoidCallback onViewHistory;
+
+  const _CompletionStats({
+    required this.elapsed,
+    required this.distanceMeters,
+    required this.calories,
+    required this.avgPace,
+    required this.steps,
+    required this.stepCountReliable,
+    required this.activityType,
+    required this.onNewActivity,
+    required this.onViewHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Text(
+                activityType.label.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF777777),
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                (distanceMeters / 1000).toStringAsFixed(2),
+                style: const TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                  height: 1.0,
+                ),
+              ),
+              const Text(
+                'KILOMETERS',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF777777),
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: _CompletionStatCard(
+                icon: Icons.access_time_rounded,
+                label: 'Duration',
+                value: _formatDuration(elapsed),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _CompletionStatCard(
+                icon: Icons.local_fire_department_rounded,
+                label: 'Calories',
+                value: '$calories',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _CompletionStatCard(
+                icon: Icons.speed_rounded,
+                label: 'Avg Pace',
+                value: _formatPace(avgPace),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _CompletionStatCard(
+                icon: Icons.directions_walk_rounded,
+                label: 'Steps',
+                value: '$steps',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onViewHistory,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.black, width: 2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'View History',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: onNewActivity,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'New Activity',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CompletionStatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _CompletionStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE3E3E3)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 24, color: const Color(0xFF2BC7D8)),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF777777),
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -755,10 +1348,10 @@ class _SlidingButtonState extends State<SlidingButton> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double maxDistance = constraints.maxWidth - 58 - 8;
+        final double maxDistance = constraints.maxWidth - 46 - 8;
 
         return Container(
-          height: 70,
+          height: 52,
           decoration: BoxDecoration(
             color: Colors.black,
             borderRadius: BorderRadius.circular(0),
@@ -772,8 +1365,8 @@ class _SlidingButtonState extends State<SlidingButton> {
                   widget.label,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
-                    letterSpacing: 2,
+                    fontSize: 12,
+                    letterSpacing: 1.5,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -810,8 +1403,8 @@ class _SlidingButtonState extends State<SlidingButton> {
                     }
                   },
                   child: Container(
-                    width: 58,
-                    height: 58,
+                    width: 46,
+                    height: 46,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.rectangle,
@@ -819,7 +1412,7 @@ class _SlidingButtonState extends State<SlidingButton> {
                     child: const Icon(
                       Icons.arrow_forward_rounded,
                       color: Colors.black,
-                      size: 28,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -844,4 +1437,77 @@ String _formatPace(int secondsPerKm) {
   final minutes = (secondsPerKm ~/ 60).toString().padLeft(2, '0');
   final seconds = (secondsPerKm % 60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
+}
+
+class _ZoomResetButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _ZoomResetButton({
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 4,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.my_location_rounded,
+            color: Colors.black,
+            size: 18,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineMapIcon extends StatelessWidget {
+  final bool isReady;
+  final bool isDownloading;
+  final double progress;
+  final VoidCallback onTap;
+
+  const _OfflineMapIcon({
+    required this.isReady,
+    required this.isDownloading,
+    required this.progress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    IconData icon;
+    Color color;
+
+    if (isReady) {
+      icon = Icons.offline_pin_rounded;
+      color = const Color(0xFF47B85A);
+    } else if (isDownloading) {
+      icon = Icons.downloading_rounded;
+      color = const Color(0xFF2BC7D8);
+    } else {
+      icon = Icons.download_for_offline_rounded;
+      color = const Color(0xFF777777);
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Icon(
+        icon,
+        color: color,
+        size: 24,
+      ),
+    );
+  }
 }
