@@ -73,6 +73,7 @@ class _ActivityTrackingView extends StatelessWidget {
                               onPause: cubit.pause,
                               onResume: cubit.resume,
                               onReset: cubit.reset,
+                              onToggleLock: cubit.toggleControlsLock,
                             ),
                           ],
                         ),
@@ -299,6 +300,7 @@ class _StartPauseControl extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onReset;
+  final VoidCallback onToggleLock;
 
   const _StartPauseControl({
     required this.state,
@@ -306,6 +308,7 @@ class _StartPauseControl extends StatelessWidget {
     required this.onPause,
     required this.onResume,
     required this.onReset,
+    required this.onToggleLock,
   });
 
   @override
@@ -313,76 +316,110 @@ class _StartPauseControl extends StatelessWidget {
     final isStarted = state.status == TrackingStatus.inProgress;
     final isPaused = state.status == TrackingStatus.paused;
     final isLoading = state.status == TrackingStatus.starting;
+    final isIdle = state.status == TrackingStatus.idle || state.status == TrackingStatus.completed;
 
-    return Row(
-      children: [
-        SizedBox(
-          width: 82,
-          height: 70,
-          child: OutlinedButton(
-            onPressed: onReset,
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 2),
-              shape: const RoundedRectangleBorder(),
-              backgroundColor: Colors.white,
-            ),
-            child: const Icon(Icons.library_music_outlined, color: Colors.black),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: SizedBox(
-            height: 70,
-            child: FilledButton(
-              onPressed: isLoading
-                  ? null
-                  : isStarted
-                      ? onPause
-                      : isPaused
-                          ? onResume
-                          : onStart,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.black,
-                shape: const RoundedRectangleBorder(),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
+    if (isIdle) {
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 70,
+              child: FilledButton(
+                onPressed: isLoading ? null : onStart,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.black,
+                  shape: const RoundedRectangleBorder(),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
                       isLoading
                           ? 'STARTING'
-                          : isStarted
-                              ? 'SLIDE TO PAUSE'
-                              : isPaused
-                                  ? 'RESUME ${state.activityType.label.toUpperCase()}'
-                                  : 'START ${state.activityType.label.toUpperCase()}',
+                          : 'START ${state.activityType.label.toUpperCase()}',
                       style: const TextStyle(
                         fontSize: 16,
                         letterSpacing: 2,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                  ),
-                  const Icon(Icons.arrow_forward_rounded, size: 34),
-                ],
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_rounded, size: 34),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 70,
+            child: FilledButton(
+              onPressed: state.controlsLocked ? null : () {},
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+              ),
+              child: const Text(
+                'FINISH',
+                style: TextStyle(
+                  fontSize: 16,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         SizedBox(
-          width: 82,
+          width: 70,
           height: 70,
           child: OutlinedButton(
-            onPressed: () {},
+            onPressed: onToggleLock,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 2),
+              side: BorderSide(
+                color: state.controlsLocked ? Colors.black : const Color(0xFFE3E3E3),
+                width: 2,
+              ),
               shape: const RoundedRectangleBorder(),
               backgroundColor: Colors.white,
             ),
-            child: const Icon(Icons.settings_outlined, color: Colors.black),
+            child: Icon(
+              state.controlsLocked ? Icons.lock : Icons.lock_open,
+              color: Colors.black,
+              size: 28,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: 70,
+            child: FilledButton(
+              onPressed: state.controlsLocked ? null : (isStarted ? onPause : onResume),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(),
+              ),
+              child: Text(
+                isStarted ? 'PAUSE' : 'RESUME',
+                style: const TextStyle(
+                  fontSize: 16,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ),
         ),
       ],

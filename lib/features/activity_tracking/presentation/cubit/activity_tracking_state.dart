@@ -20,9 +20,11 @@ class ActivityTrackingState extends Equatable {
   final int calories;
   final int steps;
   final int avgPaceSecondsPerKm;
+  final int currentPaceSecondsPerKm;
   final double currentSpeedMetersPerSecond;
   final List<TrackPoint> routePoints;
   final String? message;
+  final bool controlsLocked;
 
   const ActivityTrackingState({
     required this.status,
@@ -32,9 +34,11 @@ class ActivityTrackingState extends Equatable {
     required this.calories,
     required this.steps,
     required this.avgPaceSecondsPerKm,
+    required this.currentPaceSecondsPerKm,
     required this.currentSpeedMetersPerSecond,
     required this.routePoints,
     this.message,
+    this.controlsLocked = false,
   });
 
   factory ActivityTrackingState.initial() {
@@ -46,8 +50,10 @@ class ActivityTrackingState extends Equatable {
       calories: 0,
       steps: 0,
       avgPaceSecondsPerKm: 0,
+      currentPaceSecondsPerKm: 0,
       currentSpeedMetersPerSecond: 0,
       routePoints: [],
+      controlsLocked: false,
     );
   }
 
@@ -59,9 +65,11 @@ class ActivityTrackingState extends Equatable {
     int? calories,
     int? steps,
     int? avgPaceSecondsPerKm,
+    int? currentPaceSecondsPerKm,
     double? currentSpeedMetersPerSecond,
     List<TrackPoint>? routePoints,
     String? message,
+    bool? controlsLocked,
   }) {
     return ActivityTrackingState(
       status: status ?? this.status,
@@ -71,10 +79,12 @@ class ActivityTrackingState extends Equatable {
       calories: calories ?? this.calories,
       steps: steps ?? this.steps,
       avgPaceSecondsPerKm: avgPaceSecondsPerKm ?? this.avgPaceSecondsPerKm,
+      currentPaceSecondsPerKm: currentPaceSecondsPerKm ?? this.currentPaceSecondsPerKm,
       currentSpeedMetersPerSecond:
           currentSpeedMetersPerSecond ?? this.currentSpeedMetersPerSecond,
       routePoints: routePoints ?? this.routePoints,
       message: message,
+      controlsLocked: controlsLocked ?? this.controlsLocked,
     );
   }
 
@@ -91,8 +101,10 @@ class ActivityTrackingState extends Equatable {
         calories,
         steps,
         avgPaceSecondsPerKm,
+        currentPaceSecondsPerKm,
         currentSpeedMetersPerSecond,
         routePoints,
         message,
+        controlsLocked,
       ];
 }
