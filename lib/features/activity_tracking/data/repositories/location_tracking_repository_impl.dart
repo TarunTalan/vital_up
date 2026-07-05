@@ -7,8 +7,8 @@ import 'package:vital_up/features/activity_tracking/domain/entities/track_point.
 import 'package:vital_up/features/activity_tracking/domain/repositories/location_tracking_repository.dart';
 
 class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
-  static const double maxAccuracyMeters = 20.0;
-  static const double smoothingWeight = 0.72;
+  static const double maxAccuracyMeters = 15.0;
+  static const double smoothingWeight = 0.6;
 
   @override
   Future<bool> ensurePermission() async {
@@ -41,6 +41,7 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
               timestamp: position.timestamp ?? DateTime.now(),
               accuracy: position.accuracy,
               speed: position.speed.isFinite ? position.speed : 0,
+              altitude: position.altitude.isFinite ? position.altitude : 0,
             ))
         .where((point) => point.accuracy <= maxAccuracyMeters)
         .map((point) {
@@ -55,6 +56,8 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
             point.latitude * (1 - smoothingWeight),
         longitude: previous.longitude * smoothingWeight +
             point.longitude * (1 - smoothingWeight),
+        altitude: previous.altitude * smoothingWeight +
+            point.altitude * (1 - smoothingWeight),
         timestamp: point.timestamp,
         accuracy: point.accuracy,
         speed: point.speed,
@@ -78,7 +81,7 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
         return false;
       }
 
-      if (distance < 1.5 && point.speed < 0.8) {
+      if (distance < 1.0 && point.speed < 0.5) {
         return false;
       }
 
@@ -97,7 +100,12 @@ double haversineMeters(TrackPoint a, TrackPoint b) {
 
   final h = sin(dLat / 2) * sin(dLat / 2) +
       cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2);
-  return earthRadiusMeters * 2 * atan2(sqrt(h), sqrt(1 - h));
+  final horizontalDistance = earthRadiusMeters * 2 * atan2(sqrt(h), sqrt(1 - h));
+  
+  // Add vertical distance (altitude change) for 3D distance
+  final verticalDistance = (b.altitude - a.altitude).abs();
+  
+  return sqrt(horizontalDistance * horizontalDistance + verticalDistance * verticalDistance);
 }
 
 double _degreesToRadians(double degrees) => degrees * pi / 180.0;
