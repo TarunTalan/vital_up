@@ -52,6 +52,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     on<UpdateTrackPoint>(_onUpdateTrackPoint);
     on<UpdateSteps>(_onUpdateSteps);
     on<TickTimer>(_onTickTimer);
+    on<ResetTracking>(_onResetTracking);
   }
 
   void _onSelectActivityType(SelectActivityType event, Emitter<ActivityTrackingState> emit) {
@@ -408,6 +409,22 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$hours:$minutes:$seconds';
+  }
+
+  void _onResetTracking(ResetTracking event, Emitter<ActivityTrackingState> emit) {
+    _currentSessionId = null;
+    _startedAt = null;
+    _pauseStartedAt = null;
+    _pausedDuration = Duration.zero;
+    _currentSteps = 0;
+    _lastRawSteps = 0;
+    _rawStepsAtPause = 0;
+    _ignoredPausedSteps = 0;
+    _stepCountReliable = true;
+    _skipDistanceForNextPoint = false;
+    _stationarySince = null;
+    _lastSavedAt = null;
+    emit(const TrackingIdle());
   }
 
   @override
