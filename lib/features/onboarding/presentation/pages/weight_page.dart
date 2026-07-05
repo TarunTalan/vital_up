@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
-import 'dart:math' as math;
 
 class WeightPage extends StatefulWidget {
   const WeightPage({super.key});

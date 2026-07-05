@@ -14,5 +14,7 @@ class UserProfileCache {
   String? displayName;
   String? photoUrl;
   
+  double? weightKg;
+  
   DateTime? lastSyncedAt;
 }

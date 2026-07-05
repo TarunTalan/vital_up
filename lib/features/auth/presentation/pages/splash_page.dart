@@ -164,18 +164,7 @@ class _SplashPageState extends State<SplashPage>
   void _checkSessionAndNavigate() {
     if (!mounted || !_animationCompleted) return;
 
-    final state = context.read<AuthCubit>().state;
-
-    // Do not navigate if database session check is still running
-    if (state is AuthInitial || state is AuthLoading) {
-      return;
-    }
-
-    if (state is AuthAuthenticated) {
-      context.goNamed('dashboard');
-    } else {
-      context.goNamed('onboarding');
-    }
+    context.goNamed('dashboard');
   }
 
   @override

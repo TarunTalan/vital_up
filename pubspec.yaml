@@ -67,6 +67,13 @@ dependencies:
   google_sign_in: ^6.2.1
   geolocator: ^13.0.2
   pedometer: ^4.0.2
+  drift: ^2.16.0
+  sqlite3_flutter_libs: ^0.5.20
+  path: ^1.9.0
+  mapbox_maps_flutter: ^2.25.1
+  flutter_foreground_task: ^9.2.2
+  injectable: ^2.4.1
+  uuid: ^4.4.0
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +82,8 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.9
   isar_community_generator: ^3.3.2
+  drift_dev: ^2.16.0
+  injectable_generator: ^2.6.1
 
   flutter_lints: ^6.0.0
 

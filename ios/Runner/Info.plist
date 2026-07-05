@@ -28,8 +28,16 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>VitalUp uses your location to track walking, running, and cycling distance.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>VitalUp needs background location access to keep tracking workouts while the screen is locked.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>VitalUp needs background location access to keep tracking workouts while the screen is locked.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>VitalUp uses motion data to estimate steps during activity tracking.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

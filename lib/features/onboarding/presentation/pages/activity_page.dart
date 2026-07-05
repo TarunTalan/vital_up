@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
@@ -17,12 +16,7 @@ class ActivityPage extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
-  const ActivityPage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const ActivityPage({super.key, this.onNext, this.onBack, this.onSkip});
 
   @override
   State<ActivityPage> createState() => _ActivityPageState();
@@ -57,16 +51,18 @@ class _ActivityPageState extends State<ActivityPage> {
       onBack: widget.onBack ?? () {},
       onSkip: widget.onSkip ?? () {},
       onNext: () {
-        context.read<OnboardingCubit>().updateHealthVitals(activity: options[selectedIndex].title);
+        context.read<OnboardingCubit>().updateHealthVitals(
+          activity: options[selectedIndex].title,
+        );
         widget.onNext?.call();
       },
       title: "How active are you usually?",
-      subtitle: "This helps us suggest goals that feel right for your daily life.",
+      subtitle:
+          "This helps us suggest goals that feel right for your daily life.",
       nextEnabled: true,
       titleBottomSpace: 16.0,
       child: Column(
         children: [
-
           ...options.asMap().entries.map((entry) {
             final index = entry.key;
             final option = entry.value;
@@ -88,11 +84,12 @@ class _ActivityPageState extends State<ActivityPage> {
               ),
             );
           }),
-          
+
           const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
-          
+
           const NoteRow(
-            text: "This just tells us how much you usually move in a normal day. There is no right or wrong answer.",
+            text:
+                "This just tells us how much you usually move in a normal day. There is no right or wrong answer.",
           ),
         ],
       ),
@@ -110,7 +107,9 @@ class _ActivityPageState extends State<ActivityPage> {
 
     return InkWell(
       onTap: onClick,
-      borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
+      borderRadius: BorderRadius.circular(
+        OnboardingStyle.numberFieldCornerRadius,
+      ),
       child: Container(
         height: 64,
         width: double.infinity,
@@ -121,14 +120,18 @@ class _ActivityPageState extends State<ActivityPage> {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    brandColor.withOpacity(0.08),
-                    brandColor.withOpacity(0.7),
+                    brandColor.withValues(alpha: 0.08),
+                    brandColor.withValues(alpha: 0.7),
                   ],
                 )
               : null,
-          borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
+          borderRadius: BorderRadius.circular(
+            OnboardingStyle.numberFieldCornerRadius,
+          ),
           border: Border.all(
-            color: isSelected ? brandColor.withOpacity(0.27) : OnboardingColors.fieldBorder,
+            color: isSelected
+                ? brandColor.withValues(alpha: 0.27)
+                : OnboardingColors.fieldBorder,
             width: 1.0,
           ),
         ),

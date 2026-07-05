@@ -11,6 +11,7 @@ class ActivitySession {
   final int avgPaceSecondsPerKm;
   final int calories;
   final int steps;
+  final bool stepCountReliable;
   final List<TrackPoint> points;
 
   const ActivitySession({
@@ -23,6 +24,7 @@ class ActivitySession {
     required this.avgPaceSecondsPerKm,
     required this.calories,
     required this.steps,
+    required this.stepCountReliable,
     required this.points,
   });
 }

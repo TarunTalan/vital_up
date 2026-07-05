@@ -13,10 +13,18 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize communication port for foreground task manager
+  ForegroundServiceManager.init();
+
+  // Set Mapbox access token globally (required by mapbox_maps_flutter v2.x)
+  MapboxOptions.setAccessToken(SupabaseConfig.mapboxAccessToken);
+
   // Lock the app to Portrait mode
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
