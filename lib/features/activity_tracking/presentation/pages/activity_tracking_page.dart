@@ -99,6 +99,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           timestamp: position.timestamp,
           accuracy: position.accuracy,
           speed: position.speed.isFinite ? position.speed : 0,
+          altitude: position.altitude.isFinite ? position.altitude : 0,
         );
         setState(() {
           _currentPosition = point;
@@ -262,6 +263,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         timestamp: position.timestamp,
         accuracy: position.accuracy,
         speed: position.speed.isFinite ? position.speed : 0,
+        altitude: position.altitude.isFinite ? position.altitude : 0,
       );
       setState(() {
         _currentPosition = point;
@@ -978,20 +980,51 @@ class _StartPauseControl extends StatelessWidget {
 
     return Row(
       children: [
-        SizedBox(
-          width: 60,
-          height: 52,
-          child: OutlinedButton(
-            onPressed: onStop,
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 2),
-              shape: const RoundedRectangleBorder(),
-              backgroundColor: Colors.white,
+        Expanded(
+          child: SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              onPressed: onStop,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.black, width: 2),
+                shape: const RoundedRectangleBorder(),
+                backgroundColor: Colors.white,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.stop_rounded, color: Colors.black, size: 18),
+                  SizedBox(width: 4),
+                  Text(
+                    'FINISH',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Icon(Icons.stop_rounded, color: Colors.black, size: 24),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 48,
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => onLockToggle(true),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.black, width: 1),
+              shape: const RoundedRectangleBorder(),
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Icon(Icons.lock_rounded, color: Colors.black, size: 18),
+          ),
+        ),
+        const SizedBox(width: 8),
         Expanded(
           child: SizedBox(
             height: 52,
@@ -1003,22 +1036,23 @@ class _StartPauseControl extends StatelessWidget {
                 foregroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(),
               ),
-              child: const Row(
+               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.pause_rounded, size: 24),
-                  SizedBox(width: 8),
+                  Icon(Icons.pause_rounded, size: 18),
+                  SizedBox(width: 4),
                   Text(
                     'PAUSE',
                     style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 1.5,
+                      fontSize: 10,
+                      letterSpacing: 0.5,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
               ),
-            )
+          )
                 : FilledButton(
               onPressed: onResume,
               style: FilledButton.styleFrom(
@@ -1026,38 +1060,24 @@ class _StartPauseControl extends StatelessWidget {
                 foregroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'RESUME',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 1.5,
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 0.5,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_rounded, size: 24),
+                  SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, size: 18),
                 ],
               ),
-            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 52,
-          height: 52,
-          child: OutlinedButton(
-            onPressed: () => onLockToggle(true),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 1),
-              shape: const RoundedRectangleBorder(),
-              backgroundColor: Colors.white,
-              padding: EdgeInsets.zero,
-            ),
-            child: const Icon(Icons.lock_rounded, color: Colors.black, size: 20),
-          ),
-        ),
+        )),
       ],
     );
   }
