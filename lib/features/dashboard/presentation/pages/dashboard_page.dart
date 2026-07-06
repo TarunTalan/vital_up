@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -115,61 +116,18 @@ class _HomeTab extends StatelessWidget {
 
     return Stack(
       children: [
+        // Background - Full Screen
         Positioned.fill(
           child: Image.asset(
             'assets/images/bg.png',
             fit: BoxFit.cover,
           ),
         ),
-        SafeArea(
+        // Scrollable Content
+        Positioned.fill(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 128),
+            padding: const EdgeInsets.fromLTRB(20, 150, 20, 128), // 150pt top padding to start below fixed header
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Good morning',
-                          style: theme.textTheme.displayMedium?.copyWith(
-                            fontSize: 28,
-                            height: 1.08,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Tuesday, January 13',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: customColors?.grayText,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: colors.primary.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: colors.primary.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.calendar_month_rounded,
-                      color: colors.primary,
-                      size: 25,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 44),
               const _InsightCard(),
               const SizedBox(height: 26),
               SizedBox(
@@ -226,6 +184,79 @@ class _HomeTab extends StatelessWidget {
                 progress: 0.72,
               ),
             ],
+          ),
+        ),
+        // Fixed Top Bar
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.7),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.5, 1.0],
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Good morning',
+                              style: theme.textTheme.displayMedium?.copyWith(
+                                fontSize: 28,
+                                height: 1.08,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tuesday, January 13',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: customColors?.grayText,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: colors.primary.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.calendar_month_rounded,
+                          color: colors.primary,
+                          size: 25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -410,7 +441,7 @@ class _RestMetricCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      height: 196,
+      constraints: const BoxConstraints(minHeight: 196),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 20, 52, 18),
       decoration: BoxDecoration(
@@ -619,34 +650,33 @@ class _BottomNavBar extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: Container(
-          height: 68,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(34),
-            border: Border.all(
-              color: colors.outline.withValues(alpha: 0.30),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (var i = 0; i < items.length; i++)
-                Expanded(
-                  child: _NavItem(
-                    item: items[i],
-                    selected: selectedIndex == i,
-                    onTap: () => onItemSelected(i),
-                  ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              height: 68,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(34),
+                border: Border.all(
+                  color: colors.outline.withValues(alpha: 0.20),
                 ),
-            ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  for (var i = 0; i < items.length; i++)
+                    Expanded(
+                      child: _NavItem(
+                        item: items[i],
+                        selected: selectedIndex == i,
+                        onTap: () => onItemSelected(i),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
