@@ -7,6 +7,7 @@ class FoodItemDto {
   final String servingDescription;
   final double quantity;
   final String unit;
+  final String? fdcId;
 
   FoodItemDto({
     required this.id,
@@ -15,6 +16,7 @@ class FoodItemDto {
     required this.servingDescription,
     required this.quantity,
     required this.unit,
+    this.fdcId,
   });
 
   factory FoodItemDto.fromJson(Map<String, dynamic> json) {
@@ -25,6 +27,7 @@ class FoodItemDto {
       servingDescription: json['serving_description'] as String? ?? json['serving_description'] ?? '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
       unit: json['unit'] as String? ?? json['serving_unit'] ?? 'serving',
+      fdcId: json['fdc_id'] as String?,
     );
   }
 
@@ -36,6 +39,7 @@ class FoodItemDto {
       'serving_description': servingDescription,
       'quantity': quantity,
       'unit': unit,
+      if (fdcId != null) 'fdc_id': fdcId,
     };
   }
 

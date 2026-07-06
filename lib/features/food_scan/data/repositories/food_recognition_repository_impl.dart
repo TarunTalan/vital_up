@@ -1,23 +1,23 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dartz/dartz.dart';
-import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/error/failures.dart';
-import 'package:vital_up/core/network/dio_client.dart';
 import 'package:vital_up/features/food_scan/data/models/food_item_dto.dart';
 import 'package:vital_up/features/food_scan/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scan/domain/repositories/food_recognition_repository.dart';
-import 'dart:io';
 
 class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
-  final DioClient dioClient;
   final Logger logger;
+  final SupabaseClient supabaseClient;
 
   FoodRecognitionRepositoryImpl({
-    required this.dioClient,
     required this.logger,
+    required this.supabaseClient,
   });
 
-  final String _baseUrl = 'https://your-backend-proxy.com/api'; // Replace with actual backend proxy URL
   final Map<String, FoodItem> _cache = {};
 
   @override
@@ -29,21 +29,17 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         return Right([_cache[cacheKey]!]);
       }
 
-      final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(image.path),
-      });
+      final imageBytes = await image.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
 
-      final response = await dioClient.dio.post(
-        '$_baseUrl/food/recognize',
-        data: formData,
-        options: Options(
-          contentType: 'multipart/form-data',
-          sendTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
+      final response = await supabaseClient.functions.invoke(
+        'scan-food',
+        body: {
+          'image': base64Image,
+        },
       );
 
-      if (response.statusCode == 200) {
+      if (response.status == 200) {
         final data = response.data as Map<String, dynamic>;
         final itemsData = data['items'] as List<dynamic>?;
         
@@ -60,19 +56,13 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         }
 
         return Right(foodItems);
+      } else if (response.status == 402 || response.status == 403) {
+        return const Left(ScanQuotaExceededFailure());
+      } else if (response.status == 503) {
+        return const Left(RecognitionUnavailableFailure());
       } else {
         return const Left(ServerFailure('Failed to recognize food. Please try again.'));
       }
-    } on DioException catch (e) {
-      logger.e('Dio error in recognizeFood: ${e.message}');
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout) {
-        return const Left(NetworkFailure('Request timed out. Please check your connection.'));
-      } else if (e.type == DioExceptionType.connectionError) {
-        return const Left(NetworkFailure('No internet connection. Please check your network settings.'));
-      }
-      return Left(ServerFailure('Network error: ${e.message}'));
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
       return const Left(ServerFailure('An unexpected error occurred.'));
@@ -82,16 +72,14 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   @override
   Future<Either<Failure, List<FoodItem>>> searchByName(String query) async {
     try {
-      final response = await dioClient.dio.get(
-        '$_baseUrl/food/search',
-        queryParameters: {'query': query},
-        options: Options(
-          sendTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
-        ),
+      final response = await supabaseClient.functions.invoke(
+        'scan-food',
+        body: {
+          'search_query': query,
+        },
       );
 
-      if (response.statusCode == 200) {
+      if (response.status == 200) {
         final data = response.data as Map<String, dynamic>;
         final itemsData = data['items'] as List<dynamic>?;
         
@@ -107,16 +95,6 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       } else {
         return const Left(ServerFailure('Failed to search food. Please try again.'));
       }
-    } on DioException catch (e) {
-      logger.e('Dio error in searchByName: ${e.message}');
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout) {
-        return const Left(NetworkFailure('Request timed out. Please check your connection.'));
-      } else if (e.type == DioExceptionType.connectionError) {
-        return const Left(NetworkFailure('No internet connection. Please check your network settings.'));
-      }
-      return Left(ServerFailure('Network error: ${e.message}'));
     } catch (e) {
       logger.e('Unexpected error in searchByName: $e');
       return const Left(ServerFailure('An unexpected error occurred.'));
