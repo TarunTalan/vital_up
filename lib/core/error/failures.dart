@@ -28,3 +28,15 @@ class DatabaseFailure extends Failure {
 class ValidationFailure extends Failure {
   const ValidationFailure([super.message = 'Invalid input details provided.']);
 }
+
+class NoFoodDetectedFailure extends Failure {
+  const NoFoodDetectedFailure([super.message = 'No food was detected in the image. Please try again with a clearer photo.']);
+}
+
+class LowConfidenceFailure extends Failure {
+  const LowConfidenceFailure([super.message = 'Food recognition confidence is low. Please review and confirm the detected items.']);
+}
+
+class BarcodeNotFoundFailure extends Failure {
+  const BarcodeNotFoundFailure([super.message = 'Barcode not found in database. Please try manual search.']);
+}
