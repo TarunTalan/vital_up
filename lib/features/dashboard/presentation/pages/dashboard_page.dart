@@ -7,7 +7,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/food_scan/presentation/pages/food_scan_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -56,13 +56,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
       0 => const _HomeTab(),
-      1 => FoodScannerPage(
-          onBack: () => setState(() => _selectedIndex = 0),
-          onNavigateToDetail: (imagePath) => context.pushNamed(
-            'food-detail',
-            extra: imagePath,
-          ),
-        ),
+      1 => const FoodScanPage(),
       2 => const _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',

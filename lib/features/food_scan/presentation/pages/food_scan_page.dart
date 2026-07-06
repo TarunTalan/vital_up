@@ -21,6 +21,7 @@ class FoodScanPage extends StatelessWidget {
         saveMealLog: context.read(),
         getMealRecommendation: context.read(),
         uuid: context.read(),
+        logger: context.read(),
       ),
       child: const FoodScanView(),
     );
