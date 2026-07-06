@@ -126,7 +126,7 @@ BEGIN
     updated_at = NOW()
   RETURNING scan_count INTO v_count;
   
- _RETURN v_count;
+  RETURN v_count;
 END;
 $$;
 
