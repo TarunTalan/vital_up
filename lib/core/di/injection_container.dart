@@ -36,8 +36,14 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/pause_tracki
 import 'package:vital_up/features/activity_tracking/domain/usecases/resume_tracking_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_save_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_session_history.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/save_session_annotation.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_session_stream.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/activity_history_repository.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -113,6 +119,12 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<ActivityRepository>(
     () => ActivityRepositoryImpl(sl<AppDatabase>()),
   );
+  sl.registerLazySingleton<ActivityHistoryRepository>(
+    () => ActivityHistoryRepositoryImpl(
+      activityRepository: sl<ActivityRepository>(),
+      sharedPreferences: sl<SharedPreferences>(),
+    ),
+  );
   sl.registerLazySingleton<MapTileRepository>(
     () => MapTileRepositoryImpl(),
   );
@@ -147,6 +159,15 @@ Future<void> initDependencies() async {
     () => GetSessionHistory(sl<ActivityRepository>()),
   );
   sl.registerLazySingleton(
+    () => GetActivityHistory(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
     () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
   );
 
@@ -157,6 +178,13 @@ Future<void> initDependencies() async {
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
       authRepository: sl<AuthRepository>(),
+    ),
+  );
+  sl.registerFactory(
+    () => ActivityHistoryBloc(
+      getActivityHistory: sl<GetActivityHistory>(),
+      saveSessionAnnotation: sl<SaveSessionAnnotation>(),
+      deleteActivitySession: sl<DeleteActivitySession>(),
     ),
   );
 }
