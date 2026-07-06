@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:vital_up/features/food_scan/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scan/domain/entities/meal_log_entry.dart';
@@ -9,20 +10,15 @@ import 'package:vital_up/features/food_scan/presentation/bloc/food_scan_event.da
 import 'package:vital_up/features/food_scan/presentation/bloc/food_scan_state.dart';
 import 'dart:io';
 
+final sl = GetIt.instance;
+
 class FoodScanPage extends StatelessWidget {
   const FoodScanPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => FoodScanBloc(
-        scanFoodImage: context.read(),
-        scanBarcode: context.read(),
-        saveMealLog: context.read(),
-        getMealRecommendation: context.read(),
-        uuid: context.read(),
-        logger: context.read(),
-      ),
+      create: (_) => sl<FoodScanBloc>(),
       child: const FoodScanView(),
     );
   }
