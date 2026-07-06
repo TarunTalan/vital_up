@@ -185,5 +185,6 @@ Future<void> initDependencies() async {
     saveMealLog: sl<SaveMealLog>(),
     getMealRecommendation: sl<GetMealRecommendation>(),
     uuid: sl<Uuid>(),
+    logger: sl<Logger>(),
   ));
 }

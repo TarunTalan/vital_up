@@ -276,6 +276,8 @@ class _FoodScanResultPageState extends State<FoodScanResultPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<FoodScanBloc, FoodScanState>(
       builder: (context, state) {
+        print('FoodScanResultPage state: $state');
+        
         final image = state is RecognitionSucceeded
             ? state.image
             : state is RecognitionLowConfidence
@@ -292,6 +294,11 @@ class _FoodScanResultPageState extends State<FoodScanResultPage> {
                 ? state.nutrition
                 : <NutritionInfo>[];
         final isLowConfidence = state is RecognitionLowConfidence;
+
+        print('Image: $image');
+        print('Items count: ${items.length}');
+        print('Nutrition count: ${nutrition.length}');
+        print('Items: $items');
 
         if (image == null || items.isEmpty) {
           return const Scaffold(

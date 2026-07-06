@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scan/domain/entities/food_item.dart';
@@ -19,6 +20,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   final SaveMealLog saveMealLog;
   final GetMealRecommendation getMealRecommendation;
   final Uuid uuid;
+  final Logger logger;
 
   File? _currentImage;
   List<FoodItem> _currentItems = [];
@@ -30,6 +32,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     required this.saveMealLog,
     required this.getMealRecommendation,
     required this.uuid,
+    required this.logger,
   }) : super(ScanIdle()) {
     on<CaptureImageRequested>(_onCaptureImageRequested);
     on<ImageSelected>(_onImageSelected);
@@ -74,23 +77,32 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     final result = await scanFoodImage(_currentImage!);
 
+    logger.d('ScanFoodImage result: $result');
+
     result.fold(
       (failure) {
+        logger.e('Recognition failed: $failure');
         emit(RecognitionFailed(failure, image: _currentImage));
       },
       (nutritionList) {
+        logger.d('Nutrition list received: ${nutritionList.length} items');
         _currentNutrition = nutritionList;
         _currentItems = nutritionList.map((nut) => nut.per).toList();
+
+        logger.d('Current items: $_currentItems');
+        logger.d('Current nutrition: $_currentNutrition');
 
         final hasLowConfidence = _currentItems.any((item) => item.confidenceScore < 0.7);
 
         if (hasLowConfidence) {
+          logger.d('Emitting RecognitionLowConfidence');
           emit(RecognitionLowConfidence(
             image: _currentImage!,
             items: _currentItems,
             nutrition: _currentNutrition,
           ));
         } else {
+          logger.d('Emitting RecognitionSucceeded');
           emit(RecognitionSucceeded(
             image: _currentImage!,
             items: _currentItems,

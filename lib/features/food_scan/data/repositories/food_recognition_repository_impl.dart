@@ -39,9 +39,13 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         },
       );
 
+      logger.d('Supabase response status: ${response.status}');
+      logger.d('Supabase response data: ${response.data}');
+
       if (response.status == 200) {
         final data = response.data as Map<String, dynamic>;
         final itemsData = data['items'] as List<dynamic>?;
+        logger.d('Items data: $itemsData');
         
         if (itemsData == null || itemsData.isEmpty) {
           return const Left(NoFoodDetectedFailure());
