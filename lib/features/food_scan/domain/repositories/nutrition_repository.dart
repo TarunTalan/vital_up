@@ -7,4 +7,6 @@ abstract class NutritionRepository {
   Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item);
   
   Future<Either<Failure, FoodItem>> lookupBarcode(String barcode);
+  
+  Future<Either<Failure, List<FoodItem>>> searchByName(String query);
 }
