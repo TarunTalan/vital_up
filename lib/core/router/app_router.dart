@@ -9,6 +9,7 @@ import 'package:vital_up/features/auth/presentation/pages/reset_password_page.da
 import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.dart';
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_detail_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/blood_pressure_page.dart';
@@ -113,6 +114,22 @@ class AppRouter {
           child: const DashboardPage(),
         ),
       ),
+      /*GoRoute(
+        path: '/activity-tracking',
+        name: 'activity-tracking',
+        pageBuilder: (context, state) => FadeSlidePageRoute(
+          key: state.pageKey,
+          child: const ActivityTrackingPage(),
+        ),
+      ),*/
+      /*GoRoute(
+        path: '/activity-history',
+        name: 'activity-history',
+        pageBuilder: (context, state) => FadeSlidePageRoute(
+          key: state.pageKey,
+          child: const ActivityHistoryPage(),
+        ),
+      ),*/
       GoRoute(
         path: '/food-detail',
         name: 'food-detail',
