@@ -42,7 +42,10 @@ class FoodScanView extends StatelessWidget {
           if (state is RecognitionSucceeded || state is RecognitionLowConfidence) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const FoodScanResultPage(),
+                builder: (context) => BlocProvider.value(
+                  value: context.read<FoodScanBloc>(),
+                  child: const FoodScanResultPage(),
+                ),
               ),
             );
           } else if (state is MealLogSaved) {
