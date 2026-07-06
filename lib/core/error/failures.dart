@@ -40,3 +40,11 @@ class LowConfidenceFailure extends Failure {
 class BarcodeNotFoundFailure extends Failure {
   const BarcodeNotFoundFailure([super.message = 'Barcode not found in database. Please try manual search.']);
 }
+
+class RecognitionUnavailableFailure extends Failure {
+  const RecognitionUnavailableFailure([super.message = 'Food recognition is temporarily busy. Please try again shortly.']);
+}
+
+class ScanQuotaExceededFailure extends Failure {
+  const ScanQuotaExceededFailure([super.message = 'You have reached your monthly scan limit. Upgrade to Premium for unlimited scans.']);
+}

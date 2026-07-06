@@ -26,10 +26,12 @@ import 'package:vital_up/features/food_scan/data/repositories/food_recognition_r
 import 'package:vital_up/features/food_scan/data/repositories/meal_log_repository_impl.dart';
 import 'package:vital_up/features/food_scan/data/repositories/meal_recommendation_repository_impl.dart';
 import 'package:vital_up/features/food_scan/data/repositories/nutrition_repository_impl.dart';
+import 'package:vital_up/features/food_scan/data/repositories/subscription_repository_impl.dart';
 import 'package:vital_up/features/food_scan/domain/repositories/food_recognition_repository.dart';
 import 'package:vital_up/features/food_scan/domain/repositories/meal_log_repository.dart';
 import 'package:vital_up/features/food_scan/domain/repositories/meal_recommendation_repository.dart';
 import 'package:vital_up/features/food_scan/domain/repositories/nutrition_repository.dart';
+import 'package:vital_up/features/food_scan/domain/repositories/subscription_repository.dart';
 import 'package:vital_up/features/food_scan/domain/usecases/delete_meal_log.dart';
 import 'package:vital_up/features/food_scan/domain/usecases/get_meal_log_history.dart';
 import 'package:vital_up/features/food_scan/domain/usecases/get_meal_recommendation.dart';
@@ -118,14 +120,22 @@ Future<void> initDependencies() async {
   
   sl.registerLazySingleton<FoodRecognitionRepository>(
     () => FoodRecognitionRepositoryImpl(
-      dioClient: sl<DioClient>(),
       logger: sl<Logger>(),
+      supabaseClient: sl<SupabaseClient>(),
     ),
   );
   
   sl.registerLazySingleton<NutritionRepository>(
     () => NutritionRepositoryImpl(
-      dioClient: sl<DioClient>(),
+      dio: sl<Dio>(),
+      logger: sl<Logger>(),
+      supabaseClient: sl<SupabaseClient>(),
+    ),
+  );
+  
+  sl.registerLazySingleton<SubscriptionRepository>(
+    () => SubscriptionRepositoryImpl(
+      supabaseClient: sl<SupabaseClient>(),
       logger: sl<Logger>(),
     ),
   );
@@ -145,6 +155,7 @@ Future<void> initDependencies() async {
     () => ScanFoodImage(
       foodRecognitionRepository: sl<FoodRecognitionRepository>(),
       nutritionRepository: sl<NutritionRepository>(),
+      subscriptionRepository: sl<SubscriptionRepository>(),
     ),
   );
   
