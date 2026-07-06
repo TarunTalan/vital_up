@@ -77,32 +77,32 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     final result = await scanFoodImage(_currentImage!);
 
-    logger.d('ScanFoodImage result: $result');
+    print('ScanFoodImage result: $result');
 
     result.fold(
       (failure) {
-        logger.e('Recognition failed: $failure');
+        print('Recognition failed: $failure');
         emit(RecognitionFailed(failure, image: _currentImage));
       },
       (nutritionList) {
-        logger.d('Nutrition list received: ${nutritionList.length} items');
+        print('Nutrition list received: ${nutritionList.length} items');
         _currentNutrition = nutritionList;
         _currentItems = nutritionList.map((nut) => nut.per).toList();
 
-        logger.d('Current items: $_currentItems');
-        logger.d('Current nutrition: $_currentNutrition');
+        print('Current items: $_currentItems');
+        print('Current nutrition: $_currentNutrition');
 
         final hasLowConfidence = _currentItems.any((item) => item.confidenceScore < 0.7);
 
         if (hasLowConfidence) {
-          logger.d('Emitting RecognitionLowConfidence');
+          print('Emitting RecognitionLowConfidence');
           emit(RecognitionLowConfidence(
             image: _currentImage!,
             items: _currentItems,
             nutrition: _currentNutrition,
           ));
         } else {
-          logger.d('Emitting RecognitionSucceeded');
+          print('Emitting RecognitionSucceeded');
           emit(RecognitionSucceeded(
             image: _currentImage!,
             items: _currentItems,
