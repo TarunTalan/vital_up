@@ -5,6 +5,7 @@ import 'package:vital_up/core/database/collections/step_log_cache.dart';
 import 'package:vital_up/core/database/collections/heart_rate_log_cache.dart';
 import 'package:vital_up/core/database/collections/sleep_log_cache.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
+import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 
 class IsarService {
   late final Isar isar;
@@ -19,6 +20,7 @@ class IsarService {
         HeartRateLogCacheSchema,
         SleepLogCacheSchema,
         WaterLogCacheSchema,
+        MealLogCacheSchema,
       ],
       directory: dir.path,
     );
