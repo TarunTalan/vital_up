@@ -224,11 +224,63 @@ class _FoodDetailData {
       ),
     ];
 
-    final macroDetails = [
-      MacroDetail(name: 'Dietary Fiber', grams: totalFiber.round()),
-      MacroDetail(name: 'Total Sugars', grams: totalSugar.round()),
-      MacroDetail(name: 'Sodium', grams: totalSodium.round(), unit: 'mg'),
-    ];
+    // Build dynamic macro details from all available nutrition data
+    final macroDetails = <MacroDetail>[];
+    
+    // Add main nutrition details if they have values
+    if (totalFiber > 0) {
+      macroDetails.add(MacroDetail(name: 'Dietary Fiber', grams: totalFiber.round()));
+    }
+    if (totalSugar > 0) {
+      macroDetails.add(MacroDetail(name: 'Total Sugars', grams: totalSugar.round()));
+    }
+    if (totalSodium > 0) {
+      macroDetails.add(MacroDetail(name: 'Sodium', grams: totalSodium.round(), unit: 'mg'));
+    }
+    
+    // Add additional nutrients from all nutrition items
+    for (final nut in nutrition) {
+      for (final additional in nut.additionalNutrients) {
+        if (additional.value > 0) {
+          macroDetails.add(MacroDetail(
+            name: additional.name,
+            grams: additional.value.round(),
+            unit: additional.unit,
+          ));
+        }
+      }
+    }
+    
+    // Add other key nutrients if they have values
+    final totalCalcium = nutrition.fold<double>(0, (sum, nut) => sum + nut.calciumMg);
+    if (totalCalcium > 0) {
+      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium.round(), unit: 'mg'));
+    }
+    
+    final totalIron = nutrition.fold<double>(0, (sum, nut) => sum + nut.ironMg);
+    if (totalIron > 0) {
+      macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron.round(), unit: 'mg'));
+    }
+    
+    final totalPotassium = nutrition.fold<double>(0, (sum, nut) => sum + nut.potassiumMg);
+    if (totalPotassium > 0) {
+      macroDetails.add(MacroDetail(name: 'Potassium', grams: totalPotassium.round(), unit: 'mg'));
+    }
+    
+    final totalCholesterol = nutrition.fold<double>(0, (sum, nut) => sum + nut.cholesterolMg);
+    if (totalCholesterol > 0) {
+      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol.round(), unit: 'mg'));
+    }
+    
+    final totalVitaminC = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminCMg);
+    if (totalVitaminC > 0) {
+      macroDetails.add(MacroDetail(name: 'Vitamin C', grams: totalVitaminC.round(), unit: 'mg'));
+    }
+    
+    final totalVitaminA = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminAIu);
+    if (totalVitaminA > 0) {
+      macroDetails.add(MacroDetail(name: 'Vitamin A', grams: totalVitaminA.round(), unit: 'IU'));
+    }
 
     final dishName = items.length == 1 ? items.first.name : 'Scanned Meal';
     final now = DateTime.now();
