@@ -10,8 +10,6 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
-import 'package:vital_up/features/food_scanner/presentation/pages/food_detail_page.dart';
-import 'package:vital_up/features/food_scan/presentation/pages/food_scan_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/blood_pressure_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/bpm_page.dart';
@@ -132,23 +130,11 @@ class AppRouter {
         ),
       ),*/
       GoRoute(
-        path: '/food-detail',
-        name: 'food-detail',
-        pageBuilder: (context, state) {
-          final extra = state.extra;
-          final imagePath = extra is String ? extra : null;
-          return FadeSlidePageRoute(
-            key: state.pageKey,
-            child: FoodDetailPage(imagePath: imagePath),
-          );
-        },
-      ),
-      GoRoute(
         path: '/food-scan',
         name: 'food-scan',
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
-          child: const FoodScanPage(),
+          child: const FoodScannerPage(),
         ),
       ),
       GoRoute(

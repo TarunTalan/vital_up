@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 
 class DishItem {
+  final String id;
   final String name;
   final int calories;
 
-  const DishItem({
-    required this.name,
-    required this.calories,
-  });
+  const DishItem({this.id = '', required this.name, required this.calories});
 }
 
 class MacroMain {
@@ -27,11 +25,9 @@ class MacroMain {
 class MacroDetail {
   final String name;
   final int grams;
+  final String unit;
 
-  const MacroDetail({
-    required this.name,
-    required this.grams,
-  });
+  const MacroDetail({required this.name, required this.grams, this.unit = 'g'});
 }
 
 class MealPopupData {
