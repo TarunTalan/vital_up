@@ -40,13 +40,17 @@ class GeminiVisionProvider implements VisionProvider {
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: this.getPrompt(),
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: imageBase64,
+            parts: [
+              {
+                text: this.getPrompt(),
               },
-            }],
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: imageBase64,
+                },
+              },
+            ],
           }],
           generationConfig: {
             temperature: 0.1,
@@ -482,6 +486,22 @@ Deno.serve(async (req) => {
           });
         }
       });
+      
+      // Log the specific calories nutrient (ID 1008)
+      const caloriesNutrient = nutrients.find((n: any) => {
+        const nutrientId = n.nutrient?.id ?? n.id;
+        return nutrientId === 1008;
+      });
+      if (caloriesNutrient) {
+        console.log(`Calories nutrient (ID 1008): ${JSON.stringify({
+          id: caloriesNutrient.nutrient?.id ?? caloriesNutrient.id,
+          name: caloriesNutrient.nutrient?.name ?? caloriesNutrient.name,
+          value: caloriesNutrient.amount ?? caloriesNutrient.nutrient?.amount,
+          unit: caloriesNutrient.nutrient?.unitName ?? caloriesNutrient.unitName
+        })}`);
+      } else {
+        console.log('Calories nutrient (ID 1008) NOT FOUND in USDA response');
+      }
       
       // Log all energy-related nutrients for debugging
       const energyNutrients = nutrients.filter((n: any) => {
