@@ -378,6 +378,25 @@ Deno.serve(async (req) => {
     if (get_nutrition && fdc_id) {
       const foodData = await getUSDANutrition(fdc_id, usdaApiKey);
       const nutrients = foodData.foodNutrients || [];
+      
+      // Get the serving size from USDA data
+      // USDA data can be per 100g, per serving, per cup, etc.
+      const servingSize = foodData.servingSize || 100;
+      const servingSizeUnit = foodData.servingSizeUnit || 'g';
+      
+      // Convert USDA serving size to grams for consistent scaling
+      let usdaServingSizeInGrams = 100; // Default to 100g
+      if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
+        usdaServingSizeInGrams = servingSize;
+      } else if (servingSizeUnit.toLowerCase() === 'mg' || servingSizeUnit.toLowerCase() === 'milligrams') {
+        usdaServingSizeInGrams = servingSize / 1000;
+      } else if (servingSizeUnit.toLowerCase() === 'kg' || servingSizeUnit.toLowerCase() === 'kilograms') {
+        usdaServingSizeInGrams = servingSize * 1000;
+      } else if (servingSizeUnit.toLowerCase() === 'oz' || servingSizeUnit.toLowerCase() === 'ounces') {
+        usdaServingSizeInGrams = servingSize * 28.35;
+      } else if (servingSizeUnit.toLowerCase() === 'lb' || servingSizeUnit.toLowerCase() === 'pounds') {
+        usdaServingSizeInGrams = servingSize * 453.59;
+      }
 
       // USDA nutrient IDs for accurate matching
       const nutrientIdMap: Record<number, string> = {
@@ -446,10 +465,12 @@ Deno.serve(async (req) => {
         }
       });
 
-      // Parse portion size from serving description to scale nutrition values
-      // USDA data is per 100g, so we need to scale based on actual portion
+      // Parse portion size from serving description to get user's desired portion in grams
       const servingDescription = body.serving_description || '100g';
-      const scaleFactor = parsePortionSize(servingDescription);
+      const userPortionInGrams = parsePortionSize(servingDescription) * 100; // parsePortionSize returns scale factor relative to 100g
+
+      // Calculate scale factor: user portion / USDA serving size
+      const scaleFactor = userPortionInGrams / usdaServingSizeInGrams;
 
       // Scale all nutrition values by the portion size factor
       const scaleFields = [
