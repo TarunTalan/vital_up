@@ -38,6 +38,21 @@ class BarcodeScanning extends FoodScanState {
   const BarcodeScanning();
 }
 
+class LoadingNutrition extends FoodScanState {
+  final File? image;
+  final List<FoodItem> items;
+  final List<NutritionInfo> nutrition;
+
+  const LoadingNutrition({
+    this.image,
+    required this.items,
+    required this.nutrition,
+  });
+
+  @override
+  List<Object?> get props => [image, items, nutrition];
+}
+
 class RecognitionSucceeded extends FoodScanState {
   final File image;
   final List<FoodItem> items;

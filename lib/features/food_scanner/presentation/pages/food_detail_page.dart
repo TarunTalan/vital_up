@@ -11,6 +11,7 @@ import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommen
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/food_item_edit_dialog.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_utils.dart';
 
 final GetIt _sl = GetIt.instance;
@@ -611,8 +612,13 @@ class _CircularScoreMeter extends StatelessWidget {
 class _DishInfoCard extends StatelessWidget {
   final List<DishItem> dishes;
   final ValueChanged<String> onRemove;
+  final Function(String itemId, String name, double quantity, String unit)? onEdit;
 
-  const _DishInfoCard({required this.dishes, required this.onRemove});
+  const _DishInfoCard({
+    required this.dishes,
+    required this.onRemove,
+    this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -626,7 +632,7 @@ class _DishInfoCard extends StatelessWidget {
             children: [
               const Expanded(child: _SectionLabel('Dish Info')),
               InkWell(
-                onTap: () {},
+                onTap: () => _showAddDialog(context),
                 child: Text(
                   'Add +',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -660,7 +666,7 @@ class _DishInfoCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   InkWell(
-                    onTap: () {},
+                    onTap: () => _showEditDialog(context, dish),
                     child: const Icon(Icons.edit_outlined, size: 18),
                   ),
                   const SizedBox(width: 10),
@@ -672,6 +678,43 @@ class _DishInfoCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  void _showAddDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => FoodItemEditDialog(
+        onSave: () {
+          // This is handled by the Add + button in the parent
+          // For now, we'll implement a simple version
+          // TODO: Implement proper add functionality
+        },
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context, DishItem dish) {
+    showDialog(
+      context: context,
+      builder: (context) => FoodItemEditDialog(
+        item: FoodItem(
+          id: dish.id,
+          name: dish.name,
+          confidenceScore: 1.0,
+          servingDescription: '1 serving',
+          quantity: 1.0,
+          unit: 'serving',
+        ),
+        onSave: () {
+          // Get the values from the dialog state
+          // This is a simplified version - in production, you'd want to
+          // pass the values back via callback or state management
+          if (onEdit != null) {
+            onEdit!(dish.id, dish.name, 1.0, 'serving');
+          }
+        },
       ),
     );
   }

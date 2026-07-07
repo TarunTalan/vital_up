@@ -7,6 +7,7 @@ import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommendation.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/scan_barcode.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/scan_food_image.dart';
@@ -19,6 +20,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   final ScanBarcode scanBarcode;
   final SaveMealLog saveMealLog;
   final GetMealRecommendation getMealRecommendation;
+  final NutritionRepository nutritionRepository;
   final Uuid uuid;
   final Logger logger;
 
@@ -31,6 +33,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     required this.scanBarcode,
     required this.saveMealLog,
     required this.getMealRecommendation,
+    required this.nutritionRepository,
     required this.uuid,
     required this.logger,
   }) : super(ScanIdle()) {
@@ -40,6 +43,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     on<AdjustPortionRequested>(_onAdjustPortionRequested);
     on<RemoveDetectedItemRequested>(_onRemoveDetectedItemRequested);
     on<AddManualItemRequested>(_onAddManualItemRequested);
+    on<EditFoodItemRequested>(_onEditFoodItemRequested);
     on<ConfirmAndSaveRequested>(_onConfirmAndSaveRequested);
     on<ScanBarcodeRequested>(_onScanBarcodeRequested);
     on<RetryRecognitionRequested>(_onRetryRecognitionRequested);
@@ -220,6 +224,77 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     _currentItems.add(newItem);
     _currentNutrition.add(placeholderNutrition);
 
+    if (state is RecognitionSucceeded) {
+      emit(RecognitionSucceeded(
+        image: _currentImage!,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ));
+    } else if (state is RecognitionLowConfidence) {
+      emit(RecognitionLowConfidence(
+        image: _currentImage!,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ));
+    } else if (state is NutritionLoaded) {
+      emit(NutritionLoaded(
+        image: _currentImage!,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ));
+    }
+  }
+
+  Future<void> _onEditFoodItemRequested(
+    EditFoodItemRequested event,
+    Emitter<FoodScanState> emit,
+  ) async {
+    final itemIndex = _currentItems.indexWhere((item) => item.id == event.itemId);
+    if (itemIndex == -1) return;
+
+    // Emit loading state
+    emit(LoadingNutrition(
+      image: _currentImage,
+      items: _currentItems,
+      nutrition: _currentNutrition,
+    ));
+
+    // Update the food item with new values
+    final updatedItem = FoodItem(
+      id: event.itemId,
+      name: event.name,
+      confidenceScore: _currentItems[itemIndex].confidenceScore,
+      servingDescription: '${event.quantity} ${event.unit}',
+      quantity: event.quantity,
+      unit: event.unit,
+    );
+
+    // Fetch nutrition for the updated item
+    final nutritionResult = await nutritionRepository.getNutrition(updatedItem);
+
+    nutritionResult.fold(
+      (failure) {
+        logger.e('Failed to fetch nutrition for edited item: $failure');
+        // If nutrition fetch fails, scale existing nutrition by quantity change
+        final oldItem = _currentItems[itemIndex];
+        final oldNutrition = _currentNutrition[itemIndex];
+        final scaleFactor = event.quantity / oldItem.quantity;
+        
+        _currentItems[itemIndex] = updatedItem;
+        _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
+        
+        _emitCurrentState(emit);
+      },
+      (nutrition) {
+        _currentItems[itemIndex] = updatedItem;
+        _currentNutrition[itemIndex] = nutrition;
+        
+        _emitCurrentState(emit);
+      },
+    );
+  }
+
+  void _emitCurrentState(Emitter<FoodScanState> emit) {
     if (state is RecognitionSucceeded) {
       emit(RecognitionSucceeded(
         image: _currentImage!,
