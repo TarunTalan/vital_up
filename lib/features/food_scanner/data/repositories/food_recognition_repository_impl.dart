@@ -45,35 +45,50 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       print('Supabase response status: ${response.status}');
       print('Supabase response data: ${response.data}');
 
-      if (response.status == 200) {
-        final data = response.data as Map<String, dynamic>;
-        final itemsData = data['items'] as List<dynamic>?;
-        print('Items data: $itemsData');
-        
-        if (itemsData == null || itemsData.isEmpty) {
-          return const Left(NoFoodDetectedFailure());
-        }
+      final data = response.data as Map<String, dynamic>;
+      final itemsData = data['items'] as List<dynamic>?;
+      print('Items data: $itemsData');
 
-        final foodItems = itemsData
-            .map((item) => FoodItemDto.fromJson(item as Map<String, dynamic>).toDomain())
-            .toList();
+      if (itemsData == null || itemsData.isEmpty) {
+        return const Left(NoFoodDetectedFailure());
+      }
 
-        for (final item in foodItems) {
-          _cache[cacheKey] = item;
-        }
+      final foodItems = itemsData
+          .map((item) => FoodItemDto.fromJson(item as Map<String, dynamic>).toDomain())
+          .toList();
 
-        return Right(foodItems);
-      } else if (response.status == 402 || response.status == 403) {
-        return const Left(ScanQuotaExceededFailure());
-      } else if (response.status == 503) {
-        return const Left(RecognitionUnavailableFailure());
-      } else {
-        return const Left(ServerFailure('Failed to recognize food. Please try again.'));
+      for (final item in foodItems) {
+        _cache[cacheKey] = item;
+      }
+
+      return Right(foodItems);
+    } on FunctionException catch (e) {
+      logger.e('scan-food function error: status=${e.status} details=${e.details}');
+      switch (e.status) {
+        case 402:
+        case 403:
+          return const Left(ScanQuotaExceededFailure());
+        case 503:
+          return Left(RecognitionUnavailableFailure(_detailsMessage(e.details) ??
+              'Food recognition is temporarily busy. Please try again shortly.'));
+        default:
+          return Left(ServerFailure(
+              _detailsMessage(e.details) ?? 'Failed to recognize food. Please try again.'));
       }
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
+  }
+
+  String? _detailsMessage(dynamic details) {
+    if (details is Map && details['error'] is String) {
+      final error = details['error'] as String;
+      final extra = details['details'];
+      return extra is String ? '$error ($extra)' : error;
+    }
+    if (details is String && details.isNotEmpty) return details;
+    return null;
   }
 
   @override
