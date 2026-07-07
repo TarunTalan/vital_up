@@ -238,7 +238,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
         _emitCurrentState(emit);
       },
-      (searchResults) {
+      (searchResults) async {
         if (searchResults.isEmpty) {
           logger.e('No search results for: ${event.name}');
           // Add with placeholder nutrition
@@ -354,7 +354,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         
         _emitCurrentState(emit);
       },
-      (searchResults) {
+      (searchResults) async {
         if (searchResults.isEmpty) {
           logger.e('No search results for: ${event.name}');
           // Scale existing nutrition by quantity change
