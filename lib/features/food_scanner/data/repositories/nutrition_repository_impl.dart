@@ -43,6 +43,7 @@ class NutritionRepositoryImpl implements NutritionRepository {
         body: {
           'get_nutrition': true,
           'fdc_id': item.id,
+          'serving_description': item.servingDescription,
         },
       );
 

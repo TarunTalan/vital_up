@@ -279,6 +279,59 @@ async function logRecognition(
     });
 }
 
+function parsePortionSize(description: string): number {
+  // USDA data is per 100g, so we need to scale based on actual portion
+  // Default to 1.0 (100g) if we can't parse
+  let scaleFactor = 1.0;
+
+  // Try to extract gram value from description (e.g., "~150g", "150 g", "150grams")
+  const gramMatch = description.match(/(\d+)\s*(?:g|grams?|gram)/i);
+  if (gramMatch) {
+    const grams = parseFloat(gramMatch[1]);
+    scaleFactor = grams / 100; // Scale relative to 100g
+    return scaleFactor;
+  }
+
+  // Try to extract ounce value and convert to grams (1 oz ≈ 28.35g)
+  const ozMatch = description.match(/(\d+)\s*(?:oz|ounces?|ounce)/i);
+  if (ozMatch) {
+    const ounces = parseFloat(ozMatch[1]);
+    const grams = ounces * 28.35;
+    scaleFactor = grams / 100;
+    return scaleFactor;
+  }
+
+  // Try to extract cup value and approximate (1 cup ≈ 240g for most foods)
+  const cupMatch = description.match(/(\d+)\s*(?:cup|cups)/i);
+  if (cupMatch) {
+    const cups = parseFloat(cupMatch[1]);
+    const grams = cups * 240;
+    scaleFactor = grams / 100;
+    return scaleFactor;
+  }
+
+  // Try to extract piece/slice count with size hints
+  const pieceMatch = description.match(/(\d+)\s*(?:piece|pieces|slice|slices)/i);
+  if (pieceMatch) {
+    const count = parseFloat(pieceMatch[1]);
+    // Default approximation: 1 piece/slice ≈ 50g (adjustable)
+    const grams = count * 50;
+    scaleFactor = grams / 100;
+    return scaleFactor;
+  }
+
+  // Try to extract "medium", "large", "small" size hints
+  if (description.toLowerCase().includes('large')) {
+    scaleFactor = 1.5; // Large ≈ 150g
+  } else if (description.toLowerCase().includes('medium')) {
+    scaleFactor = 1.2; // Medium ≈ 120g
+  } else if (description.toLowerCase().includes('small')) {
+    scaleFactor = 0.8; // Small ≈ 80g
+  }
+
+  return scaleFactor;
+}
+
 Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -392,6 +445,34 @@ Deno.serve(async (req) => {
           });
         }
       });
+
+      // Parse portion size from serving description to scale nutrition values
+      // USDA data is per 100g, so we need to scale based on actual portion
+      const servingDescription = body.serving_description || '100g';
+      const scaleFactor = parsePortionSize(servingDescription);
+
+      // Scale all nutrition values by the portion size factor
+      const scaleFields = [
+        'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg',
+        'calcium_mg', 'iron_mg', 'vitamin_a_iu', 'vitamin_c_mg', 'vitamin_d_iu',
+        'vitamin_e_mg', 'vitamin_k_mg', 'thiamin_mg', 'riboflavin_mg', 'niacin_mg',
+        'vitamin_b6_mg', 'vitamin_b12_mcg', 'folate_mcg', 'potassium_mg',
+        'phosphorus_mg', 'magnesium_mg', 'zinc_mg', 'copper_mg', 'manganese_mg',
+        'selenium_mcg', 'cholesterol_mg', 'saturated_fat_g', 'trans_fat_g',
+        'monounsaturated_fat_g', 'polyunsaturated_fat_g'
+      ];
+
+      scaleFields.forEach(field => {
+        if (nutritionData[field] !== undefined) {
+          nutritionData[field] = nutritionData[field] * scaleFactor;
+        }
+      });
+
+      // Scale additional nutrients too
+      nutritionData.additional_nutrients = nutritionData.additional_nutrients.map((n: any) => ({
+        ...n,
+        value: n.value * scaleFactor
+      }));
 
       return jsonResponse(nutritionData, 200);
     }

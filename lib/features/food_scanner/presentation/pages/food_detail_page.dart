@@ -37,88 +37,128 @@ class FoodDetailPage extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        final data = _FoodDetailData.fromState(state);
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            foregroundColor: _FoodScannerStyle.onBackground,
-            leading: IconButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back_rounded),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.ios_share_rounded),
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.info_outline_rounded),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: Stack(
+        // Show loading overlay when fetching nutrition for manual items
+        if (state is LoadingNutrition) {
+          return Stack(
             children: [
-              Positioned.fill(
-                child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
-              ),
-              if (data == null)
-                const Center(child: Text('No nutrition data available.'))
-              else
-                SafeArea(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      _FoodScannerStyle.paddingLarge,
-                      _FoodScannerStyle.paddingSmall,
-                      _FoodScannerStyle.paddingLarge,
-                      _FoodScannerStyle.paddingLarge,
-                    ),
-                    children: [
-                      _ScannedDish(imagePath: data.imagePath),
-                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                      _KeyMatrices(data: data),
-                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                      _DishInfoCard(
-                        dishes: data.dishes,
-                        onRemove: (id) {
-                          context.read<FoodScanBloc>().add(
-                            RemoveDetectedItemRequested(id),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                      _MacroCard(
-                        macros: data.macros,
-                        details: data.macroDetails,
-                        totalGrams: data.totalMacroGrams,
-                      ),
-                      if (data.mealInfo != null) ...[
-                        const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                        _MealInfoPopup(data: data.mealInfo!),
-                      ],
-                      if (data.suggestions.isNotEmpty) ...[
-                        const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                        _Suggestions(suggestions: data.suggestions),
-                      ],
-                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                      _SaveButton(
-                        isSaving: state is SavingMealLog,
-                        onSave: () {
-                          context.read<FoodScanBloc>().add(
-                            ConfirmAndSaveRequested(data.mealType),
-                          );
-                        },
-                      ),
-                    ],
+              _buildContent(context, state),
+              const Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black54,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.white),
                   ),
                 ),
+              ),
             ],
-          ),
-        );
+          );
+        }
+        return _buildContent(context, state);
       },
+    );
+  }
+
+  Widget _buildContent(BuildContext context, FoodScanState state) {
+    final data = _FoodDetailData.fromState(state);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: _FoodScannerStyle.onBackground,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+        actions: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.info_outline_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
+          ),
+          if (data == null)
+            const Center(child: Text('No nutrition data available.'))
+          else
+            SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  _FoodScannerStyle.paddingLarge,
+                  _FoodScannerStyle.paddingSmall,
+                  _FoodScannerStyle.paddingLarge,
+                  _FoodScannerStyle.paddingLarge,
+                ),
+                children: [
+                  _ScannedDish(imagePath: data.imagePath),
+                  const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                  _KeyMatrices(data: data),
+                  const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                  _DishInfoCard(
+                    dishes: data.dishes,
+                    foodItems: data.foodItems,
+                    onRemove: (id) {
+                      context.read<FoodScanBloc>().add(
+                        RemoveDetectedItemRequested(id),
+                      );
+                    },
+                    onEdit: (itemId, name, quantity, unit) {
+                      context.read<FoodScanBloc>().add(
+                        EditFoodItemRequested(
+                          itemId: itemId,
+                          name: name,
+                          quantity: quantity,
+                          unit: unit,
+                        ),
+                      );
+                    },
+                    onAdd: (name, quantity, unit) {
+                      context.read<FoodScanBloc>().add(
+                        AddManualItemRequested(
+                          name: name,
+                          quantity: quantity,
+                          unit: unit,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                  _MacroCard(
+                    macros: data.macros,
+                    details: data.macroDetails,
+                    totalGrams: data.totalMacroGrams,
+                  ),
+                  if (data.mealInfo != null) ...[
+                    const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                    _MealInfoPopup(data: data.mealInfo!),
+                  ],
+                  if (data.suggestions.isNotEmpty) ...[
+                    const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                    _Suggestions(suggestions: data.suggestions),
+                  ],
+                  const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                  _SaveButton(
+                    isSaving: state is SavingMealLog,
+                    onSave: () {
+                      context.read<FoodScanBloc>().add(
+                        ConfirmAndSaveRequested(data.mealType),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -129,6 +169,7 @@ class _FoodDetailData {
   final int totalCalories;
   final int healthScore;
   final List<DishItem> dishes;
+  final List<FoodItem> foodItems;
   final List<MacroMain> macros;
   final List<MacroDetail> macroDetails;
   final int totalMacroGrams;
@@ -142,6 +183,7 @@ class _FoodDetailData {
     required this.totalCalories,
     required this.healthScore,
     required this.dishes,
+    required this.foodItems,
     required this.macros,
     required this.macroDetails,
     required this.totalMacroGrams,
@@ -167,11 +209,21 @@ class _FoodDetailData {
       image = state.image;
       items = state.items;
       nutrition = state.nutrition;
+    } else if (state is LoadingNutrition) {
+      image = state.image;
+      items = state.items;
+      nutrition = state.nutrition;
     } else {
       return null;
     }
 
     if (items.isEmpty || nutrition.isEmpty) return null;
+    
+    // Handle null image case for manual entry without image
+    if (image == null) {
+      // For manual entries without an image, we'll skip the image display
+      // but still show the nutrition data
+    }
 
     final totalCalories = FoodScanUtils.calculateTotalCalories(nutrition);
     final totalProtein = FoodScanUtils.calculateTotalProtein(nutrition);
@@ -305,7 +357,7 @@ class _FoodDetailData {
     );
 
     return _FoodDetailData(
-      imagePath: image.path,
+      imagePath: image?.path ?? '',
       dishName: dishName,
       totalCalories: totalCalories.round(),
       healthScore: _computeHealthScore(
@@ -314,6 +366,7 @@ class _FoodDetailData {
         fatPct / 100,
       ),
       dishes: dishes,
+      foodItems: items,
       macros: macros,
       macroDetails: macroDetails,
       totalMacroGrams: (totalProtein + totalCarbs + totalFat).round(),
@@ -611,13 +664,17 @@ class _CircularScoreMeter extends StatelessWidget {
 
 class _DishInfoCard extends StatelessWidget {
   final List<DishItem> dishes;
+  final List<FoodItem> foodItems;
   final ValueChanged<String> onRemove;
   final Function(String itemId, String name, double quantity, String unit)? onEdit;
+  final Function(String name, double quantity, String unit)? onAdd;
 
   const _DishInfoCard({
     required this.dishes,
+    required this.foodItems,
     required this.onRemove,
     this.onEdit,
+    this.onAdd,
   });
 
   @override
@@ -686,33 +743,36 @@ class _DishInfoCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => FoodItemEditDialog(
-        onSave: () {
-          // This is handled by the Add + button in the parent
-          // For now, we'll implement a simple version
-          // TODO: Implement proper add functionality
+        onSave: (name, quantity, unit) {
+          if (onAdd != null) {
+            onAdd!(name, quantity, unit);
+          }
         },
       ),
     );
   }
 
   void _showEditDialog(BuildContext context, DishItem dish) {
+    // Find the corresponding FoodItem to get current values
+    final foodItem = foodItems.firstWhere(
+      (item) => item.id == dish.id,
+      orElse: () => FoodItem(
+        id: dish.id,
+        name: dish.name,
+        confidenceScore: 1.0,
+        servingDescription: '1 serving',
+        quantity: 1.0,
+        unit: 'serving',
+      ),
+    );
+
     showDialog(
       context: context,
       builder: (context) => FoodItemEditDialog(
-        item: FoodItem(
-          id: dish.id,
-          name: dish.name,
-          confidenceScore: 1.0,
-          servingDescription: '1 serving',
-          quantity: 1.0,
-          unit: 'serving',
-        ),
-        onSave: () {
-          // Get the values from the dialog state
-          // This is a simplified version - in production, you'd want to
-          // pass the values back via callback or state management
+        item: foodItem,
+        onSave: (name, quantity, unit) {
           if (onEdit != null) {
-            onEdit!(dish.id, dish.name, 1.0, 'serving');
+            onEdit!(dish.id, name, quantity, unit);
           }
         },
       ),
