@@ -100,7 +100,7 @@ Rules:
 
 class GroqVisionProvider implements VisionProvider {
   private apiKey: string;
-  private model: string = 'llama-3.2-11b-vision-preview';
+  private model: string = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -266,67 +266,6 @@ async function logRecognition(
     });
 }
 
-async function checkScanQuota(supabase: any, userId: string): Promise<{ allowed: boolean; remaining: number }> {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('is_premium')
-    .eq('user_id', userId)
-    .single();
-
-  const isPremium = subscription?.is_premium || false;
-
-  if (isPremium) {
-    return { allowed: true, remaining: -1 }; // Unlimited
-  }
-
-  const { data: usage } = await supabase
-    .from('scan_usage')
-    .select('scan_count')
-    .eq('user_id', userId)
-    .eq('month', monthStart.toISOString().slice(0, 7))
-    .single();
-
-  const currentCount = usage?.scan_count || 0;
-  const FREE_TIER_LIMIT = 10;
-
-  if (currentCount >= FREE_TIER_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  return { allowed: true, remaining: FREE_TIER_LIMIT - currentCount };
-}
-
-async function incrementScanCount(supabase: any, userId: string): Promise<void> {
-  const now = new Date();
-  const monthKey = now.toISOString().slice(0, 7);
-
-  const { data: existing } = await supabase
-    .from('scan_usage')
-    .select('scan_count')
-    .eq('user_id', userId)
-    .eq('month', monthKey)
-    .single();
-
-  if (existing) {
-    await supabase
-      .from('scan_usage')
-      .update({ scan_count: existing.scan_count + 1 })
-      .eq('user_id', userId)
-      .eq('month', monthKey);
-  } else {
-    await supabase
-      .from('scan_usage')
-      .insert({
-        user_id: userId,
-        month: monthKey,
-        scan_count: 1,
-      });
-  }
-}
-
 Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -405,15 +344,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Image required' }), { status: 400 });
     }
 
-    // Check quota
-    const quotaCheck = await checkScanQuota(supabase, user.id);
-    if (!quotaCheck.allowed) {
-      return new Response(
-        JSON.stringify({ error: 'Scan quota exceeded', remaining: quotaCheck.remaining }),
-        { status: 402 }
-      );
-    }
-
     const startTime = Date.now();
     const chain = new VisionProviderChain(geminiApiKey, groqApiKey);
     const { results, servedBy } = await chain.recognize(image);
@@ -450,9 +380,6 @@ Deno.serve(async (req) => {
         });
       }
     }
-
-    // Increment scan count
-    await incrementScanCount(supabase, user.id);
 
     return new Response(JSON.stringify({ items }), { status: 200 });
 
