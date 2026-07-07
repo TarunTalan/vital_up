@@ -1,76 +1,360 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_scanner_models.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommendation.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_utils.dart';
+
+final GetIt _sl = GetIt.instance;
 
 class FoodDetailPage extends StatelessWidget {
-  final String? imagePath;
-
-  const FoodDetailPage({
-    super.key,
-    this.imagePath,
-  });
+  const FoodDetailPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: _FoodScannerStyle.onBackground,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.ios_share_rounded),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.info_outline_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/bg.png',
-              fit: BoxFit.cover,
+    return BlocConsumer<FoodScanBloc, FoodScanState>(
+      listenWhen: (previous, current) =>
+          current is MealLogSaved || current is RecognitionFailed,
+      listener: (context, state) {
+        if (state is MealLogSaved) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Meal saved to your log.')),
+          );
+          Navigator.of(context).maybePop();
+        } else if (state is RecognitionFailed) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+        }
+      },
+      builder: (context, state) {
+        final data = _FoodDetailData.fromState(state);
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            foregroundColor: _FoodScannerStyle.onBackground,
+            leading: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back_rounded),
             ),
-          ),
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                _FoodScannerStyle.paddingLarge,
-                _FoodScannerStyle.paddingSmall,
-                _FoodScannerStyle.paddingLarge,
-                _FoodScannerStyle.paddingLarge,
+            actions: [
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.ios_share_rounded),
               ),
-              children: [
-                _ScannedDish(imagePath: imagePath),
-                const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                const _KeyMatrices(),
-                const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                const _DishInfoCard(),
-                const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                const _MacroCard(),
-                const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                const _MealInfoPopup(),
-                const SizedBox(height: _FoodScannerStyle.rowSpacing),
-                const _Suggestions(),
-              ],
-            ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.info_outline_rounded),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
-        ],
-      ),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
+              ),
+              if (data == null)
+                const Center(child: Text('No nutrition data available.'))
+              else
+                SafeArea(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      _FoodScannerStyle.paddingLarge,
+                      _FoodScannerStyle.paddingSmall,
+                      _FoodScannerStyle.paddingLarge,
+                      _FoodScannerStyle.paddingLarge,
+                    ),
+                    children: [
+                      _ScannedDish(imagePath: data.imagePath),
+                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                      _KeyMatrices(data: data),
+                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                      _DishInfoCard(
+                        dishes: data.dishes,
+                        onRemove: (id) {
+                          context.read<FoodScanBloc>().add(
+                            RemoveDetectedItemRequested(id),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                      _MacroCard(
+                        macros: data.macros,
+                        details: data.macroDetails,
+                        totalGrams: data.totalMacroGrams,
+                      ),
+                      if (data.mealInfo != null) ...[
+                        const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                        _MealInfoPopup(data: data.mealInfo!),
+                      ],
+                      if (data.suggestions.isNotEmpty) ...[
+                        const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                        _Suggestions(suggestions: data.suggestions),
+                      ],
+                      const SizedBox(height: _FoodScannerStyle.rowSpacing),
+                      _SaveButton(
+                        isSaving: state is SavingMealLog,
+                        onSave: () {
+                          context.read<FoodScanBloc>().add(
+                            ConfirmAndSaveRequested(data.mealType),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
+}
+
+class _FoodDetailData {
+  final String? imagePath;
+  final String dishName;
+  final int totalCalories;
+  final int healthScore;
+  final List<DishItem> dishes;
+  final List<MacroMain> macros;
+  final List<MacroDetail> macroDetails;
+  final int totalMacroGrams;
+  final MealType mealType;
+  final MealPopupData? mealInfo;
+  final List<String> suggestions;
+
+  const _FoodDetailData({
+    required this.imagePath,
+    required this.dishName,
+    required this.totalCalories,
+    required this.healthScore,
+    required this.dishes,
+    required this.macros,
+    required this.macroDetails,
+    required this.totalMacroGrams,
+    required this.mealType,
+    required this.mealInfo,
+    required this.suggestions,
+  });
+
+  static _FoodDetailData? fromState(FoodScanState state) {
+    File? image;
+    List<FoodItem> items;
+    List<NutritionInfo> nutrition;
+
+    if (state is RecognitionSucceeded) {
+      image = state.image;
+      items = state.items;
+      nutrition = state.nutrition;
+    } else if (state is RecognitionLowConfidence) {
+      image = state.image;
+      items = state.items;
+      nutrition = state.nutrition;
+    } else if (state is NutritionLoaded) {
+      image = state.image;
+      items = state.items;
+      nutrition = state.nutrition;
+    } else {
+      return null;
+    }
+
+    if (items.isEmpty || nutrition.isEmpty) return null;
+
+    final totalCalories = FoodScanUtils.calculateTotalCalories(nutrition);
+    final totalProtein = FoodScanUtils.calculateTotalProtein(nutrition);
+    final totalCarbs = FoodScanUtils.calculateTotalCarbs(nutrition);
+    final totalFat = FoodScanUtils.calculateTotalFat(nutrition);
+    final totalFiber = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.fiberG,
+    );
+    final totalSugar = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.sugarG,
+    );
+    final totalSodium = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.sodiumMg,
+    );
+
+    final proteinPct = (FoodScanUtils.calculateProteinRatio(nutrition) * 100)
+        .round();
+    final carbPct = (FoodScanUtils.calculateCarbRatio(nutrition) * 100).round();
+    final fatPct = (FoodScanUtils.calculateFatRatio(nutrition) * 100).round();
+
+    final dishes = [
+      for (final nut in nutrition)
+        DishItem(
+          id: nut.per.id,
+          name: nut.per.name,
+          calories: nut.calories.round(),
+        ),
+    ];
+
+    final macros = [
+      MacroMain(
+        name: 'Protein',
+        grams: totalProtein.round(),
+        percent: proteinPct,
+        color: const Color(0xFF00B3A4),
+      ),
+      MacroMain(
+        name: 'Carbs',
+        grams: totalCarbs.round(),
+        percent: carbPct,
+        color: const Color(0xFFFFB300),
+      ),
+      MacroMain(
+        name: 'Fat',
+        grams: totalFat.round(),
+        percent: fatPct,
+        color: const Color(0xFF9C7CFF),
+      ),
+    ];
+
+    final macroDetails = [
+      MacroDetail(name: 'Dietary Fiber', grams: totalFiber.round()),
+      MacroDetail(name: 'Total Sugars', grams: totalSugar.round()),
+      MacroDetail(name: 'Sodium', grams: totalSodium.round(), unit: 'mg'),
+    ];
+
+    final dishName = items.length == 1 ? items.first.name : 'Scanned Meal';
+    final now = DateTime.now();
+    final mealType = MealLogEntry.mealTypeFromTime(now);
+
+    final recommendation = _buildRecommendation(
+      image: image,
+      items: items,
+      nutrition: nutrition,
+      totalCalories: totalCalories,
+      mealType: mealType,
+      now: now,
+    );
+
+    final mealInfo = MealPopupData(
+      title: _mealTypeLabel(mealType),
+      time: _formatTime(now),
+      points: recommendation == null || recommendation.message.isEmpty
+          ? const []
+          : [recommendation.message],
+    );
+
+    return _FoodDetailData(
+      imagePath: image.path,
+      dishName: dishName,
+      totalCalories: totalCalories.round(),
+      healthScore: _computeHealthScore(
+        proteinPct / 100,
+        carbPct / 100,
+        fatPct / 100,
+      ),
+      dishes: dishes,
+      macros: macros,
+      macroDetails: macroDetails,
+      totalMacroGrams: (totalProtein + totalCarbs + totalFat).round(),
+      mealType: mealType,
+      mealInfo: mealInfo.points.isEmpty ? null : mealInfo,
+      suggestions: recommendation == null
+          ? const []
+          : _tagsToSuggestions(recommendation.reasonTags),
+    );
+  }
+}
+
+_Recommendation? _buildRecommendation({
+  required File? image,
+  required List<FoodItem> items,
+  required List<NutritionInfo> nutrition,
+  required double totalCalories,
+  required MealType mealType,
+  required DateTime now,
+}) {
+  if (!_sl.isRegistered<GetMealRecommendation>()) return null;
+  final entry = MealLogEntry(
+    id: 'preview',
+    capturedAt: now,
+    imagePath: image?.path ?? '',
+    items: items,
+    nutrition: nutrition,
+    totalCalories: totalCalories,
+    mealType: mealType,
+    userConfirmed: false,
+  );
+  final recommendation = _sl<GetMealRecommendation>()(entry, now: now);
+  return _Recommendation(
+    message: recommendation.message,
+    reasonTags: recommendation.reasonTags,
+  );
+}
+
+class _Recommendation {
+  final String message;
+  final List<String> reasonTags;
+
+  const _Recommendation({required this.message, required this.reasonTags});
+}
+
+List<String> _tagsToSuggestions(List<String> tags) {
+  const mapping = {
+    'high_protein':
+        'This meal is protein-rich, which supports muscle maintenance and satiety.',
+    'high_fat':
+        'This meal is high in fat, so balance it with lighter meals today.',
+    'late_eating':
+        'It is getting late; try to finish eating a couple of hours before bed.',
+    'post_workout_window':
+        'Great post-workout timing for recovery and muscle repair.',
+  };
+  return [
+    for (final tag in tags)
+      if (mapping.containsKey(tag)) mapping[tag]!,
+  ];
+}
+
+String _mealTypeLabel(MealType type) {
+  switch (type) {
+    case MealType.breakfast:
+      return 'Breakfast';
+    case MealType.lunch:
+      return 'Lunch';
+    case MealType.dinner:
+      return 'Dinner';
+    case MealType.snack:
+      return 'Snack';
+  }
+}
+
+String _formatTime(DateTime time) {
+  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  final minute = time.minute.toString().padLeft(2, '0');
+  final period = time.hour < 12 ? 'AM' : 'PM';
+  return '$hour:$minute $period';
+}
+
+int _computeHealthScore(
+  double proteinRatio,
+  double carbRatio,
+  double fatRatio,
+) {
+  // Heuristic based on how close the macro split is to a balanced target
+  // (protein 30%, carbs 40%, fat 30% of calories).
+  final deviation =
+      (proteinRatio - 0.3).abs() +
+      (carbRatio - 0.4).abs() +
+      (fatRatio - 0.3).abs();
+  return (100 - deviation * 100).clamp(0, 100).round();
 }
 
 class _FoodScannerStyle {
@@ -95,7 +379,6 @@ class _FoodScannerStyle {
   static const double paddingSmall = 12;
   static const double rowSpacing = 16;
   static const double cardRadius = 20;
-  static const double iconSize = 18;
   static const double meterSize = 120;
   static const double meterStroke = 12;
   static const double textSmall = 14;
@@ -158,25 +441,6 @@ class _ScannedDish extends StatelessWidget {
                     color: colors.primary,
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.edit_rounded),
-                      color: _FoodScannerStyle.onBackground,
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.add_rounded),
-                      color: _FoodScannerStyle.onBackground,
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -186,7 +450,9 @@ class _ScannedDish extends StatelessWidget {
 }
 
 class _KeyMatrices extends StatelessWidget {
-  const _KeyMatrices();
+  final _FoodDetailData data;
+
+  const _KeyMatrices({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +465,7 @@ class _KeyMatrices extends StatelessWidget {
           const _SectionLabel('Key Matrices'),
           const SizedBox(height: 10),
           Text(
-            'Dish Name',
+            data.dishName,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: _FoodScannerStyle.textMedium,
               decoration: TextDecoration.underline,
@@ -208,7 +474,7 @@ class _KeyMatrices extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const _CircularScoreMeter(score: 70),
+              _CircularScoreMeter(score: data.healthScore),
               const SizedBox(width: _FoodScannerStyle.rowSpacing),
               Expanded(
                 child: Column(
@@ -226,9 +492,9 @@ class _KeyMatrices extends StatelessWidget {
                           fontSize: _FoodScannerStyle.textLarge,
                           fontWeight: FontWeight.w600,
                         ),
-                        children: const [
-                          TextSpan(text: '348'),
-                          TextSpan(
+                        children: [
+                          TextSpan(text: '${data.totalCalories}'),
+                          const TextSpan(
                             text: ' Kcal',
                             style: TextStyle(
                               color: _FoodScannerStyle.tealText,
@@ -279,10 +545,10 @@ class _CircularScoreMeter extends StatelessWidget {
             '$clamped $label',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: _FoodScannerStyle.textMedium,
-                ),
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: _FoodScannerStyle.textMedium,
+            ),
           ),
         ],
       ),
@@ -291,15 +557,10 @@ class _CircularScoreMeter extends StatelessWidget {
 }
 
 class _DishInfoCard extends StatelessWidget {
-  const _DishInfoCard();
+  final List<DishItem> dishes;
+  final ValueChanged<String> onRemove;
 
-  static const dishes = [
-    DishItem(name: 'Chopped Onions', calories: 5),
-    DishItem(name: 'Cucumber Slices', calories: 8),
-    DishItem(name: 'Pav', calories: 328),
-    DishItem(name: 'Pav Bhaji', calories: 716),
-    DishItem(name: 'Lime Wedge', calories: 7),
-  ];
+  const _DishInfoCard({required this.dishes, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -352,7 +613,7 @@ class _DishInfoCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   InkWell(
-                    onTap: () {},
+                    onTap: () => onRemove(dish.id),
                     child: const Icon(Icons.delete_outline_rounded, size: 18),
                   ),
                 ],
@@ -365,34 +626,15 @@ class _DishInfoCard extends StatelessWidget {
 }
 
 class _MacroCard extends StatelessWidget {
-  const _MacroCard();
+  final List<MacroMain> macros;
+  final List<MacroDetail> details;
+  final int totalGrams;
 
-  static const macros = [
-    MacroMain(
-      name: 'Protein',
-      grams: 38,
-      percent: 43,
-      color: Color(0xFF00B3A4),
-    ),
-    MacroMain(
-      name: 'Carbs',
-      grams: 38,
-      percent: 43,
-      color: Color(0xFFFFB300),
-    ),
-    MacroMain(
-      name: 'Fat',
-      grams: 38,
-      percent: 43,
-      color: Color(0xFF9C7CFF),
-    ),
-  ];
-
-  static const details = [
-    MacroDetail(name: 'Dietary Fiber', grams: 5),
-    MacroDetail(name: 'Total Sugars', grams: 8),
-    MacroDetail(name: 'Saturated Fat', grams: 7),
-  ];
+  const _MacroCard({
+    required this.macros,
+    required this.details,
+    required this.totalGrams,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +680,7 @@ class _MacroCard extends StatelessWidget {
           ],
           const Divider(height: 32, color: _FoodScannerStyle.divider),
           Text(
-            'Total: 88g of macronutrients',
+            'Total: ${totalGrams}g of macronutrients',
             style: theme.textTheme.bodySmall?.copyWith(
               color: Colors.grey,
               fontSize: _FoodScannerStyle.textSmall,
@@ -483,7 +725,7 @@ class _MacroMainRow extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         LinearProgressIndicator(
-          value: macro.percent / 100,
+          value: (macro.percent / 100).clamp(0.0, 1.0),
           minHeight: 8,
           color: macro.color,
           backgroundColor: _FoodScannerStyle.track,
@@ -501,7 +743,9 @@ class _MacroDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85);
+    final color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.85);
 
     return Row(
       children: [
@@ -515,7 +759,7 @@ class _MacroDetailRow extends StatelessWidget {
           ),
         ),
         Text(
-          '${detail.grams} g',
+          '${detail.grams} ${detail.unit}',
           style: TextStyle(
             color: color,
             fontSize: _FoodScannerStyle.textMedium,
@@ -527,16 +771,9 @@ class _MacroDetailRow extends StatelessWidget {
 }
 
 class _MealInfoPopup extends StatelessWidget {
-  const _MealInfoPopup();
+  final MealPopupData data;
 
-  static const data = MealPopupData(
-    title: 'Lunch',
-    time: '12:45 PM',
-    points: [
-      'Great timing! This meal fits well in your afternoon eating window.',
-      'Eating protein-rich meals during midday helps maintain energy levels and supports muscle protein synthesis.',
-    ],
-  );
+  const _MealInfoPopup({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -549,11 +786,7 @@ class _MealInfoPopup extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.schedule_rounded,
-                color: colors.primary,
-                size: 20,
-              ),
+              Icon(Icons.schedule_rounded, color: colors.primary, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -576,13 +809,6 @@ class _MealInfoPopup extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: _FoodScannerStyle.subtleText,
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -596,7 +822,9 @@ class _MealInfoPopup extends StatelessWidget {
 }
 
 class _Suggestions extends StatelessWidget {
-  const _Suggestions();
+  final List<String> suggestions;
+
+  const _Suggestions({required this.suggestions});
 
   @override
   Widget build(BuildContext context) {
@@ -627,18 +855,38 @@ class _Suggestions extends StatelessWidget {
           const SizedBox(height: 12),
           Divider(color: colors.outline.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
-          const _SuggestionRow(
-            number: 1,
-            text:
-                'Consider adding colourful veggies like bell peppers or cherry tomatoes for extra vitamins.',
-          ),
-          const SizedBox(height: 8),
-          const _SuggestionRow(
-            number: 2,
-            text:
-                'Try a lighter dressing or use it on the side to reduce added sugars.',
-          ),
+          for (var i = 0; i < suggestions.length; i++) ...[
+            _SuggestionRow(number: i + 1, text: suggestions[i]),
+            if (i != suggestions.length - 1) const SizedBox(height: 8),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _SaveButton extends StatelessWidget {
+  final bool isSaving;
+  final VoidCallback onSave;
+
+  const _SaveButton({required this.isSaving, required this.onSave});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: FilledButton(
+        onPressed: isSaving ? null : onSave,
+        child: isSaving
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Text('Add to Log'),
       ),
     );
   }
@@ -648,10 +896,7 @@ class _SuggestionRow extends StatelessWidget {
   final int number;
   final String text;
 
-  const _SuggestionRow({
-    required this.number,
-    required this.text,
-  });
+  const _SuggestionRow({required this.number, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -662,10 +907,9 @@ class _SuggestionRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontSize: 15,
-                  height: 1.2,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.2),
           ),
         ),
         const Icon(Icons.chevron_right_rounded, size: 16),
@@ -728,10 +972,9 @@ class _BulletText extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 15,
-                    height: 1.2,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.2),
             ),
           ),
         ],
@@ -750,9 +993,9 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey,
-            fontSize: _FoodScannerStyle.textSmall,
-          ),
+        color: Colors.grey,
+        fontSize: _FoodScannerStyle.textSmall,
+      ),
     );
   }
 }
