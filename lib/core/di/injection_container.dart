@@ -155,7 +155,6 @@ Future<void> initDependencies() async {
     () => ScanFoodImage(
       foodRecognitionRepository: sl<FoodRecognitionRepository>(),
       nutritionRepository: sl<NutritionRepository>(),
-      subscriptionRepository: sl<SubscriptionRepository>(),
     ),
   );
   
