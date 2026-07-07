@@ -183,6 +183,7 @@ Future<void> initDependencies() async {
     scanBarcode: sl<ScanBarcode>(),
     saveMealLog: sl<SaveMealLog>(),
     getMealRecommendation: sl<GetMealRecommendation>(),
+    nutritionRepository: sl<NutritionRepository>(),
     uuid: sl<Uuid>(),
     logger: sl<Logger>(),
   ));

@@ -56,6 +56,23 @@ class AddManualItemRequested extends FoodScanEvent {
   List<Object?> get props => [name, quantity, unit];
 }
 
+class EditFoodItemRequested extends FoodScanEvent {
+  final String itemId;
+  final String name;
+  final double quantity;
+  final String unit;
+
+  const EditFoodItemRequested({
+    required this.itemId,
+    required this.name,
+    required this.quantity,
+    required this.unit,
+  });
+
+  @override
+  List<Object?> get props => [itemId, name, quantity, unit];
+}
+
 class ConfirmAndSaveRequested extends FoodScanEvent {
   final MealType mealType;
 
