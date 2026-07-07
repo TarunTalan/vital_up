@@ -5,39 +5,18 @@ import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
-import 'package:vital_up/features/food_scanner/domain/repositories/subscription_repository.dart';
 
 class ScanFoodImage {
   final FoodRecognitionRepository foodRecognitionRepository;
   final NutritionRepository nutritionRepository;
-  final SubscriptionRepository subscriptionRepository;
 
   ScanFoodImage({
     required this.foodRecognitionRepository,
     required this.nutritionRepository,
-    required this.subscriptionRepository,
   });
 
   Future<Either<Failure, List<NutritionInfo>>> call(File image) async {
     print('ScanFoodImage use case called');
-    // Check quota before making API calls
-    print('Checking quota...');
-    final quotaResult = await subscriptionRepository.remainingFreeScans();
-    print('Quota result: $quotaResult');
-    
-    if (quotaResult.isLeft()) {
-      print('Quota check failed');
-      return Left(quotaResult.swap().getOrElse(() => const ServerFailure('Failed to check quota')));
-    }
-
-    final remainingScans = quotaResult.getOrElse(() => 0);
-    print('Remaining scans: $remainingScans');
-    
-    if (remainingScans == 0) {
-      print('Scan quota exceeded');
-      return const Left(ScanQuotaExceededFailure());
-    }
-
     print('Calling foodRecognitionRepository.recognizeFood');
     final recognitionResult = await foodRecognitionRepository.recognizeFood(
       image,
