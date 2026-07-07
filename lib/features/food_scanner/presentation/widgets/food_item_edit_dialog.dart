@@ -3,7 +3,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 
 class FoodItemEditDialog extends StatefulWidget {
   final FoodItem? item;
-  final VoidCallback onSave;
+  final Function(String name, double quantity, String unit) onSave;
 
   const FoodItemEditDialog({
     super.key,
@@ -57,8 +57,8 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
       return;
     }
 
-    // Save the data - the parent will handle the event
-    widget.onSave();
+    // Save the data - pass values back to parent
+    widget.onSave(name, quantity, _selectedUnit);
     Navigator.of(context).pop();
   }
 

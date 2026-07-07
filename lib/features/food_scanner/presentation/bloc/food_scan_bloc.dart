@@ -208,41 +208,43 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       unit: event.unit,
     );
 
-    // For manual items, we'll need to fetch nutrition
-    // For now, we'll add with placeholder nutrition
-    final placeholderNutrition = NutritionInfo(
-      calories: 0,
-      proteinG: 0,
-      carbsG: 0,
-      fatG: 0,
-      fiberG: 0,
-      sugarG: 0,
-      sodiumMg: 0,
-      per: newItem,
+    // Emit loading state
+    emit(LoadingNutrition(
+      image: _currentImage,
+      items: _currentItems,
+      nutrition: _currentNutrition,
+    ));
+
+    // Fetch nutrition for the manual item
+    final nutritionResult = await nutritionRepository.getNutrition(newItem);
+
+    nutritionResult.fold(
+      (failure) {
+        logger.e('Failed to fetch nutrition for manual item: $failure');
+        // If nutrition fetch fails, add with zero nutrition
+        final placeholderNutrition = NutritionInfo(
+          calories: 0,
+          proteinG: 0,
+          carbsG: 0,
+          fatG: 0,
+          fiberG: 0,
+          sugarG: 0,
+          sodiumMg: 0,
+          per: newItem,
+        );
+
+        _currentItems.add(newItem);
+        _currentNutrition.add(placeholderNutrition);
+
+        _emitCurrentState(emit);
+      },
+      (nutrition) {
+        _currentItems.add(newItem);
+        _currentNutrition.add(nutrition);
+
+        _emitCurrentState(emit);
+      },
     );
-
-    _currentItems.add(newItem);
-    _currentNutrition.add(placeholderNutrition);
-
-    if (state is RecognitionSucceeded) {
-      emit(RecognitionSucceeded(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
-    } else if (state is RecognitionLowConfidence) {
-      emit(RecognitionLowConfidence(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
-    } else if (state is NutritionLoaded) {
-      emit(NutritionLoaded(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
-    }
   }
 
   Future<void> _onEditFoodItemRequested(
