@@ -242,7 +242,7 @@ class VisionProviderChain {
 
 async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
   const response = await fetch(
-    `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${apiKey}&pageSize=5`
+    `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${apiKey}&pageSize=10&dataType=Foundation,SR%20Legacy,Branded`
   );
 
   if (!response.ok) {
@@ -250,7 +250,46 @@ async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
   }
 
   const data = await response.json();
-  return data.foods || [];
+  const foods = data.foods || [];
+  
+  // Filter and score foods to get the best match
+  // Prefer Foundation and SR Legacy data over Branded
+  // Prefer exact name matches
+  const scoredFoods = foods.map((food: any) => {
+    let score = 0;
+    
+    // Prefer Foundation and SR Legacy data types
+    if (food.dataType === 'Foundation') {
+      score += 10;
+    } else if (food.dataType === 'SR Legacy') {
+      score += 8;
+    } else if (food.dataType === 'Branded') {
+      score += 1;
+    }
+    
+    // Prefer exact name matches
+    const foodNameLower = food.description.toLowerCase();
+    const queryLower = query.toLowerCase();
+    if (foodNameLower === queryLower) {
+      score += 5;
+    } else if (foodNameLower.includes(queryLower)) {
+      score += 3;
+    }
+    
+    // Penalize foods with very long descriptions (likely multi-ingredient products)
+    if (food.description.length > 50) {
+      score -= 2;
+    }
+    
+    return { ...food, score };
+  });
+  
+  // Sort by score and return top results
+  scoredFoods.sort((a: any, b: any) => b.score - a.score);
+  
+  console.log(`USDA search for "${query}": found ${foods.length} results, top scored: ${scoredFoods.slice(0, 3).map((f: any) => `${f.description} (${f.dataType}, score: ${f.score})`).join(', ')}`);
+  
+  return scoredFoods.slice(0, 5);
 }
 
 async function getUSDANutrition(fdcId: string, apiKey: string): Promise<any> {
