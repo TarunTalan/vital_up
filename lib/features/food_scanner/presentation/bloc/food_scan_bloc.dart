@@ -315,6 +315,15 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         items: _currentItems,
         nutrition: _currentNutrition,
       ));
+    } else {
+      // Default to RecognitionSucceeded if we have data
+      if (_currentImage != null && _currentItems.isNotEmpty) {
+        emit(RecognitionSucceeded(
+          image: _currentImage!,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ));
+      }
     }
   }
 
