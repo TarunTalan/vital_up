@@ -20,6 +20,17 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
 
   final Map<String, FoodItem> _cache = {};
 
+  /// Supabase Edge Functions only auto-decode the response body into a
+  /// [Map] when the function sets `Content-Type: application/json`.
+  /// If that header is missing, `response.data` comes back as a raw
+  /// JSON string instead, which crashes a plain `as Map<String, dynamic>`
+  /// cast. This normalizes either case.
+  Map<String, dynamic> _decodeMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is String) return jsonDecode(raw) as Map<String, dynamic>;
+    throw FormatException('Unexpected response type: ${raw.runtimeType}');
+  }
+
   @override
   Future<Either<Failure, List<FoodItem>>> recognizeFood(File image) async {
     print('recognizeFood called with image: ${image.path}');
@@ -45,7 +56,7 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       print('Supabase response status: ${response.status}');
       print('Supabase response data: ${response.data}');
 
-      final data = response.data as Map<String, dynamic>;
+      final data = _decodeMap(response.data);
       final itemsData = data['items'] as List<dynamic>?;
       print('Items data: $itemsData');
 
@@ -102,9 +113,9 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       );
 
       if (response.status == 200) {
-        final data = response.data as Map<String, dynamic>;
+        final data = _decodeMap(response.data);
         final itemsData = data['items'] as List<dynamic>?;
-        
+
         if (itemsData == null || itemsData.isEmpty) {
           return const Left(ServerFailure('No results found.'));
         }

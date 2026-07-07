@@ -10,6 +10,18 @@ interface VisionProvider {
   recognize(imageBase64: string): Promise<VisionResponse[]>;
 }
 
+// Every response from this function must be JSON, and clients (including the
+// Supabase Dart SDK) only auto-decode the body into a Map when the
+// Content-Type header says so. Without it, callers get a raw string and
+// crash on `response.data as Map<String, dynamic>`. Route every response
+// through this helper so that header is never missed.
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 class GeminiVisionProvider implements VisionProvider {
   private apiKey: string;
   private model: string = 'gemini-2.0-flash';
@@ -55,7 +67,7 @@ class GeminiVisionProvider implements VisionProvider {
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (!text) {
       throw new Error('No response from Gemini');
     }
@@ -146,7 +158,7 @@ class GroqVisionProvider implements VisionProvider {
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content;
-    
+
     if (!text) {
       throw new Error('No response from Groq');
     }
@@ -280,14 +292,14 @@ Deno.serve(async (req) => {
     // Verify JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401 });
+      return jsonResponse({ error: 'Invalid token' }, 401);
     }
 
     const body = await req.json();
@@ -306,13 +318,49 @@ Deno.serve(async (req) => {
         unit: 'serving',
       }));
 
-      return new Response(JSON.stringify({ items }), { status: 200 });
+      return jsonResponse({ items }, 200);
     }
 
     // Handle nutrition lookup by FDC ID
     if (get_nutrition && fdc_id) {
       const foodData = await getUSDANutrition(fdc_id, usdaApiKey);
       const nutrients = foodData.foodNutrients || [];
+
+      // USDA nutrient IDs for accurate matching
+      const nutrientIdMap: Record<number, string> = {
+        1008: 'calories',           // Energy
+        1003: 'protein_g',          // Protein
+        1005: 'carbs_g',            // Carbohydrate, by difference
+        1004: 'fat_g',              // Total lipid (fat)
+        1079: 'fiber_g',            // Fiber, total dietary
+        2000: 'sugar_g',            // Sugars, total
+        1093: 'sodium_mg',          // Sodium
+        1087: 'calcium_mg',         // Calcium
+        1089: 'iron_mg',            // Iron
+        1104: 'vitamin_a_iu',       // Vitamin A, IU
+        1162: 'vitamin_c_mg',       // Vitamin C, total ascorbic acid
+        1106: 'vitamin_d_iu',       // Vitamin D
+        1114: 'vitamin_e_mg',       // Vitamin E
+        1187: 'vitamin_k_mg',       // Vitamin K
+        1124: 'thiamin_mg',         // Vitamin B1
+        1126: 'riboflavin_mg',      // Vitamin B2
+        1165: 'niacin_mg',          // Vitamin B3
+        1176: 'vitamin_b6_mg',      // Vitamin B6
+        1178: 'vitamin_b12_mcg',    // Vitamin B12
+        1135: 'folate_mcg',         // Folate
+        1092: 'potassium_mg',       // Potassium
+        1091: 'phosphorus_mg',      // Phosphorus
+        1090: 'magnesium_mg',       // Magnesium
+        1098: 'zinc_mg',            // Zinc
+        1100: 'copper_mg',          // Copper
+        1101: 'manganese_mg',       // Manganese
+        1109: 'selenium_mcg',       // Selenium
+        1253: 'cholesterol_mg',     // Cholesterol
+        1258: 'saturated_fat_g',    // Fatty acids, total saturated
+        1292: 'trans_fat_g',        // Fatty acids, total trans
+        1257: 'monounsaturated_fat_g', // Fatty acids, total monounsaturated
+        1259: 'polyunsaturated_fat_g', // Fatty acids, total polyunsaturated
+      };
 
       const nutritionData: any = {
         calories: 0,
@@ -322,27 +370,35 @@ Deno.serve(async (req) => {
         fiber_g: 0,
         sugar_g: 0,
         sodium_mg: 0,
+        additional_nutrients: [],
       };
 
       nutrients.forEach((n: any) => {
-        const name = n.name?.toLowerCase() || '';
-        const value = n.amount || 0;
+        const nutrientId = n.nutrient?.id ?? n.id;
+        const nutrientName = n.nutrient?.name ?? n.name;
+        const unitName = n.nutrient?.unitName ?? n.unitName;
+        const value = n.amount ?? n.nutrient?.amount ?? 0;
 
-        if (name.includes('energy')) nutritionData.calories = value;
-        else if (name.includes('protein')) nutritionData.protein_g = value;
-        else if (name.includes('carbohydrate')) nutritionData.carbs_g = value;
-        else if (name.includes('total lipid')) nutritionData.fat_g = value;
-        else if (name.includes('fiber')) nutritionData.fiber_g = value;
-        else if (name.includes('sugars')) nutritionData.sugar_g = value;
-        else if (name.includes('sodium')) nutritionData.sodium_mg = value;
+        if (nutrientId && nutrientIdMap[nutrientId]) {
+          const field = nutrientIdMap[nutrientId];
+          nutritionData[field] = value;
+        } else {
+          // Include all other nutrients as additional data
+          nutritionData.additional_nutrients.push({
+            id: nutrientId,
+            name: nutrientName,
+            unit: unitName,
+            value: value,
+          });
+        }
       });
 
-      return new Response(JSON.stringify(nutritionData), { status: 200 });
+      return jsonResponse(nutritionData, 200);
     }
 
     // Handle image recognition
     if (!image) {
-      return new Response(JSON.stringify({ error: 'Image required' }), { status: 400 });
+      return jsonResponse({ error: 'Image required' }, 400);
     }
 
     const startTime = Date.now();
@@ -382,21 +438,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ items }), { status: 200 });
+    return jsonResponse({ items }, 200);
 
   } catch (error) {
     console.error('Error in scan-food function:', error);
-    
+
     if (typeof error?.message === 'string' && error.message.startsWith('All vision providers failed')) {
-      return new Response(
-        JSON.stringify({ error: 'Recognition temporarily unavailable', details: error.message }),
-        { status: 503 }
+      return jsonResponse(
+        { error: 'Recognition temporarily unavailable', details: error.message },
+        503
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500 }
-    );
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
