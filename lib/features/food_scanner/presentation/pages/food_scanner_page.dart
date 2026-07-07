@@ -2,25 +2,42 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/food_detail_page.dart';
 
-class FoodScannerPage extends StatefulWidget {
-  final VoidCallback onBack;
-  final ValueChanged<String?> onNavigateToDetail;
+final GetIt _sl = GetIt.instance;
 
-  const FoodScannerPage({
-    super.key,
-    required this.onBack,
-    required this.onNavigateToDetail,
-  });
+class FoodScannerPage extends StatelessWidget {
+  final VoidCallback? onBack;
+
+  const FoodScannerPage({super.key, this.onBack});
 
   @override
-  State<FoodScannerPage> createState() => _FoodScannerPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider<FoodScanBloc>(
+      create: (_) => _sl<FoodScanBloc>(),
+      child: FoodScannerView(onBack: onBack),
+    );
+  }
 }
 
-class _FoodScannerPageState extends State<FoodScannerPage> {
+class FoodScannerView extends StatefulWidget {
+  final VoidCallback? onBack;
+
+  const FoodScannerView({super.key, this.onBack});
+
+  @override
+  State<FoodScannerView> createState() => _FoodScannerViewState();
+}
+
+class _FoodScannerViewState extends State<FoodScannerView> {
   final ImagePicker _imagePicker = ImagePicker();
   CameraController? _cameraController;
   Future<void>? _cameraInitFuture;
@@ -105,7 +122,7 @@ class _FoodScannerPageState extends State<FoodScannerPage> {
       final image = await controller.takePicture();
       if (!mounted) return;
       setState(() => _selectedImage = image);
-      widget.onNavigateToDetail(image.path);
+      _analyzeImage(image.path);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +138,25 @@ class _FoodScannerPageState extends State<FoodScannerPage> {
     if (image == null || !mounted) return;
 
     setState(() => _selectedImage = image);
-    widget.onNavigateToDetail(image.path);
+    _analyzeImage(image.path);
+  }
+
+  void _analyzeImage(String path) {
+    final bloc = context.read<FoodScanBloc>();
+    bloc.add(ImageSelected(File(path)));
+    bloc.add(RecognizeFoodRequested());
+  }
+
+  void _openDetail(BuildContext context) {
+    final bloc = context.read<FoodScanBloc>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider<FoodScanBloc>.value(
+          value: bloc,
+          child: const FoodDetailPage(),
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleFlash() async {
@@ -135,86 +170,110 @@ class _FoodScannerPageState extends State<FoodScannerPage> {
       setState(() => _torchEnabled = enabled);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Flash is not available.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Flash is not available.')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(child: _buildCameraLayer()),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.48),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.55),
-                  ],
+    return BlocConsumer<FoodScanBloc, FoodScanState>(
+      listenWhen: (previous, current) =>
+          current is RecognitionSucceeded ||
+          current is RecognitionLowConfidence ||
+          current is RecognitionFailed,
+      listener: (context, state) {
+        if (state is RecognitionSucceeded ||
+            state is RecognitionLowConfidence) {
+          _openDetail(context);
+        } else if (state is RecognitionFailed) {
+          setState(() => _selectedImage = null);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+        }
+      },
+      builder: (context, state) {
+        final isRecognizing = state is RecognizingFood;
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              Positioned.fill(child: _buildCameraLayer()),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.48),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.55),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: Column(
-                children: [
-                  Row(
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Column(
                     children: [
-                      _ScannerIconButton(
-                        iconAsset: 'assets/icons/arrow.svg',
-                        onTap: widget.onBack,
+                      Row(
+                        children: [
+                          _ScannerIconButton(
+                            iconAsset: 'assets/icons/arrow.svg',
+                            onTap:
+                                widget.onBack ??
+                                () => Navigator.of(context).maybePop(),
+                          ),
+                          const Spacer(),
+                          _ScannerIconButton(
+                            iconAsset: 'assets/icons/info_icon.svg',
+                            onTap: () {},
+                            size: 26,
+                          ),
+                        ],
                       ),
                       const Spacer(),
-                      _ScannerIconButton(
-                        iconAsset: 'assets/icons/info_icon.svg',
-                        onTap: () {},
-                        size: 26,
+                      if (_selectedImage != null) ...[
+                        _ScannedPreviewCard(
+                          imagePath: _selectedImage!.path,
+                          onEdit: _pickFromGallery,
+                          onAdd: () => _analyzeImage(_selectedImage!.path),
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _ScannerIconButton(
+                            iconAsset: 'assets/icons/gallery_add.svg',
+                            onTap: isRecognizing ? () {} : _pickFromGallery,
+                          ),
+                          _CaptureButton(
+                            isLoading: _isCapturing || isRecognizing,
+                            onTap: _capturePhoto,
+                          ),
+                          _ScannerIconButton(
+                            iconAsset: 'assets/icons/flash.svg',
+                            color: _torchEnabled ? Colors.yellow : Colors.white,
+                            onTap: _toggleFlash,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const Spacer(),
-                  if (_selectedImage != null) ...[
-                    _ScannedPreviewCard(
-                      imagePath: _selectedImage!.path,
-                      onEdit: _pickFromGallery,
-                      onAdd: () => widget.onNavigateToDetail(_selectedImage!.path),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _ScannerIconButton(
-                        iconAsset: 'assets/icons/gallery_add.svg',
-                        onTap: _pickFromGallery,
-                      ),
-                      _CaptureButton(
-                        isLoading: _isCapturing,
-                        onTap: _capturePhoto,
-                      ),
-                      _ScannerIconButton(
-                        iconAsset: 'assets/icons/flash.svg',
-                        color: _torchEnabled ? Colors.yellow : Colors.white,
-                        onTap: _toggleFlash,
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
+              if (isRecognizing)
+                const Positioned.fill(child: _RecognizingOverlay()),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -254,6 +313,30 @@ class _FoodScannerPageState extends State<FoodScannerPage> {
 
         return _FullScreenCameraPreview(controller: controller);
       },
+    );
+  }
+}
+
+class _RecognizingOverlay extends StatelessWidget {
+  const _RecognizingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black54,
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              'Analysing your meal...',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -319,15 +402,12 @@ class _ScannerMessage extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 12),
-          FilledButton(
-            onPressed: onTap,
-            child: Text(buttonLabel),
-          ),
+          FilledButton(onPressed: onTap, child: Text(buttonLabel)),
         ],
       ),
     );
@@ -372,10 +452,7 @@ class _CaptureButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onTap;
 
-  const _CaptureButton({
-    required this.isLoading,
-    required this.onTap,
-  });
+  const _CaptureButton({required this.isLoading, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -451,8 +528,10 @@ class _ScannedPreviewCard extends StatelessWidget {
                         'assets/icons/edit.svg',
                         width: 22,
                         height: 22,
-                        colorFilter:
-                            const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -462,8 +541,10 @@ class _ScannedPreviewCard extends StatelessWidget {
                         'assets/icons/plus.svg',
                         width: 22,
                         height: 22,
-                        colorFilter:
-                            const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                   ],
