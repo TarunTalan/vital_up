@@ -12,7 +12,7 @@ interface VisionProvider {
 
 class GeminiVisionProvider implements VisionProvider {
   private apiKey: string;
-  private model: string = 'gemini-2.0-flash-exp';
+  private model: string = 'gemini-2.0-flash';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -203,7 +203,7 @@ class VisionProviderChain {
   }
 
   async recognize(imageBase64: string): Promise<{ results: VisionResponse[]; servedBy: string }> {
-    let lastError: Error | null = null;
+    const errors: string[] = [];
 
     for (const provider of this.providers) {
       try {
@@ -213,13 +213,14 @@ class VisionProviderChain {
           servedBy: provider instanceof GeminiVisionProvider ? 'gemini' : 'groq',
         };
       } catch (error) {
-        lastError = error as Error;
-        console.error(`${provider.constructor.name} failed:`, error);
+        const reason = `${provider.constructor.name}: ${(error as Error).message}`;
+        errors.push(reason);
+        console.error(reason);
         // Continue to next provider
       }
     }
 
-    throw new Error('All vision providers failed');
+    throw new Error(`All vision providers failed | ${errors.join(' || ')}`);
   }
 }
 
@@ -386,9 +387,9 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error in scan-food function:', error);
     
-    if (error.message === 'All vision providers failed') {
+    if (typeof error?.message === 'string' && error.message.startsWith('All vision providers failed')) {
       return new Response(
-        JSON.stringify({ error: 'Recognition temporarily unavailable' }),
+        JSON.stringify({ error: 'Recognition temporarily unavailable', details: error.message }),
         { status: 503 }
       );
     }
