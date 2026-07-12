@@ -88,6 +88,10 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       }
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
+      final errorMessage = e.toString();
+      if (errorMessage.contains('SocketException') || errorMessage.contains('Failed host lookup')) {
+        return const Left(NetworkFailure('No internet connection. Please check your connection.'));
+      }
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
   }

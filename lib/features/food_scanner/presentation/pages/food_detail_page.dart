@@ -11,6 +11,7 @@ import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommen
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/food_item_edit_dialog.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_utils.dart';
 
@@ -99,7 +100,20 @@ class FoodDetailPage extends StatelessWidget {
                   _FoodScannerStyle.paddingLarge,
                 ),
                 children: [
-                  _ScannedDish(imagePath: data.imagePath),
+                  _ScannedDish(
+                    imagePath: data.imagePath,
+                    onEditImage: () {
+                      final bloc = context.read<FoodScanBloc>();
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => BlocProvider<FoodScanBloc>.value(
+                            value: bloc,
+                            child: const FoodScannerPage(isEditingImage: true),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: _FoodScannerStyle.rowSpacing),
                   _KeyMatrices(data: data),
                   const SizedBox(height: _FoodScannerStyle.rowSpacing),
@@ -514,8 +528,9 @@ class _GlassCard extends StatelessWidget {
 
 class _ScannedDish extends StatelessWidget {
   final String? imagePath;
+  final VoidCallback? onEditImage;
 
-  const _ScannedDish({this.imagePath});
+  const _ScannedDish({this.imagePath, this.onEditImage});
 
   @override
   Widget build(BuildContext context) {
@@ -525,30 +540,51 @@ class _ScannedDish extends StatelessWidget {
       width: double.infinity,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              if (imagePath != null)
-                Image.file(
-                  File(imagePath!),
-                  width: double.infinity,
-                  height: 180,
-                  fit: BoxFit.cover,
-                )
-              else
-                Container(
-                  height: 180,
-                  color: _FoodScannerStyle.cardBg,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.restaurant_rounded,
-                    size: 64,
-                    color: colors.primary,
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            if (imagePath != null)
+              Image.file(
+                File(imagePath!),
+                width: double.infinity,
+                height: 180,
+                fit: BoxFit.cover,
+              )
+            else
+              Container(
+                height: 180,
+                color: _FoodScannerStyle.cardBg,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.restaurant_rounded,
+                  size: 64,
+                  color: colors.primary,
+                ),
+              ),
+            if (onEditImage != null)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: onEditImage,
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(
+                        Icons.edit_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
+      ),
     );
   }
 }
