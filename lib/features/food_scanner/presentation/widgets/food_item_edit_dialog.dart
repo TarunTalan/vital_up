@@ -122,7 +122,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                 SizedBox(
                   width: 120,
                   child: DropdownButtonFormField<String>(
-                    value: _selectedUnit,
+                    initialValue: _selectedUnit,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -149,7 +149,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -164,7 +164,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                     child: Text(
                       'Nutrition data will be fetched from USDA database based on the food name.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ),

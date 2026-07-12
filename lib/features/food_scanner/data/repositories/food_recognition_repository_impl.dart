@@ -33,17 +33,17 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
 
   @override
   Future<Either<Failure, List<FoodItem>>> recognizeFood(File image) async {
-    print('recognizeFood called with image: ${image.path}');
+    logger.i('recognizeFood called with image: ${image.path}');
     try {
       final cacheKey = image.path;
       if (_cache.containsKey(cacheKey)) {
-        print('Returning cached food recognition result');
+        logger.d('Returning cached food recognition result');
         return Right([_cache[cacheKey]!]);
       }
 
-      print('Reading image bytes...');
+      logger.d('Reading image bytes...');
       final imageBytes = await image.readAsBytes();
-      print('Encoding to base64...');
+      logger.d('Encoding to base64...');
       final base64Image = base64Encode(imageBytes);
 
       final response = await supabaseClient.functions.invoke(
@@ -53,12 +53,12 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         },
       );
 
-      print('Supabase response status: ${response.status}');
-      print('Supabase response data: ${response.data}');
+      logger.d('Supabase response status: ${response.status}');
+      logger.d('Supabase response data: ${response.data}');
 
       final data = _decodeMap(response.data);
       final itemsData = data['items'] as List<dynamic>?;
-      print('Items data: $itemsData');
+      logger.d('Items data: $itemsData');
 
       if (itemsData == null || itemsData.isEmpty) {
         return const Left(NoFoodDetectedFailure());

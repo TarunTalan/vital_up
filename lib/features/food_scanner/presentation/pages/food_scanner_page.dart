@@ -1,4 +1,8 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui';
+
+import 'package:image/image.dart' as img;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +15,8 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_detail_page.dart';
+import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -42,6 +48,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   CameraController? _cameraController;
   Future<void>? _cameraInitFuture;
   XFile? _selectedImage;
+  XFile? _croppedImage;
   bool _permissionDenied = false;
   bool _isCapturing = false;
   bool _torchEnabled = false;
@@ -121,8 +128,21 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     try {
       final image = await controller.takePicture();
       if (!mounted) return;
-      setState(() => _selectedImage = image);
-      _analyzeImage(image.path);
+
+      // Crop the captured photo to match the viewport outline
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final screenHeight = MediaQuery.sizeOf(context).height;
+      final croppedFile = await cropCapturedImage(
+        imagePath: image.path,
+        screenWidth: screenWidth,
+        screenHeight: screenHeight,
+      );
+
+      setState(() {
+        _selectedImage = image;
+        _croppedImage = XFile(croppedFile.path);
+      });
+      _analyzeImage(croppedFile.path);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,7 +157,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     final image = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (image == null || !mounted) return;
 
-    setState(() => _selectedImage = image);
+    setState(() {
+      _selectedImage = image;
+      _croppedImage = null;
+    });
     _analyzeImage(image.path);
   }
 
@@ -156,7 +179,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
           child: const FoodDetailPage(),
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _selectedImage = null;
+          _croppedImage = null;
+        });
+      }
+    });
   }
 
   Future<void> _toggleFlash() async {
@@ -188,7 +218,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             state is RecognitionLowConfidence) {
           _openDetail(context);
         } else if (state is RecognitionFailed) {
-          setState(() => _selectedImage = null);
+          setState(() {
+            _selectedImage = null;
+            _croppedImage = null;
+          });
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(state.failure.message)));
@@ -216,6 +249,20 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                   ),
                 ),
               ),
+              // Scanner focused viewport overlay
+              if (_cameraController != null &&
+                  _cameraController!.value.isInitialized &&
+                  _cameraInitFuture != null &&
+                  state is! RecognizingFood)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: ScannerOverlayPainter(
+                        strokeColor: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -223,10 +270,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     children: [
                       Row(
                         children: [
-                          _ScannerIconButton(
-                            iconAsset: 'assets/icons/arrow.svg',
-                            onTap:
-                                widget.onBack ??
+                          BackIcon(
+                            onClick: widget.onBack ??
                                 () => Navigator.of(context).maybePop(),
                           ),
                           const Spacer(),
@@ -238,11 +283,11 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                         ],
                       ),
                       const Spacer(),
-                      if (_selectedImage != null) ...[
+                      if (_croppedImage != null || _selectedImage != null) ...[
                         _ScannedPreviewCard(
-                          imagePath: _selectedImage!.path,
+                          imagePath: (_croppedImage ?? _selectedImage)!.path,
                           onEdit: _pickFromGallery,
-                          onAdd: () => _analyzeImage(_selectedImage!.path),
+                          onAdd: () => _analyzeImage((_croppedImage ?? _selectedImage)!.path),
                         ),
                         const SizedBox(height: 18),
                       ],
@@ -254,7 +299,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                             onTap: isRecognizing ? () {} : _pickFromGallery,
                           ),
                           _CaptureButton(
-                            isLoading: _isCapturing || isRecognizing,
+                            isLoading: _isCapturing,
                             onTap: _capturePhoto,
                           ),
                           _ScannerIconButton(
@@ -268,8 +313,12 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                   ),
                 ),
               ),
-              if (isRecognizing)
-                const Positioned.fill(child: _RecognizingOverlay()),
+              if (state is RecognizingFood)
+                Positioned.fill(
+                  child: _RecognizingOverlay(
+                    image: File(_selectedImage?.path ?? state.image.path),
+                  ),
+                ),
             ],
           ),
         );
@@ -318,25 +367,65 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 }
 
 class _RecognizingOverlay extends StatelessWidget {
-  const _RecognizingOverlay();
+  final File image;
+
+  const _RecognizingOverlay({required this.image});
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black54,
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text(
-              'Analysing your meal...',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ],
+    return Stack(
+      children: [
+        // 1. Display the captured image in the background (full size to avoid zoom jumps)
+        Positioned.fill(
+          child: Image.file(
+            image,
+            fit: BoxFit.cover,
+          ),
         ),
-      ),
+        // 2. Apply glassmorphic blur filter on top of the image
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.35),
+            ),
+          ),
+        ),
+        // 3. Center loading card
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 1.5,
+              ),
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                VitalUpLoader(
+                  size: 80,
+                  iconSize: 26,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Analysing your meal...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -374,7 +463,10 @@ class _ScannerLoading extends StatelessWidget {
     return Container(
       color: const Color(0xFF101316),
       child: const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+        child: VitalUpLoader(
+          size: 80,
+          iconSize: 26,
+        ),
       ),
     );
   }
@@ -502,10 +594,13 @@ class _ScannedPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double screenHeight = MediaQuery.sizeOf(context).height;
+    final double cardHeight = screenHeight * 0.35;
+
     return Align(
       alignment: Alignment.center,
       child: SizedBox(
-        width: MediaQuery.sizeOf(context).width * 0.7,
+        width: MediaQuery.sizeOf(context).width - 40.0,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Stack(
@@ -514,7 +609,7 @@ class _ScannedPreviewCard extends StatelessWidget {
               Image.file(
                 File(imagePath),
                 width: double.infinity,
-                height: 180,
+                height: cardHeight,
                 fit: BoxFit.cover,
               ),
               Padding(
@@ -557,3 +652,150 @@ class _ScannedPreviewCard extends StatelessWidget {
     );
   }
 }
+
+class ScannerOverlayPainter extends CustomPainter {
+  final Color barrierColor;
+  final double borderRadius;
+  final double strokeWidth;
+  final Color strokeColor;
+
+  ScannerOverlayPainter({
+    this.barrierColor = const Color(0x66000000),
+    this.borderRadius = 24.0,
+    this.strokeWidth = 3.0,
+    this.strokeColor = Colors.white,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double width = size.width;
+    final double height = size.height;
+
+    // Viewport has the exact same dimensions as the captured preview card
+    final double boxWidth = width - 40.0;
+    final double boxHeight = height * 0.35;
+    final double left = (width - boxWidth) / 2;
+    final double top = (height - boxHeight) / 2 - 40; // offset upwards slightly for aesthetic balance
+    final Rect rect = Rect.fromLTWH(left, top, boxWidth, boxHeight);
+    final RRect rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
+
+    // 1. Draw the darkened background mask with cutout for viewport
+    final Paint maskPaint = Paint()..color = barrierColor;
+    final Path path = Path()
+      ..addRect(Rect.fromLTWH(0, 0, width, height))
+      ..addRRect(rrect)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, maskPaint);
+
+    // 2. Draw the viewport outline with low opacity
+    final Paint outlinePaint = Paint()
+      ..color = strokeColor.withValues(alpha: 0.18)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(rrect, outlinePaint);
+
+    // 3. Draw the corner brackets
+    final Paint linePaint = Paint()
+      ..color = strokeColor
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const double lineLength = 20.0; // bracket arm length
+
+    // Top Left Corner
+    canvas.drawPath(
+      Path()
+        ..moveTo(left, top + lineLength)
+        ..lineTo(left, top + borderRadius)
+        ..arcToPoint(Offset(left + borderRadius, top), radius: Radius.circular(borderRadius))
+        ..lineTo(left + lineLength, top),
+      linePaint,
+    );
+
+    // Top Right Corner
+    canvas.drawPath(
+      Path()
+        ..moveTo(left + boxWidth - lineLength, top)
+        ..lineTo(left + boxWidth - borderRadius, top)
+        ..arcToPoint(Offset(left + boxWidth, top + borderRadius), radius: Radius.circular(borderRadius))
+        ..lineTo(left + boxWidth, top + lineLength),
+      linePaint,
+    );
+
+    // Bottom Left Corner
+    canvas.drawPath(
+      Path()
+        ..moveTo(left, top + boxHeight - lineLength)
+        ..lineTo(left, top + boxHeight - borderRadius)
+        ..arcToPoint(Offset(left + borderRadius, top + boxHeight), radius: Radius.circular(borderRadius), clockwise: false)
+        ..lineTo(left + lineLength, top + boxHeight),
+      linePaint,
+    );
+
+    // Bottom Right Corner
+    canvas.drawPath(
+      Path()
+        ..moveTo(left + boxWidth - lineLength, top + boxHeight)
+        ..lineTo(left + boxWidth - borderRadius, top + boxHeight)
+        ..arcToPoint(Offset(left + boxWidth, top + boxHeight - borderRadius), radius: Radius.circular(borderRadius), clockwise: false)
+        ..lineTo(left + boxWidth, top + boxHeight - lineLength),
+      linePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+Future<File> cropCapturedImage({
+  required String imagePath,
+  required double screenWidth,
+  required double screenHeight,
+}) async {
+  try {
+    final bytes = await File(imagePath).readAsBytes();
+    final originalImage = img.decodeImage(bytes);
+    if (originalImage == null) return File(imagePath);
+
+    final double imgW = originalImage.width.toDouble();
+    final double imgH = originalImage.height.toDouble();
+
+    final double sw = screenWidth;
+    final double sh = screenHeight;
+
+    // Viewport coordinates matching the custom painter overlay
+    final double boxWidth = sw - 40.0;
+    final double boxHeight = sh * 0.35;
+    final double boxLeft = (sw - boxWidth) / 2;
+    final double boxTop = (sh - boxHeight) / 2 - 40;
+
+    // Camera preview uses BoxFit.cover, so we calculate the scale and offsets
+    final double scale = math.max(sw / imgW, sh / imgH);
+    final double previewScaledW = imgW * scale;
+    final double previewScaledH = imgH * scale;
+    final double dx = (sw - previewScaledW) / 2;
+    final double dy = (sh - previewScaledH) / 2;
+
+    // Map screen coordinates of the viewport to original image pixels
+    final double cropLeft = (boxLeft - dx) / scale;
+    final double cropTop = (boxTop - dy) / scale;
+    final double cropWidth = boxWidth / scale;
+    final double cropHeight = boxHeight / scale;
+
+    final croppedImage = img.copyCrop(
+      originalImage,
+      x: cropLeft.round().clamp(0, originalImage.width - 1),
+      y: cropTop.round().clamp(0, originalImage.height - 1),
+      width: cropWidth.round().clamp(1, originalImage.width),
+      height: cropHeight.round().clamp(1, originalImage.height),
+    );
+
+    final croppedBytes = img.encodeJpg(croppedImage);
+    final croppedFile = File(imagePath)..writeAsBytesSync(croppedBytes);
+    return croppedFile;
+  } catch (_) {
+    return File(imagePath);
+  }
+}
+
