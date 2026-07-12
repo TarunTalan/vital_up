@@ -81,32 +81,32 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     final result = await scanFoodImage(_currentImage!);
 
-    print('ScanFoodImage result: $result');
+    logger.d('ScanFoodImage result: $result');
 
     result.fold(
       (failure) {
-        print('Recognition failed: $failure');
+        logger.e('Recognition failed: $failure');
         emit(RecognitionFailed(failure, image: _currentImage));
       },
       (nutritionList) {
-        print('Nutrition list received: ${nutritionList.length} items');
+        logger.i('Nutrition list received: ${nutritionList.length} items');
         _currentNutrition = nutritionList;
         _currentItems = nutritionList.map((nut) => nut.per).toList();
 
-        print('Current items: $_currentItems');
-        print('Current nutrition: $_currentNutrition');
+        logger.d('Current items: $_currentItems');
+        logger.d('Current nutrition: $_currentNutrition');
 
         final hasLowConfidence = _currentItems.any((item) => item.confidenceScore < 0.7);
 
         if (hasLowConfidence) {
-          print('Emitting RecognitionLowConfidence');
+          logger.w('Emitting RecognitionLowConfidence due to low confidence item(s)');
           emit(RecognitionLowConfidence(
             image: _currentImage!,
             items: _currentItems,
             nutrition: _currentNutrition,
           ));
         } else {
-          print('Emitting RecognitionSucceeded');
+          logger.i('Emitting RecognitionSucceeded');
           emit(RecognitionSucceeded(
             image: _currentImage!,
             items: _currentItems,
@@ -209,110 +209,122 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // Search for the food name to get the correct fdc_id
     final searchResult = await nutritionRepository.searchByName(event.name);
 
+    Failure? searchFailure;
+    List<FoodItem>? searchResultsList;
+
     searchResult.fold(
-      (failure) {
-        logger.e('Failed to search for manual food: $failure');
-        // If search fails, add with placeholder nutrition
-        final newItem = FoodItem(
-          id: uuid.v4(),
-          name: event.name,
-          confidenceScore: 1.0,
-          servingDescription: '${event.quantity} ${event.unit}',
-          quantity: event.quantity,
-          unit: event.unit,
-        );
-        
-        final placeholderNutrition = NutritionInfo(
-          calories: 0,
-          proteinG: 0,
-          carbsG: 0,
-          fatG: 0,
-          fiberG: 0,
-          sugarG: 0,
-          sodiumMg: 0,
-          per: newItem,
-        );
-
-        _currentItems.add(newItem);
-        _currentNutrition.add(placeholderNutrition);
-
-        _emitCurrentState(emit);
-      },
-      (searchResults) async {
-        if (searchResults.isEmpty) {
-          logger.e('No search results for: ${event.name}');
-          // Add with placeholder nutrition
-          final newItem = FoodItem(
-            id: uuid.v4(),
-            name: event.name,
-            confidenceScore: 1.0,
-            servingDescription: '${event.quantity} ${event.unit}',
-            quantity: event.quantity,
-            unit: event.unit,
-          );
-          
-          final placeholderNutrition = NutritionInfo(
-            calories: 0,
-            proteinG: 0,
-            carbsG: 0,
-            fatG: 0,
-            fiberG: 0,
-            sugarG: 0,
-            sodiumMg: 0,
-            per: newItem,
-          );
-
-          _currentItems.add(newItem);
-          _currentNutrition.add(placeholderNutrition);
-
-          _emitCurrentState(emit);
-          return;
-        }
-
-        // Use the first search result
-        final searchItem = searchResults.first;
-        
-        final newItem = FoodItem(
-          id: searchItem.id,
-          name: event.name,
-          confidenceScore: 1.0,
-          servingDescription: '${event.quantity} ${event.unit}',
-          quantity: event.quantity,
-          unit: event.unit,
-        );
-
-        // Fetch nutrition for the manual item
-        final nutritionResult = await nutritionRepository.getNutrition(newItem);
-
-        nutritionResult.fold(
-          (failure) {
-            logger.e('Failed to fetch nutrition for manual item: $failure');
-            // If nutrition fetch fails, add with zero nutrition
-            final placeholderNutrition = NutritionInfo(
-              calories: 0,
-              proteinG: 0,
-              carbsG: 0,
-              fatG: 0,
-              fiberG: 0,
-              sugarG: 0,
-              sodiumMg: 0,
-              per: newItem,
-            );
-
-            _currentItems.add(newItem);
-            _currentNutrition.add(placeholderNutrition);
-
-            _emitCurrentState(emit);
-          },
-          (nutrition) {
-            _currentItems.add(newItem);
-            _currentNutrition.add(nutrition);
-
-            _emitCurrentState(emit);
-          },
-        );
-      },
+      (l) => searchFailure = l,
+      (r) => searchResultsList = r,
     );
+
+    if (searchFailure != null || searchResultsList == null) {
+      logger.e('Failed to search for manual food: $searchFailure');
+      // If search fails, add with placeholder nutrition
+      final newItem = FoodItem(
+        id: uuid.v4(),
+        name: event.name,
+        confidenceScore: 1.0,
+        servingDescription: '${event.quantity} ${event.unit}',
+        quantity: event.quantity,
+        unit: event.unit,
+      );
+      
+      final placeholderNutrition = NutritionInfo(
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sugarG: 0,
+        sodiumMg: 0,
+        per: newItem,
+      );
+
+      _currentItems.add(newItem);
+      _currentNutrition.add(placeholderNutrition);
+
+      _emitCurrentState(emit);
+      return;
+    }
+
+    if (searchResultsList!.isEmpty) {
+      logger.e('No search results for: ${event.name}');
+      // Add with placeholder nutrition
+      final newItem = FoodItem(
+        id: uuid.v4(),
+        name: event.name,
+        confidenceScore: 1.0,
+        servingDescription: '${event.quantity} ${event.unit}',
+        quantity: event.quantity,
+        unit: event.unit,
+      );
+      
+      final placeholderNutrition = NutritionInfo(
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sugarG: 0,
+        sodiumMg: 0,
+        per: newItem,
+      );
+
+      _currentItems.add(newItem);
+      _currentNutrition.add(placeholderNutrition);
+
+      _emitCurrentState(emit);
+      return;
+    }
+
+    // Use the first search result
+    final searchItem = searchResultsList!.first;
+    
+    final newItem = FoodItem(
+      id: searchItem.id,
+      name: event.name,
+      confidenceScore: 1.0,
+      servingDescription: '${event.quantity} ${event.unit}',
+      quantity: event.quantity,
+      unit: event.unit,
+    );
+
+    // Fetch nutrition for the manual item
+    final nutritionResult = await nutritionRepository.getNutrition(newItem);
+
+    Failure? nutritionFailure;
+    NutritionInfo? nutritionInfo;
+
+    nutritionResult.fold(
+      (l) => nutritionFailure = l,
+      (r) => nutritionInfo = r,
+    );
+
+    if (nutritionFailure != null || nutritionInfo == null) {
+      logger.e('Failed to fetch nutrition for manual item: $nutritionFailure');
+      // If nutrition fetch fails, add with zero nutrition
+      final placeholderNutrition = NutritionInfo(
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+        fiberG: 0,
+        sugarG: 0,
+        sodiumMg: 0,
+        per: newItem,
+      );
+
+      _currentItems.add(newItem);
+      _currentNutrition.add(placeholderNutrition);
+
+      _emitCurrentState(emit);
+      return;
+    }
+
+    _currentItems.add(newItem);
+    _currentNutrition.add(nutritionInfo!);
+
+    _emitCurrentState(emit);
   }
 
   Future<void> _onEditFoodItemRequested(
@@ -332,89 +344,101 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // Search for the new food name to get the correct fdc_id
     final searchResult = await nutritionRepository.searchByName(event.name);
 
+    Failure? searchFailure;
+    List<FoodItem>? searchResultsList;
+
     searchResult.fold(
-      (failure) {
-        logger.e('Failed to search for edited food: $failure');
-        // If search fails, scale existing nutrition by quantity change
-        final oldItem = _currentItems[itemIndex];
-        final oldNutrition = _currentNutrition[itemIndex];
-        final scaleFactor = event.quantity / oldItem.quantity;
-        
-        final updatedItem = FoodItem(
-          id: event.itemId,
-          name: event.name,
-          confidenceScore: _currentItems[itemIndex].confidenceScore,
-          servingDescription: '${event.quantity} ${event.unit}',
-          quantity: event.quantity,
-          unit: event.unit,
-        );
-        
-        _currentItems[itemIndex] = updatedItem;
-        _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-        
-        _emitCurrentState(emit);
-      },
-      (searchResults) async {
-        if (searchResults.isEmpty) {
-          logger.e('No search results for: ${event.name}');
-          // Scale existing nutrition by quantity change
-          final oldItem = _currentItems[itemIndex];
-          final oldNutrition = _currentNutrition[itemIndex];
-          final scaleFactor = event.quantity / oldItem.quantity;
-          
-          final updatedItem = FoodItem(
-            id: event.itemId,
-            name: event.name,
-            confidenceScore: _currentItems[itemIndex].confidenceScore,
-            servingDescription: '${event.quantity} ${event.unit}',
-            quantity: event.quantity,
-            unit: event.unit,
-          );
-          
-          _currentItems[itemIndex] = updatedItem;
-          _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-          
-          _emitCurrentState(emit);
-          return;
-        }
-
-        // Use the first search result
-        final searchItem = searchResults.first;
-        
-        final updatedItem = FoodItem(
-          id: searchItem.id,
-          name: event.name,
-          confidenceScore: _currentItems[itemIndex].confidenceScore,
-          servingDescription: '${event.quantity} ${event.unit}',
-          quantity: event.quantity,
-          unit: event.unit,
-        );
-
-        // Fetch nutrition for the updated item with new fdc_id
-        final nutritionResult = await nutritionRepository.getNutrition(updatedItem);
-
-        nutritionResult.fold(
-          (failure) {
-            logger.e('Failed to fetch nutrition for edited item: $failure');
-            // If nutrition fetch fails, scale existing nutrition by quantity change
-            final oldItem = _currentItems[itemIndex];
-            final oldNutrition = _currentNutrition[itemIndex];
-            final scaleFactor = event.quantity / oldItem.quantity;
-            
-            _currentItems[itemIndex] = updatedItem;
-            _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-            
-            _emitCurrentState(emit);
-          },
-          (nutrition) {
-            _currentItems[itemIndex] = updatedItem;
-            _currentNutrition[itemIndex] = nutrition;
-            
-            _emitCurrentState(emit);
-          },
-        );
-      },
+      (l) => searchFailure = l,
+      (r) => searchResultsList = r,
     );
+
+    if (searchFailure != null || searchResultsList == null) {
+      logger.e('Failed to search for edited food: $searchFailure');
+      // If search fails, scale existing nutrition by quantity change
+      final oldItem = _currentItems[itemIndex];
+      final oldNutrition = _currentNutrition[itemIndex];
+      final scaleFactor = event.quantity / oldItem.quantity;
+      
+      final updatedItem = FoodItem(
+        id: event.itemId,
+        name: event.name,
+        confidenceScore: _currentItems[itemIndex].confidenceScore,
+        servingDescription: '${event.quantity} ${event.unit}',
+        quantity: event.quantity,
+        unit: event.unit,
+      );
+      
+      _currentItems[itemIndex] = updatedItem;
+      _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
+      
+      _emitCurrentState(emit);
+      return;
+    }
+
+    if (searchResultsList!.isEmpty) {
+      logger.e('No search results for: ${event.name}');
+      // Scale existing nutrition by quantity change
+      final oldItem = _currentItems[itemIndex];
+      final oldNutrition = _currentNutrition[itemIndex];
+      final scaleFactor = event.quantity / oldItem.quantity;
+      
+      final updatedItem = FoodItem(
+        id: event.itemId,
+        name: event.name,
+        confidenceScore: _currentItems[itemIndex].confidenceScore,
+        servingDescription: '${event.quantity} ${event.unit}',
+        quantity: event.quantity,
+        unit: event.unit,
+      );
+      
+      _currentItems[itemIndex] = updatedItem;
+      _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
+      
+      _emitCurrentState(emit);
+      return;
+    }
+
+    // Use the first search result
+    final searchItem = searchResultsList!.first;
+    
+    final updatedItem = FoodItem(
+      id: searchItem.id,
+      name: event.name,
+      confidenceScore: _currentItems[itemIndex].confidenceScore,
+      servingDescription: '${event.quantity} ${event.unit}',
+      quantity: event.quantity,
+      unit: event.unit,
+    );
+
+    // Fetch nutrition for the updated item with new fdc_id
+    final nutritionResult = await nutritionRepository.getNutrition(updatedItem);
+
+    Failure? nutritionFailure;
+    NutritionInfo? nutritionInfo;
+
+    nutritionResult.fold(
+      (l) => nutritionFailure = l,
+      (r) => nutritionInfo = r,
+    );
+
+    if (nutritionFailure != null || nutritionInfo == null) {
+      logger.e('Failed to fetch nutrition for edited item: $nutritionFailure');
+      // If nutrition fetch fails, scale existing nutrition by quantity change
+      final oldItem = _currentItems[itemIndex];
+      final oldNutrition = _currentNutrition[itemIndex];
+      final scaleFactor = event.quantity / oldItem.quantity;
+      
+      _currentItems[itemIndex] = updatedItem;
+      _currentNutrition[itemIndex] = oldNutrition.scaledBy(scaleFactor);
+      
+      _emitCurrentState(emit);
+      return;
+    }
+
+    _currentItems[itemIndex] = updatedItem;
+    _currentNutrition[itemIndex] = nutritionInfo!;
+    
+    _emitCurrentState(emit);
   }
 
   void _emitCurrentState(Emitter<FoodScanState> emit) {

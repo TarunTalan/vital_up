@@ -218,25 +218,99 @@ class VisionProviderChain {
     ];
   }
 
+  private providerName(provider: VisionProvider): string {
+    return provider instanceof GeminiVisionProvider ? 'gemini' : 'groq';
+  }
+
+  // Retries a single provider once on rate-limit errors (with a short backoff)
+  // before giving up on it, since 429s are often transient.
+  private async recognizeWithRetry(provider: VisionProvider, imageBase64: string): Promise<VisionResponse[]> {
+    try {
+      return await provider.recognize(imageBase64);
+    } catch (error) {
+      if ((error as Error).message === 'RATE_LIMIT_EXCEEDED') {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return provider.recognize(imageBase64);
+      }
+      throw error;
+    }
+  }
+
+  private normalizeName(name: string): string {
+    return name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+  }
+
+  // Calls BOTH providers concurrently (instead of stopping at the first
+  // success) so that a single hallucinated/incorrect result from one model
+  // can be caught and corrected using the other. This directly targets the
+  // "Groq/Gemini sometimes give wrong output" problem: a single-provider
+  // fallback chain never notices when the first provider that happens to
+  // answer is simply wrong.
   async recognize(imageBase64: string): Promise<{ results: VisionResponse[]; servedBy: string }> {
+    const settled = await Promise.allSettled(
+      this.providers.map(p => this.recognizeWithRetry(p, imageBase64))
+    );
+
+    const successes: { provider: VisionProvider; results: VisionResponse[] }[] = [];
     const errors: string[] = [];
 
-    for (const provider of this.providers) {
-      try {
-        const results = await provider.recognize(imageBase64);
-        return {
-          results,
-          servedBy: provider instanceof GeminiVisionProvider ? 'gemini' : 'groq',
-        };
-      } catch (error) {
-        const reason = `${provider.constructor.name}: ${(error as Error).message}`;
-        errors.push(reason);
-        console.error(reason);
-        // Continue to next provider
+    settled.forEach((outcome, i) => {
+      const provider = this.providers[i];
+      if (outcome.status === 'fulfilled') {
+        successes.push({ provider, results: outcome.value });
+      } else {
+        errors.push(`${provider.constructor.name}: ${(outcome.reason as Error).message}`);
+        console.error(`${provider.constructor.name}: ${(outcome.reason as Error).message}`);
       }
+    });
+
+    if (successes.length === 0) {
+      throw new Error(`All vision providers failed | ${errors.join(' || ')}`);
     }
 
-    throw new Error(`All vision providers failed | ${errors.join(' || ')}`);
+    if (successes.length === 1) {
+      return {
+        results: successes[0].results,
+        servedBy: this.providerName(successes[0].provider),
+      };
+    }
+
+    // Both providers responded — reconcile rather than blindly trusting
+    // whichever happened to be first (previously: Gemini, always, if it
+    // didn't throw). If their top guesses agree (same normalized food name),
+    // average the confidence and prefer that consensus item first. If they
+    // disagree, keep both providers' top items but rank the higher-confidence
+    // one first, and note in servedBy that this was a cross-checked result.
+    const [a, b] = successes;
+    const topA = a.results[0];
+    const topB = b.results[0];
+
+    if (topA && topB && this.normalizeName(topA.candidateName) === this.normalizeName(topB.candidateName)) {
+      const merged: VisionResponse = {
+        candidateName: topA.candidateName,
+        estimatedPortionDescription: topA.confidenceHint >= topB.confidenceHint
+          ? topA.estimatedPortionDescription
+          : topB.estimatedPortionDescription,
+        confidenceHint: Math.min(1, (topA.confidenceHint + topB.confidenceHint) / 2 + 0.1),
+      };
+      const rest = a.results.slice(1);
+      return {
+        results: [merged, ...rest],
+        servedBy: `${this.providerName(a.provider)}+${this.providerName(b.provider)} (agreed)`,
+      };
+    }
+
+    // Disagreement: surface the higher-confidence provider's full result set
+    // first, but keep the other provider's top guess as a fallback candidate
+    // so a wrong first guess still leaves the correct one reachable.
+    const [primary, secondary] = (a.results[0]?.confidenceHint ?? 0) >= (b.results[0]?.confidenceHint ?? 0)
+      ? [a, b]
+      : [b, a];
+
+    return {
+      results: [...primary.results, secondary.results[0]].filter(Boolean),
+      servedBy: `${this.providerName(primary.provider)} (disagreed with ${this.providerName(secondary.provider)})`,
+    };
   }
 }
 
@@ -251,13 +325,26 @@ async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
 
   const data = await response.json();
   const foods = data.foods || [];
-  
+
   // Filter and score foods to get the best match
   // Prefer Foundation and SR Legacy data over Branded
   // Prefer exact name matches
+  // Processed/derivative forms that should only outrank the plain/raw food
+  // when the user actually asked for that form. Without this, a search for
+  // "potato" was matching "Flour, potato" (a USDA Foundation entry) ahead of
+  // any plain potato entry, because Foundation data type + substring match
+  // outscored everything else regardless of how transformed the food was.
+  const PROCESSED_FORM_WORDS = [
+    'flour', 'starch', 'powder', 'bread', 'chips', 'crisps', 'dried',
+    'dehydrated', 'canned', 'juice', 'extract', 'flakes', 'granules',
+    'concentrate', 'syrup', 'paste', 'puree',
+  ];
+
   const scoredFoods = foods.map((food: any) => {
     let score = 0;
-    
+    const foodNameLower = food.description.toLowerCase();
+    const queryLower = query.toLowerCase();
+
     // Prefer Foundation and SR Legacy data types
     if (food.dataType === 'Foundation') {
       score += 10;
@@ -266,39 +353,53 @@ async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
     } else if (food.dataType === 'Branded') {
       score += 1;
     }
-    
+
     // Prefer exact name matches
-    const foodNameLower = food.description.toLowerCase();
-    const queryLower = query.toLowerCase();
     if (foodNameLower === queryLower) {
       score += 5;
     } else if (foodNameLower.includes(queryLower)) {
       score += 3;
     }
-    
+
+    // Prefer the USDA convention of naming raw/whole foods as
+    // "<Food>, raw" — this is usually exactly what a generic query like
+    // "potato" or "banana" means.
+    if (new RegExp(`^${queryLower}s?,\\s*raw\\b`).test(foodNameLower)) {
+      score += 6;
+    }
+
+    // Penalize processed/derivative forms UNLESS the user's own query
+    // mentioned that form (e.g. searching "potato flour" should still find
+    // potato flour).
+    for (const word of PROCESSED_FORM_WORDS) {
+      if (foodNameLower.includes(word) && !queryLower.includes(word)) {
+        score -= 8;
+      }
+    }
+
     // Penalize foods with very long descriptions (likely multi-ingredient products)
     if (food.description.length > 50) {
       score -= 2;
     }
-    
+
     return { ...food, score };
   });
-  
+
   // Sort by score and return top results
   scoredFoods.sort((a: any, b: any) => b.score - a.score);
-  
+
   console.log(`USDA search for "${query}": found ${foods.length} results, top scored: ${scoredFoods.slice(0, 3).map((f: any) => `${f.description} (${f.dataType}, score: ${f.score})`).join(', ')}`);
-  
+
   return scoredFoods.slice(0, 5);
 }
 
 async function getUSDANutrition(fdcId: string, apiKey: string): Promise<any> {
-  const response = await fetch(
-    `https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${apiKey}`
-  );
+  const url = `https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${apiKey}`;
+  const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error('USDA API error');
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`USDA API error: Status ${response.status}. Response: ${errorText}`);
   }
 
   return response.json();
@@ -394,7 +495,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY')!;
     const groqApiKey = Deno.env.get('GROQ_API_KEY')!;
-    const usdaApiKey = Deno.env.get('USDA_FDC_API_KEY')!;
+    const usdaApiKey = Deno.env.get('USDA_FDC_API_KEY') || 'DEMO_KEY';
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -432,16 +533,55 @@ Deno.serve(async (req) => {
 
     // Handle nutrition lookup by FDC ID
     if (get_nutrition && fdc_id) {
-      const foodData = await getUSDANutrition(fdc_id, usdaApiKey);
-      const nutrients = foodData.foodNutrients || [];
+      let numericId = fdc_id.toString().trim();
+      const isNumeric = /^\d+$/.test(numericId);
       
+      if (!isNumeric) {
+        console.log(`Non-numeric fdc_id provided: "${fdc_id}". Searching USDA by name first.`);
+        const searchResults = await searchUSDA(fdc_id.toString(), usdaApiKey);
+        if (searchResults.length > 0 && searchResults[0].fdcId) {
+          numericId = searchResults[0].fdcId.toString();
+          console.log(`Found matching FDC ID: ${numericId} for "${fdc_id}"`);
+        } else {
+          console.log(`No USDA match found for non-numeric fdc_id: "${fdc_id}". Returning placeholder nutrition.`);
+          return jsonResponse({
+            calories: 0,
+            protein_g: 0,
+            carbs_g: 0,
+            fat_g: 0,
+            fiber_g: 0,
+            sugar_g: 0,
+            sodium_mg: 0,
+            additional_nutrients: [],
+          }, 200);
+        }
+      }
+
+      let foodData;
+      try {
+        foodData = await getUSDANutrition(numericId, usdaApiKey);
+      } catch (error) {
+        console.error(`Failed to fetch FDC ID ${numericId}:`, error);
+        return jsonResponse({
+          calories: 0,
+          protein_g: 0,
+          carbs_g: 0,
+          fat_g: 0,
+          fiber_g: 0,
+          sugar_g: 0,
+          sodium_mg: 0,
+          additional_nutrients: [],
+        }, 200);
+      }
+      const nutrients = foodData.foodNutrients || [];
+
       // Get the serving size from USDA data
       // USDA data can be per 100g, per serving, per cup, etc.
       const servingSize = foodData.servingSize || 100;
       const servingSizeUnit = foodData.servingSizeUnit || 'g';
-      
+
       console.log(`USDA serving size: ${servingSize} ${servingSizeUnit}`);
-      
+
       // Convert USDA serving size to grams for consistent scaling
       let usdaServingSizeInGrams = 100; // Default to 100g
       if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
@@ -458,41 +598,52 @@ Deno.serve(async (req) => {
 
       console.log(`USDA serving size in grams: ${usdaServingSizeInGrams}`);
 
-      // USDA nutrient IDs for accurate matching
-      const nutrientIdMap: Record<number, string> = {
-        1008: 'calories',           // Energy
-        1003: 'protein_g',          // Protein
-        1005: 'carbs_g',            // Carbohydrate, by difference
-        1004: 'fat_g',              // Total lipid (fat)
-        1079: 'fiber_g',            // Fiber, total dietary
-        2000: 'sugar_g',            // Sugars, total
-        1093: 'sodium_mg',          // Sodium
-        1087: 'calcium_mg',         // Calcium
-        1089: 'iron_mg',            // Iron
-        1104: 'vitamin_a_iu',       // Vitamin A, IU
-        1162: 'vitamin_c_mg',       // Vitamin C, total ascorbic acid
-        1106: 'vitamin_d_iu',       // Vitamin D
-        1114: 'vitamin_e_mg',       // Vitamin E
-        1187: 'vitamin_k_mg',       // Vitamin K
-        1124: 'thiamin_mg',         // Vitamin B1
-        1126: 'riboflavin_mg',      // Vitamin B2
-        1165: 'niacin_mg',          // Vitamin B3
-        1176: 'vitamin_b6_mg',      // Vitamin B6
-        1178: 'vitamin_b12_mcg',    // Vitamin B12
-        1135: 'folate_mcg',         // Folate
-        1092: 'potassium_mg',       // Potassium
-        1091: 'phosphorus_mg',      // Phosphorus
-        1090: 'magnesium_mg',       // Magnesium
-        1098: 'zinc_mg',            // Zinc
-        1100: 'copper_mg',          // Copper
-        1101: 'manganese_mg',       // Manganese
-        1109: 'selenium_mcg',       // Selenium
-        1253: 'cholesterol_mg',     // Cholesterol
-        1258: 'saturated_fat_g',    // Fatty acids, total saturated
-        1292: 'trans_fat_g',        // Fatty acids, total trans
-        1257: 'monounsaturated_fat_g', // Fatty acids, total monounsaturated
-        1259: 'polyunsaturated_fat_g', // Fatty acids, total polyunsaturated
-      };
+      // IMPORTANT: matching is done primarily by NUTRIENT NAME (which the
+      // USDA API always returns correctly alongside each value), not by a
+      // hardcoded ID table. A previous version of this map had several IDs
+      // transposed (e.g. it read Thiamin's id (1165) but wrote it into
+      // niacin_mg; it read Biotin's id (1176) but wrote it into
+      // vitamin_b6_mg; it read Copper's id (1098) but wrote it into
+      // zinc_mg). Matching by name is immune to that whole class of bug —
+      // it doesn't matter what ID USDA assigned, only what the entry is
+      // actually called. Order matters: more specific patterns are listed
+      // before more general ones.
+      const nutrientNameRules: Array<{ test: RegExp; field: string }> = [
+        { test: /^protein$/i, field: 'protein_g' },
+        { test: /^carbohydrate/i, field: 'carbs_g' },
+        { test: /^total lipid \(fat\)$/i, field: 'fat_g' },
+        { test: /^fiber, total dietary$/i, field: 'fiber_g' },
+        { test: /^sugars,? total/i, field: 'sugar_g' },
+        { test: /^sodium/i, field: 'sodium_mg' },
+        { test: /^calcium/i, field: 'calcium_mg' },
+        { test: /^iron/i, field: 'iron_mg' },
+        { test: /^potassium/i, field: 'potassium_mg' },
+        { test: /^phosphorus/i, field: 'phosphorus_mg' },
+        { test: /^magnesium/i, field: 'magnesium_mg' },
+        { test: /^zinc/i, field: 'zinc_mg' },
+        { test: /^copper/i, field: 'copper_mg' },
+        { test: /^manganese/i, field: 'manganese_mg' },
+        { test: /^selenium/i, field: 'selenium_mcg' },
+        { test: /^vitamin a, rae/i, field: 'vitamin_a_mcg' },
+        { test: /^vitamin a, iu/i, field: 'vitamin_a_iu' },
+        { test: /^vitamin d \(d2 ?\+ ?d3\)/i, field: 'vitamin_d_mcg' },
+        { test: /^vitamin d/i, field: 'vitamin_d_iu' },
+        { test: /^vitamin e/i, field: 'vitamin_e_mg' },
+        { test: /^vitamin k/i, field: 'vitamin_k_mg' },
+        { test: /^vitamin c/i, field: 'vitamin_c_mg' },
+        { test: /^thiamin/i, field: 'thiamin_mg' },
+        { test: /^riboflavin/i, field: 'riboflavin_mg' },
+        { test: /^niacin/i, field: 'niacin_mg' },
+        { test: /^vitamin b-?6/i, field: 'vitamin_b6_mg' },
+        { test: /^vitamin b-?12/i, field: 'vitamin_b12_mcg' },
+        { test: /^biotin/i, field: 'biotin_ug' },
+        { test: /^folate,? total/i, field: 'folate_mcg' },
+        { test: /^cholesterol/i, field: 'cholesterol_mg' },
+        { test: /^fatty acids, total saturated/i, field: 'saturated_fat_g' },
+        { test: /^fatty acids, total trans/i, field: 'trans_fat_g' },
+        { test: /^fatty acids, total monounsaturated/i, field: 'monounsaturated_fat_g' },
+        { test: /^fatty acids, total polyunsaturated/i, field: 'polyunsaturated_fat_g' },
+      ];
 
       const nutritionData: any = {
         calories: 0,
@@ -507,16 +658,18 @@ Deno.serve(async (req) => {
 
       nutrients.forEach((n: any) => {
         const nutrientId = n.nutrient?.id ?? n.id;
-        const nutrientName = n.nutrient?.name ?? n.name;
+        const nutrientName: string = n.nutrient?.name ?? n.name ?? '';
         const unitName = n.nutrient?.unitName ?? n.unitName;
         const value = n.amount ?? n.nutrient?.amount ?? 0;
 
-        if (nutrientId && nutrientIdMap[nutrientId]) {
-          const field = nutrientIdMap[nutrientId];
-          nutritionData[field] = value;
-          console.log(`Matched nutrient ${nutrientId} (${nutrientName}): ${value} ${unitName} -> ${field}`);
+        const rule = nutrientNameRules.find(r => r.test.test(nutrientName.trim()));
+
+        if (rule) {
+          nutritionData[rule.field] = value;
+          console.log(`Matched nutrient ${nutrientId} (${nutrientName}): ${value} ${unitName} -> ${rule.field}`);
         } else {
-          // Include all other nutrients as additional data
+          // Include all other nutrients (including Energy, handled separately
+          // below) as additional data.
           nutritionData.additional_nutrients.push({
             id: nutrientId,
             name: nutrientName,
@@ -525,29 +678,33 @@ Deno.serve(async (req) => {
           });
         }
       });
-      
-      // Log the specific calories nutrient (ID 1008)
-      const caloriesNutrient = nutrients.find((n: any) => {
-        const nutrientId = n.nutrient?.id ?? n.id;
-        return nutrientId === 1008;
-      });
-      if (caloriesNutrient) {
-        console.log(`Calories nutrient (ID 1008): ${JSON.stringify({
-          id: caloriesNutrient.nutrient?.id ?? caloriesNutrient.id,
-          name: caloriesNutrient.nutrient?.name ?? caloriesNutrient.name,
-          value: caloriesNutrient.amount ?? caloriesNutrient.nutrient?.amount,
-          unit: caloriesNutrient.nutrient?.unitName ?? caloriesNutrient.unitName
-        })}`);
-      } else {
-        console.log('Calories nutrient (ID 1008) NOT FOUND in USDA response');
-      }
-      
-      // Log all energy-related nutrients for debugging
+
+      // --- Calories ---
+      // Prefer the standard "Energy" value in kcal (USDA id 1008). Some
+      // Foundation Foods entries don't include id 1008 at all and only
+      // provide the Atwater-factor-derived energy values — without a
+      // fallback this silently produced 0 calories for those foods.
       const energyNutrients = nutrients.filter((n: any) => {
-        const nutrientId = n.nutrient?.id ?? n.id;
-        const nutrientName = (n.nutrient?.name ?? n.name).toLowerCase();
-        return nutrientName.includes('energy') || nutrientName.includes('calorie') || nutrientName === 'Energy';
+        const name = (n.nutrient?.name ?? n.name ?? '').toLowerCase();
+        return name.includes('energy');
       });
+
+      const findEnergy = (predicate: (name: string) => boolean) =>
+        energyNutrients.find((n: any) => predicate((n.nutrient?.name ?? n.name ?? '').toLowerCase()));
+
+      const standardEnergy = findEnergy(name => name === 'energy');
+      const atwaterGeneral = findEnergy(name => name.includes('atwater general'));
+      const atwaterSpecific = findEnergy(name => name.includes('atwater specific'));
+
+      const chosenEnergy = standardEnergy ?? atwaterGeneral ?? atwaterSpecific;
+
+      if (chosenEnergy) {
+        nutritionData.calories = chosenEnergy.amount ?? chosenEnergy.nutrient?.amount ?? 0;
+        console.log(`Calories source: ${chosenEnergy.nutrient?.name ?? chosenEnergy.name} = ${nutritionData.calories} kcal`);
+      } else {
+        console.log('No energy nutrient (standard or Atwater) found in USDA response');
+      }
+
       console.log(`Energy nutrients found: ${JSON.stringify(energyNutrients.map((n: any) => ({
         id: n.nutrient?.id ?? n.id,
         name: n.nutrient?.name ?? n.name,
@@ -645,13 +802,22 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error in scan-food function:', error);
 
-    if (typeof error?.message === 'string' && error.message.startsWith('All vision providers failed')) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.startsWith('All vision providers failed')) {
       return jsonResponse(
-        { error: 'Recognition temporarily unavailable', details: error.message },
+        { error: 'Recognition temporarily unavailable', details: errorMessage },
         503
       );
     }
 
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    if (errorMessage.includes('USDA API error')) {
+      return jsonResponse(
+        { error: 'USDA API lookup failed', details: errorMessage },
+        500
+      );
+    }
+
+    return jsonResponse({ error: 'Internal server error', details: errorMessage }, 500);
   }
 });
