@@ -92,3 +92,12 @@ class ScanBarcodeRequested extends FoodScanEvent {
 }
 
 class RetryRecognitionRequested extends FoodScanEvent {}
+
+class UpdateMealImageRequested extends FoodScanEvent {
+  final File image;
+
+  const UpdateMealImageRequested(this.image);
+
+  @override
+  List<Object?> get props => [image];
+}

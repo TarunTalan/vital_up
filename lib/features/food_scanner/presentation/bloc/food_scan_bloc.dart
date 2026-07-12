@@ -47,6 +47,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     on<ConfirmAndSaveRequested>(_onConfirmAndSaveRequested);
     on<ScanBarcodeRequested>(_onScanBarcodeRequested);
     on<RetryRecognitionRequested>(_onRetryRecognitionRequested);
+    on<UpdateMealImageRequested>(_onUpdateMealImageRequested);
   }
 
   Future<void> _onCaptureImageRequested(
@@ -539,6 +540,14 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     if (_currentImage != null) {
       add(RecognizeFoodRequested());
     }
+  }
+
+  Future<void> _onUpdateMealImageRequested(
+    UpdateMealImageRequested event,
+    Emitter<FoodScanState> emit,
+  ) async {
+    _currentImage = event.image;
+    _emitCurrentState(emit);
   }
 
   void _reset() {

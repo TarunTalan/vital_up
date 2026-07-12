@@ -22,22 +22,27 @@ final GetIt _sl = GetIt.instance;
 
 class FoodScannerPage extends StatelessWidget {
   final VoidCallback? onBack;
+  final bool isEditingImage;
 
-  const FoodScannerPage({super.key, this.onBack});
+  const FoodScannerPage({super.key, this.onBack, this.isEditingImage = false});
 
   @override
   Widget build(BuildContext context) {
+    if (isEditingImage) {
+      return FoodScannerView(onBack: onBack, isEditingImage: isEditingImage);
+    }
     return BlocProvider<FoodScanBloc>(
       create: (_) => _sl<FoodScanBloc>(),
-      child: FoodScannerView(onBack: onBack),
+      child: FoodScannerView(onBack: onBack, isEditingImage: isEditingImage),
     );
   }
 }
 
 class FoodScannerView extends StatefulWidget {
   final VoidCallback? onBack;
+  final bool isEditingImage;
 
-  const FoodScannerView({super.key, this.onBack});
+  const FoodScannerView({super.key, this.onBack, this.isEditingImage = false});
 
   @override
   State<FoodScannerView> createState() => _FoodScannerViewState();
@@ -216,7 +221,20 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       listener: (context, state) {
         if (state is RecognitionSucceeded ||
             state is RecognitionLowConfidence) {
-          _openDetail(context);
+          if (widget.isEditingImage) {
+            final bloc = context.read<FoodScanBloc>();
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute<void>(
+                builder: (_) => BlocProvider<FoodScanBloc>.value(
+                  value: bloc,
+                  child: const FoodDetailPage(),
+                ),
+              ),
+              (route) => route.isFirst,
+            );
+          } else {
+            _openDetail(context);
+          }
         } else if (state is RecognitionFailed) {
           setState(() {
             _selectedImage = null;
