@@ -20,7 +20,6 @@ class NutritionRepositoryImpl implements NutritionRepository {
     required this.supabaseClient,
   });
 
-  final String _usdaBaseUrl = 'https://api.nal.usda.gov/fdc/v1';
   final String _openFoodFactsBaseUrl = 'https://world.openfoodfacts.org/api/v0';
 
   /// Supabase Edge Functions only auto-decode the response body into a

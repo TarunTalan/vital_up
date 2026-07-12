@@ -521,11 +521,10 @@ class _ScannedDish extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Center(
-      child: SizedBox(
-        width: MediaQuery.sizeOf(context).width * 0.7,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
           child: Stack(
             alignment: Alignment.bottomRight,
             children: [
@@ -550,7 +549,6 @@ class _ScannedDish extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }
