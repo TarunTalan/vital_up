@@ -43,7 +43,6 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
         allowBackgroundLocationUpdates: true,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
-        activityType: CLActivityType.fitness,
       );
     } else if (Platform.isAndroid) {
       settings = AndroidSettings(
