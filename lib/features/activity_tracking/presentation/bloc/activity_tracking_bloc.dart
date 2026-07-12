@@ -35,6 +35,9 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   bool _stepCountReliable = true;
   bool _skipDistanceForNextPoint = false;
 
+  /// User weight cached at session start to avoid hitting the DB on every tick.
+  double _cachedWeightKg = 70.0;
+
   DateTime? _lastSavedAt;
   DateTime? _stationarySince;
 
@@ -81,6 +84,14 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _skipDistanceForNextPoint = false;
     _stationarySince = null;
     _lastSavedAt = DateTime.now();
+
+    // Cache user weight once per session — avoids async DB hit on every tick.
+    final userResult = await authRepository.getCurrentUser();
+    _cachedWeightKg = userResult.fold(
+      (failure) => 70.0,
+      (user) => user?.weightKg ?? 70.0,
+    );
+
     final activityType = state.activityType;
 
     emit(TrackingInProgress(
@@ -227,7 +238,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     if (start == null) return;
 
     final elapsed = DateTime.now().difference(start) - _pausedDuration;
-    final calories = await _calculateCalories(s.activityType, elapsed, s.distanceMeters);
+    final calories = _calculateCalories(s.activityType, elapsed, s.distanceMeters);
     
     emit(TrackingInProgress(
       activityType: s.activityType,
@@ -269,7 +280,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _updateStationaryState(event.point, segmentDistance);
 
     final pace = _calculateOverallPace(s.elapsed, distance);
-    final calories = await _calculateCalories(s.activityType, s.elapsed, distance);
+    final calories = _calculateCalories(s.activityType, s.elapsed, distance);
 
     emit(TrackingInProgress(
       activityType: s.activityType,
@@ -350,34 +361,31 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     }
   }
 
-  Future<int> _calculateCalories(ActivityType type, Duration elapsed, double distanceMeters) async {
-    // Get user weight from auth repository
-    final userResult = await authRepository.getCurrentUser();
-    final weightKg = userResult.fold(
-      (failure) => 70.0, // Default weight if unavailable
-      (user) => user?.weightKg ?? 70.0,
-    );
-    
-    // Use distance-based calculation for more accuracy (like Adidas Running)
-    // Fallback to duration-based if distance is too small
+  /// Calculates calories burned using a MET×weight×time + distance-correction blend.
+  ///
+  /// Strategy (mirrors Adidas Running app approach):
+  ///   1. Duration-only MET estimate: `MET × weight(kg) × hours`
+  ///   2. Distance-based estimate:    `kcalPerKgPerKm × weight(kg) × distance(km)`
+  ///   3. We blend them:  when distance < 10 m use pure MET;
+  ///      otherwise return the average of both to smooth out GPS noise.
+  int _calculateCalories(
+    ActivityType type,
+    Duration elapsed,
+    double distanceMeters,
+  ) {
+    final weightKg = _cachedWeightKg;
+    final hours = elapsed.inSeconds / 3600.0;
+    final metCalories = type.met * weightKg * hours;
+
     if (distanceMeters < 10.0) {
-      final hours = elapsed.inSeconds / 3600.0;
-      return (type.met * weightKg * hours).round();
+      return metCalories.round();
     }
-    
+
     final distanceKm = distanceMeters / 1000.0;
-    
-    // Calculate calories based on distance and weight
-    // Running: ~1 kcal per kg per km
-    // Walking: ~0.7 kcal per kg per km
-    // Cycling: ~0.4 kcal per kg per km
-    final caloriesPerKmPerKg = switch (type) {
-      ActivityType.walk => 0.7,
-      ActivityType.run => 1.0,
-      ActivityType.cycle => 0.4,
-    };
-    
-    return (distanceKm * weightKg * caloriesPerKmPerKg).round();
+    final distanceCalories = type.kcalPerKgPerKm * weightKg * distanceKm;
+
+    // Blend: 50% MET-based, 50% distance-based for best overall accuracy.
+    return ((metCalories + distanceCalories) / 2).round();
   }
 
   int _calculateOverallPace(Duration elapsed, double distanceMeters) {

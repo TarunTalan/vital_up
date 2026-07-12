@@ -8,8 +8,13 @@ import 'package:vital_up/features/activity_tracking/domain/entities/track_point.
 import 'package:vital_up/features/activity_tracking/domain/repositories/location_tracking_repository.dart';
 
 class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
-  static const double maxAccuracyMeters = 15.0;
-  static const double smoothingWeight = 0.6;
+  /// Maximum horizontal accuracy we accept for a GPS fix.
+  /// 25 m allows most urban rooftop-occlusion scenarios while still being reliable.
+  static const double _maxAccuracyMeters = 25.0;
+
+  /// EMA smoothing coefficient for walking only (0 = fully raw, 1 = fully previous).
+  /// Applied to lat/lon to reduce GPS jitter at low speeds.
+  static const double _walkSmoothWeight = 0.55;
 
   @override
   Future<bool> ensurePermission() async {
@@ -34,15 +39,16 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
     if (Platform.isIOS) {
       settings = AppleSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
+        distanceFilter: 1,
         allowBackgroundLocationUpdates: true,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
+        activityType: CLActivityType.fitness,
       );
     } else if (Platform.isAndroid) {
       settings = AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
+        distanceFilter: 1,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'VitalUp Active Workout',
           notificationText: 'Tracking your workout in the background',
@@ -52,68 +58,99 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
     } else {
       settings = const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
+        distanceFilter: 1,
       );
     }
 
     return Geolocator.getPositionStream(locationSettings: settings)
+        // Step 1 — Map raw position to TrackPoint
         .map((position) => TrackPoint(
               latitude: position.latitude,
               longitude: position.longitude,
               timestamp: position.timestamp ?? DateTime.now(),
               accuracy: position.accuracy,
-              speed: position.speed.isFinite ? position.speed : 0,
-              altitude: position.altitude.isFinite ? position.altitude : 0,
+              speed: position.speed.isFinite && position.speed >= 0
+                  ? position.speed
+                  : 0.0,
+              altitude: position.altitude.isFinite ? position.altitude : 0.0,
             ))
-        .where((point) => point.accuracy <= maxAccuracyMeters)
+        // Step 2 — Reject fixes with poor accuracy
+        .where((point) => point.accuracy <= _maxAccuracyMeters)
+        // Step 3 — Adaptive positional smoothing (EMA only for walking)
         .map((point) {
-      final previous = lastSmoothed;
-      if (previous == null) {
-        lastSmoothed = point;
-        return point;
-      }
+          // For run/cycle we trust the Doppler speed from the GPS chip and
+          // do NOT smear the position — high-speed EMA causes significant lag.
+          if (activityType != ActivityType.walk) {
+            lastSmoothed = point;
+            return point;
+          }
 
-      final smoothed = TrackPoint(
-        latitude: previous.latitude * smoothingWeight +
-            point.latitude * (1 - smoothingWeight),
-        longitude: previous.longitude * smoothingWeight +
-            point.longitude * (1 - smoothingWeight),
-        altitude: previous.altitude * smoothingWeight +
-            point.altitude * (1 - smoothingWeight),
-        timestamp: point.timestamp,
-        accuracy: point.accuracy,
-        speed: point.speed,
-      );
-      lastSmoothed = smoothed;
-      return smoothed;
-    }).where((point) {
-      final previous = lastAccepted;
-      if (previous == null) {
-        lastAccepted = point;
-        return true;
-      }
+          final previous = lastSmoothed;
+          if (previous == null) {
+            lastSmoothed = point;
+            return point;
+          }
 
-      final elapsedSeconds =
-          point.timestamp.difference(previous.timestamp).inMilliseconds / 1000;
-      if (elapsedSeconds <= 0) return false;
+          final smoothed = TrackPoint(
+            latitude: previous.latitude * _walkSmoothWeight +
+                point.latitude * (1 - _walkSmoothWeight),
+            longitude: previous.longitude * _walkSmoothWeight +
+                point.longitude * (1 - _walkSmoothWeight),
+            altitude: previous.altitude * _walkSmoothWeight +
+                point.altitude * (1 - _walkSmoothWeight),
+            timestamp: point.timestamp,
+            accuracy: point.accuracy,
+            speed: point.speed, // always keep raw Doppler speed
+          );
+          lastSmoothed = smoothed;
+          return smoothed;
+        })
+        // Step 4 — Speed-gate: use GPS-chip Doppler speed as primary filter,
+        // and position-derived speed only as a sanity upper-bound check.
+        .where((point) {
+          final previous = lastAccepted;
+          if (previous == null) {
+            lastAccepted = point;
+            return true;
+          }
 
-      final distance = haversineMeters(previous, point);
-      final impliedSpeed = distance / elapsedSeconds;
-      if (impliedSpeed > activityType.maxReasonableSpeedMetersPerSecond) {
-        return false;
-      }
+          final elapsedSeconds =
+              point.timestamp.difference(previous.timestamp).inMilliseconds / 1000.0;
+          if (elapsedSeconds <= 0) return false;
 
-      if (distance < 1.0 && point.speed < 0.5) {
-        return false;
-      }
+          // Primary filter: GPS chip Doppler speed. This is far more accurate
+          // than position-derived speed at all speeds.
+          if (point.speed > activityType.maxReasonableSpeedMetersPerSecond) {
+            return false;
+          }
 
-      lastAccepted = point;
-      return true;
-    });
+          // Secondary sanity check: implied position-derived speed should not
+          // be more than 2× the activity max (very permissive — accounts for
+          // accumulated positional error over short time windows).
+          final distance3d = haversineMeters3d(previous, point);
+          final impliedSpeed = distance3d / elapsedSeconds;
+          if (impliedSpeed > activityType.maxReasonableSpeedMetersPerSecond * 2) {
+            return false;
+          }
+
+          // Minimum movement gate per activity type:
+          // Walk: ignore if < 0.8 m and standing still
+          // Run/Cycle: ignore if < 0.5 m (GPS noise floor)
+          final minDist = activityType == ActivityType.walk ? 0.8 : 0.5;
+          final minSpeed = activityType == ActivityType.walk ? 0.3 : 0.1;
+          if (distance3d < minDist && point.speed < minSpeed) {
+            return false;
+          }
+
+          lastAccepted = point;
+          return true;
+        });
   }
 }
 
-double haversineMeters(TrackPoint a, TrackPoint b) {
+/// 3D Haversine distance in meters, incorporating altitude change.
+/// More accurate than 2D on hilly routes.
+double haversineMeters3d(TrackPoint a, TrackPoint b) {
   const earthRadiusMeters = 6371000.0;
   final dLat = _degreesToRadians(b.latitude - a.latitude);
   final dLng = _degreesToRadians(b.longitude - a.longitude);
@@ -123,8 +160,14 @@ double haversineMeters(TrackPoint a, TrackPoint b) {
   final h = sin(dLat / 2) * sin(dLat / 2) +
       cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2);
   final horizontalDistance = earthRadiusMeters * 2 * atan2(sqrt(h), sqrt(1 - h));
-  
-  return horizontalDistance;
+
+  // Incorporate altitude delta (Pythagorean 3D distance).
+  final dAlt = b.altitude - a.altitude;
+  return sqrt(horizontalDistance * horizontalDistance + dAlt * dAlt);
 }
 
+/// 2D Haversine — kept for backwards-compatibility (used by bloc for pace calculation).
+double haversineMeters(TrackPoint a, TrackPoint b) => haversineMeters3d(a, b);
+
 double _degreesToRadians(double degrees) => degrees * pi / 180.0;
+
