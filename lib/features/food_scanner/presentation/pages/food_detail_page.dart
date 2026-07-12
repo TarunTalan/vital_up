@@ -69,16 +69,25 @@ class FoodDetailPage extends StatelessWidget {
         foregroundColor: _FoodScannerStyle.onBackground,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: Color(0xFF1C1C1C),
+          ),
         ),
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.ios_share_rounded),
+            icon: const Icon(
+              Icons.ios_share_rounded,
+              color: Color(0xFF1C1C1C),
+            ),
           ),
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.info_outline_rounded),
+            icon: const Icon(
+              Icons.info_outline_rounded,
+              color: Color(0xFF1C1C1C),
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -256,11 +265,6 @@ class _FoodDetailData {
       (sum, nut) => sum + nut.sodiumMg,
     );
 
-    final proteinPct = (FoodScanUtils.calculateProteinRatio(nutrition) * 100)
-        .round();
-    final carbPct = (FoodScanUtils.calculateCarbRatio(nutrition) * 100).round();
-    final fatPct = (FoodScanUtils.calculateFatRatio(nutrition) * 100).round();
-
     final dishes = [
       for (final nut in nutrition)
         DishItem(
@@ -270,86 +274,84 @@ class _FoodDetailData {
         ),
     ];
 
-    final macros = [
-      MacroMain(
-        name: 'Protein',
-        grams: totalProtein.round(),
-        percent: proteinPct,
-        color: const Color(0xFF00B3A4),
-      ),
-      MacroMain(
-        name: 'Carbs',
-        grams: totalCarbs.round(),
-        percent: carbPct,
-        color: const Color(0xFFFFB300),
-      ),
-      MacroMain(
-        name: 'Fat',
-        grams: totalFat.round(),
-        percent: fatPct,
-        color: const Color(0xFF9C7CFF),
-      ),
+    final totalSaturatedFat = nutrition.fold<double>(0, (sum, nut) => sum + nut.saturatedFatG);
+    final totalTransFat = nutrition.fold<double>(0, (sum, nut) => sum + nut.transFatG);
+    final totalCholesterol = nutrition.fold<double>(0, (sum, nut) => sum + nut.cholesterolMg);
+    final totalPotassium = nutrition.fold<double>(0, (sum, nut) => sum + nut.potassiumMg);
+    final totalCalcium = nutrition.fold<double>(0, (sum, nut) => sum + nut.calciumMg);
+    final totalIron = nutrition.fold<double>(0, (sum, nut) => sum + nut.ironMg);
+    final totalVitaminC = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminCMg);
+
+    final candidates = [
+      _NutrientCandidate(name: 'Carbs', value: totalCarbs, unit: 'g', color: const Color(0xFFFFB300)),
+      _NutrientCandidate(name: 'Protein', value: totalProtein, unit: 'g', color: const Color(0xFF00B3A4)),
+      _NutrientCandidate(name: 'Fat', value: totalFat, unit: 'g', color: const Color(0xFF9C7CFF)),
+      if (totalFiber > 0)
+        _NutrientCandidate(name: 'Dietary Fiber', value: totalFiber, unit: 'g', color: const Color(0xFF4CAF50)),
+      if (totalSugar > 0)
+        _NutrientCandidate(name: 'Total Sugars', value: totalSugar, unit: 'g', color: const Color(0xFFE91E63)),
+      if (totalSaturatedFat > 0)
+        _NutrientCandidate(name: 'Saturated Fat', value: totalSaturatedFat, unit: 'g', color: const Color(0xFFFF5722)),
+      if (totalTransFat > 0)
+        _NutrientCandidate(name: 'Trans Fat', value: totalTransFat, unit: 'g', color: const Color(0xFF9E9E9E)),
     ];
 
-    // Build dynamic macro details from all available nutrition data
+    candidates.sort((a, b) => b.value.compareTo(a.value));
+
+    final top3 = candidates.take(3).toList();
+    final totalTop3Weight = top3.fold<double>(0, (sum, item) => sum + item.value);
+
+    final macros = top3.map((item) {
+      final pct = totalTop3Weight > 0 ? (item.value / totalTop3Weight * 100).round() : 0;
+      return MacroMain(
+        name: item.name,
+        grams: item.value.round(),
+        percent: pct,
+        color: item.color,
+      );
+    }).toList();
+
     final macroDetails = <MacroDetail>[];
     
-    // Add main nutrition details if they have values
-    if (totalFiber > 0) {
-      macroDetails.add(MacroDetail(name: 'Dietary Fiber', grams: totalFiber.round()));
+    // Add remaining candidates to the details list
+    final remainingCandidates = candidates.skip(3);
+    for (final item in remainingCandidates) {
+      macroDetails.add(MacroDetail(
+        name: item.name,
+        grams: item.value.round(),
+        unit: 'g',
+      ));
     }
-    if (totalSugar > 0) {
-      macroDetails.add(MacroDetail(name: 'Total Sugars', grams: totalSugar.round()));
+
+    if (totalCholesterol > 0) {
+      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol.round(), unit: 'mg'));
     }
     if (totalSodium > 0) {
       macroDetails.add(MacroDetail(name: 'Sodium', grams: totalSodium.round(), unit: 'mg'));
     }
-    
-    // Add additional nutrients from all nutrition items
-    for (final nut in nutrition) {
-      for (final additional in nut.additionalNutrients) {
-        if (additional.value > 0) {
-          macroDetails.add(MacroDetail(
-            name: additional.name,
-            grams: additional.value.round(),
-            unit: additional.unit,
-          ));
-        }
-      }
-    }
-    
-    // Add other key nutrients if they have values
-    final totalCalcium = nutrition.fold<double>(0, (sum, nut) => sum + nut.calciumMg);
-    if (totalCalcium > 0) {
-      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium.round(), unit: 'mg'));
-    }
-    
-    final totalIron = nutrition.fold<double>(0, (sum, nut) => sum + nut.ironMg);
-    if (totalIron > 0) {
-      macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron.round(), unit: 'mg'));
-    }
-    
-    final totalPotassium = nutrition.fold<double>(0, (sum, nut) => sum + nut.potassiumMg);
     if (totalPotassium > 0) {
       macroDetails.add(MacroDetail(name: 'Potassium', grams: totalPotassium.round(), unit: 'mg'));
     }
-    
-    final totalCholesterol = nutrition.fold<double>(0, (sum, nut) => sum + nut.cholesterolMg);
-    if (totalCholesterol > 0) {
-      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol.round(), unit: 'mg'));
+    if (totalCalcium > 0) {
+      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium.round(), unit: 'mg'));
     }
-    
-    final totalVitaminC = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminCMg);
+    if (totalIron > 0) {
+      macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron.round(), unit: 'mg'));
+    }
     if (totalVitaminC > 0) {
       macroDetails.add(MacroDetail(name: 'Vitamin C', grams: totalVitaminC.round(), unit: 'mg'));
     }
-    
-    final totalVitaminA = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminAIu);
-    if (totalVitaminA > 0) {
-      macroDetails.add(MacroDetail(name: 'Vitamin A', grams: totalVitaminA.round(), unit: 'IU'));
+
+    String capitalize(String s) {
+      if (s.isEmpty) return s;
+      return s.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+      }).join(' ');
     }
 
-    final dishName = items.length == 1 ? items.first.name : 'Scanned Meal';
+    final rawDishName = items.length == 1 ? items.first.name : 'Scanned Meal';
+    final dishName = capitalize(rawDishName);
     final now = DateTime.now();
     final mealType = MealLogEntry.mealTypeFromTime(now);
 
@@ -370,20 +372,26 @@ class _FoodDetailData {
           : [recommendation.message],
     );
 
+    final totalMacronutrientsWeight = totalProtein + totalCarbs + totalFat;
+    final totalMacroWeight = candidates.fold<double>(0, (sum, item) => sum + item.value);
+
     return _FoodDetailData(
       imagePath: image?.path ?? '',
       dishName: dishName,
       totalCalories: totalCalories.round(),
       healthScore: _computeHealthScore(
-        proteinPct / 100,
-        carbPct / 100,
-        fatPct / 100,
+        proteinRatio: totalProtein / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        carbRatio: totalCarbs / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        fatRatio: totalFat / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        fiberG: totalFiber,
+        sugarG: totalSugar,
+        sodiumMg: totalSodium,
       ),
       dishes: dishes,
       foodItems: items,
       macros: macros,
       macroDetails: macroDetails,
-      totalMacroGrams: (totalProtein + totalCarbs + totalFat).round(),
+      totalMacroGrams: totalMacroWeight.round(),
       mealType: mealType,
       mealInfo: mealInfo.points.isEmpty ? null : mealInfo,
       suggestions: recommendation == null
@@ -463,18 +471,33 @@ String _formatTime(DateTime time) {
   return '$hour:$minute $period';
 }
 
-int _computeHealthScore(
-  double proteinRatio,
-  double carbRatio,
-  double fatRatio,
-) {
-  // Heuristic based on how close the macro split is to a balanced target
-  // (protein 30%, carbs 40%, fat 30% of calories).
+int _computeHealthScore({
+  required double proteinRatio,
+  required double carbRatio,
+  required double fatRatio,
+  required double fiberG,
+  required double sugarG,
+  required double sodiumMg,
+}) {
+  // Start with a base score based on macro split deviation (max deviation is 1.2)
   final deviation =
       (proteinRatio - 0.3).abs() +
       (carbRatio - 0.4).abs() +
       (fatRatio - 0.3).abs();
-  return (100 - deviation * 100).clamp(0, 100).round();
+  
+  // Base score ranges from 52 to 100
+  double score = 100 - (deviation * 40);
+  
+  // Bonus for fiber (+4 points per gram, max +15)
+  score += (fiberG * 4.0).clamp(0.0, 15.0);
+  
+  // Penalty for sugar (-1.0 points per gram, max -15)
+  score -= (sugarG * 1.0).clamp(0.0, 15.0);
+  
+  // Penalty for sodium (-1 point per 50mg, max -15)
+  score -= (sodiumMg / 50.0).clamp(0.0, 15.0);
+  
+  return score.clamp(1.0, 100.0).round();
 }
 
 class _FoodScannerStyle {
@@ -534,8 +557,6 @@ class _ScannedDish extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return SizedBox(
       width: double.infinity,
       child: ClipRRect(
@@ -555,10 +576,10 @@ class _ScannedDish extends StatelessWidget {
                 height: 180,
                 color: _FoodScannerStyle.cardBg,
                 alignment: Alignment.center,
-                child: Icon(
+                child: const Icon(
                   Icons.restaurant_rounded,
                   size: 64,
-                  color: colors.primary,
+                  color: Color(0xFF1C1C1C),
                 ),
               ),
             if (onEditImage != null)
@@ -566,7 +587,7 @@ class _ScannedDish extends StatelessWidget {
                 bottom: 8,
                 right: 8,
                 child: Material(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: Colors.white.withValues(alpha: 0.8),
                   shape: const CircleBorder(),
                   child: InkWell(
                     onTap: onEditImage,
@@ -576,7 +597,7 @@ class _ScannedDish extends StatelessWidget {
                       child: Icon(
                         Icons.edit_rounded,
                         size: 20,
-                        color: Colors.white,
+                        color: Color(0xFF1C1C1C),
                       ),
                     ),
                   ),
@@ -681,13 +702,30 @@ class _CircularScoreMeter extends StatelessWidget {
               strokeCap: StrokeCap.round,
             ),
           ),
-          Text(
-            '$clamped $label',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: _FoodScannerStyle.textMedium,
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$clamped',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 26,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -758,12 +796,20 @@ class _DishInfoCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   InkWell(
                     onTap: () => _showEditDialog(context, dish),
-                    child: const Icon(Icons.edit_outlined, size: 18),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: Color(0xFF1C1C1C),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   InkWell(
                     onTap: () => onRemove(dish.id),
-                    child: const Icon(Icons.delete_outline_rounded, size: 18),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: Color(0xFF1C1C1C),
+                    ),
                   ),
                 ],
               ),
@@ -814,7 +860,7 @@ class _DishInfoCard extends StatelessWidget {
   }
 }
 
-class _MacroCard extends StatelessWidget {
+class _MacroCard extends StatefulWidget {
   final List<MacroMain> macros;
   final List<MacroDetail> details;
   final int totalGrams;
@@ -826,8 +872,22 @@ class _MacroCard extends StatelessWidget {
   });
 
   @override
+  State<_MacroCard> createState() => _MacroCardState();
+}
+
+class _MacroCardState extends State<_MacroCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasMore = widget.details.length > 5;
+    final visibleDetails = _isExpanded ? widget.details : widget.details.take(5).toList();
+
+    final totalGrams = widget.macros.fold<double>(0, (sum, m) => sum + m.grams) +
+        widget.details
+            .where((d) => d.unit.toLowerCase() == 'g')
+            .fold<double>(0, (sum, d) => sum + d.grams);
 
     return _GlassCard(
       child: Column(
@@ -836,40 +896,51 @@ class _MacroCard extends StatelessWidget {
           Row(
             children: [
               const Expanded(child: _SectionLabel('Macros')),
-              InkWell(
-                onTap: () {},
-                child: Row(
-                  children: [
-                    Text(
-                      'Less Details',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: _FoodScannerStyle.action,
-                        fontSize: _FoodScannerStyle.textSmall,
+              if (hasMore)
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isExpanded = !_isExpanded;
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        _isExpanded ? 'Less Details' : 'More Details',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: _FoodScannerStyle.action,
+                          fontSize: _FoodScannerStyle.textSmall,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.keyboard_arrow_up_rounded,
-                      color: _FoodScannerStyle.action,
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF1C1C1C),
+                        size: 18,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
-          for (final macro in macros) ...[
+          for (final macro in widget.macros) ...[
             _MacroMainRow(macro),
             const SizedBox(height: 14),
           ],
-          const Divider(height: 32, color: _FoodScannerStyle.divider),
-          for (final detail in details) ...[
-            _MacroDetailRow(detail),
-            const SizedBox(height: 10),
+          if (visibleDetails.isNotEmpty) ...[
+            const Divider(height: 32, color: _FoodScannerStyle.divider),
+            for (final detail in visibleDetails) ...[
+              _MacroDetailRow(detail),
+              const SizedBox(height: 10),
+            ],
           ],
           const Divider(height: 32, color: _FoodScannerStyle.divider),
           Text(
-            'Total: ${totalGrams}g of macronutrients',
+            'Total: ${totalGrams.round()}g of macronutrients',
             style: theme.textTheme.bodySmall?.copyWith(
               color: Colors.grey,
               fontSize: _FoodScannerStyle.textSmall,
@@ -975,7 +1046,11 @@ class _MealInfoPopup extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.schedule_rounded, color: colors.primary, size: 20),
+              const Icon(
+                Icons.schedule_rounded,
+                color: Color(0xFF1C1C1C),
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -1026,9 +1101,9 @@ class _Suggestions extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.lightbulb_outline_rounded,
-                color: colors.primary,
+                color: Color(0xFF1C1C1C),
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -1101,7 +1176,11 @@ class _SuggestionRow extends StatelessWidget {
             ).textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.2),
           ),
         ),
-        const Icon(Icons.chevron_right_rounded, size: 16),
+        const Icon(
+          Icons.chevron_right_rounded,
+          size: 16,
+          color: Color(0xFF1C1C1C),
+        ),
       ],
     );
   }
@@ -1209,4 +1288,18 @@ String _scoreLabel(int score) {
   if (score >= 55) return 'Fair';
   if (score >= 40) return 'Low';
   return 'Poor';
+}
+
+class _NutrientCandidate {
+  final String name;
+  final double value;
+  final String unit;
+  final Color color;
+
+  const _NutrientCandidate({
+    required this.name,
+    required this.value,
+    required this.unit,
+    required this.color,
+  });
 }

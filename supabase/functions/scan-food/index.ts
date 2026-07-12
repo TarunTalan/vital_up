@@ -314,7 +314,26 @@ class VisionProviderChain {
   }
 }
 
-async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
+async function searchUSDA(query: string, apiKey: string, supabase?: any): Promise<any[]> {
+  const queryNormalized = query.trim().toLowerCase();
+  
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('food_search_cache')
+        .select('search_results, expires_at')
+        .eq('query_normalized', queryNormalized)
+        .single();
+        
+      if (!error && data && new Date(data.expires_at) > new Date()) {
+        console.log(`Cache hit for USDA search: "${queryNormalized}"`);
+        return data.search_results;
+      }
+    } catch (e) {
+      console.error('Error reading search cache:', e);
+    }
+  }
+
   const response = await fetch(
     `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${apiKey}&pageSize=10&dataType=Foundation,SR%20Legacy,Branded`
   );
@@ -323,8 +342,8 @@ async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
     throw new Error('USDA API error');
   }
 
-  const data = await response.json();
-  const foods = data.foods || [];
+  const responseData = await response.json();
+  const foods = responseData.foods || [];
 
   // Filter and score foods to get the best match
   // Prefer Foundation and SR Legacy data over Branded
@@ -390,7 +409,26 @@ async function searchUSDA(query: string, apiKey: string): Promise<any[]> {
 
   console.log(`USDA search for "${query}": found ${foods.length} results, top scored: ${scoredFoods.slice(0, 3).map((f: any) => `${f.description} (${f.dataType}, score: ${f.score})`).join(', ')}`);
 
-  return scoredFoods.slice(0, 5);
+  const results = scoredFoods.slice(0, 5);
+
+  // Save to cache
+  if (supabase) {
+    try {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // Cache for 7 days
+      await supabase
+        .from('food_search_cache')
+        .insert({
+          query_normalized: queryNormalized,
+          search_results: results,
+          expires_at: expiresAt.toISOString(),
+        });
+    } catch (e) {
+      console.error('Error writing to search cache:', e);
+    }
+  }
+
+  return results;
 }
 
 async function getUSDANutrition(fdcId: string, apiKey: string): Promise<any> {
@@ -517,7 +555,7 @@ Deno.serve(async (req) => {
 
     // Handle search query (manual food search)
     if (search_query) {
-      const foods = await searchUSDA(search_query, usdaApiKey);
+      const foods = await searchUSDA(search_query, usdaApiKey, supabase);
       const items = foods.map((food: any) => ({
         id: food.fdcId?.toString() || food.description,
         name: food.description,
@@ -538,7 +576,7 @@ Deno.serve(async (req) => {
       
       if (!isNumeric) {
         console.log(`Non-numeric fdc_id provided: "${fdc_id}". Searching USDA by name first.`);
-        const searchResults = await searchUSDA(fdc_id.toString(), usdaApiKey);
+        const searchResults = await searchUSDA(fdc_id.toString(), usdaApiKey, supabase);
         if (searchResults.length > 0 && searchResults[0].fdcId) {
           numericId = searchResults[0].fdcId.toString();
           console.log(`Found matching FDC ID: ${numericId} for "${fdc_id}"`);
@@ -558,45 +596,123 @@ Deno.serve(async (req) => {
       }
 
       let foodData;
+      let nutrients = [];
+      let usdaServingSizeInGrams = 100;
+      const cacheKey = `usda_raw:${numericId}`;
+
+      // Check database cache first
+      let cachedData = null;
       try {
-        foodData = await getUSDANutrition(numericId, usdaApiKey);
-      } catch (error) {
-        console.error(`Failed to fetch FDC ID ${numericId}:`, error);
-        return jsonResponse({
-          calories: 0,
-          protein_g: 0,
-          carbs_g: 0,
-          fat_g: 0,
-          fiber_g: 0,
-          sugar_g: 0,
-          sodium_mg: 0,
-          additional_nutrients: [],
-        }, 200);
-      }
-      const nutrients = foodData.foodNutrients || [];
-
-      // Get the serving size from USDA data
-      // USDA data can be per 100g, per serving, per cup, etc.
-      const servingSize = foodData.servingSize || 100;
-      const servingSizeUnit = foodData.servingSizeUnit || 'g';
-
-      console.log(`USDA serving size: ${servingSize} ${servingSizeUnit}`);
-
-      // Convert USDA serving size to grams for consistent scaling
-      let usdaServingSizeInGrams = 100; // Default to 100g
-      if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
-        usdaServingSizeInGrams = servingSize;
-      } else if (servingSizeUnit.toLowerCase() === 'mg' || servingSizeUnit.toLowerCase() === 'milligrams') {
-        usdaServingSizeInGrams = servingSize / 1000;
-      } else if (servingSizeUnit.toLowerCase() === 'kg' || servingSizeUnit.toLowerCase() === 'kilograms') {
-        usdaServingSizeInGrams = servingSize * 1000;
-      } else if (servingSizeUnit.toLowerCase() === 'oz' || servingSizeUnit.toLowerCase() === 'ounces') {
-        usdaServingSizeInGrams = servingSize * 28.35;
-      } else if (servingSizeUnit.toLowerCase() === 'lb' || servingSizeUnit.toLowerCase() === 'pounds') {
-        usdaServingSizeInGrams = servingSize * 453.59;
+        const { data, error } = await supabase
+          .from('food_search_cache')
+          .select('search_results')
+          .eq('query_normalized', cacheKey)
+          .single();
+        if (!error && data) {
+          console.log(`Cache hit for USDA raw nutrition: "${cacheKey}"`);
+          cachedData = data.search_results;
+        }
+      } catch (e) {
+        console.error('Error reading raw nutrition cache:', e);
       }
 
-      console.log(`USDA serving size in grams: ${usdaServingSizeInGrams}`);
+      if (cachedData) {
+        foodData = cachedData;
+        nutrients = foodData.foodNutrients || [];
+        const servingSize = foodData.servingSize || 100;
+        const servingSizeUnit = foodData.servingSizeUnit || 'g';
+        
+        if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
+          usdaServingSizeInGrams = servingSize;
+        } else if (servingSizeUnit.toLowerCase() === 'mg' || servingSizeUnit.toLowerCase() === 'milligrams') {
+          usdaServingSizeInGrams = servingSize / 1000;
+        } else if (servingSizeUnit.toLowerCase() === 'kg' || servingSizeUnit.toLowerCase() === 'kilograms') {
+          usdaServingSizeInGrams = servingSize * 1000;
+        } else if (servingSizeUnit.toLowerCase() === 'oz' || servingSizeUnit.toLowerCase() === 'ounces') {
+          usdaServingSizeInGrams = servingSize * 28.35;
+        } else if (servingSizeUnit.toLowerCase() === 'lb' || servingSizeUnit.toLowerCase() === 'pounds') {
+          usdaServingSizeInGrams = servingSize * 453.59;
+        }
+      } else {
+        // Cache miss, call USDA
+        try {
+          foodData = await getUSDANutrition(numericId, usdaApiKey);
+          nutrients = foodData.foodNutrients || [];
+          
+          const servingSize = foodData.servingSize || 100;
+          const servingSizeUnit = foodData.servingSizeUnit || 'g';
+          
+          if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
+            usdaServingSizeInGrams = servingSize;
+          } else if (servingSizeUnit.toLowerCase() === 'mg' || servingSizeUnit.toLowerCase() === 'milligrams') {
+            usdaServingSizeInGrams = servingSize / 1000;
+          } else if (servingSizeUnit.toLowerCase() === 'kg' || servingSizeUnit.toLowerCase() === 'kilograms') {
+            usdaServingSizeInGrams = servingSize * 1000;
+          } else if (servingSizeUnit.toLowerCase() === 'oz' || servingSizeUnit.toLowerCase() === 'ounces') {
+            usdaServingSizeInGrams = servingSize * 28.35;
+          } else if (servingSizeUnit.toLowerCase() === 'lb' || servingSizeUnit.toLowerCase() === 'pounds') {
+            usdaServingSizeInGrams = servingSize * 453.59;
+          }
+
+          // Save to database cache
+          try {
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 7); // Cache for 7 days
+            await supabase
+              .from('food_search_cache')
+              .insert({
+                query_normalized: cacheKey,
+                search_results: foodData,
+                expires_at: expiresAt.toISOString(),
+              });
+          } catch (e) {
+            console.error('Error writing raw nutrition to cache:', e);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch FDC ID ${numericId} from detail endpoint:`, error);
+          
+          // Fallback: Search for the FDC ID on the foods search API
+          console.log(`Trying search endpoint fallback for FDC ID ${numericId}...`);
+          try {
+            const searchResults = await searchUSDA(numericId, usdaApiKey, supabase);
+            const matchedFood = searchResults.find((f: any) => f.fdcId?.toString() === numericId) ?? searchResults[0];
+            
+            if (matchedFood) {
+              console.log(`Found fallback food: ${matchedFood.description}`);
+              nutrients = matchedFood.foodNutrients || [];
+              
+              const servingSizeUnit = matchedFood.servingSizeUnit || 'g';
+              const servingSize = matchedFood.servingSize || 100;
+              
+              if (servingSizeUnit.toLowerCase() === 'g' || servingSizeUnit.toLowerCase() === 'grams') {
+                usdaServingSizeInGrams = servingSize;
+              } else if (servingSizeUnit.toLowerCase() === 'mg' || servingSizeUnit.toLowerCase() === 'milligrams') {
+                usdaServingSizeInGrams = servingSize / 1000;
+              } else if (servingSizeUnit.toLowerCase() === 'kg' || servingSizeUnit.toLowerCase() === 'kilograms') {
+                usdaServingSizeInGrams = servingSize * 1000;
+              } else if (servingSizeUnit.toLowerCase() === 'oz' || servingSizeUnit.toLowerCase() === 'ounces') {
+                usdaServingSizeInGrams = servingSize * 28.35;
+              } else if (servingSizeUnit.toLowerCase() === 'lb' || servingSizeUnit.toLowerCase() === 'pounds') {
+                usdaServingSizeInGrams = servingSize * 453.59;
+              }
+            } else {
+              throw new Error('No food item matched the FDC ID in search fallback.');
+            }
+          } catch (fallbackError) {
+            console.error('Fallback search also failed:', fallbackError);
+            return jsonResponse({
+              calories: 0,
+              protein_g: 0,
+              carbs_g: 0,
+              fat_g: 0,
+              fiber_g: 0,
+              sugar_g: 0,
+              sodium_mg: 0,
+              additional_nutrients: [],
+            }, 200);
+          }
+        }
+      }
 
       // IMPORTANT: matching is done primarily by NUTRIENT NAME (which the
       // USDA API always returns correctly alongside each value), not by a
@@ -657,10 +773,10 @@ Deno.serve(async (req) => {
       };
 
       nutrients.forEach((n: any) => {
-        const nutrientId = n.nutrient?.id ?? n.id;
-        const nutrientName: string = n.nutrient?.name ?? n.name ?? '';
+        const nutrientId = n.nutrient?.id ?? n.id ?? n.nutrientId;
+        const nutrientName: string = n.nutrient?.name ?? n.name ?? n.nutrientName ?? '';
         const unitName = n.nutrient?.unitName ?? n.unitName;
-        const value = n.amount ?? n.nutrient?.amount ?? 0;
+        const value = n.amount ?? n.nutrient?.amount ?? n.value ?? 0;
 
         const rule = nutrientNameRules.find(r => r.test.test(nutrientName.trim()));
 
@@ -685,7 +801,7 @@ Deno.serve(async (req) => {
       // provide the Atwater-factor-derived energy values — without a
       // fallback this silently produced 0 calories for those foods.
       const energyNutrients = nutrients.filter((n: any) => {
-        const name = (n.nutrient?.name ?? n.name ?? '').toLowerCase();
+        const name = (n.nutrient?.name ?? n.name ?? n.nutrientName ?? '').toLowerCase();
         return name.includes('energy');
       });
 
@@ -699,16 +815,16 @@ Deno.serve(async (req) => {
       const chosenEnergy = standardEnergy ?? atwaterGeneral ?? atwaterSpecific;
 
       if (chosenEnergy) {
-        nutritionData.calories = chosenEnergy.amount ?? chosenEnergy.nutrient?.amount ?? 0;
-        console.log(`Calories source: ${chosenEnergy.nutrient?.name ?? chosenEnergy.name} = ${nutritionData.calories} kcal`);
+        nutritionData.calories = chosenEnergy.amount ?? chosenEnergy.nutrient?.amount ?? chosenEnergy.value ?? 0;
+        console.log(`Calories source: ${chosenEnergy.nutrient?.name ?? chosenEnergy.name ?? chosenEnergy.nutrientName} = ${nutritionData.calories} kcal`);
       } else {
         console.log('No energy nutrient (standard or Atwater) found in USDA response');
       }
 
       console.log(`Energy nutrients found: ${JSON.stringify(energyNutrients.map((n: any) => ({
-        id: n.nutrient?.id ?? n.id,
-        name: n.nutrient?.name ?? n.name,
-        value: n.amount ?? n.nutrient?.amount,
+        id: n.nutrient?.id ?? n.id ?? n.nutrientId,
+        name: n.nutrient?.name ?? n.name ?? n.nutrientName,
+        value: n.amount ?? n.nutrient?.amount ?? n.value,
         unit: n.nutrient?.unitName ?? n.unitName
       })))}`);
 
@@ -771,7 +887,7 @@ Deno.serve(async (req) => {
     // Match with USDA
     const items = [];
     for (const result of results) {
-      const usdaFoods = await searchUSDA(result.candidateName, usdaApiKey);
+      const usdaFoods = await searchUSDA(result.candidateName, usdaApiKey, supabase);
       const bestMatch = usdaFoods[0];
 
       if (bestMatch) {
