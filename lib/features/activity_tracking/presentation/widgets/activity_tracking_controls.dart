@@ -214,6 +214,7 @@ class StartPauseControl extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onStop;
   final VoidCallback onSettingsTap;
+  final VoidCallback? onMusicTap;
 
   const StartPauseControl({
     super.key,
@@ -225,6 +226,7 @@ class StartPauseControl extends StatelessWidget {
     required this.onResume,
     required this.onStop,
     required this.onSettingsTap,
+    this.onMusicTap,
   });
 
   @override
@@ -239,7 +241,7 @@ class StartPauseControl extends StatelessWidget {
             width: 52,
             height: 52,
             child: OutlinedButton(
-              onPressed: () {
+              onPressed: onMusicTap ?? () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Music integration coming soon')),
                 );

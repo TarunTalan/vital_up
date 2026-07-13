@@ -80,10 +80,66 @@ class ForegroundServiceManager {
       notificationTitle: 'VitalUp Active Workout',
       notificationText: 'Tracking your $activityName...',
       notificationIcon: const NotificationIcon(
-        metaDataName: 'com.example.vital_up.MainActivity',
+        metaDataName: 'com.pravera.flutter_foreground_task.NOTIFICATION_ICON',
       ),
       callback: startCallback,
     );
+  }
+
+  static Future<void> startDownloadService({required String trackTitle}) async {
+    if (!Platform.isAndroid) return;
+    if (await FlutterForegroundTask.isRunningService) return;
+
+    final reqResult = await FlutterForegroundTask.checkNotificationPermission();
+    if (reqResult != NotificationPermission.granted) {
+      await FlutterForegroundTask.requestNotificationPermission();
+    }
+
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'audio_download_channel',
+        channelName: 'Audio Download Service',
+        channelDescription: 'Keeps audio download alive in background',
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: false,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.nothing(),
+        autoRunOnBoot: false,
+        allowWakeLock: true,
+      ),
+    );
+
+    await FlutterForegroundTask.startService(
+      notificationTitle: 'VitalUp Download',
+      notificationText: 'Downloading $trackTitle...',
+      notificationIcon: const NotificationIcon(
+        metaDataName: 'com.pravera.flutter_foreground_task.NOTIFICATION_ICON',
+      ),
+      callback: startCallback,
+    );
+  }
+
+  static Future<void> updateDownloadProgress({required String trackTitle, required double progress}) async {
+    if (!Platform.isAndroid) return;
+    if (await FlutterForegroundTask.isRunningService) {
+      final pct = (progress * 100).toStringAsFixed(0);
+      FlutterForegroundTask.updateService(
+        notificationTitle: 'Downloading $trackTitle',
+        notificationText: '$pct% completed',
+      );
+    }
+  }
+
+  static Future<void> stopDownloadService() async {
+    if (!Platform.isAndroid) return;
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
   }
 
   static Future<void> update(String statsText) async {

@@ -8,11 +8,13 @@ import 'package:flutter_tts/flutter_tts.dart';
 /// finishes so the caller can dispatch [StartTracking] immediately after.
 class CountdownOverlay extends StatefulWidget {
   final int durationSeconds;
+  final bool voiceCoachEnabled;
   final VoidCallback onFinished;
 
   const CountdownOverlay({
     super.key,
     required this.durationSeconds,
+    required this.voiceCoachEnabled,
     required this.onFinished,
   });
 
@@ -57,7 +59,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   void _runCount() {
     _controller.reset();
     _controller.forward();
-    if (_count <= 3 && _count >= 1) {
+    if (widget.voiceCoachEnabled && _count <= 3 && _count >= 1) {
       _tts.speak('$_count');
     }
   }

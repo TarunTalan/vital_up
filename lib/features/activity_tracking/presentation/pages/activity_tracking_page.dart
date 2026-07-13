@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
@@ -21,8 +22,15 @@ import 'package:vital_up/features/activity_tracking/presentation/widgets/activit
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/countdown_overlay.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
+import 'package:isar_community/isar.dart';
+import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/database/collections/favorite_audio.dart';
+import 'package:vital_up/core/database/collections/downloaded_track.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music_player.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
+import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
+import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 
 const String kOfflineRegionId = 'local_workout_region_10k';
 
@@ -55,11 +63,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   final DistanceUnitNotifier _unitNotifier = DistanceUnitNotifier();
   final WorkoutPrefsNotifier _prefsNotifier = WorkoutPrefsNotifier();
-  final VoiceCoachService _voiceCoach = VoiceCoachService();
+  final VoiceCoachService _voiceCoach = sl<VoiceCoachService>();
   final HeartRateManager _hrManager = HeartRateManager();
   int? _liveHeartRate;
   StreamSubscription<int?>? _hrSubscription;
-  bool _isAudioPlaying = true;
+  bool _isCurrentTrackFavorited = false;
+  bool _isPlayerMinimized = false;
 
   mbx.MapboxMap? _mapboxMap;
   mbx.PolylineAnnotationManager? _polylineAnnotationManager;
@@ -74,7 +83,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void initState() {
     super.initState();
     _unitNotifier.load();
-    _prefsNotifier.load();
+    _prefsNotifier.load().then((_) {
+      _checkIfCurrentTrackFavorited();
+    });
     _prefsNotifier.addListener(_onPrefsChanged);
     _voiceCoach.init();
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
@@ -86,12 +97,128 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   void _onPrefsChanged() {
     if (mounted) {
+      _checkIfCurrentTrackFavorited();
       final defaultType = _prefsNotifier.value.defaultActivityType;
       final bloc = context.read<ActivityTrackingBloc>();
       if (bloc.state is TrackingIdle) {
         bloc.add(SelectActivityType(defaultType));
       }
     }
+  }
+
+  Future<void> _checkIfCurrentTrackFavorited() async {
+    final track = _prefsNotifier.value.backgroundAudioTrack;
+    final isar = sl<IsarService>().isar;
+    final existing = await isar.favoriteAudios.filter().trackIdEqualTo(track).findFirst();
+    if (mounted) {
+      setState(() {
+        _isCurrentTrackFavorited = existing != null;
+      });
+    }
+  }
+
+  static const _audioChannel = MethodChannel('com.example.vital_up/audio_intent');
+
+  void _playWorkoutAudio({bool play = true}) {
+    final prefs = _prefsNotifier.value;
+    if (prefs.preferredPlayerPackage != 'builtIn') {
+      _audioChannel.invokeMethod('launchAudioApp', {'packageName': prefs.preferredPlayerPackage});
+    } else {
+      sl<IsarService>().isar.downloadedTracks
+          .filter()
+          .trackIdEqualTo(prefs.backgroundAudioTrack)
+          .findFirst()
+          .then((downloaded) {
+        final localPath = downloaded?.localFilePath;
+        final source = downloaded != null
+            ? 'download'
+            : (prefs.backgroundAudioTrack.startsWith('Local:') ? 'local' : 'preset');
+        sl<WorkoutAudioService>().playTrack(
+          prefs.backgroundAudioTrack,
+          source: source,
+          localPath: localPath,
+          play: play,
+        );
+      });
+    }
+  }
+
+  void _pauseWorkoutAudio() {
+    final prefs = _prefsNotifier.value;
+    if (prefs.preferredPlayerPackage == 'builtIn') {
+      sl<WorkoutAudioService>().pause();
+    }
+    _voiceCoach.stop();
+  }
+
+  void _resumeWorkoutAudio() {
+    final prefs = _prefsNotifier.value;
+    if (prefs.preferredPlayerPackage != 'builtIn') {
+      _audioChannel.invokeMethod('launchAudioApp', {'packageName': prefs.preferredPlayerPackage});
+    } else {
+      sl<WorkoutAudioService>().resume();
+    }
+  }
+
+  void _stopWorkoutAudio() {
+    final prefs = _prefsNotifier.value;
+    if (prefs.preferredPlayerPackage == 'builtIn') {
+      sl<WorkoutAudioService>().stop();
+    }
+  }
+
+  Future<void> _cycleTrack({required bool next}) async {
+    final prefs = _prefsNotifier.value;
+    final queueType = prefs.backgroundAudioQueueType;
+    final currentTrack = prefs.backgroundAudioTrack;
+
+    List<String> queue = [];
+
+    if (queueType == 'stories' || queueType == 'curated') {
+      queue = [
+        'Story: It\'s Possible',
+        'Story: Goals',
+        'Story: Light Up the Darkness',
+        'Story: Without Limits',
+        'Story: Best Speeches',
+      ];
+    } else if (queueType == 'favorite') {
+      final favs = await sl<IsarService>().isar.favoriteAudios.where().findAll();
+      queue = favs.map((f) => f.trackId).toList();
+    } else if (queueType == 'local') {
+      final songs = await sl<LocalAudioQueryService>().getLocalSongs();
+      queue = songs.map((s) => 'Local:${s.id}').toList();
+    }
+
+    if (queue.isEmpty) {
+      queue = [
+        'Story: It\'s Possible',
+        'Story: Goals',
+        'Story: Light Up the Darkness',
+        'Story: Without Limits',
+        'Story: Best Speeches',
+      ];
+    }
+
+    int currentIndex = queue.indexOf(currentTrack);
+    int targetIndex;
+
+    if (currentIndex == -1) {
+      targetIndex = next ? 0 : queue.length - 1;
+    } else {
+      if (next) {
+        targetIndex = (currentIndex + 1) % queue.length;
+      } else {
+        targetIndex = (currentIndex - 1 + queue.length) % queue.length;
+      }
+    }
+
+    final targetTrack = queue[targetIndex];
+    await _prefsNotifier.setBackgroundAudioTrack(targetTrack, queueType: queueType);
+
+    _voiceCoach.stop();
+
+    _playWorkoutAudio();
   }
 
   Future<void> _checkOfflineMap() async {
@@ -106,6 +233,11 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   @override
   void dispose() {
+    // Reset selected track to None, stop playback, and reset TTS/voice coach on exit
+    _prefsNotifier.setBackgroundAudioTrack('None');
+    _stopWorkoutAudio();
+    _voiceCoach.stop();
+
     _prefsNotifier.removeListener(_onPrefsChanged);
     _positionSubscription?.cancel();
     _hrSubscription?.cancel();
@@ -359,10 +491,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
               unit: _unitNotifier.value,
             );
           }
-          // Voice coach background story check
-          if (_isAudioPlaying && _prefsNotifier.value.backgroundAudioTrack != 'None') {
-            _voiceCoach.checkStoryNarrative(_prefsNotifier.value.backgroundAudioTrack);
-          }
+
           // Set start point on first track point
           if (_startPoint == null && state.routePoints.isNotEmpty) {
             setState(() {
@@ -611,31 +740,87 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (state is TrackingInProgress || state is TrackingPaused)
-                                    ValueListenableBuilder<WorkoutPrefs>(
-                                      valueListenable: _prefsNotifier,
-                                      builder: (_, prefs, __) {
-                                        return WorkoutMusicPlayer(
-                                          trackName: prefs.backgroundAudioTrack,
-                                          isPlaying: _isAudioPlaying,
-                                          onPlayPause: () {
-                                            setState(() {
-                                              _isAudioPlaying = !_isAudioPlaying;
-                                            });
-                                          },
-                                          onNext: () {
-                                            final nextTrack = switch (prefs.backgroundAudioTrack) {
-                                              'Story: Rise & Grind' => 'Story: The Ascent',
-                                              'Story: The Ascent' => 'Music: Synthwave Cardio Energy',
-                                              'Music: Synthwave Cardio Energy' => 'Music: Lo-Fi Jogging Beats',
-                                              _ => 'Story: Rise & Grind',
-                                            };
-                                            _prefsNotifier.setBackgroundAudioTrack(nextTrack);
-                                            _voiceCoach.resetStory();
-                                          },
-                                        );
-                                      },
-                                    ),
+                                  ValueListenableBuilder<WorkoutPrefs>(
+                                    valueListenable: _prefsNotifier,
+                                    builder: (_, prefs, __) {
+                                      final isExternal = prefs.preferredPlayerPackage != 'builtIn';
+                                      final displayTrack = isExternal
+                                          ? 'Player: ${prefs.preferredPlayerPackage.split('.').last.toUpperCase()}'
+                                          : prefs.backgroundAudioTrack;
+
+                                      return StreamBuilder<bool>(
+                                        stream: sl<WorkoutAudioService>().playingStream,
+                                        initialData: sl<WorkoutAudioService>().isPlaying,
+                                        builder: (context, playingSnapshot) {
+                                          final isPlaying = playingSnapshot.data ?? false;
+                                           return WorkoutMusicPlayer(
+                                             trackName: displayTrack,
+                                             isPlaying: isExternal ? false : isPlaying,
+                                             isFavorited: isExternal ? false : _isCurrentTrackFavorited,
+                                             isMinimized: _isPlayerMinimized,
+                                             onMinimizeToggle: () {
+                                               setState(() {
+                                                 _isPlayerMinimized = !_isPlayerMinimized;
+                                               });
+                                             },
+                                             onTap: () {
+                                               Navigator.of(context).push(
+                                                 MaterialPageRoute(
+                                                   builder: (_) => WorkoutAudioPage(
+                                                     current: prefs,
+                                                     notifier: _prefsNotifier,
+                                                   ),
+                                                 ),
+                                               ).then((_) {
+                                                 _checkIfCurrentTrackFavorited();
+                                               });
+                                             },
+                                             onDiscard: () {
+                                               _prefsNotifier.setBackgroundAudioTrack('None');
+                                               _stopWorkoutAudio();
+                                               _voiceCoach.stop();
+                                             },
+                                             onPlayPause: () {
+                                               if (isExternal) {
+                                                 _playWorkoutAudio();
+                                               } else {
+                                                 final audioService = sl<WorkoutAudioService>();
+                                                 if (audioService.isPlaying) {
+                                                   _pauseWorkoutAudio();
+                                                   sl<VoiceCoachService>().stop();
+                                                 } else {
+                                                   _playWorkoutAudio();
+                                                 }
+                                               }
+                                             },
+                                             onNext: isExternal ? () {} : () => _cycleTrack(next: true),
+                                             onPrevious: isExternal ? () {} : () => _cycleTrack(next: false),
+                                             onFavoriteToggle: isExternal ? () {} : () async {
+                                               final track = prefs.backgroundAudioTrack;
+                                               final isar = sl<IsarService>().isar;
+                                               final existing = await isar.favoriteAudios.filter().trackIdEqualTo(track).findFirst();
+                                               await isar.writeTxn(() async {
+                                                 if (existing != null) {
+                                                   await isar.favoriteAudios.delete(existing.id);
+                                                 } else {
+                                                   final title = track.replaceFirst('Story: ', '').replaceFirst('Music: ', '');
+                                                   final source = track.startsWith('Local:') ? 'local' : 'preset';
+                                                   final fav = FavoriteAudio()
+                                                     ..trackId = track
+                                                     ..title = title
+                                                     ..subtitle = source == 'local' ? 'Local Track' : 'Curated Audio'
+                                                     ..audioSource = source
+                                                     ..favoritedAt = DateTime.now();
+                                                   await isar.favoriteAudios.put(fav);
+                                                 }
+                                               });
+                                               _checkIfCurrentTrackFavorited();
+                                             },
+                                           );
+                                        },
+                                      );
+                                    },
+                                  ),
                                   if (state is TrackingIdle) ...[
                                     ActivitySelector(
                                       selected: state.activityType,
@@ -647,16 +832,24 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                   StartPauseControl(
                                     state: state,
                                     isLocked: _isLocked,
+                                    onMusicTap: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => WorkoutAudioPage(
+                                            current: _prefsNotifier.value,
+                                            notifier: _prefsNotifier,
+                                          ),
+                                        ),
+                                      ).then((_) {
+                                        _checkIfCurrentTrackFavorited();
+                                      });
+                                    },
                                     onLockToggle: (locked) {
                                       setState(() {
                                         _isLocked = locked;
                                       });
                                     },
                                     onStart: () async {
-                                      _voiceCoach.resetStory();
-                                      setState(() {
-                                        _isAudioPlaying = true;
-                                      });
                                       final duration = _prefsNotifier.value.countdownDurationSeconds;
                                       if (duration > 0) {
                                         setState(() {
@@ -667,24 +860,25 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                         if (_prefsNotifier.value.voiceCoachEnabled) {
                                           _voiceCoach.announceStart();
                                         }
+                                        _playWorkoutAudio();
                                       }
                                     },
-                                    onPause: () {
-                                      bloc.add(PauseTracking());
-                                      setState(() {
-                                        _isAudioPlaying = false;
-                                      });
-                                    },
+                                     onPause: () {
+                                       bloc.add(PauseTracking());
+                                       _pauseWorkoutAudio();
+                                     },
                                      onResume: () {
                                        bloc.add(ResumeTracking());
-                                       setState(() {
-                                         _isAudioPlaying = true;
-                                       });
+
                                        if (_prefsNotifier.value.voiceCoachEnabled) {
                                          _voiceCoach.announceResume();
                                        }
+                                       _resumeWorkoutAudio();
                                      },
-                                    onStop: () => bloc.add(StopAndSaveTracking()),
+                                    onStop: () {
+                                      bloc.add(StopAndSaveTracking());
+                                      _stopWorkoutAudio();
+                                    },
                                     onSettingsTap: () => _openSettings(),
                                   ),
                                 ],
@@ -700,6 +894,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                   Positioned.fill(
                     child: CountdownOverlay(
                       durationSeconds: _prefsNotifier.value.countdownDurationSeconds,
+                      voiceCoachEnabled: _prefsNotifier.value.voiceCoachEnabled,
                       onFinished: () {
                         setState(() {
                           _isCountingDown = false;
@@ -708,6 +903,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                         if (_prefsNotifier.value.voiceCoachEnabled) {
                           _voiceCoach.announceStart();
                         }
+                        _playWorkoutAudio();
                       },
                     ),
                   ),

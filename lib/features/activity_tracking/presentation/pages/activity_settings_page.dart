@@ -5,7 +5,7 @@ import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/customize_layout_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/audio_track_picker_sheet.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/target_picker_sheet.dart';
 
@@ -270,12 +270,17 @@ class ActivitySettingsPage extends StatelessWidget {
                         : prefs.backgroundAudioTrack,
                     trailing: const Icon(Icons.chevron_right_rounded,
                         color: Color(0xFFCCCCCC)),
-                    onTap: () => AudioTrackPickerSheet.show(
-                      context,
-                      current: prefs,
-                      notifier: prefsNotifier,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => WorkoutAudioPage(
+                          current: prefs,
+                          notifier: prefsNotifier,
+                        ),
+                      ),
                     ),
                   ),
+
+
 
                   // ── Display ──────────────────────────────────────────────
                   _SectionHeader('DISPLAY'),
@@ -439,6 +444,8 @@ class _UnitPill extends StatelessWidget {
     );
   }
 }
+
+
 
 class _OfflineMapTile extends StatefulWidget {
   final DistanceUnitNotifier unitNotifier;
