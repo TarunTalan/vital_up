@@ -43,6 +43,11 @@ const UserProfileCacheSchema = CollectionSchema(
       name: r'username',
       type: IsarType.string,
     ),
+    r'weightKg': PropertySchema(
+      id: 6,
+      name: r'weightKg',
+      type: IsarType.double,
+    ),
   },
 
   estimateSize: _userProfileCacheEstimateSize,
@@ -110,6 +115,7 @@ void _userProfileCacheSerialize(
   writer.writeString(offsets[3], object.photoUrl);
   writer.writeString(offsets[4], object.supabaseId);
   writer.writeString(offsets[5], object.username);
+  writer.writeDouble(offsets[6], object.weightKg);
 }
 
 UserProfileCache _userProfileCacheDeserialize(
@@ -126,6 +132,7 @@ UserProfileCache _userProfileCacheDeserialize(
   object.photoUrl = reader.readStringOrNull(offsets[3]);
   object.supabaseId = reader.readString(offsets[4]);
   object.username = reader.readString(offsets[5]);
+  object.weightKg = reader.readDoubleOrNull(offsets[6]);
   return object;
 }
 
@@ -148,6 +155,8 @@ P _userProfileCacheDeserializeProp<P>(
       return (reader.readString(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readDoubleOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -1231,6 +1240,99 @@ extension UserProfileCacheQueryFilter
       );
     });
   }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'weightKg'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'weightKg'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgEqualTo(double? value, {double epsilon = Query.epsilon}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'weightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'weightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'weightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  weightKgBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'weightKg',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
 }
 
 extension UserProfileCacheQueryObject
@@ -1321,6 +1423,20 @@ extension UserProfileCacheQuerySortBy
   sortByUsernameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'username', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'weightKg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByWeightKgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'weightKg', Sort.desc);
     });
   }
 }
@@ -1422,6 +1538,20 @@ extension UserProfileCacheQuerySortThenBy
       return query.addSortBy(r'username', Sort.desc);
     });
   }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'weightKg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByWeightKgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'weightKg', Sort.desc);
+    });
+  }
 }
 
 extension UserProfileCacheQueryWhereDistinct
@@ -1466,6 +1596,13 @@ extension UserProfileCacheQueryWhereDistinct
   distinctByUsername({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'username', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
+  distinctByWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'weightKg');
     });
   }
 }
@@ -1514,6 +1651,12 @@ extension UserProfileCacheQueryProperty
   QueryBuilder<UserProfileCache, String, QQueryOperations> usernameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'username');
+    });
+  }
+
+  QueryBuilder<UserProfileCache, double?, QQueryOperations> weightKgProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'weightKg');
     });
   }
 }
