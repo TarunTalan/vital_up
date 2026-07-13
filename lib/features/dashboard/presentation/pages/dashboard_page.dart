@@ -404,7 +404,6 @@ class _RestMetricCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      height: 196,
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 20, 52, 18),
       decoration: BoxDecoration(

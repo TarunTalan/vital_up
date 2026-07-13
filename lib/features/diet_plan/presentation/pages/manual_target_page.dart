@@ -95,12 +95,20 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
-              _buildField('Daily Calories', 'kcal', _calController),
-              _buildField('Protein', 'g', _proController),
-              _buildField('Carbohydrates', 'g', _carbController),
-              _buildField('Fats', 'g', _fatController),
-              const Spacer(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      _buildField('Daily Calories', 'kcal', _calController),
+                      _buildField('Protein', 'g', _proController),
+                      _buildField('Carbohydrates', 'g', _carbController),
+                      _buildField('Fats', 'g', _fatController),
+                    ],
+                  ),
+                ),
+              ),
               SizedBox(
                 width: double.infinity,
                 height: AppTheme.buttonHeight,
