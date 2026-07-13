@@ -24,23 +24,37 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") || "";
     console.log("--- DEBUG INFO START ---");
+    console.time("TotalExecution");
     console.log("Auth Header (first 20 chars):", authHeader.substring(0, 20));
     console.log("Has SUPABASE_URL:", !!Deno.env.get("SUPABASE_URL"));
     console.log("Has SUPABASE_ANON_KEY:", !!Deno.env.get("SUPABASE_ANON_KEY"));
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    console.log("getUser error object:", userError);
     console.log("--- DEBUG INFO END ---");
 
+    console.time("SetupAndAuth");
+    const [authResult, bodyResult] = await Promise.allSettled([
+      supabaseClient.auth.getUser(),
+      req.json()
+    ]);
+    console.timeEnd("SetupAndAuth");
+
     // BYPASS AUTHORIZATION FOR TESTING
-    // if (userError || !user) {
+    // if (authResult.status === "rejected" || (authResult.status === "fulfilled" && (authResult.value.error || !authResult.value.data.user))) {
+    //   console.timeEnd("TotalExecution");
     //   return new Response(JSON.stringify({ error: "Unauthorized" }), {
     //     status: 401,
     //     headers: { ...corsHeaders, "Content-Type": "application/json" },
     //   });
     // }
 
-    const { target, preferences } = await req.json();
+    if (bodyResult.status === "rejected") {
+      console.timeEnd("TotalExecution");
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { target, preferences } = bodyResult.value;
 
     const prompt = `You are a meal-planning assistant. Given a daily nutrition target and
 dietary constraints, generate a one-day meal plan.
@@ -58,7 +72,7 @@ exactly this schema:
   "meals": [
     {
       "name": "string (e.g. Breakfast)",
-      "items": ["string", "string"],
+      "items": ["string (compact food name, max 2-3 words)", "string"],
       "calories": number,
       "protein": number,
       "carbs": number,
@@ -72,7 +86,7 @@ exactly this schema:
 }
 
 Meal calories/macros must sum to within 5% of the target. Do not include
-any allergen from the exclude list under any circumstance.`;
+any allergen from the exclude list under any circumstance. Provide extremely brief item names (e.g. "Oatmeal", "2 Eggs") to reduce response size.`;
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const groqKey = Deno.env.get("GROQ_API_KEY");
@@ -82,6 +96,11 @@ any allergen from the exclude list under any circumstance.`;
       try {
         let aiResponseText = "";
 
+        const timeoutMs = attempt === 1 ? 13000 : 8000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        console.time(`GeminiCall_Attempt${attempt}`);
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
           {
@@ -91,15 +110,22 @@ any allergen from the exclude list under any circumstance.`;
               "x-goog-api-key": geminiKey ?? "",
             },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }] }]
+              contents: [{ parts: [{ text: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }] }],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
             }),
+            signal: controller.signal
           }
         );
+        clearTimeout(timeoutId);
 
 
         const shouldFallback = (geminiRes.status === 429 || geminiRes.status === 404 || geminiRes.status >= 500) && !!groqKey;
 
         if (shouldFallback) {
+          const groqController = new AbortController();
+          const groqTimeoutId = setTimeout(() => groqController.abort(), timeoutMs);
           const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -110,8 +136,10 @@ any allergen from the exclude list under any circumstance.`;
               model: "llama-3.3-70b-versatile",
               messages: [{ role: "user", content: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }],
               temperature: 0.2,
-            })
+            }),
+            signal: groqController.signal
           });
+          clearTimeout(groqTimeoutId);
           const groqData = await groqRes.json();
           if (!groqRes.ok) throw new Error(groqData.error?.message || "Groq Error");
           aiResponseText = groqData.choices?.[0]?.message?.content || "";
@@ -120,6 +148,7 @@ any allergen from the exclude list under any circumstance.`;
           if (!geminiRes.ok) throw new Error(geminiData.error?.message || "Gemini Error");
           aiResponseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
         }
+        console.timeEnd(`GeminiCall_Attempt${attempt}`);
 
         let cleanJsonStr = aiResponseText.trim();
         if (cleanJsonStr.startsWith("```json")) {
@@ -160,7 +189,10 @@ any allergen from the exclude list under any circumstance.`;
 
         break;
       } catch (e: any) {
+        console.timeEnd(`GeminiCall_Attempt${attempt}`);
+        console.error(`Attempt ${attempt} failed:`, e);
         if (attempt === 2) {
+          console.timeEnd("TotalExecution");
           return new Response(JSON.stringify({
             error: "Failed to generate valid plan.",
             details: e.message
@@ -172,10 +204,12 @@ any allergen from the exclude list under any circumstance.`;
       }
     }
 
+    console.timeEnd("TotalExecution");
     return new Response(JSON.stringify(resultJson), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
+    console.timeEnd("TotalExecution");
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
