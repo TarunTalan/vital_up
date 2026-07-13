@@ -18,6 +18,9 @@ class DriftActivitySessions extends Table {
   IntColumn get calories => integer()();
   IntColumn get steps => integer()();
   BoolColumn get stepCountReliable => boolean().withDefault(const Constant(true))();
+  TextColumn get targetType => text().nullable()();
+  RealColumn get targetValue => real().nullable()();
+  BoolColumn get targetAchieved => boolean().nullable().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -38,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -47,6 +50,20 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(
               driftActivitySessions,
               driftActivitySessions.stepCountReliable,
+            );
+          }
+          if (from < 3) {
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.targetType,
+            );
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.targetValue,
+            );
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.targetAchieved,
             );
           }
         },

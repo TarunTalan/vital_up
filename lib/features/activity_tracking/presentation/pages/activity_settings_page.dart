@@ -153,10 +153,27 @@ class ActivitySettingsPage extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (prefs.targetType != WorkoutTargetType.none)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F0F0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              prefs.dailyTargetEnabled ? 'DAILY' : 'SESSION',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF888888),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        if (prefs.targetType != WorkoutTargetType.none)
                           GestureDetector(
                             onTap: () => prefsNotifier.clearTarget(),
                             child: const Padding(
-                              padding: EdgeInsets.only(right: 4),
+                              padding: EdgeInsets.only(right: 4, left: 4),
                               child: Icon(Icons.cancel_outlined,
                                   color: Color(0xFFBBBBBB), size: 20),
                             ),
@@ -172,6 +189,66 @@ class ActivitySettingsPage extends StatelessWidget {
                         distanceUnit: unit,
                         notifier: prefsNotifier,
                       );
+                    },
+                  ),
+
+                  _SettingsTile(
+                    icon: Icons.calendar_today_rounded,
+                    title: 'Daily target',
+                    subtitle: prefs.dailyTargetEnabled
+                        ? (() {
+                            if (prefs.dailyTargetType == WorkoutTargetType.distance) {
+                              final val = unit == DistanceUnit.miles
+                                  ? prefs.dailyTargetValue / 1.60934
+                                  : prefs.dailyTargetValue;
+                              return '${val.toStringAsFixed(1)} ${unit.label} every session';
+                            } else if (prefs.dailyTargetType == WorkoutTargetType.calories) {
+                              return '${prefs.dailyTargetValue.toStringAsFixed(0)} kcal every session';
+                            }
+                            return 'Enabled';
+                          })()
+                        : 'Disabled — targets are per-session only',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (prefs.dailyTargetEnabled)
+                          GestureDetector(
+                            onTap: () => prefsNotifier.clearDailyTarget(),
+                            child: const Padding(
+                              padding: EdgeInsets.only(right: 4),
+                              child: Icon(Icons.cancel_outlined,
+                                  color: Color(0xFFBBBBBB), size: 20),
+                            ),
+                          ),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: Color(0xFFCCCCCC)),
+                      ],
+                    ),
+                    onTap: () async {
+                      final result = await showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        builder: (_) => TargetPickerSheet(
+                          current: prefs.dailyTargetEnabled
+                              ? prefs.copyWith(
+                                  targetType: prefs.dailyTargetType,
+                                  targetValue: prefs.dailyTargetValue,
+                                )
+                              : prefs.copyWith(
+                                  targetType: WorkoutTargetType.none,
+                                  targetValue: 0.0,
+                                ),
+                          distanceUnit: unit,
+                        ),
+                      );
+                      if (result != null) {
+                        final (WorkoutTargetType type, double val) = result;
+                        await prefsNotifier.setDailyTarget(type, val);
+                      }
                     },
                   ),
 

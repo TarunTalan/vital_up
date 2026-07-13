@@ -7,6 +7,9 @@ const _kCountdownKey = 'workout_countdown';
 const _kTargetTypeKey = 'workout_target_type'; // 'none' | 'distance' | 'calories'
 const _kTargetValueKey = 'workout_target_value';
 const _kSelectedMetricsKey = 'workout_selected_metrics';
+const _kDailyTargetEnabledKey = 'workout_daily_target_enabled';
+const _kDailyTargetTypeKey = 'workout_daily_target_type';
+const _kDailyTargetValueKey = 'workout_daily_target_value';
 
 /// Type of workout goal the user has set.
 enum WorkoutTargetType { none, distance, calories }
@@ -63,6 +66,15 @@ class WorkoutPrefs {
   final ActivityType defaultActivityType;
   final String preferredPlayerPackage; // 'builtIn' or package name
 
+  /// Whether a daily target is enabled (auto-applies to every new session).
+  final bool dailyTargetEnabled;
+
+  /// The daily target type (distance or calories).
+  final WorkoutTargetType dailyTargetType;
+
+  /// The daily target value in km or kcal.
+  final double dailyTargetValue;
+
   const WorkoutPrefs({
     this.voiceCoachEnabled = true,
     this.countdownDurationSeconds = 3,
@@ -77,6 +89,9 @@ class WorkoutPrefs {
     this.backgroundAudioQueueType = 'stories',
     this.defaultActivityType = ActivityType.walk,
     this.preferredPlayerPackage = 'builtIn',
+    this.dailyTargetEnabled = false,
+    this.dailyTargetType = WorkoutTargetType.none,
+    this.dailyTargetValue = 0.0,
   });
 
   WorkoutPrefs copyWith({
@@ -89,6 +104,9 @@ class WorkoutPrefs {
     String? backgroundAudioQueueType,
     ActivityType? defaultActivityType,
     String? preferredPlayerPackage,
+    bool? dailyTargetEnabled,
+    WorkoutTargetType? dailyTargetType,
+    double? dailyTargetValue,
   }) {
     return WorkoutPrefs(
       voiceCoachEnabled: voiceCoachEnabled ?? this.voiceCoachEnabled,
@@ -100,6 +118,9 @@ class WorkoutPrefs {
       backgroundAudioQueueType: backgroundAudioQueueType ?? this.backgroundAudioQueueType,
       defaultActivityType: defaultActivityType ?? this.defaultActivityType,
       preferredPlayerPackage: preferredPlayerPackage ?? this.preferredPlayerPackage,
+      dailyTargetEnabled: dailyTargetEnabled ?? this.dailyTargetEnabled,
+      dailyTargetType: dailyTargetType ?? this.dailyTargetType,
+      dailyTargetValue: dailyTargetValue ?? this.dailyTargetValue,
     );
   }
 }
@@ -144,6 +165,16 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     }
     final countdownDuration = prefs.getInt('workout_countdown_duration') ?? defaultCountdown;
 
+    // Daily target fields
+    final dailyTargetEnabled = prefs.getBool(_kDailyTargetEnabledKey) ?? false;
+    final dailyTargetTypeName =
+        prefs.getString(_kDailyTargetTypeKey) ?? WorkoutTargetType.none.name;
+    final dailyTargetType = WorkoutTargetType.values.firstWhere(
+      (e) => e.name == dailyTargetTypeName,
+      orElse: () => WorkoutTargetType.none,
+    );
+    final dailyTargetValue = prefs.getDouble(_kDailyTargetValueKey) ?? 0.0;
+
     value = WorkoutPrefs(
       voiceCoachEnabled: prefs.getBool(_kVoiceCoachKey) ?? true,
       countdownDurationSeconds: countdownDuration,
@@ -156,6 +187,9 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
           : (prefs.getString('workout_audio_queue_type') ?? 'stories'),
       defaultActivityType: defaultActivityType,
       preferredPlayerPackage: prefs.getString('workout_preferred_player_package') ?? 'builtIn',
+      dailyTargetEnabled: dailyTargetEnabled,
+      dailyTargetType: dailyTargetType,
+      dailyTargetValue: dailyTargetValue,
     );
   }
 
@@ -214,5 +248,46 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     value = value.copyWith(preferredPlayerPackage: package);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('workout_preferred_player_package', package);
+  }
+
+  /// Sets a persistent daily target that auto-applies to every new session.
+  Future<void> setDailyTarget(WorkoutTargetType type, double targetValue) async {
+    value = value.copyWith(
+      dailyTargetEnabled: true,
+      dailyTargetType: type,
+      dailyTargetValue: targetValue,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kDailyTargetEnabledKey, true);
+    await prefs.setString(_kDailyTargetTypeKey, type.name);
+    await prefs.setDouble(_kDailyTargetValueKey, targetValue);
+  }
+
+  /// Disables the daily target.
+  Future<void> clearDailyTarget() async {
+    value = value.copyWith(
+      dailyTargetEnabled: false,
+      dailyTargetType: WorkoutTargetType.none,
+      dailyTargetValue: 0.0,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kDailyTargetEnabledKey, false);
+    await prefs.setString(_kDailyTargetTypeKey, WorkoutTargetType.none.name);
+    await prefs.setDouble(_kDailyTargetValueKey, 0.0);
+  }
+
+  /// If a daily target is enabled, copies it into the per-session target fields.
+  /// Call this at session start.
+  Future<void> applyDailyTargetIfEnabled() async {
+    if (value.dailyTargetEnabled &&
+        value.dailyTargetType != WorkoutTargetType.none &&
+        value.dailyTargetValue > 0) {
+      await setTarget(value.dailyTargetType, value.dailyTargetValue);
+    }
+  }
+
+  /// Clears the per-session target. Call after a session is saved.
+  Future<void> clearSessionTarget() async {
+    await clearTarget();
   }
 }

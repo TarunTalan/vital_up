@@ -152,6 +152,53 @@ class ActivityHistoryCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (session.targetType != null && session.targetValue != null && session.targetValue! > 0) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: session.targetAchieved
+                              ? const Color(0xFFE8F5E9)
+                              : const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.flag_rounded,
+                              size: 12,
+                              color: session.targetAchieved
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFFF9800),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              session.targetType == 'distance'
+                                  ? '${session.targetValue!.toStringAsFixed(1)} km'
+                                  : '${session.targetValue!.toStringAsFixed(0)} kcal',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: session.targetAchieved
+                                    ? const Color(0xFF4CAF50)
+                                    : const Color(0xFFFF9800),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              session.targetAchieved
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              size: 14,
+                              color: session.targetAchieved
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFFF9800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -51,6 +51,9 @@ class ActivityCompletionPage extends StatelessWidget {
                     steps: session.steps,
                     stepCountReliable: session.stepCountReliable,
                     activityType: session.activityType,
+                    targetType: session.targetType,
+                    targetValue: session.targetValue,
+                    targetAchieved: session.targetAchieved,
                     onNewActivity: onNewActivity,
                     onViewHistory: onViewHistory,
                   ),
@@ -72,6 +75,9 @@ class _CompletionStats extends StatelessWidget {
   final int steps;
   final bool stepCountReliable;
   final ActivityType activityType;
+  final String? targetType;
+  final double? targetValue;
+  final bool targetAchieved;
   final VoidCallback onNewActivity;
   final VoidCallback onViewHistory;
 
@@ -83,6 +89,9 @@ class _CompletionStats extends StatelessWidget {
     required this.steps,
     required this.stepCountReliable,
     required this.activityType,
+    this.targetType,
+    this.targetValue,
+    this.targetAchieved = false,
     required this.onNewActivity,
     required this.onViewHistory,
   });
@@ -171,6 +180,76 @@ class _CompletionStats extends StatelessWidget {
             ),
           ],
         ),
+        if (targetType != null && targetValue != null && targetValue! > 0) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: targetAchieved
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: targetAchieved
+                    ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
+                    : const Color(0xFFFF9800).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  targetAchieved
+                      ? Icons.emoji_events_rounded
+                      : Icons.flag_rounded,
+                  size: 28,
+                  color: targetAchieved
+                      ? const Color(0xFF4CAF50)
+                      : const Color(0xFFFF9800),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        targetAchieved
+                            ? 'Target Achieved! 🎉'
+                            : 'Target Not Reached',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: targetAchieved
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFE65100),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        targetType == 'distance'
+                            ? '🎯 ${targetValue!.toStringAsFixed(1)} km'
+                            : '🎯 ${targetValue!.toStringAsFixed(0)} kcal',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF555555),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  targetAchieved
+                      ? Icons.check_circle_rounded
+                      : Icons.cancel_outlined,
+                  size: 28,
+                  color: targetAchieved
+                      ? const Color(0xFF4CAF50)
+                      : const Color(0xFFFF9800),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 32),
         Row(
           children: [

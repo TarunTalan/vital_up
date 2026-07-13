@@ -117,6 +117,43 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _targetTypeMeta = const VerificationMeta(
+    'targetType',
+  );
+  @override
+  late final GeneratedColumn<String> targetType = GeneratedColumn<String>(
+    'target_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetValueMeta = const VerificationMeta(
+    'targetValue',
+  );
+  @override
+  late final GeneratedColumn<double> targetValue = GeneratedColumn<double>(
+    'target_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetAchievedMeta = const VerificationMeta(
+    'targetAchieved',
+  );
+  @override
+  late final GeneratedColumn<bool> targetAchieved = GeneratedColumn<bool>(
+    'target_achieved',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("target_achieved" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -129,6 +166,9 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
     calories,
     steps,
     stepCountReliable,
+    targetType,
+    targetValue,
+    targetAchieved,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -230,6 +270,30 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
         ),
       );
     }
+    if (data.containsKey('target_type')) {
+      context.handle(
+        _targetTypeMeta,
+        targetType.isAcceptableOrUnknown(data['target_type']!, _targetTypeMeta),
+      );
+    }
+    if (data.containsKey('target_value')) {
+      context.handle(
+        _targetValueMeta,
+        targetValue.isAcceptableOrUnknown(
+          data['target_value']!,
+          _targetValueMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_achieved')) {
+      context.handle(
+        _targetAchievedMeta,
+        targetAchieved.isAcceptableOrUnknown(
+          data['target_achieved']!,
+          _targetAchievedMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -279,6 +343,18 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
         DriftSqlType.bool,
         data['${effectivePrefix}step_count_reliable'],
       )!,
+      targetType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_type'],
+      ),
+      targetValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_value'],
+      ),
+      targetAchieved: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}target_achieved'],
+      ),
     );
   }
 
@@ -300,6 +376,9 @@ class DriftActivitySession extends DataClass
   final int calories;
   final int steps;
   final bool stepCountReliable;
+  final String? targetType;
+  final double? targetValue;
+  final bool? targetAchieved;
   const DriftActivitySession({
     required this.id,
     required this.activityType,
@@ -311,6 +390,9 @@ class DriftActivitySession extends DataClass
     required this.calories,
     required this.steps,
     required this.stepCountReliable,
+    this.targetType,
+    this.targetValue,
+    this.targetAchieved,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -327,6 +409,15 @@ class DriftActivitySession extends DataClass
     map['calories'] = Variable<int>(calories);
     map['steps'] = Variable<int>(steps);
     map['step_count_reliable'] = Variable<bool>(stepCountReliable);
+    if (!nullToAbsent || targetType != null) {
+      map['target_type'] = Variable<String>(targetType);
+    }
+    if (!nullToAbsent || targetValue != null) {
+      map['target_value'] = Variable<double>(targetValue);
+    }
+    if (!nullToAbsent || targetAchieved != null) {
+      map['target_achieved'] = Variable<bool>(targetAchieved);
+    }
     return map;
   }
 
@@ -344,6 +435,15 @@ class DriftActivitySession extends DataClass
       calories: Value(calories),
       steps: Value(steps),
       stepCountReliable: Value(stepCountReliable),
+      targetType: targetType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetType),
+      targetValue: targetValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetValue),
+      targetAchieved: targetAchieved == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetAchieved),
     );
   }
 
@@ -369,6 +469,9 @@ class DriftActivitySession extends DataClass
       calories: serializer.fromJson<int>(json['calories']),
       steps: serializer.fromJson<int>(json['steps']),
       stepCountReliable: serializer.fromJson<bool>(json['stepCountReliable']),
+      targetType: serializer.fromJson<String?>(json['targetType']),
+      targetValue: serializer.fromJson<double?>(json['targetValue']),
+      targetAchieved: serializer.fromJson<bool?>(json['targetAchieved']),
     );
   }
   @override
@@ -385,6 +488,9 @@ class DriftActivitySession extends DataClass
       'calories': serializer.toJson<int>(calories),
       'steps': serializer.toJson<int>(steps),
       'stepCountReliable': serializer.toJson<bool>(stepCountReliable),
+      'targetType': serializer.toJson<String?>(targetType),
+      'targetValue': serializer.toJson<double?>(targetValue),
+      'targetAchieved': serializer.toJson<bool?>(targetAchieved),
     };
   }
 
@@ -399,6 +505,9 @@ class DriftActivitySession extends DataClass
     int? calories,
     int? steps,
     bool? stepCountReliable,
+    Value<String?> targetType = const Value.absent(),
+    Value<double?> targetValue = const Value.absent(),
+    Value<bool?> targetAchieved = const Value.absent(),
   }) => DriftActivitySession(
     id: id ?? this.id,
     activityType: activityType ?? this.activityType,
@@ -410,6 +519,11 @@ class DriftActivitySession extends DataClass
     calories: calories ?? this.calories,
     steps: steps ?? this.steps,
     stepCountReliable: stepCountReliable ?? this.stepCountReliable,
+    targetType: targetType.present ? targetType.value : this.targetType,
+    targetValue: targetValue.present ? targetValue.value : this.targetValue,
+    targetAchieved: targetAchieved.present
+        ? targetAchieved.value
+        : this.targetAchieved,
   );
   DriftActivitySession copyWithCompanion(DriftActivitySessionsCompanion data) {
     return DriftActivitySession(
@@ -433,6 +547,15 @@ class DriftActivitySession extends DataClass
       stepCountReliable: data.stepCountReliable.present
           ? data.stepCountReliable.value
           : this.stepCountReliable,
+      targetType: data.targetType.present
+          ? data.targetType.value
+          : this.targetType,
+      targetValue: data.targetValue.present
+          ? data.targetValue.value
+          : this.targetValue,
+      targetAchieved: data.targetAchieved.present
+          ? data.targetAchieved.value
+          : this.targetAchieved,
     );
   }
 
@@ -448,7 +571,10 @@ class DriftActivitySession extends DataClass
           ..write('avgPaceSecondsPerKm: $avgPaceSecondsPerKm, ')
           ..write('calories: $calories, ')
           ..write('steps: $steps, ')
-          ..write('stepCountReliable: $stepCountReliable')
+          ..write('stepCountReliable: $stepCountReliable, ')
+          ..write('targetType: $targetType, ')
+          ..write('targetValue: $targetValue, ')
+          ..write('targetAchieved: $targetAchieved')
           ..write(')'))
         .toString();
   }
@@ -465,6 +591,9 @@ class DriftActivitySession extends DataClass
     calories,
     steps,
     stepCountReliable,
+    targetType,
+    targetValue,
+    targetAchieved,
   );
   @override
   bool operator ==(Object other) =>
@@ -479,7 +608,10 @@ class DriftActivitySession extends DataClass
           other.avgPaceSecondsPerKm == this.avgPaceSecondsPerKm &&
           other.calories == this.calories &&
           other.steps == this.steps &&
-          other.stepCountReliable == this.stepCountReliable);
+          other.stepCountReliable == this.stepCountReliable &&
+          other.targetType == this.targetType &&
+          other.targetValue == this.targetValue &&
+          other.targetAchieved == this.targetAchieved);
 }
 
 class DriftActivitySessionsCompanion
@@ -494,6 +626,9 @@ class DriftActivitySessionsCompanion
   final Value<int> calories;
   final Value<int> steps;
   final Value<bool> stepCountReliable;
+  final Value<String?> targetType;
+  final Value<double?> targetValue;
+  final Value<bool?> targetAchieved;
   final Value<int> rowid;
   const DriftActivitySessionsCompanion({
     this.id = const Value.absent(),
@@ -506,6 +641,9 @@ class DriftActivitySessionsCompanion
     this.calories = const Value.absent(),
     this.steps = const Value.absent(),
     this.stepCountReliable = const Value.absent(),
+    this.targetType = const Value.absent(),
+    this.targetValue = const Value.absent(),
+    this.targetAchieved = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftActivitySessionsCompanion.insert({
@@ -519,6 +657,9 @@ class DriftActivitySessionsCompanion
     required int calories,
     required int steps,
     this.stepCountReliable = const Value.absent(),
+    this.targetType = const Value.absent(),
+    this.targetValue = const Value.absent(),
+    this.targetAchieved = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        activityType = Value(activityType),
@@ -539,6 +680,9 @@ class DriftActivitySessionsCompanion
     Expression<int>? calories,
     Expression<int>? steps,
     Expression<bool>? stepCountReliable,
+    Expression<String>? targetType,
+    Expression<double>? targetValue,
+    Expression<bool>? targetAchieved,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -555,6 +699,9 @@ class DriftActivitySessionsCompanion
       if (calories != null) 'calories': calories,
       if (steps != null) 'steps': steps,
       if (stepCountReliable != null) 'step_count_reliable': stepCountReliable,
+      if (targetType != null) 'target_type': targetType,
+      if (targetValue != null) 'target_value': targetValue,
+      if (targetAchieved != null) 'target_achieved': targetAchieved,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -570,6 +717,9 @@ class DriftActivitySessionsCompanion
     Value<int>? calories,
     Value<int>? steps,
     Value<bool>? stepCountReliable,
+    Value<String?>? targetType,
+    Value<double?>? targetValue,
+    Value<bool?>? targetAchieved,
     Value<int>? rowid,
   }) {
     return DriftActivitySessionsCompanion(
@@ -583,6 +733,9 @@ class DriftActivitySessionsCompanion
       calories: calories ?? this.calories,
       steps: steps ?? this.steps,
       stepCountReliable: stepCountReliable ?? this.stepCountReliable,
+      targetType: targetType ?? this.targetType,
+      targetValue: targetValue ?? this.targetValue,
+      targetAchieved: targetAchieved ?? this.targetAchieved,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -622,6 +775,15 @@ class DriftActivitySessionsCompanion
     if (stepCountReliable.present) {
       map['step_count_reliable'] = Variable<bool>(stepCountReliable.value);
     }
+    if (targetType.present) {
+      map['target_type'] = Variable<String>(targetType.value);
+    }
+    if (targetValue.present) {
+      map['target_value'] = Variable<double>(targetValue.value);
+    }
+    if (targetAchieved.present) {
+      map['target_achieved'] = Variable<bool>(targetAchieved.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -641,6 +803,9 @@ class DriftActivitySessionsCompanion
           ..write('calories: $calories, ')
           ..write('steps: $steps, ')
           ..write('stepCountReliable: $stepCountReliable, ')
+          ..write('targetType: $targetType, ')
+          ..write('targetValue: $targetValue, ')
+          ..write('targetAchieved: $targetAchieved, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1142,6 +1307,9 @@ typedef $$DriftActivitySessionsTableCreateCompanionBuilder =
       required int calories,
       required int steps,
       Value<bool> stepCountReliable,
+      Value<String?> targetType,
+      Value<double?> targetValue,
+      Value<bool?> targetAchieved,
       Value<int> rowid,
     });
 typedef $$DriftActivitySessionsTableUpdateCompanionBuilder =
@@ -1156,6 +1324,9 @@ typedef $$DriftActivitySessionsTableUpdateCompanionBuilder =
       Value<int> calories,
       Value<int> steps,
       Value<bool> stepCountReliable,
+      Value<String?> targetType,
+      Value<double?> targetValue,
+      Value<bool?> targetAchieved,
       Value<int> rowid,
     });
 
@@ -1252,6 +1423,21 @@ class $$DriftActivitySessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get targetAchieved => $composableBuilder(
+    column: $table.targetAchieved,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> driftTrackPointsRefs(
     Expression<bool> Function($$DriftTrackPointsTableFilterComposer f) f,
   ) {
@@ -1336,6 +1522,21 @@ class $$DriftActivitySessionsTableOrderingComposer
     column: $table.stepCountReliable,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get targetAchieved => $composableBuilder(
+    column: $table.targetAchieved,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftActivitySessionsTableAnnotationComposer
@@ -1384,6 +1585,21 @@ class $$DriftActivitySessionsTableAnnotationComposer
 
   GeneratedColumn<bool> get stepCountReliable => $composableBuilder(
     column: $table.stepCountReliable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetType => $composableBuilder(
+    column: $table.targetType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get targetAchieved => $composableBuilder(
+    column: $table.targetAchieved,
     builder: (column) => column,
   );
 
@@ -1462,6 +1678,9 @@ class $$DriftActivitySessionsTableTableManager
                 Value<int> calories = const Value.absent(),
                 Value<int> steps = const Value.absent(),
                 Value<bool> stepCountReliable = const Value.absent(),
+                Value<String?> targetType = const Value.absent(),
+                Value<double?> targetValue = const Value.absent(),
+                Value<bool?> targetAchieved = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftActivitySessionsCompanion(
                 id: id,
@@ -1474,6 +1693,9 @@ class $$DriftActivitySessionsTableTableManager
                 calories: calories,
                 steps: steps,
                 stepCountReliable: stepCountReliable,
+                targetType: targetType,
+                targetValue: targetValue,
+                targetAchieved: targetAchieved,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1488,6 +1710,9 @@ class $$DriftActivitySessionsTableTableManager
                 required int calories,
                 required int steps,
                 Value<bool> stepCountReliable = const Value.absent(),
+                Value<String?> targetType = const Value.absent(),
+                Value<double?> targetValue = const Value.absent(),
+                Value<bool?> targetAchieved = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftActivitySessionsCompanion.insert(
                 id: id,
@@ -1500,6 +1725,9 @@ class $$DriftActivitySessionsTableTableManager
                 calories: calories,
                 steps: steps,
                 stepCountReliable: stepCountReliable,
+                targetType: targetType,
+                targetValue: targetValue,
+                targetAchieved: targetAchieved,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
