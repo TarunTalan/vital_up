@@ -29,9 +29,29 @@ subprojects {
 subprojects {
     afterEvaluate {
         plugins.withId("com.android.library") {
-            extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+            extensions.configure<com.android.build.api.dsl.LibraryExtension>("android") {
                 compileSdk = 36
+                if (namespace == null) {
+                    val groupStr = project.group.toString()
+                    namespace = if (groupStr.isNotEmpty() && groupStr.contains(".")) {
+                        groupStr
+                    } else {
+                        "com.vitalup.fallback." + project.name.replace("-", "_")
+                    }
+                }
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
             }
+        }
+    }
+}
+
+subprojects {
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 }
