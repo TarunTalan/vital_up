@@ -24,7 +24,25 @@ class PauseTracking extends ActivityTrackingEvent {}
 
 class ResumeTracking extends ActivityTrackingEvent {}
 
-class StopAndSaveTracking extends ActivityTrackingEvent {}
+class StopAndSaveTracking extends ActivityTrackingEvent {
+  /// The target type active for this session ('distance', 'calories', or null).
+  final String? targetType;
+
+  /// The target value in km or kcal.
+  final double? targetValue;
+
+  /// Whether the target was achieved.
+  final bool targetAchieved;
+
+  const StopAndSaveTracking({
+    this.targetType,
+    this.targetValue,
+    this.targetAchieved = false,
+  });
+
+  @override
+  List<Object?> get props => [targetType, targetValue, targetAchieved];
+}
 
 class UpdateTrackPoint extends ActivityTrackingEvent {
   final TrackPoint point;

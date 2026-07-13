@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-/// Full-screen animated 3-2-1 countdown overlay shown before a workout starts.
+/// Full-screen animated countdown overlay shown before a workout starts.
 ///
-/// Call [CountdownOverlay.show] and await it — it resolves after the countdown
-/// finishes so the caller can dispatch [StartTracking] immediately after.
+/// Features:
+///  • Animated scale + fade number display
+///  • **+10** button — adds 10 seconds to the remaining countdown
+///  • **Skip** button — immediately fires [onFinished]
 class CountdownOverlay extends StatefulWidget {
   final int durationSeconds;
   final bool voiceCoachEnabled;
@@ -31,6 +34,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   Timer? _ticker;
   final FlutterTts _tts = FlutterTts();
   bool _finishedNaturally = false;
+  bool _skipped = false;
 
   @override
   void initState() {
@@ -69,7 +73,6 @@ class _CountdownOverlayState extends State<CountdownOverlay>
     if (_count <= 1) {
       _ticker?.cancel();
       _finishedNaturally = true;
-      // Short delay so the last number finishes animating before popping.
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) widget.onFinished();
       });
@@ -79,11 +82,31 @@ class _CountdownOverlayState extends State<CountdownOverlay>
     _runCount();
   }
 
+  /// Adds 10 seconds to the remaining count (max 1000) and restarts the animation.
+  void _addTen() {
+    HapticFeedback.lightImpact();
+    _ticker?.cancel();
+    setState(() => _count = (_count + 10).clamp(0, 1000));
+    _controller.reset();
+    _controller.forward();
+    // Restart the periodic ticker from now
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  /// Immediately skips to the start of the workout.
+  void _skip() {
+    HapticFeedback.mediumImpact();
+    _ticker?.cancel();
+    _tts.stop();
+    _skipped = true;
+    if (mounted) widget.onFinished();
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
     _controller.dispose();
-    if (!_finishedNaturally) {
+    if (!_finishedNaturally && !_skipped) {
       _tts.stop();
     }
     super.dispose();
@@ -92,28 +115,148 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.55),
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (_, __) {
-            return Opacity(
-              opacity: _opacityAnim.value,
-              child: Transform.scale(
-                scale: _scaleAnim.value,
-                child: Text(
-                  '$_count',
-                  style: const TextStyle(
-                    fontSize: 160,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    height: 1.0,
-                  ),
+      backgroundColor: Colors.black.withValues(alpha: 0.72),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Top label (no button here anymore) ───────────────────────
+            const SizedBox(height: 16),
+            // ── Centre: animated count ────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (_, __) {
+                        return Opacity(
+                          opacity: _opacityAnim.value,
+                          child: Transform.scale(
+                            scale: _scaleAnim.value,
+                            child: Text(
+                              '$_count',
+                              style: const TextStyle(
+                                fontSize: 160,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'GET READY',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+
+            // ── Bottom: +10 sec & Skip buttons ──────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CountdownButton(
+                    label: '+10 sec',
+                    icon: Icons.add_circle_outline_rounded,
+                    onTap: _addTen,
+                    filled: true,
+                    wide: true,
+                  ),
+                  const SizedBox(height: 12),
+                  _CountdownButton(
+                    label: 'Skip',
+                    icon: Icons.skip_next_rounded,
+                    onTap: _skip,
+                    filled: false,
+                    wide: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Helper button widget ────────────────────────────────────────────────────
+
+class _CountdownButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool filled;
+  final bool wide;
+
+  const _CountdownButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.filled,
+    this.wide = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 20, color: filled ? Colors.black : Colors.white),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: filled ? Colors.black : Colors.white,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+
+    if (filled) {
+      return SizedBox(
+        width: double.infinity,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white30),
+        ),
+        child: content,
       ),
     );
   }

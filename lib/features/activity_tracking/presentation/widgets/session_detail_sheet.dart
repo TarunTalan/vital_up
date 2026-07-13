@@ -117,6 +117,64 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                 const Expanded(child: SizedBox()),
               ],
             ),
+            if (session.targetType != null && session.targetValue != null && session.targetValue! > 0) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: session.targetAchieved
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.flag_rounded,
+                      size: 20,
+                      color: session.targetAchieved
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFFFF9800),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Target: ${session.targetType == 'distance' ? '${session.targetValue!.toStringAsFixed(1)} km' : '${session.targetValue!.toStringAsFixed(0)} kcal'}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            session.targetAchieved ? 'Achieved ✓' : 'Not achieved',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: session.targetAchieved
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFFF9800),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      session.targetAchieved
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_outlined,
+                      color: session.targetAchieved
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFFFF9800),
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (!session.stepCountReliable) ...[
               const SizedBox(height: 4),
               const Text(

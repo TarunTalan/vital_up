@@ -220,6 +220,9 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       steps: steps,
       stepCountReliable: _stepCountReliable,
       points: points,
+      targetType: event.targetType,
+      targetValue: event.targetValue,
+      targetAchieved: event.targetAchieved,
     );
 
     await stopAndSaveSession(session);

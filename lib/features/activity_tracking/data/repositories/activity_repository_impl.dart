@@ -23,6 +23,9 @@ class ActivityRepositoryImpl implements ActivityRepository {
       calories: session.calories,
       steps: session.steps,
       stepCountReliable: Value(session.stepCountReliable),
+      targetType: Value(session.targetType),
+      targetValue: Value(session.targetValue),
+      targetAchieved: Value(session.targetAchieved),
     );
     await database.saveSessionCompanion(dbSession);
 
@@ -66,6 +69,9 @@ class ActivityRepositoryImpl implements ActivityRepository {
         steps: s.steps,
         stepCountReliable: s.stepCountReliable,
         points: points,
+        targetType: s.targetType,
+        targetValue: s.targetValue,
+        targetAchieved: s.targetAchieved ?? false,
       ));
     }
 
@@ -99,6 +105,9 @@ class ActivityRepositoryImpl implements ActivityRepository {
       steps: s.steps,
       stepCountReliable: s.stepCountReliable,
       points: points,
+      targetType: s.targetType,
+      targetValue: s.targetValue,
+      targetAchieved: s.targetAchieved ?? false,
     );
   }
 

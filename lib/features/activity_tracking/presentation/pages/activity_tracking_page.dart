@@ -856,6 +856,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                           _isCountingDown = true;
                                         });
                                       } else {
+                                        _prefsNotifier.applyDailyTargetIfEnabled();
                                         bloc.add(StartTracking());
                                         if (_prefsNotifier.value.voiceCoachEnabled) {
                                           _voiceCoach.announceStart();
@@ -876,7 +877,36 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                        _resumeWorkoutAudio();
                                      },
                                     onStop: () {
-                                      bloc.add(StopAndSaveTracking());
+                                      final prefs = _prefsNotifier.value;
+                                      String? tType;
+                                      double? tValue;
+                                      bool tAchieved = false;
+                                      if (prefs.targetType != WorkoutTargetType.none && prefs.targetValue > 0) {
+                                        tType = prefs.targetType.name;
+                                        tValue = prefs.targetValue;
+                                        // Compute achievement from current bloc state
+                                        final s = context.read<ActivityTrackingBloc>().state;
+                                        if (prefs.targetType == WorkoutTargetType.distance) {
+                                          final targetMeters = prefs.targetValue * 1000;
+                                          if (s is TrackingInProgress) {
+                                            tAchieved = s.distanceMeters >= targetMeters;
+                                          } else if (s is TrackingPaused) {
+                                            tAchieved = s.distanceMeters >= targetMeters;
+                                          }
+                                        } else if (prefs.targetType == WorkoutTargetType.calories) {
+                                          if (s is TrackingInProgress) {
+                                            tAchieved = s.calories >= prefs.targetValue;
+                                          } else if (s is TrackingPaused) {
+                                            tAchieved = s.calories >= prefs.targetValue;
+                                          }
+                                        }
+                                      }
+                                      bloc.add(StopAndSaveTracking(
+                                        targetType: tType,
+                                        targetValue: tValue,
+                                        targetAchieved: tAchieved,
+                                      ));
+                                      _prefsNotifier.clearSessionTarget();
                                       _stopWorkoutAudio();
                                     },
                                     onSettingsTap: () => _openSettings(),
@@ -900,6 +930,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                           _isCountingDown = false;
                         });
                         bloc.add(StartTracking());
+                        _prefsNotifier.applyDailyTargetIfEnabled();
                         if (_prefsNotifier.value.voiceCoachEnabled) {
                           _voiceCoach.announceStart();
                         }
