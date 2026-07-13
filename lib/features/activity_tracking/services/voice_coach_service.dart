@@ -1,6 +1,8 @@
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
 
 /// Handles all text-to-speech announcements during a workout session.
 ///
@@ -15,12 +17,54 @@ class VoiceCoachService {
   bool _announced75 = false;
   bool _announced90 = false;
 
+  Map<String, String>? _defaultVoice;
+
   Future<void> init() async {
     if (_initialized) return;
     await _tts.setLanguage('en-US');
     await _tts.setSpeechRate(0.48);
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
+
+    try {
+      final List<dynamic>? voices = await _tts.getVoices;
+      if (voices != null) {
+        final List<Map<String, String>> enUsVoices = [];
+        for (var voice in voices) {
+          if (voice is Map) {
+            final name = voice['name']?.toString() ?? '';
+            final locale = voice['locale']?.toString() ?? '';
+            if (locale.startsWith('en-US') || locale.startsWith('en_US')) {
+              enUsVoices.add({'name': name, 'locale': locale});
+            }
+          }
+        }
+
+        if (enUsVoices.isNotEmpty) {
+          _defaultVoice = enUsVoices.firstWhere(
+            (v) => v['name']!.toLowerCase().contains('google') || v['name']!.toLowerCase().contains('x-sfg'),
+            orElse: () => enUsVoices.first,
+          );
+        }
+      }
+    } catch (_) {}
+
+    _tts.setStartHandler(() {
+      try {
+        sl<WorkoutAudioService>().setDucked(true);
+      } catch (_) {}
+    });
+    _tts.setCompletionHandler(() {
+      try {
+        sl<WorkoutAudioService>().setDucked(false);
+      } catch (_) {}
+    });
+    _tts.setErrorHandler((_) {
+      try {
+        sl<WorkoutAudioService>().setDucked(false);
+      } catch (_) {}
+    });
+
     _initialized = true;
   }
 
@@ -202,57 +246,17 @@ class VoiceCoachService {
     await _speak('Target reached! $targetLabel. Great job!');
   }
 
-  int _lastStorySegmentIndex = 0;
-  DateTime? _lastStoryTime;
-
-  void resetStory() {
-    _lastStorySegmentIndex = 0;
-    _lastStoryTime = null;
-  }
-
-  /// Announce a motivational story segment every 90 seconds if active
-  Future<void> checkStoryNarrative(String trackName) async {
-    if (trackName == 'None' || trackName.startsWith('Music:')) return;
-    
-    final now = DateTime.now();
-    if (_lastStoryTime != null && now.difference(_lastStoryTime!).inSeconds < 90) {
-      return; 
-    }
-    
-    _lastStoryTime = now;
-    
-    List<String> segments = [];
-    if (trackName.contains('Rise & Grind')) {
-      segments = [
-        "Welcome to Rise and Grind. The morning air is crisp, but you are warmer. Your muscles are warming up. Every stride is a decision to be better.",
-        "Remember why you started this. The cold road ahead represents opportunity. Let go of the fatigue. Focus on your breathing.",
-        "Your pace is steady. Your posture is upright. You are matching the rhythm of your heart. Keep your eyes forward, victory is in your steps.",
-        "Halfway through the morning breeze. The world is waking up, but you are already ahead. Do not stop now, push the tempo.",
-        "You are in the final stretch. Dig deep. The ground under your feet is yours to conquer. Finish strong!"
-      ];
-    } else if (trackName.contains('The Ascent')) {
-      segments = [
-        "Starting the ascent. The mountain is tall, but your determination is taller. Take deep breaths. Keep a steady cadence.",
-        "The slope is getting steeper. This is where champions are forged. Feel the burn in your calves, embrace it. You are climbing.",
-        "Look how far you've come from the valley. Keep moving forward. Don't look back, focus on the next step.",
-        "Near the peak. The wind is howling, but your spirit is solid. Push through this threshold. Just a little more.",
-        "You've reached the summit! Feel the wind, look at the horizon. You conquered the ascent today. Amazing job."
-      ];
-    }
-    
-    if (segments.isNotEmpty) {
-      final index = _lastStorySegmentIndex % segments.length;
-      _lastStorySegmentIndex++;
-      await _speak(segments[index]);
-    }
-  }
-
   Future<void> dispose() async {
     await _tts.stop();
   }
 
   Future<void> _speak(String text) async {
     await _tts.stop();
+    await _tts.setSpeechRate(0.48);
+    await _tts.setPitch(1.0);
+    if (_defaultVoice != null) {
+      await _tts.setVoice(_defaultVoice!);
+    }
     await _tts.speak(text);
   }
 }

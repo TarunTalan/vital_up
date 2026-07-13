@@ -21,6 +21,8 @@ extension WorkoutTargetTypeLabel on WorkoutTargetType {
   }
 }
 
+// Removed AudioPlayerType enum
+
 /// Metrics that can be displayed on the tracking screen.
 enum StatMetric {
   distance,
@@ -56,8 +58,10 @@ class WorkoutPrefs {
   final WorkoutTargetType targetType;
   final double targetValue; // km or kcal depending on targetType
   final List<StatMetric> selectedMetrics;
-  final String backgroundAudioTrack; // 'None', 'Rise & Grind Story', 'Lo-Fi Run Beats', 'Synthwave Power'
+  final String backgroundAudioTrack; // 'None', 'Story: It\'s Possible', 'Lo-Fi Jogging Beats', 'Synthwave Cardio Energy'
+  final String backgroundAudioQueueType; // 'curated', 'local', 'favorite'
   final ActivityType defaultActivityType;
+  final String preferredPlayerPackage; // 'builtIn' or package name
 
   const WorkoutPrefs({
     this.voiceCoachEnabled = true,
@@ -70,7 +74,9 @@ class WorkoutPrefs {
       StatMetric.avgPace,
     ],
     this.backgroundAudioTrack = 'None',
+    this.backgroundAudioQueueType = 'stories',
     this.defaultActivityType = ActivityType.walk,
+    this.preferredPlayerPackage = 'builtIn',
   });
 
   WorkoutPrefs copyWith({
@@ -80,7 +86,9 @@ class WorkoutPrefs {
     double? targetValue,
     List<StatMetric>? selectedMetrics,
     String? backgroundAudioTrack,
+    String? backgroundAudioQueueType,
     ActivityType? defaultActivityType,
+    String? preferredPlayerPackage,
   }) {
     return WorkoutPrefs(
       voiceCoachEnabled: voiceCoachEnabled ?? this.voiceCoachEnabled,
@@ -89,7 +97,9 @@ class WorkoutPrefs {
       targetValue: targetValue ?? this.targetValue,
       selectedMetrics: selectedMetrics ?? this.selectedMetrics,
       backgroundAudioTrack: backgroundAudioTrack ?? this.backgroundAudioTrack,
+      backgroundAudioQueueType: backgroundAudioQueueType ?? this.backgroundAudioQueueType,
       defaultActivityType: defaultActivityType ?? this.defaultActivityType,
+      preferredPlayerPackage: preferredPlayerPackage ?? this.preferredPlayerPackage,
     );
   }
 }
@@ -140,8 +150,12 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
       targetType: targetType,
       targetValue: prefs.getDouble(_kTargetValueKey) ?? 0.0,
       selectedMetrics: metrics,
-      backgroundAudioTrack: prefs.getString('workout_audio_track') ?? 'None',
+      backgroundAudioTrack: 'None',
+      backgroundAudioQueueType: (prefs.getString('workout_audio_queue_type') == 'curated')
+          ? 'stories'
+          : (prefs.getString('workout_audio_queue_type') ?? 'stories'),
       defaultActivityType: defaultActivityType,
+      preferredPlayerPackage: prefs.getString('workout_preferred_player_package') ?? 'builtIn',
     );
   }
 
@@ -179,10 +193,15 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     await prefs.setStringList(_kSelectedMetricsKey, metrics.map((e) => e.name).toList());
   }
 
-  Future<void> setBackgroundAudioTrack(String track) async {
-    value = value.copyWith(backgroundAudioTrack: track);
+  Future<void> setBackgroundAudioTrack(String track, {String? queueType}) async {
+    final resolvedQueueType = queueType ?? (track.startsWith('Local:') ? 'local' : 'stories');
+    value = value.copyWith(
+      backgroundAudioTrack: track,
+      backgroundAudioQueueType: resolvedQueueType,
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('workout_audio_track', track);
+    await prefs.setString('workout_audio_queue_type', resolvedQueueType);
   }
 
   Future<void> setDefaultActivityType(ActivityType type) async {
@@ -190,6 +209,10 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('workout_default_activity_type', type.name);
   }
+
+  Future<void> setPreferredPlayerPackage(String package) async {
+    value = value.copyWith(preferredPlayerPackage: package);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('workout_preferred_player_package', package);
+  }
 }
-
-
