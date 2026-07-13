@@ -1,25 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 /// Full-screen animated 3-2-1 countdown overlay shown before a workout starts.
 ///
 /// Call [CountdownOverlay.show] and await it — it resolves after the countdown
 /// finishes so the caller can dispatch [StartTracking] immediately after.
 class CountdownOverlay extends StatefulWidget {
-  const CountdownOverlay({super.key});
+  final int durationSeconds;
+  final VoidCallback onFinished;
 
-  /// Pushes a full-screen overlay route and awaits the countdown.
-  static Future<void> show(BuildContext context) {
-    return Navigator.of(context, rootNavigator: true).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierDismissible: false,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-        pageBuilder: (_, __, ___) => const CountdownOverlay(),
-      ),
-    );
-  }
+  const CountdownOverlay({
+    super.key,
+    required this.durationSeconds,
+    required this.onFinished,
+  });
 
   @override
   State<CountdownOverlay> createState() => _CountdownOverlayState();
@@ -27,15 +22,21 @@ class CountdownOverlay extends StatefulWidget {
 
 class _CountdownOverlayState extends State<CountdownOverlay>
     with SingleTickerProviderStateMixin {
-  int _count = 3;
+  late int _count;
   late AnimationController _controller;
   late Animation<double> _scaleAnim;
   late Animation<double> _opacityAnim;
   Timer? _ticker;
+  final FlutterTts _tts = FlutterTts();
+  bool _finishedNaturally = false;
 
   @override
   void initState() {
     super.initState();
+    _count = widget.durationSeconds;
+    _tts.setSpeechRate(0.55);
+    _tts.setVolume(1.0);
+    _tts.setPitch(1.0);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -56,15 +57,19 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   void _runCount() {
     _controller.reset();
     _controller.forward();
+    if (_count <= 3 && _count >= 1) {
+      _tts.speak('$_count');
+    }
   }
 
   void _tick() {
     if (!mounted) return;
     if (_count <= 1) {
       _ticker?.cancel();
+      _finishedNaturally = true;
       // Short delay so the last number finishes animating before popping.
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) widget.onFinished();
       });
       return;
     }
@@ -76,6 +81,9 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   void dispose() {
     _ticker?.cancel();
     _controller.dispose();
+    if (!_finishedNaturally) {
+      _tts.stop();
+    }
     super.dispose();
   }
 

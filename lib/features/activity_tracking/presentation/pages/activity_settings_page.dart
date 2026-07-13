@@ -41,7 +41,7 @@ class ActivitySettingsPage extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'WORKOUT SETTINGS',
+          'ACTIVITY SETTINGS',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w900,
@@ -94,18 +94,60 @@ class ActivitySettingsPage extends StatelessWidget {
 
                   _SettingsTile(
                     icon: Icons.timer_3_rounded,
-                    title: 'Countdown before start',
-                    subtitle: '3-second countdown when you tap Start',
-                    trailing: Switch(
-                      value: prefs.countdownEnabled,
-                      activeColor: Colors.black,
-                      onChanged: (v) => prefsNotifier.setCountdown(v),
-                    ),
+                    title: 'Countdown duration',
+                    subtitle: prefs.countdownDurationSeconds == 0
+                        ? 'Disabled'
+                        : '${prefs.countdownDurationSeconds} seconds',
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        color: Color(0xFFCCCCCC)),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: const Text(
+                            'COUNTDOWN DURATION',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [0, 3, 5, 10].map((sec) {
+                              final isSel = prefs.countdownDurationSeconds == sec;
+                              return ListTile(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                title: Text(
+                                  sec == 0 ? 'Off' : '$sec seconds',
+                                  style: TextStyle(
+                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    color: isSel ? Colors.black : Colors.black87,
+                                  ),
+                                ),
+                                trailing: isSel
+                                    ? const Icon(Icons.check_rounded, color: Colors.black)
+                                    : null,
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  prefsNotifier.setCountdownDuration(sec);
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      );
+                    },
                   ),
 
                   _SettingsTile(
                     icon: Icons.flag_rounded,
-                    title: 'Workout target',
+                    title: 'Activity target',
                     subtitle: targetSubtitle,
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,

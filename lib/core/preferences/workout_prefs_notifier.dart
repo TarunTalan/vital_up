@@ -52,7 +52,7 @@ enum StatMetric {
 /// All values persist in [SharedPreferences].
 class WorkoutPrefs {
   final bool voiceCoachEnabled;
-  final bool countdownEnabled;
+  final int countdownDurationSeconds;
   final WorkoutTargetType targetType;
   final double targetValue; // km or kcal depending on targetType
   final List<StatMetric> selectedMetrics;
@@ -61,7 +61,7 @@ class WorkoutPrefs {
 
   const WorkoutPrefs({
     this.voiceCoachEnabled = true,
-    this.countdownEnabled = true,
+    this.countdownDurationSeconds = 3,
     this.targetType = WorkoutTargetType.none,
     this.targetValue = 0.0,
     this.selectedMetrics = const [
@@ -75,7 +75,7 @@ class WorkoutPrefs {
 
   WorkoutPrefs copyWith({
     bool? voiceCoachEnabled,
-    bool? countdownEnabled,
+    int? countdownDurationSeconds,
     WorkoutTargetType? targetType,
     double? targetValue,
     List<StatMetric>? selectedMetrics,
@@ -84,7 +84,7 @@ class WorkoutPrefs {
   }) {
     return WorkoutPrefs(
       voiceCoachEnabled: voiceCoachEnabled ?? this.voiceCoachEnabled,
-      countdownEnabled: countdownEnabled ?? this.countdownEnabled,
+      countdownDurationSeconds: countdownDurationSeconds ?? this.countdownDurationSeconds,
       targetType: targetType ?? this.targetType,
       targetValue: targetValue ?? this.targetValue,
       selectedMetrics: selectedMetrics ?? this.selectedMetrics,
@@ -126,9 +126,17 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
       orElse: () => ActivityType.walk,
     );
 
+    final int defaultCountdown;
+    if (prefs.containsKey(_kCountdownKey)) {
+      defaultCountdown = (prefs.getBool(_kCountdownKey) ?? true) ? 3 : 0;
+    } else {
+      defaultCountdown = 3;
+    }
+    final countdownDuration = prefs.getInt('workout_countdown_duration') ?? defaultCountdown;
+
     value = WorkoutPrefs(
       voiceCoachEnabled: prefs.getBool(_kVoiceCoachKey) ?? true,
-      countdownEnabled: prefs.getBool(_kCountdownKey) ?? true,
+      countdownDurationSeconds: countdownDuration,
       targetType: targetType,
       targetValue: prefs.getDouble(_kTargetValueKey) ?? 0.0,
       selectedMetrics: metrics,
@@ -143,10 +151,11 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     await prefs.setBool(_kVoiceCoachKey, enabled);
   }
 
-  Future<void> setCountdown(bool enabled) async {
-    value = value.copyWith(countdownEnabled: enabled);
+  Future<void> setCountdownDuration(int durationSeconds) async {
+    value = value.copyWith(countdownDurationSeconds: durationSeconds);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kCountdownKey, enabled);
+    await prefs.setInt('workout_countdown_duration', durationSeconds);
+    await prefs.setBool(_kCountdownKey, durationSeconds > 0);
   }
 
   Future<void> setTarget(WorkoutTargetType type, double targetValue) async {
