@@ -244,7 +244,7 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       // 1. Initialize Google Sign-In with standard scopes and Web Client ID
       final googleSignIn = GoogleSignIn(
-        clientId: SupabaseConfig.googleWebClientId,
+        serverClientId: SupabaseConfig.googleWebClientId,
         scopes: ['email', 'profile'],
       );
 

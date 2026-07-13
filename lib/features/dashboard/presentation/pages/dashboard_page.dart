@@ -209,6 +209,8 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 24),
               const _DashboardSegmentedTabs(),
               const SizedBox(height: 25),
+              const _DietPlanCard(),
+              const SizedBox(height: 25),
               const _RestMetricCard(
                 title: 'Sleep',
                 value: '6h 43m',
@@ -716,4 +718,51 @@ class _BottomNavItem {
   final String iconAsset;
 
   const _BottomNavItem(this.label, this.iconAsset);
+}
+
+class _DietPlanCard extends StatelessWidget {
+  const _DietPlanCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return InkWell(
+      onTap: () => context.pushNamed('diet-plan-prefs'),
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.restaurant_menu, color: colors.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('AI Diet Plan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Generate a personalized meal plan', style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: colors.primary, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
 }
