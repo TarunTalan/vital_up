@@ -75,6 +75,10 @@ dependencies:
   injectable: ^2.4.1
   uuid: ^4.4.0
 
+  # Activity Tracking extras
+  flutter_tts: ^4.1.0
+  flutter_blue_plus: ^1.35.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

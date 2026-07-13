@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   flutter_secure_storage_windows
+  flutter_tts
   geolocator_windows
   isar_community_flutter_libs
   sqlite3_flutter_libs
