@@ -44,6 +44,10 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_t
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_history_repository.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
+import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
+import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -187,4 +191,10 @@ Future<void> initDependencies() async {
       deleteActivitySession: sl<DeleteActivitySession>(),
     ),
   );
+
+  // Audio Services
+  sl.registerLazySingleton<WorkoutAudioService>(() => WorkoutAudioService());
+  sl.registerLazySingleton<LocalAudioQueryService>(() => LocalAudioQueryService());
+  sl.registerLazySingleton<InAppAudioDownloader>(() => InAppAudioDownloader(sl<IsarService>()));
+  sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
 }
