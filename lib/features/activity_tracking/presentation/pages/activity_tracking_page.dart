@@ -51,6 +51,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   double _mapDownloadProgress = 0.0;
   bool _isUiVisible = true;
   bool _isLocked = true;
+  bool _isCountingDown = false;
 
   final DistanceUnitNotifier _unitNotifier = DistanceUnitNotifier();
   final WorkoutPrefsNotifier _prefsNotifier = WorkoutPrefsNotifier();
@@ -342,21 +343,21 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             SnackBar(content: Text(state.message)),
           );
         } else if (state is TrackingInProgress) {
-          // Voice coach milestone check
+          // Voice coach updates
           if (_prefsNotifier.value.voiceCoachEnabled) {
             _voiceCoach.checkMilestone(
               distanceMeters: state.distanceMeters,
               avgPaceSecondsPerKm: state.avgPaceSecondsPerKm,
               unit: _unitNotifier.value,
+              calories: state.calories,
+              prefs: _prefsNotifier.value,
             );
-            // Target reached check
-            final prefs = _prefsNotifier.value;
-            if (prefs.targetType == WorkoutTargetType.distance &&
-                state.distanceMeters >= prefs.targetValue * 1000 &&
-                state.distanceMeters - (state.routePoints.length > 1 ? 0 : 0) >=
-                    prefs.targetValue * 1000) {
-              // fire once — voice coach handles dedup
-            }
+            _voiceCoach.checkTargetStatus(
+              distanceMeters: state.distanceMeters,
+              calories: state.calories,
+              prefs: _prefsNotifier.value,
+              unit: _unitNotifier.value,
+            );
           }
           // Voice coach background story check
           if (_isAudioPlaying && _prefsNotifier.value.backgroundAudioTrack != 'None') {
@@ -382,6 +383,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingCompleted) {
+          if (_prefsNotifier.value.voiceCoachEnabled) {
+            _voiceCoach.announceStop(
+              distanceMeters: state.session.totalDistanceMeters,
+              elapsedSeconds: state.session.totalDurationSeconds,
+            );
+          }
           final bloc = context.read<ActivityTrackingBloc>();
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -650,12 +657,16 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                       setState(() {
                                         _isAudioPlaying = true;
                                       });
-                                      if (_prefsNotifier.value.countdownEnabled) {
-                                        await CountdownOverlay.show(context);
-                                      }
-                                      bloc.add(StartTracking());
-                                      if (_prefsNotifier.value.voiceCoachEnabled) {
-                                        _voiceCoach.announceStart();
+                                      final duration = _prefsNotifier.value.countdownDurationSeconds;
+                                      if (duration > 0) {
+                                        setState(() {
+                                          _isCountingDown = true;
+                                        });
+                                      } else {
+                                        bloc.add(StartTracking());
+                                        if (_prefsNotifier.value.voiceCoachEnabled) {
+                                          _voiceCoach.announceStart();
+                                        }
                                       }
                                     },
                                     onPause: () {
@@ -664,12 +675,15 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                         _isAudioPlaying = false;
                                       });
                                     },
-                                    onResume: () {
-                                      bloc.add(ResumeTracking());
-                                      setState(() {
-                                        _isAudioPlaying = true;
-                                      });
-                                    },
+                                     onResume: () {
+                                       bloc.add(ResumeTracking());
+                                       setState(() {
+                                         _isAudioPlaying = true;
+                                       });
+                                       if (_prefsNotifier.value.voiceCoachEnabled) {
+                                         _voiceCoach.announceResume();
+                                       }
+                                     },
                                     onStop: () => bloc.add(StopAndSaveTracking()),
                                     onSettingsTap: () => _openSettings(),
                                   ),
@@ -682,6 +696,21 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                     ),
                   ),
                 ),
+                if (_isCountingDown)
+                  Positioned.fill(
+                    child: CountdownOverlay(
+                      durationSeconds: _prefsNotifier.value.countdownDurationSeconds,
+                      onFinished: () {
+                        setState(() {
+                          _isCountingDown = false;
+                        });
+                        bloc.add(StartTracking());
+                        if (_prefsNotifier.value.voiceCoachEnabled) {
+                          _voiceCoach.announceStart();
+                        }
+                      },
+                    ),
+                  ),
               ],
             ),
           ),

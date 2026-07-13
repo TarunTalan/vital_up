@@ -58,7 +58,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isStory ? 'NARRATIVE STORY' : 'WORKOUT SOUNDTRACK',
+                  isStory ? 'NARRATIVE STORY' : 'ACTIVITY SOUNDTRACK',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w900,

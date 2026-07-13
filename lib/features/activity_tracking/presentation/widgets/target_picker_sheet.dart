@@ -117,7 +117,7 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
               ),
               const SizedBox(height: 20),
               const Text(
-                'WORKOUT TARGET',
+                'ACTIVITY TARGET',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
