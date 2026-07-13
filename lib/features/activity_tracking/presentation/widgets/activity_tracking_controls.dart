@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
+import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
 /// Row of activity type buttons (walk/run/cycle/more) shown while idle.
 class ActivitySelector extends StatelessWidget {
@@ -42,6 +43,7 @@ class ActivitySelector extends StatelessWidget {
         const SizedBox(width: 8),
         MoreActivitiesButton(
           enabled: enabled,
+          selected: selected,
           onSelected: onSelected,
         ),
       ],
@@ -86,16 +88,22 @@ class ActivityButton extends StatelessWidget {
 
 class MoreActivitiesButton extends StatelessWidget {
   final bool enabled;
+  final ActivityType selected;
   final ValueChanged<ActivityType> onSelected;
 
   const MoreActivitiesButton({
     super.key,
     required this.enabled,
+    required this.selected,
     required this.onSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isCustomSelected = selected != ActivityType.walk &&
+        selected != ActivityType.run &&
+        selected != ActivityType.cycle;
+
     return Expanded(
       child: InkWell(
         onTap: enabled
@@ -104,32 +112,67 @@ class MoreActivitiesButton extends StatelessWidget {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('More Activities'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'More Activities',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.directions_walk_rounded),
+                    leading: Icon(activityTypeIcon(ActivityType.walk)),
                     title: const Text('Walking'),
+                    trailing: selected == ActivityType.walk
+                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        : null,
                     onTap: () {
                       Navigator.of(context).pop();
                       onSelected(ActivityType.walk);
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.directions_run_rounded),
+                    leading: Icon(activityTypeIcon(ActivityType.run)),
                     title: const Text('Running'),
+                    trailing: selected == ActivityType.run
+                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        : null,
                     onTap: () {
                       Navigator.of(context).pop();
                       onSelected(ActivityType.run);
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.directions_bike_rounded),
+                    leading: Icon(activityTypeIcon(ActivityType.cycle)),
                     title: const Text('Cycling'),
+                    trailing: selected == ActivityType.cycle
+                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        : null,
                     onTap: () {
                       Navigator.of(context).pop();
                       onSelected(ActivityType.cycle);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(activityTypeIcon(ActivityType.trekking)),
+                    title: const Text('Trekking'),
+                    trailing: selected == ActivityType.trekking
+                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        : null,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(ActivityType.trekking);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(activityTypeIcon(ActivityType.climbing)),
+                    title: const Text('Climbing'),
+                    trailing: selected == ActivityType.climbing
+                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        : null,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(ActivityType.climbing);
                     },
                   ),
                 ],
@@ -143,12 +186,16 @@ class MoreActivitiesButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
-              color: const Color(0xFFE3E3E3),
-              width: 1,
+              color: isCustomSelected ? Colors.black : const Color(0xFFE3E3E3),
+              width: isCustomSelected ? 2 : 1,
             ),
           ),
-          child: const Center(
-            child: Icon(Icons.more_horiz_rounded, size: 22, color: Colors.black),
+          child: Center(
+            child: Icon(
+              isCustomSelected ? activityTypeIcon(selected) : Icons.more_horiz_rounded,
+              size: 22,
+              color: Colors.black,
+            ),
           ),
         ),
       ),

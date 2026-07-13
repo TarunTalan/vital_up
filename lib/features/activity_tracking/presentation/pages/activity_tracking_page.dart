@@ -6,15 +6,23 @@ import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
+import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_completion_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/activity_settings_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_common_widgets.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_controls.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/countdown_overlay.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music_player.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 
 const String kOfflineRegionId = 'local_workout_region_10k';
 
@@ -44,6 +52,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   bool _isUiVisible = true;
   bool _isLocked = true;
 
+  final DistanceUnitNotifier _unitNotifier = DistanceUnitNotifier();
+  final WorkoutPrefsNotifier _prefsNotifier = WorkoutPrefsNotifier();
+  final VoiceCoachService _voiceCoach = VoiceCoachService();
+  final HeartRateManager _hrManager = HeartRateManager();
+  int? _liveHeartRate;
+  StreamSubscription<int?>? _hrSubscription;
+  bool _isAudioPlaying = true;
+
   mbx.MapboxMap? _mapboxMap;
   mbx.PolylineAnnotationManager? _polylineAnnotationManager;
   mbx.CircleAnnotationManager? _circleAnnotationManager;
@@ -56,8 +72,25 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   @override
   void initState() {
     super.initState();
+    _unitNotifier.load();
+    _prefsNotifier.load();
+    _prefsNotifier.addListener(_onPrefsChanged);
+    _voiceCoach.init();
+    _hrSubscription = _hrManager.bpmStream.listen((bpm) {
+      if (mounted) setState(() => _liveHeartRate = bpm);
+    });
     _checkOfflineMap();
     _startLocationUpdates();
+  }
+
+  void _onPrefsChanged() {
+    if (mounted) {
+      final defaultType = _prefsNotifier.value.defaultActivityType;
+      final bloc = context.read<ActivityTrackingBloc>();
+      if (bloc.state is TrackingIdle) {
+        bloc.add(SelectActivityType(defaultType));
+      }
+    }
   }
 
   Future<void> _checkOfflineMap() async {
@@ -72,7 +105,13 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   @override
   void dispose() {
+    _prefsNotifier.removeListener(_onPrefsChanged);
     _positionSubscription?.cancel();
+    _hrSubscription?.cancel();
+    _hrManager.dispose();
+    _voiceCoach.dispose();
+    _unitNotifier.dispose();
+    _prefsNotifier.dispose();
     super.dispose();
   }
 
@@ -178,55 +217,16 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  void _showSettingsSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActivitySettingsPage(
+          unitNotifier: _unitNotifier,
+          prefsNotifier: _prefsNotifier,
+          hrManager: _hrManager,
+          liveHeartRate: _liveHeartRate,
+        ),
       ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'SETTINGS',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: OfflineMapIcon(
-                  isReady: _isOfflineMapReady,
-                  isDownloading: _isDownloadingMap,
-                  progress: _mapDownloadProgress,
-                  onTap: () {},
-                ),
-                title: Text(
-                  _isOfflineMapReady
-                      ? 'Offline map ready'
-                      : _isDownloadingMap
-                      ? 'Downloading offline map…'
-                      : 'Download offline map',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: _isOfflineMapReady
-                    ? null
-                    : const Text('Keep tracking your route without signal'),
-                onTap: _isOfflineMapReady || _isDownloadingMap
-                    ? null
-                    : () {
-                  Navigator.of(sheetContext).pop();
-                  _downloadOfflineMap();
-                },
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -342,6 +342,26 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             SnackBar(content: Text(state.message)),
           );
         } else if (state is TrackingInProgress) {
+          // Voice coach milestone check
+          if (_prefsNotifier.value.voiceCoachEnabled) {
+            _voiceCoach.checkMilestone(
+              distanceMeters: state.distanceMeters,
+              avgPaceSecondsPerKm: state.avgPaceSecondsPerKm,
+              unit: _unitNotifier.value,
+            );
+            // Target reached check
+            final prefs = _prefsNotifier.value;
+            if (prefs.targetType == WorkoutTargetType.distance &&
+                state.distanceMeters >= prefs.targetValue * 1000 &&
+                state.distanceMeters - (state.routePoints.length > 1 ? 0 : 0) >=
+                    prefs.targetValue * 1000) {
+              // fire once — voice coach handles dedup
+            }
+          }
+          // Voice coach background story check
+          if (_isAudioPlaying && _prefsNotifier.value.backgroundAudioTrack != 'None') {
+            _voiceCoach.checkStoryNarrative(_prefsNotifier.value.backgroundAudioTrack);
+          }
           // Set start point on first track point
           if (_startPoint == null && state.routePoints.isNotEmpty) {
             setState(() {
@@ -355,6 +375,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingPaused) {
+          if (_prefsNotifier.value.voiceCoachEnabled) _voiceCoach.announcePause();
           // Stay unlocked or locked as per user preference
           _updateRoute(state.routePoints);
           if (state.routePoints.isNotEmpty) {
@@ -394,22 +415,55 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         double distanceMeters = 0.0;
         int calories = 0;
         int avgPace = 0;
+        int steps = 0;
+        double currentSpeed = 0.0;
+        double elevationGain = 0.0;
 
         if (state is TrackingInProgress) {
           elapsed = state.elapsed;
           distanceMeters = state.distanceMeters;
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
+          steps = state.steps;
+          if (state.routePoints.isNotEmpty) {
+            currentSpeed = state.routePoints.last.speed;
+            double cumulativeElevation = 0.0;
+            for (int i = 1; i < state.routePoints.length; i++) {
+              final diff = state.routePoints[i].altitude - state.routePoints[i - 1].altitude;
+              if (diff > 0) cumulativeElevation += diff;
+            }
+            elevationGain = cumulativeElevation;
+          }
         } else if (state is TrackingPaused) {
           elapsed = state.elapsed;
           distanceMeters = state.distanceMeters;
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
+          steps = state.steps;
+          if (state.routePoints.isNotEmpty) {
+            currentSpeed = 0.0;
+            double cumulativeElevation = 0.0;
+            for (int i = 1; i < state.routePoints.length; i++) {
+              final diff = state.routePoints[i].altitude - state.routePoints[i - 1].altitude;
+              if (diff > 0) cumulativeElevation += diff;
+            }
+            elevationGain = cumulativeElevation;
+          }
         } else if (state is TrackingCompleted) {
           elapsed = Duration(seconds: state.session.totalDurationSeconds);
           distanceMeters = state.session.totalDistanceMeters;
           calories = state.session.calories;
           avgPace = state.session.avgPaceSecondsPerKm;
+          steps = state.session.steps;
+          if (state.session.points.isNotEmpty) {
+            currentSpeed = 0.0;
+            double cumulativeElevation = 0.0;
+            for (int i = 1; i < state.session.points.length; i++) {
+              final diff = state.session.points[i].altitude - state.session.points[i - 1].altitude;
+              if (diff > 0) cumulativeElevation += diff;
+            }
+            elevationGain = cumulativeElevation;
+          }
         }
 
         return PopScope(
@@ -456,6 +510,22 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                     ),
                   ),
 
+                // History Button (only in Idle) — top-right
+                if (state is TrackingIdle)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: RoundIconButton(
+                          icon: Icons.history_rounded,
+                          onPressed: () => context.pushNamed('activity-history'),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // Top Stats Overlay
                 Positioned(
                   top: 0,
@@ -467,11 +537,26 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                       padding: EdgeInsets.only(
                         top: state is TrackingIdle ? 56 : 12,
                       ),
-                      child: TopStats(
-                        elapsed: elapsed,
-                        distanceMeters: distanceMeters,
-                        calories: calories,
-                        avgPace: avgPace,
+                      child: ValueListenableBuilder<DistanceUnit>(
+                        valueListenable: _unitNotifier,
+                        builder: (_, unit, __) {
+                          return ValueListenableBuilder<WorkoutPrefs>(
+                            valueListenable: _prefsNotifier,
+                            builder: (_, prefs, __) => TopStats(
+                              elapsed: elapsed,
+                              distanceMeters: distanceMeters,
+                              calories: calories,
+                              avgPace: avgPace,
+                              distanceUnit: unit,
+                              heartRateBpm: _liveHeartRate,
+                              workoutPrefs: prefs,
+                              steps: steps,
+                              currentSpeed: currentSpeed,
+                              elevationGain: elevationGain,
+                              activityTypeName: state.activityType.label,
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -519,6 +604,31 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  if (state is TrackingInProgress || state is TrackingPaused)
+                                    ValueListenableBuilder<WorkoutPrefs>(
+                                      valueListenable: _prefsNotifier,
+                                      builder: (_, prefs, __) {
+                                        return WorkoutMusicPlayer(
+                                          trackName: prefs.backgroundAudioTrack,
+                                          isPlaying: _isAudioPlaying,
+                                          onPlayPause: () {
+                                            setState(() {
+                                              _isAudioPlaying = !_isAudioPlaying;
+                                            });
+                                          },
+                                          onNext: () {
+                                            final nextTrack = switch (prefs.backgroundAudioTrack) {
+                                              'Story: Rise & Grind' => 'Story: The Ascent',
+                                              'Story: The Ascent' => 'Music: Synthwave Cardio Energy',
+                                              'Music: Synthwave Cardio Energy' => 'Music: Lo-Fi Jogging Beats',
+                                              _ => 'Story: Rise & Grind',
+                                            };
+                                            _prefsNotifier.setBackgroundAudioTrack(nextTrack);
+                                            _voiceCoach.resetStory();
+                                          },
+                                        );
+                                      },
+                                    ),
                                   if (state is TrackingIdle) ...[
                                     ActivitySelector(
                                       selected: state.activityType,
@@ -535,11 +645,33 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                         _isLocked = locked;
                                       });
                                     },
-                                    onStart: () => bloc.add(StartTracking()),
-                                    onPause: () => bloc.add(PauseTracking()),
-                                    onResume: () => bloc.add(ResumeTracking()),
+                                    onStart: () async {
+                                      _voiceCoach.resetStory();
+                                      setState(() {
+                                        _isAudioPlaying = true;
+                                      });
+                                      if (_prefsNotifier.value.countdownEnabled) {
+                                        await CountdownOverlay.show(context);
+                                      }
+                                      bloc.add(StartTracking());
+                                      if (_prefsNotifier.value.voiceCoachEnabled) {
+                                        _voiceCoach.announceStart();
+                                      }
+                                    },
+                                    onPause: () {
+                                      bloc.add(PauseTracking());
+                                      setState(() {
+                                        _isAudioPlaying = false;
+                                      });
+                                    },
+                                    onResume: () {
+                                      bloc.add(ResumeTracking());
+                                      setState(() {
+                                        _isAudioPlaying = true;
+                                      });
+                                    },
                                     onStop: () => bloc.add(StopAndSaveTracking()),
-                                    onSettingsTap: () => _showSettingsSheet(),
+                                    onSettingsTap: () => _openSettings(),
                                   ),
                                 ],
                               ),
