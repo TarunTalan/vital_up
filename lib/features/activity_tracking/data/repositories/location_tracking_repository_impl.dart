@@ -79,7 +79,7 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
         .map((point) {
           // For run/cycle we trust the Doppler speed from the GPS chip and
           // do NOT smear the position — high-speed EMA causes significant lag.
-          if (activityType != ActivityType.walk) {
+          if (!activityType.isSlowMovement) {
             lastSmoothed = point;
             return point;
           }
@@ -133,10 +133,10 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
           }
 
           // Minimum movement gate per activity type:
-          // Walk: ignore if < 0.8 m and standing still
+          // Walk/Trek/Climb: ignore if < 0.8 m and standing still
           // Run/Cycle: ignore if < 0.5 m (GPS noise floor)
-          final minDist = activityType == ActivityType.walk ? 0.8 : 0.5;
-          final minSpeed = activityType == ActivityType.walk ? 0.3 : 0.1;
+          final minDist = activityType.isSlowMovement ? 0.8 : 0.5;
+          final minSpeed = activityType.isSlowMovement ? 0.3 : 0.1;
           if (distance3d < minDist && point.speed < minSpeed) {
             return false;
           }

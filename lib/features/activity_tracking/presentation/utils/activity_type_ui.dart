@@ -8,5 +8,7 @@ IconData activityTypeIcon(ActivityType type) {
     ActivityType.walk => Icons.directions_walk_rounded,
     ActivityType.run => Icons.directions_run_rounded,
     ActivityType.cycle => Icons.directions_bike_rounded,
+    ActivityType.trekking => Icons.hiking_rounded,
+    ActivityType.climbing => Icons.terrain_rounded,
   };
 }
