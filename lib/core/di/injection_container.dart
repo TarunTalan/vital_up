@@ -19,6 +19,12 @@ import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
 import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
+import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_datasource.dart';
+import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
+import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_repository.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/generate_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/get_cached_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -87,4 +93,23 @@ Future<void> initDependencies() async {
     () => OnboardingRepositoryImpl(remoteDataSource: sl<OnboardingRemoteDataSource>()),
   );
   sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
+
+  // 9. Diet Plan
+  sl.registerLazySingleton<DietPlanRemoteDataSource>(
+    () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
+  );
+  sl.registerLazySingleton<DietPlanRepository>(
+    () => DietPlanRepositoryImpl(
+      remoteDataSource: sl<DietPlanRemoteDataSource>(),
+      isarService: sl<IsarService>(),
+    ),
+  );
+  sl.registerLazySingleton(() => GenerateMealPlan(sl<DietPlanRepository>()));
+  sl.registerLazySingleton(() => GetCachedMealPlan(sl<DietPlanRepository>()));
+  sl.registerFactory(
+    () => DietPlanCubit(
+      generateMealPlan: sl<GenerateMealPlan>(),
+      getCachedMealPlan: sl<GetCachedMealPlan>(),
+    ),
+  );
 }

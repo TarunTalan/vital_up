@@ -21,6 +21,11 @@ import 'package:vital_up/features/onboarding/presentation/pages/ox_level_page.da
 import 'package:vital_up/features/onboarding/presentation/pages/personal_details_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/sleep_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_mode_select_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_preferences_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
 
 class AppRouter {
   AppRouter._();
@@ -240,6 +245,58 @@ class AppRouter {
             onSkip: () => context.goNamed('dashboard'),
           ),
         ),
+      ),
+      GoRoute(
+        path: '/diet-plan-prefs',
+        name: 'diet-plan-prefs',
+        pageBuilder: (context, state) => FadeSlidePageRoute(
+          key: state.pageKey,
+          child: const DietPlanPreferencesPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/diet-plan-mode',
+        name: 'diet-plan-mode',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FadeSlidePageRoute(
+            key: state.pageKey,
+            child: DietPlanModeSelectPage(preferences: extra),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/diet-plan-goal',
+        name: 'diet-plan-goal',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FadeSlidePageRoute(
+            key: state.pageKey,
+            child: GoalSetupPage(preferences: extra),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/diet-plan-manual',
+        name: 'diet-plan-manual',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FadeSlidePageRoute(
+            key: state.pageKey,
+            child: ManualTargetPage(preferences: extra),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/diet-plan-result',
+        name: 'diet-plan-result',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return FadeSlidePageRoute(
+            key: state.pageKey,
+            child: DietPlanResultPage(params: extra),
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
