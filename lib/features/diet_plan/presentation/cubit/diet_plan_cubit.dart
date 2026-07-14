@@ -3,24 +3,27 @@ import 'package:vital_up/core/network/api_result.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/generate_meal_plan.dart';
-import 'package:vital_up/features/diet_plan/domain/usecases/get_cached_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
 import 'diet_plan_state.dart';
 
 class DietPlanCubit extends Cubit<DietPlanState> {
   final GenerateMealPlan _generateMealPlan;
-  final GetCachedMealPlan _getCachedMealPlan;
+  final GetActiveMealPlan _getActiveMealPlan;
+  final SetActiveMealPlan _setActiveMealPlan;
 
   DietPlanCubit({
     required GenerateMealPlan generateMealPlan,
-    required GetCachedMealPlan getCachedMealPlan,
+    required GetActiveMealPlan getActiveMealPlan,
+    required SetActiveMealPlan setActiveMealPlan,
   })  : _generateMealPlan = generateMealPlan,
-        _getCachedMealPlan = getCachedMealPlan,
+        _getActiveMealPlan = getActiveMealPlan,
+        _setActiveMealPlan = setActiveMealPlan,
         super(DietPlanInitial());
 
-  Future<void> loadTodayMealPlan() async {
+  Future<void> loadActiveMealPlan() async {
     emit(DietPlanLoading());
-    final dateKey = DateTime.now().toIso8601String().split('T')[0];
-    final cached = await _getCachedMealPlan(dateKey);
+    final cached = await _getActiveMealPlan();
     if (cached != null) {
       emit(DietPlanLoaded(cached));
     } else {
@@ -43,5 +46,9 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     } else if (result is ApiError<MealPlan>) {
       emit(DietPlanError(result.message));
     }
+  }
+
+  Future<void> saveActivePlan(MealPlan plan) async {
+    await _setActiveMealPlan(plan);
   }
 }

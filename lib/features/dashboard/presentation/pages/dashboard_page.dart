@@ -7,6 +7,9 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -16,7 +19,20 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  late final DietPlanCubit _dietPlanCubit;
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _dietPlanCubit = sl<DietPlanCubit>()..loadActiveMealPlan();
+  }
+
+  @override
+  void dispose() {
+    _dietPlanCubit.close();
+    super.dispose();
+  }
 
   static const _items = [
     _BottomNavItem('Home', 'assets/icons/home.svg'),
@@ -57,7 +73,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
-      0 => const _HomeTab(),
+      0 => BlocProvider.value(
+          value: _dietPlanCubit,
+          child: const _HomeTab(),
+        ),
       1 => FoodScannerPage(
           onBack: () => setState(() => _selectedIndex = 0),
           onNavigateToDetail: (imagePath) => context.pushNamed(
@@ -209,7 +228,29 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 24),
               const _DashboardSegmentedTabs(),
               const SizedBox(height: 25),
-              const _DietPlanCard(),
+              BlocBuilder<DietPlanCubit, DietPlanState>(
+                builder: (context, state) {
+                  if (state is DietPlanLoaded) {
+                    return _ActiveDietPlanCard(
+                      plan: state.mealPlan,
+                      onTap: () async {
+                        await context.pushNamed('diet-plan-result', extra: {'mode': 'cached'});
+                        if (context.mounted) {
+                          context.read<DietPlanCubit>().loadActiveMealPlan();
+                        }
+                      },
+                    );
+                  }
+                  return _DietPlanCard(
+                    onTap: () async {
+                      await context.pushNamed('diet-plan-prefs');
+                      if (context.mounted) {
+                        context.read<DietPlanCubit>().loadActiveMealPlan();
+                      }
+                    },
+                  );
+                },
+              ),
               const SizedBox(height: 25),
               const _RestMetricCard(
                 title: 'Sleep',
@@ -720,7 +761,8 @@ class _BottomNavItem {
 }
 
 class _DietPlanCard extends StatelessWidget {
-  const _DietPlanCard();
+  final VoidCallback onTap;
+  const _DietPlanCard({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -728,7 +770,7 @@ class _DietPlanCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return InkWell(
-      onTap: () => context.pushNamed('diet-plan-prefs'),
+      onTap: onTap,
       borderRadius: BorderRadius.circular(13),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -759,6 +801,55 @@ class _DietPlanCard extends StatelessWidget {
               ),
             ),
             Icon(Icons.arrow_forward_ios, color: colors.primary, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveDietPlanCard extends StatelessWidget {
+  final dynamic plan; 
+  final VoidCallback onTap;
+
+  const _ActiveDietPlanCard({required this.plan, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD8F2DC),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0xFF47B85A).withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF47B85A).withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.restaurant, color: Color(0xFF111111)),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Active Diet Plan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF111111))),
+                  const SizedBox(height: 4),
+                  Text('${plan.totalCalories} kcal • ${plan.meals.length} meals', style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF4E4E4E))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: Color(0xFF111111), size: 16),
           ],
         ),
       ),

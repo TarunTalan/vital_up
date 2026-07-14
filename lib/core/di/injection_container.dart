@@ -23,7 +23,8 @@ import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_da
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_repository.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/generate_meal_plan.dart';
-import 'package:vital_up/features/diet_plan/domain/usecases/get_cached_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -105,11 +106,13 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerLazySingleton(() => GenerateMealPlan(sl<DietPlanRepository>()));
-  sl.registerLazySingleton(() => GetCachedMealPlan(sl<DietPlanRepository>()));
+  sl.registerLazySingleton(() => GetActiveMealPlan(sl<DietPlanRepository>()));
+  sl.registerLazySingleton(() => SetActiveMealPlan(sl<DietPlanRepository>()));
   sl.registerFactory(
     () => DietPlanCubit(
       generateMealPlan: sl<GenerateMealPlan>(),
-      getCachedMealPlan: sl<GetCachedMealPlan>(),
+      getActiveMealPlan: sl<GetActiveMealPlan>(),
+      setActiveMealPlan: sl<SetActiveMealPlan>(),
     ),
   );
 }
