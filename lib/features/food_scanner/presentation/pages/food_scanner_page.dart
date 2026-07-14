@@ -214,10 +214,20 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
-      listenWhen: (previous, current) =>
-          current is RecognitionSucceeded ||
-          current is RecognitionLowConfidence ||
-          current is RecognitionFailed,
+      listenWhen: (previous, current) {
+        // Prevent duplicate navigation / page pushes:
+        // If the previous state was already a detail-view state, we are already
+        // showing the detail page. In that case, do not push another screen.
+        final wasInDetail = previous is RecognitionSucceeded ||
+            previous is RecognitionLowConfidence ||
+            previous is NutritionLoaded ||
+            previous is LoadingNutrition;
+
+        return !wasInDetail &&
+            (current is RecognitionSucceeded ||
+             current is RecognitionLowConfidence ||
+             current is RecognitionFailed);
+      },
       listener: (context, state) {
         if (state is RecognitionSucceeded ||
             state is RecognitionLowConfidence) {

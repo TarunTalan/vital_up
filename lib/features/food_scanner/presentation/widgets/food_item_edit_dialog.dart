@@ -191,7 +191,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<String>(
-                                initialValue: _selectedUnit,
+                                value: _selectedUnit,
                                 isExpanded: true,
                                 style: theme.textTheme.bodyLarge,
                                 dropdownColor: dialogBgColor,
