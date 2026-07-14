@@ -94,12 +94,12 @@ class RecognitionFailed extends FoodScanState {
 }
 
 class NutritionLoaded extends FoodScanState {
-  final File image;
+  final File? image;
   final List<FoodItem> items;
   final List<NutritionInfo> nutrition;
 
   const NutritionLoaded({
-    required this.image,
+    this.image,
     required this.items,
     required this.nutrition,
   });
