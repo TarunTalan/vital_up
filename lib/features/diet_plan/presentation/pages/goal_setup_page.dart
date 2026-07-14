@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class GoalSetupPage extends StatefulWidget {
   final Map<String, dynamic> preferences;
@@ -49,10 +50,12 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final customColors = theme.extension<VitalUpColors>();
+    final cardColor = theme.cardTheme.color ?? Colors.white;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+    return AuthBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
         title: const Text('Goal Setup'),
         backgroundColor: Colors.transparent,
       ),
@@ -72,10 +75,18 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
                   hintText: 'e.g. 65',
                   suffixText: 'kg',
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.72),
+                  fillColor: cardColor.withValues(alpha: 0.72),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.primary, width: 2),
                   ),
                 ),
               ),
@@ -89,10 +100,18 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
                   hintText: 'e.g. 4',
                   suffixText: 'weeks',
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.72),
+                  fillColor: cardColor.withValues(alpha: 0.72),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.primary, width: 2),
                   ),
                 ),
               ),
@@ -112,6 +131,7 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

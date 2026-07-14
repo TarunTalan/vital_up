@@ -11,6 +11,8 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.d
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class DietPlanResultPage extends StatefulWidget {
   final Map<String, dynamic> params;
@@ -124,57 +126,59 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _cubit,
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text('Your Diet Plan'),
+      child: AuthBackground(
+        child: Scaffold(
           backgroundColor: Colors.transparent,
-          actions: [
-            if (_target != null)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _regenerate,
-              ),
-          ],
-        ),
-        body: BlocBuilder<DietPlanCubit, DietPlanState>(
-          builder: (context, state) {
-            if (state is DietPlanLoading) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Generating your personalized plan...'),
-                  ],
+          appBar: AppBar(
+            title: const Text('Your Diet Plan'),
+            backgroundColor: Colors.transparent,
+            actions: [
+              if (_target != null)
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _regenerate,
                 ),
-              );
-            } else if (state is DietPlanLoaded) {
-              return _buildPlanContent(context, state.mealPlan);
-            } else if (state is DietPlanError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+            ],
+          ),
+          body: BlocBuilder<DietPlanCubit, DietPlanState>(
+            builder: (context, state) {
+              if (state is DietPlanLoading) {
+                return const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      const SizedBox(height: 16),
-                      Text(state.message, textAlign: TextAlign.center),
-                      const SizedBox(height: 24),
-                      if (_target != null)
-                        FilledButton(
-                          onPressed: _regenerate,
-                          child: const Text('Try Again'),
-                        ),
+                      VitalUpLoader(),
+                      SizedBox(height: 16),
+                      Text('Generating your personalized plan...'),
                     ],
                   ),
-                ),
-              );
-            }
-            return const Center(child: Text('No plan found for today.'));
-          },
+                );
+              } else if (state is DietPlanLoaded) {
+                return _buildPlanContent(context, state.mealPlan);
+              } else if (state is DietPlanError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                        const SizedBox(height: 16),
+                        Text(state.message, textAlign: TextAlign.center),
+                        const SizedBox(height: 24),
+                        if (_target != null)
+                          FilledButton(
+                            onPressed: _regenerate,
+                            child: const Text('Try Again'),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return const Center(child: Text('No plan found for today.'));
+            },
+          ),
         ),
       ),
     );
@@ -183,26 +187,35 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   Widget _buildPlanContent(BuildContext context, MealPlan plan) {
     final theme = Theme.of(context);
     
-    return ListView(
+    return Padding(
       padding: const EdgeInsets.all(AppTheme.hPadding),
-      children: [
-        _buildMacroRing(context, plan),
-        const SizedBox(height: 32),
-        Text('Meals', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 16),
-        ...plan.meals.map((m) => _MealCard(meal: m)),
-      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildMacroRing(context, plan),
+          const SizedBox(height: 32),
+          Text('Meals', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              children: plan.meals.map((m) => _MealCard(meal: m)).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildMacroRing(BuildContext context, MealPlan plan) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final cardColor = theme.cardTheme.color ?? Colors.white;
     
     return Container(
       height: 220,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
+        color: cardColor.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
       ),
@@ -266,12 +279,13 @@ class _MealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final cardColor = theme.cardTheme.color ?? Colors.white;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
+        color: cardColor.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class DietPlanModeSelectPage extends StatelessWidget {
   final Map<String, dynamic> preferences;
@@ -11,9 +12,10 @@ class DietPlanModeSelectPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+    return AuthBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
         title: const Text('Choose Mode'),
         backgroundColor: Colors.transparent,
       ),
@@ -68,6 +70,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -89,6 +92,7 @@ class _ModeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final cardColor = theme.cardTheme.color ?? Colors.white;
 
     return InkWell(
       onTap: onTap,
@@ -96,7 +100,7 @@ class _ModeCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.72),
+          color: cardColor.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: colors.outline.withValues(alpha: 0.3),

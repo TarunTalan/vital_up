@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class ManualTargetPage extends StatefulWidget {
   final Map<String, dynamic> preferences;
@@ -53,10 +54,13 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
   }
 
   Widget _buildField(String label, String suffix, TextEditingController controller) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final cardColor = theme.cardTheme.color ?? Colors.white;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall),
+        Text(label, style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -64,10 +68,18 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
           decoration: InputDecoration(
             suffixText: suffix,
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.72),
+            fillColor: cardColor.withValues(alpha: 0.72),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colors.primary, width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -83,9 +95,10 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
     final colors = theme.colorScheme;
     final customColors = theme.extension<VitalUpColors>();
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+    return AuthBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
         title: const Text('Manual Target'),
         backgroundColor: Colors.transparent,
       ),
@@ -124,6 +137,7 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
