@@ -281,24 +281,18 @@ class _FoodDetailData {
     final totalCalcium = nutrition.fold<double>(0, (sum, nut) => sum + nut.calciumMg);
     final totalIron = nutrition.fold<double>(0, (sum, nut) => sum + nut.ironMg);
     final totalVitaminC = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminCMg);
+    final totalVitaminD = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminDIu);
+    final totalVitaminB12 = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminB12Mcg);
+    final totalMagnesium = nutrition.fold<double>(0, (sum, nut) => sum + nut.magnesiumMg);
+    final totalZinc = nutrition.fold<double>(0, (sum, nut) => sum + nut.zincMg);
 
     final candidates = [
       _NutrientCandidate(name: 'Carbs', value: totalCarbs, unit: 'g', color: const Color(0xFFFFB300)),
       _NutrientCandidate(name: 'Protein', value: totalProtein, unit: 'g', color: const Color(0xFF00B3A4)),
       _NutrientCandidate(name: 'Fat', value: totalFat, unit: 'g', color: const Color(0xFF9C7CFF)),
-      if (totalFiber > 0)
-        _NutrientCandidate(name: 'Dietary Fiber', value: totalFiber, unit: 'g', color: const Color(0xFF4CAF50)),
-      if (totalSugar > 0)
-        _NutrientCandidate(name: 'Total Sugars', value: totalSugar, unit: 'g', color: const Color(0xFFE91E63)),
-      if (totalSaturatedFat > 0)
-        _NutrientCandidate(name: 'Saturated Fat', value: totalSaturatedFat, unit: 'g', color: const Color(0xFFFF5722)),
-      if (totalTransFat > 0)
-        _NutrientCandidate(name: 'Trans Fat', value: totalTransFat, unit: 'g', color: const Color(0xFF9E9E9E)),
     ];
 
-    candidates.sort((a, b) => b.value.compareTo(a.value));
-
-    final top3 = candidates.take(3).toList();
+    final top3 = candidates;
     final totalTop3Weight = top3.fold<double>(0, (sum, item) => sum + item.value);
 
     final macros = top3.map((item) {
@@ -313,34 +307,70 @@ class _FoodDetailData {
 
     final macroDetails = <MacroDetail>[];
     
-    // Add remaining candidates to the details list
-    final remainingCandidates = candidates.skip(3);
-    for (final item in remainingCandidates) {
-      macroDetails.add(MacroDetail(
-        name: item.name,
-        grams: item.value.round(),
-        unit: 'g',
-      ));
-    }
-
-    if (totalCholesterol > 0) {
-      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol.round(), unit: 'mg'));
-    }
-    if (totalSodium > 0) {
-      macroDetails.add(MacroDetail(name: 'Sodium', grams: totalSodium.round(), unit: 'mg'));
+    // --- 1. Common Healthy Macros/Nutrients ---
+    if (totalFiber > 0) {
+      macroDetails.add(MacroDetail(name: 'Dietary Fiber', grams: totalFiber, unit: 'g'));
     }
     if (totalPotassium > 0) {
-      macroDetails.add(MacroDetail(name: 'Potassium', grams: totalPotassium.round(), unit: 'mg'));
+      macroDetails.add(MacroDetail(name: 'Potassium', grams: totalPotassium, unit: 'mg'));
     }
     if (totalCalcium > 0) {
-      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium.round(), unit: 'mg'));
+      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium, unit: 'mg'));
     }
     if (totalIron > 0) {
-      macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron.round(), unit: 'mg'));
+      macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron, unit: 'mg'));
     }
     if (totalVitaminC > 0) {
-      macroDetails.add(MacroDetail(name: 'Vitamin C', grams: totalVitaminC.round(), unit: 'mg'));
+      macroDetails.add(MacroDetail(name: 'Vitamin C', grams: totalVitaminC, unit: 'mg'));
     }
+
+    // --- 2. Rare but Important Healthy Nutrients ---
+    if (totalVitaminD > 0) {
+      macroDetails.add(MacroDetail(name: 'Vitamin D', grams: totalVitaminD, unit: 'IU'));
+    }
+    if (totalVitaminB12 > 0) {
+      macroDetails.add(MacroDetail(name: 'Vitamin B12', grams: totalVitaminB12, unit: 'mcg'));
+    }
+    if (totalMagnesium > 0) {
+      macroDetails.add(MacroDetail(name: 'Magnesium', grams: totalMagnesium, unit: 'mg'));
+    }
+    if (totalZinc > 0) {
+      macroDetails.add(MacroDetail(name: 'Zinc', grams: totalZinc, unit: 'mg'));
+    }
+
+    // --- 3. Unhealthy/Harmful Macros/Nutrients ---
+    if (totalSugar > 0) {
+      macroDetails.add(MacroDetail(name: 'Total Sugars', grams: totalSugar, unit: 'g'));
+    }
+    if (totalSaturatedFat > 0) {
+      macroDetails.add(MacroDetail(name: 'Saturated Fat', grams: totalSaturatedFat, unit: 'g'));
+    }
+    if (totalTransFat > 0) {
+      macroDetails.add(MacroDetail(name: 'Trans Fat', grams: totalTransFat, unit: 'g'));
+    }
+    if (totalCholesterol > 0) {
+      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol, unit: 'mg'));
+    }
+    if (totalSodium > 0) {
+      macroDetails.add(MacroDetail(name: 'Sodium', grams: totalSodium, unit: 'mg'));
+    }
+
+    // Sort all details in descending order of their weight contribution (converting all to grams)
+    double getWeightInGrams(MacroDetail detail) {
+      switch (detail.unit.toLowerCase()) {
+        case 'g':
+          return detail.grams;
+        case 'mg':
+          return detail.grams / 1000.0;
+        case 'mcg':
+          return detail.grams / 1000000.0;
+        case 'iu':
+          return detail.grams * 0.000000025; // 1 IU Vitamin D = 0.025 mcg = 0.000000025 g
+        default:
+          return detail.grams;
+      }
+    }
+    macroDetails.sort((a, b) => getWeightInGrams(b).compareTo(getWeightInGrams(a)));
 
     String capitalize(String s) {
       if (s.isEmpty) return s;
@@ -380,12 +410,17 @@ class _FoodDetailData {
       dishName: dishName,
       totalCalories: totalCalories.round(),
       healthScore: _computeHealthScore(
+        totalCalories: totalCalories,
         proteinRatio: totalProtein / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
         carbRatio: totalCarbs / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
         fatRatio: totalFat / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
         fiberG: totalFiber,
         sugarG: totalSugar,
         sodiumMg: totalSodium,
+        saturatedFatG: totalSaturatedFat,
+        transFatG: totalTransFat,
+        cholesterolMg: totalCholesterol,
+        foodNames: items.map((item) => item.name).toList(),
       ),
       dishes: dishes,
       foodItems: items,
@@ -472,12 +507,17 @@ String _formatTime(DateTime time) {
 }
 
 int _computeHealthScore({
+  required double totalCalories,
   required double proteinRatio,
   required double carbRatio,
   required double fatRatio,
   required double fiberG,
   required double sugarG,
   required double sodiumMg,
+  required double saturatedFatG,
+  required double transFatG,
+  required double cholesterolMg,
+  required List<String> foodNames,
 }) {
   // Start with a base score based on macro split deviation (max deviation is 1.2)
   final deviation =
@@ -485,17 +525,78 @@ int _computeHealthScore({
       (carbRatio - 0.4).abs() +
       (fatRatio - 0.3).abs();
   
-  // Base score ranges from 52 to 100
-  double score = 100 - (deviation * 40);
+  // For low-calorie meals (like snacks or single whole fruits), we scale down the deviation penalty
+  // because snacks/fruits are naturally unbalanced (e.g. an apple is 100% carbs, almonds are 100% fat).
+  // If calories < 300, we scale the deviation penalty down linearly.
+  double deviationWeight = 40.0;
+  if (totalCalories < 300) {
+    deviationWeight = 10.0 + ((totalCalories - 100).clamp(0.0, 200.0) / 200.0) * 30.0;
+  }
   
-  // Bonus for fiber (+4 points per gram, max +15)
+  // Base score ranges from 52 to 100 (when deviationWeight is 40)
+  double score = 100 - (deviation * deviationWeight);
+  
+  // Bonus for fiber (+4.0 points per gram, max +15)
   score += (fiberG * 4.0).clamp(0.0, 15.0);
   
-  // Penalty for sugar (-1.0 points per gram, max -15)
-  score -= (sugarG * 1.0).clamp(0.0, 15.0);
+  // Penalty for sugar (-1.0 points per gram, max -45)
+  // Scientific adjustment: if fiber is present, it slows down sugar absorption (lowering glycemic impact).
+  // We discount the sugar penalty based on the fiber-to-sugar ratio.
+  double sugarPenalty = sugarG * 1.0;
+  if (fiberG > 0 && sugarG > 0) {
+    final fiberToSugarRatio = fiberG / (sugarG * 0.2); // healthy target is 1:5 fiber-to-sugar
+    final sugarDiscount = fiberToSugarRatio.clamp(0.0, 1.0);
+    sugarPenalty = sugarPenalty * (1.0 - sugarDiscount);
+  }
+  score -= sugarPenalty.clamp(0.0, 45.0);
   
-  // Penalty for sodium (-1 point per 50mg, max -15)
-  score -= (sodiumMg / 50.0).clamp(0.0, 15.0);
+  // Penalty for sodium (-1 point per 50mg, max -30)
+  score -= (sodiumMg / 50.0).clamp(0.0, 30.0);
+
+  // Penalty for saturated fat (high saturated fat is unhealthy).
+  // If more than 10% of total calories come from saturated fat, apply penalty (max -30).
+  double satFatRatio = (saturatedFatG * 9) / (totalCalories > 0 ? totalCalories : 1);
+  if (satFatRatio > 0.10) {
+    score -= ((satFatRatio - 0.10) * 100.0).clamp(0.0, 30.0);
+  }
+
+  // Penalty for trans fat (extremely harmful, 0g is the only healthy amount, max -40).
+  if (transFatG > 0) {
+    score -= (transFatG * 5.0).clamp(0.0, 40.0);
+  }
+
+  // Penalty for cholesterol (excessive cholesterol is harmful, max -20).
+  if (cholesterolMg > 100.0) {
+    score -= ((cholesterolMg - 100.0) / 20.0).clamp(0.0, 20.0);
+  }
+
+  // Extra penalty for excessive fat ratio (> 35% of total macronutrient weight, max -25)
+  if (fatRatio > 0.35) {
+    score -= ((fatRatio - 0.35) * 50.0).clamp(0.0, 25.0);
+  }
+
+  // Keyword-based Junk Food Penalty
+  bool isJunkFood(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('sweet potato') ||
+        lower.contains('stir fried') ||
+        lower.contains('stir-fried') ||
+        lower.contains('pan fried') ||
+        lower.contains('pan-fried')) {
+      return false;
+    }
+    final keywords = [
+      'fried', 'samosa', 'fries', 'gulab jamun', 'ice cream', 
+      'burger', 'pizza', 'donut', 'crisps', 'chips', 'soda', 'coke', 
+      'candy', 'sweet', 'cake', 'waffle', 'chocolate', 'nugget', 
+      'hot dog', 'hotdog', 'milkshake', 'cookie', 'brownie', 'pastry',
+      'syrup'
+    ];
+    return keywords.any((k) => lower.contains(k));
+  }
+
+  final junkCount = foodNames.where(isJunkFood).length;
+  score -= (junkCount * 18.0).clamp(0.0, 45.0);
   
   return score.clamp(1.0, 100.0).round();
 }
@@ -752,6 +853,8 @@ class _DishInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.white70 : const Color(0xFF1C1C1C);
 
     return _GlassCard(
       child: Column(
@@ -773,47 +876,110 @@ class _DishInfoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _FoodScannerStyle.paddingSmall),
-          for (final dish in dishes)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      dish.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: _FoodScannerStyle.textMedium,
+          for (final dish in dishes) ...[
+            (() {
+              // Find the corresponding FoodItem to get portion details
+              final foodItem = foodItems.firstWhere(
+                (item) => item.id == dish.id,
+                orElse: () => FoodItem(
+                  id: dish.id,
+                  name: dish.name,
+                  confidenceScore: 1.0,
+                  servingDescription: '1 serving',
+                  quantity: 1.0,
+                  unit: 'serving',
+                ),
+              );
+
+              // Helper to compute weight in grams
+              double getWeightInGrams(double qty, String unit) {
+                switch (unit.toLowerCase()) {
+                  case 'g':
+                    return qty;
+                  case 'oz':
+                    return qty * 28.35;
+                  case 'cup':
+                    return qty * 240;
+                  case 'piece':
+                  case 'slice':
+                    return qty * 50;
+                  case 'tbsp':
+                    return qty * 15;
+                  case 'tsp':
+                    return qty * 5;
+                  default:
+                    return qty * 100;
+                }
+              }
+
+              final totalWeight = getWeightInGrams(foodItem.quantity, foodItem.unit);
+              final qtyStr = foodItem.quantity == foodItem.quantity.roundToDouble()
+                  ? foodItem.quantity.round().toString()
+                  : foodItem.quantity.toStringAsFixed(1);
+              final weightStr = totalWeight == totalWeight.roundToDouble()
+                  ? totalWeight.round().toString()
+                  : totalWeight.toStringAsFixed(1);
+
+              final subtitleText = foodItem.unit.toLowerCase() == 'g'
+                  ? '${qtyStr} g'
+                  : '${qtyStr} ${foodItem.unit} (~${weightStr}g)';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dish.name,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: _FoodScannerStyle.textMedium,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitleText,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey,
+                              fontSize: _FoodScannerStyle.textSmall,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  Text(
-                    '${dish.calories} kcal',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.grey,
-                      fontSize: _FoodScannerStyle.textSmall,
+                    Text(
+                      '${dish.calories} kcal',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                        fontSize: _FoodScannerStyle.textSmall,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  InkWell(
-                    onTap: () => _showEditDialog(context, dish),
-                    child: const Icon(
-                      Icons.edit_outlined,
-                      size: 18,
-                      color: Color(0xFF1C1C1C),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: () => _showEditDialog(context, dish),
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: iconColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  InkWell(
-                    onTap: () => onRemove(dish.id),
-                    child: const Icon(
-                      Icons.delete_outline_rounded,
-                      size: 18,
-                      color: Color(0xFF1C1C1C),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: () => onRemove(dish.id),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: iconColor,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            })(),
+          ],
         ],
       ),
     );
@@ -1007,6 +1173,10 @@ class _MacroDetailRow extends StatelessWidget {
       context,
     ).colorScheme.onSurface.withValues(alpha: 0.85);
 
+    final gramsStr = detail.grams == detail.grams.roundToDouble()
+        ? detail.grams.round().toString()
+        : detail.grams.toStringAsFixed(1);
+
     return Row(
       children: [
         Expanded(
@@ -1019,10 +1189,11 @@ class _MacroDetailRow extends StatelessWidget {
           ),
         ),
         Text(
-          '${detail.grams} ${detail.unit}',
+          '$gramsStr ${detail.unit}',
           style: TextStyle(
             color: color,
             fontSize: _FoodScannerStyle.textMedium,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
