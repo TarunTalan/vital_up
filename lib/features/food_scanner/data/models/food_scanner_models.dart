@@ -24,7 +24,7 @@ class MacroMain {
 
 class MacroDetail {
   final String name;
-  final int grams;
+  final double grams;
   final String unit;
 
   const MacroDetail({required this.name, required this.grams, this.unit = 'g'});
