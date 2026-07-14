@@ -8,5 +8,7 @@ abstract class DietPlanRepository {
     required Map<String, dynamic> preferences,
   });
 
-  Future<MealPlan?> getCachedMealPlan(String dateKey);
+  Future<MealPlan?> getActiveMealPlan();
+
+  Future<void> setActiveMealPlan(MealPlan plan);
 }

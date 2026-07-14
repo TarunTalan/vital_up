@@ -27,10 +27,6 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
     );
 
     if (result is ApiSuccess<MealPlanModel>) {
-      final isar = isarService.isar;
-      await isar.writeTxn(() async {
-        await isar.mealPlanModels.put(result.data);
-      });
       return ApiSuccess(result.data.toEntity());
     } else if (result is ApiError<MealPlanModel>) {
       return ApiError(message: result.message, code: result.code);
@@ -39,9 +35,18 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
   }
 
   @override
-  Future<MealPlan?> getCachedMealPlan(String dateKey) async {
+  Future<MealPlan?> getActiveMealPlan() async {
     final isar = isarService.isar;
-    final cached = await isar.mealPlanModels.where().dateKeyEqualTo(dateKey).findFirst();
+    final cached = await isar.mealPlanModels.where().dateKeyEqualTo('active_plan').findFirst();
     return cached?.toEntity();
+  }
+
+  @override
+  Future<void> setActiveMealPlan(MealPlan plan) async {
+    final isar = isarService.isar;
+    final model = MealPlanModel.fromEntity(plan, 'active_plan');
+    await isar.writeTxn(() async {
+      await isar.mealPlanModels.put(model);
+    });
   }
 }

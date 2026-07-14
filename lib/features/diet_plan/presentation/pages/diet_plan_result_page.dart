@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/calculate_target_from_goal.dart';
@@ -37,7 +38,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     _preferences = widget.params['preferences'] as Map<String, dynamic>? ?? {};
     
     if (_mode == 'cached') {
-      _cubit.loadTodayMealPlan();
+      _cubit.loadActiveMealPlan();
     } else {
       _calculateAndGenerate();
     }
@@ -127,58 +128,99 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     return BlocProvider.value(
       value: _cubit,
       child: AuthBackground(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            title: const Text('Your Diet Plan'),
-            backgroundColor: Colors.transparent,
-            actions: [
-              if (_target != null)
-                IconButton(
-                  icon: const Icon(Icons.refresh),
+        child: BlocBuilder<DietPlanCubit, DietPlanState>(
+          builder: (context, state) {
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                title: const Text('Your Diet Plan'),
+                backgroundColor: Colors.transparent,
+              ),
+              bottomNavigationBar: state is DietPlanLoaded && _mode != 'cached'
+                  ? _buildBottomActions(context, state.mealPlan)
+                  : null,
+              body: Builder(
+                builder: (context) {
+                  if (state is DietPlanLoading) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          VitalUpLoader(),
+                          SizedBox(height: 16),
+                          Text('Generating your personalized plan...'),
+                        ],
+                      ),
+                    );
+                  } else if (state is DietPlanLoaded) {
+                    return _buildPlanContent(context, state.mealPlan);
+                  } else if (state is DietPlanError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                            const SizedBox(height: 16),
+                            Text(state.message, textAlign: TextAlign.center),
+                            const SizedBox(height: 24),
+                            if (_target != null)
+                              FilledButton(
+                                onPressed: _regenerate,
+                                child: const Text('Try Again'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return const Center(child: Text('No active plan found.'));
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomActions(BuildContext context, MealPlan plan) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppTheme.hPadding, 8, AppTheme.hPadding, 16),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: SizedBox(
+                height: AppTheme.buttonHeight,
+                child: OutlinedButton(
                   onPressed: _regenerate,
+                  child: const Text('Regenerate'),
                 ),
-            ],
-          ),
-          body: BlocBuilder<DietPlanCubit, DietPlanState>(
-            builder: (context, state) {
-              if (state is DietPlanLoading) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      VitalUpLoader(),
-                      SizedBox(height: 16),
-                      Text('Generating your personalized plan...'),
-                    ],
-                  ),
-                );
-              } else if (state is DietPlanLoaded) {
-                return _buildPlanContent(context, state.mealPlan);
-              } else if (state is DietPlanError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                        const SizedBox(height: 16),
-                        Text(state.message, textAlign: TextAlign.center),
-                        const SizedBox(height: 24),
-                        if (_target != null)
-                          FilledButton(
-                            onPressed: _regenerate,
-                            child: const Text('Try Again'),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return const Center(child: Text('No plan found for today.'));
-            },
-          ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: SizedBox(
+                height: AppTheme.buttonHeight,
+                child: FilledButton(
+                  onPressed: () async {
+                    await _cubit.saveActivePlan(plan);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Active plan saved successfully!')),
+                      );
+                      context.goNamed('dashboard');
+                    }
+                  },
+                  child: const Text('Set as Active Plan'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
