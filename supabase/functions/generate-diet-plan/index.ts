@@ -56,43 +56,79 @@ serve(async (req) => {
 
     const { target, preferences } = bodyResult.value;
 
-    const prompt = `You are a meal-planning assistant. Given a daily nutrition target and
-dietary constraints, generate a one-day meal plan.
+    // Used to force divergence between calls with an otherwise-identical prompt.
+    const varietySeed = crypto.randomUUID();
 
-Target: ${target.calories} kcal, ${target.protein}g protein, ${target.carbs}g carbs, ${target.fat}g fat
-Dietary type: ${preferences.dietaryType || "Any"}
-Allergies (strict exclude): ${preferences.allergies || "None"}
-Avoid: ${preferences.avoid || "None"}
-Number of meals: ${preferences.mealsPerDay || 4}
+    const prompt = `You are a meal-planning assistant specializing in Indian cuisine.
+    Given a daily nutrition target and dietary constraints, generate a one-day
+    meal plan using common Indian foods and meal patterns.
 
-Respond with ONLY valid JSON, no markdown fences, no preamble, matching
-exactly this schema:
+    Target: ${target.calories} kcal, ${target.protein}g protein, ${target.carbs}g carbs, ${target.fat}g fat
+    Dietary type: ${preferences.dietaryType || "Any"}
+    Cuisine region: ${preferences.region || "Any Indian (mix of North/South/West/East as appropriate)"}
+    Allergies (strict exclude): ${preferences.allergies || "None"}
+    Avoid: ${preferences.avoid || "None"}
+    Number of meals: ${preferences.mealsPerDay || 4}
 
-{
-  "meals": [
+    Recently used items (do not reuse any of these dishes in this response): ${preferences.recentItems?.join(", ") || "None"}
+    Variety seed (use this to intentionally pick a different combination of dishes than you would by default; do not mention it in the output): ${varietySeed}
+
+    Use realistic Indian dishes and meal structures appropriate to the time of day
+    (e.g. poha/idli/paratha/upma for breakfast; dal/sabzi/roti/rice/curry for lunch
+    and dinner; sprouts/fruit/nuts/chaas for snacks). Reflect regional variety
+    based on the cuisine region if specified. Use standard Indian household
+    portion sizes (e.g. "2 Roti", "1 Bowl Dal", "1 Cup Rice") rather than
+    Western units like slices or cups of cereal.
+
+    Respond with ONLY valid JSON, no markdown fences, no preamble, matching
+    exactly this schema:
+
     {
-      "name": "string (e.g. Breakfast)",
-      "items": ["string (compact food name, max 2-3 words)", "string"],
-      "calories": number,
-      "protein": number,
-      "carbs": number,
-      "fat": number
+      "meals": [
+        {
+          "name": "string (e.g. Breakfast)",
+          "items": ["string (compact Indian food name with portion, max 3-4 words)", "string"],
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fat": number
+        }
+      ],
+      "totalCalories": number,
+      "totalProtein": number,
+      "totalCarbs": number,
+      "totalFat": number
     }
-  ],
-  "totalCalories": number,
-  "totalProtein": number,
-  "totalCarbs": number,
-  "totalFat": number
-}
 
-Meal calories/macros must sum to within 5% of the target. Do not include
-any allergen from the exclude list under any circumstance. Provide extremely brief item names (e.g. "Oatmeal", "2 Eggs") to reduce response size.`;
+    Meal calories/macros must sum to within 5% of the target. Do not include
+    any allergen from the exclude list under any circumstance. Provide extremely
+    brief item names with portion size (e.g. "2 Roti", "1 Bowl Palak Dal",
+    "1 Cup Curd") to reduce response size.
+
+    IMPORTANT CONSTRAINTS:
+
+    DIETARY TYPE ENFORCEMENT:
+    - Vegan: absolutely no dairy products (milk, curd, paneer, cheese, butter, ghee, yogurt, lassi, buttermilk).
+    - Vegetarian: no meat, fish, seafood, eggs.
+    - Eggetarian: eggs allowed, meat/fish not allowed.
+    - Non-Vegetarian: unrestricted unless otherwise excluded.
+
+    VARIETY:
+    - Avoid repetitive meal selections.
+    - Do not default to Poha or Idli for breakfast unless the variety seed clearly favors it.
+    - Prefer different breakfast categories whenever multiple valid options exist.
+    - Generate regionally appropriate variety.
+
+    VALIDATION:
+    Before responding, verify every food item complies with dietary type, allergies, avoid list, and meal timing.
+    If any item violates these rules, regenerate internally before producing JSON.`;
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const groqKey = Deno.env.get("GROQ_API_KEY");
     let resultJson = null;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
+      let usedProvider = "gemini";
       try {
         let aiResponseText = "";
 
@@ -112,7 +148,9 @@ any allergen from the exclude list under any circumstance. Provide extremely bri
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }] }],
               generationConfig: {
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                temperature: 0.9,
+                topP: 0.95
               }
             }),
             signal: controller.signal
@@ -120,10 +158,15 @@ any allergen from the exclude list under any circumstance. Provide extremely bri
         );
         clearTimeout(timeoutId);
 
+        console.log(`Gemini attempt ${attempt} status:`, geminiRes.status);
 
         const shouldFallback = (geminiRes.status === 429 || geminiRes.status === 404 || geminiRes.status >= 500) && !!groqKey;
 
         if (shouldFallback) {
+          usedProvider = "groq";
+          const geminiErrBody = await geminiRes.clone().json().catch(() => null);
+          console.error(`Gemini failed (status ${geminiRes.status}), falling back to Groq. Error:`, geminiErrBody?.error?.message);
+
           const groqController = new AbortController();
           const groqTimeoutId = setTimeout(() => groqController.abort(), timeoutMs);
           const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -135,7 +178,7 @@ any allergen from the exclude list under any circumstance. Provide extremely bri
             body: JSON.stringify({
               model: "llama-3.3-70b-versatile",
               messages: [{ role: "user", content: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }],
-              temperature: 0.2,
+              temperature: 0.9,
             }),
             signal: groqController.signal
           });
@@ -158,6 +201,7 @@ any allergen from the exclude list under any circumstance. Provide extremely bri
         }
 
         resultJson = JSON.parse(cleanJsonStr);
+        resultJson._debugProvider = usedProvider;
 
         const tCal = resultJson.totalCalories;
         const targetCal = target.calories;

@@ -100,16 +100,30 @@ curl -i -X POST '$baseUrl/functions/v1/generate-diet-plan' \\
       } else {
         final errorMsg = response.data?['error']?.toString() ?? 'Server error';
         final details = response.data?['details']?.toString();
+        
+        // Log the detailed error to the terminal
+        print('API Error [generateDietPlan]: $errorMsg');
+        if (details != null) {
+          print('Details: $details');
+        }
+        
         return ApiError(
-          message: details != null ? '$errorMsg\nDetails: $details' : errorMsg, 
+          message: 'Unable to generate diet plan. Please try again later.', 
           code: response.status ?? 500
         );
       }
     } on FunctionException catch (e) {
       final rawError = e.details != null ? e.details.toString() : (e.reasonPhrase ?? 'No reason phrase');
-      // Use 555 so it doesn't get mapped to generic 401 text
-      return ApiError(message: 'DEBUG: $rawError', code: 555);
+      
+      // Log the detailed error to the terminal
+      print('FunctionException [generateDietPlan]: $rawError');
+      
+      return const ApiError(
+        message: 'Unable to connect to the server. Please try again later.', 
+        code: 500
+      );
     } catch (e) {
+      print('Unexpected error [generateDietPlan]: $e');
       final err = ResponseHandler.fromException(e) as ApiError;
       return ApiError(message: err.message, code: err.code);
     }
