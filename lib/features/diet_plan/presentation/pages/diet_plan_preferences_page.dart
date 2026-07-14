@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 class DietPlanPreferencesPage extends StatefulWidget {
   const DietPlanPreferencesPage({super.key});
@@ -21,9 +22,10 @@ class _DietPlanPreferencesPageState extends State<DietPlanPreferencesPage> {
     final colors = theme.colorScheme;
     final customColors = theme.extension<VitalUpColors>();
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
+    return AuthBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
         title: const Text('Dietary Preferences'),
         backgroundColor: Colors.transparent,
       ),
@@ -100,6 +102,7 @@ class _DietPlanPreferencesPageState extends State<DietPlanPreferencesPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
