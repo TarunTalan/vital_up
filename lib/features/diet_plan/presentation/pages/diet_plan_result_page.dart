@@ -97,7 +97,18 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     }
   }
 
+  DateTime? _lastRegenerateTime;
+
   void _regenerate() {
+    final now = DateTime.now();
+    if (_lastRegenerateTime != null && now.difference(_lastRegenerateTime!).inSeconds < 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait a moment before trying again.')),
+      );
+      return;
+    }
+    _lastRegenerateTime = now;
+
     if (_target != null) {
       _cubit.generatePlan(target: _target!, preferences: _preferences);
     }
