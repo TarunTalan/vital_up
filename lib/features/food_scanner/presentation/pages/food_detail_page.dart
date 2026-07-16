@@ -406,7 +406,7 @@ class _FoodDetailData {
     final totalMacroWeight = candidates.fold<double>(0, (sum, item) => sum + item.value);
 
     return _FoodDetailData(
-      imagePath: image?.path ?? '',
+      imagePath: image?.path,
       dishName: dishName,
       totalCalories: totalCalories.round(),
       healthScore: _computeHealthScore(
@@ -665,7 +665,7 @@ class _ScannedDish extends StatelessWidget {
         child: Stack(
           alignment: Alignment.bottomRight,
           children: [
-            if (imagePath != null)
+            if (imagePath != null && imagePath!.isNotEmpty)
               Image.file(
                 File(imagePath!),
                 width: double.infinity,
