@@ -123,8 +123,8 @@ serve(async (req) => {
     Before responding, verify every food item complies with dietary type, allergies, avoid list, and meal timing.
     If any item violates these rules, regenerate internally before producing JSON.`;
 
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    const groqKey = Deno.env.get("GROQ_API_KEY");
+    const geminiKey = Deno.env.get("FOOD_RECOMMEND_GEMINI_API_KEY");
+    const groqKey = Deno.env.get("FOOD_RECOMMEND_GROQ_API_KEY");
     let resultJson = null;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
