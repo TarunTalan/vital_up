@@ -79,7 +79,7 @@ class IsarService {
         final response = await supabase
             .from('proprietary_products')
             .select()
-            .order('updated_at', descending: true)
+            .order('updated_at', ascending: false)
             .limit(100);
 
         if (response == null || response is! List) {

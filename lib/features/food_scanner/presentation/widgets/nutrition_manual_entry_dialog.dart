@@ -426,7 +426,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                     filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                                     child: Container(
                                       width: 320,
-                                      maxHeight: 220,
+                                      constraints: const BoxConstraints(maxHeight: 220),
                                       decoration: BoxDecoration(
                                         color: bgColor,
                                         borderRadius: BorderRadius.circular(12),
