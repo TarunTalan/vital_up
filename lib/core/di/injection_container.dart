@@ -130,6 +130,7 @@ Future<void> initDependencies() async {
       dio: sl<Dio>(),
       logger: sl<Logger>(),
       supabaseClient: sl<SupabaseClient>(),
+      isarService: sl<IsarService>(),
     ),
   );
   
