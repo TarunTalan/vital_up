@@ -5,10 +5,14 @@ import 'dart:ui';
 import 'package:image/image.dart' as img;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
@@ -17,6 +21,9 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state
 import 'package:vital_up/features/food_scanner/presentation/pages/food_detail_page.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_ocr_parser.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_manual_entry_dialog.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -59,6 +66,16 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   bool _torchEnabled = false;
   String? _errorMessage;
 
+  CameraDescription? _cameraDescription;
+  final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
+  final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  bool _isStreaming = false;
+  bool _isProcessingFrame = false;
+  bool _isScanningBarcode = false;
+  bool _isScanningNutritionLabel = false;
+  String? _currentFailedBarcode;
+  List<Offset> _detectedQrPoints = [];
+
   @override
   void initState() {
     super.initState();
@@ -67,7 +84,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   @override
   void dispose() {
+    _stopImageStream();
     _cameraController?.dispose();
+    _barcodeScanner.close();
+    _textRecognizer.close();
     super.dispose();
   }
 
@@ -103,7 +123,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         backCamera,
         ResolutionPreset.high,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: Platform.isAndroid
+            ? ImageFormatGroup.yuv420
+            : ImageFormatGroup.bgra8888,
       );
 
       _cameraInitFuture = controller.initialize();
@@ -116,10 +138,185 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       await _cameraController?.dispose();
       setState(() {
         _cameraController = controller;
+        _cameraDescription = backCamera;
       });
+
+      _startImageStream(controller);
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = 'Unable to start camera.');
+    }
+  }
+
+  void _startImageStream(CameraController controller) {
+    if (_isStreaming) return;
+    _isStreaming = true;
+    _isProcessingFrame = false;
+    _detectedQrPoints = [];
+
+    controller.startImageStream((CameraImage image) {
+      _processCameraImage(image);
+    });
+  }
+
+  Future<void> _stopImageStream() async {
+    if (!_isStreaming) return;
+    _isStreaming = false;
+    _isProcessingFrame = false;
+    _detectedQrPoints = [];
+    
+    final controller = _cameraController;
+    if (controller != null && controller.value.isStreamingImages) {
+      try {
+        await controller.stopImageStream();
+      } catch (e) {
+        debugPrint('Error stopping image stream: $e');
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _processCameraImage(CameraImage image) async {
+    if (_isProcessingFrame || _isScanningBarcode) return;
+    _isProcessingFrame = true;
+
+    try {
+      final cameraDesc = _cameraDescription;
+      if (cameraDesc == null) return;
+
+      final inputImage = _convertCameraImage(image, cameraDesc);
+      if (inputImage == null) return;
+
+      final barcodes = await _barcodeScanner.processImage(inputImage);
+
+      if (barcodes.isNotEmpty && mounted) {
+        final qr = barcodes.first;
+        final corners = qr.cornerPoints;
+        final barcodeVal = qr.rawValue ?? qr.displayValue;
+
+        if (corners.length == 4) {
+          final screenW = MediaQuery.sizeOf(context).width;
+          final screenH = MediaQuery.sizeOf(context).height;
+
+          final screenPoints = corners.map((p) {
+            return _mapPoint(
+              p,
+              Size(image.width.toDouble(), image.height.toDouble()),
+              cameraDesc.sensorOrientation,
+              Size(screenW, screenH),
+            );
+          }).toList();
+
+          if (mounted) {
+            setState(() {
+              _detectedQrPoints = screenPoints;
+            });
+          }
+
+          if (barcodeVal != null && barcodeVal.isNotEmpty) {
+            _onBarcodeDetected(barcodeVal);
+          }
+        }
+      } else {
+        if (_detectedQrPoints.isNotEmpty && mounted) {
+          setState(() {
+            _detectedQrPoints = [];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error processing camera image: $e');
+    } finally {
+      _isProcessingFrame = false;
+    }
+  }
+
+  InputImage? _convertCameraImage(CameraImage image, CameraDescription cameraDesc) {
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final rotation = InputImageRotationValue.fromRawValue(cameraDesc.sensorOrientation) ??
+          InputImageRotation.rotation90deg;
+
+      InputImageFormat format;
+      if (Platform.isAndroid) {
+        format = InputImageFormat.nv21;
+      } else if (Platform.isIOS) {
+        format = InputImageFormat.bgra8888;
+      } else {
+        format = InputImageFormatValue.fromRawValue(image.format.raw as int) ??
+            InputImageFormat.nv21;
+      }
+
+      final metadata = InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      );
+
+      return InputImage.fromBytes(bytes: bytes, metadata: metadata);
+    } catch (e) {
+      debugPrint('Error converting camera image: $e');
+      return null;
+    }
+  }
+
+  Offset _mapPoint(math.Point<int> point, Size imageSize, int sensorOrientation, Size widgetSize) {
+    final double imgW = imageSize.width;
+    final double imgH = imageSize.height;
+    final double widgetW = widgetSize.width;
+    final double widgetH = widgetSize.height;
+
+    final double previewW = imgH;
+    final double previewH = imgW;
+
+    final double scaleX = widgetW / previewW;
+    final double scaleY = widgetH / previewH;
+    final double scale = math.max(scaleX, scaleY);
+
+    final double scaledW = previewW * scale;
+    final double scaledH = previewH * scale;
+    final double dx = (widgetW - scaledW) / 2;
+    final double dy = (widgetH - scaledH) / 2;
+
+    double x = point.x.toDouble();
+    double y = point.y.toDouble();
+
+    if (sensorOrientation == 90) {
+      return Offset(
+        (imgH - y) * scale + dx,
+        x * scale + dy,
+      );
+    } else if (sensorOrientation == 270) {
+      return Offset(
+        y * scale + dx,
+        (imgW - x) * scale + dy,
+      );
+    } else {
+      return Offset(
+        x * scale + dx,
+        y * scale + dy,
+      );
+    }
+  }
+
+  void _onBarcodeDetected(String barcode) async {
+    if (_isScanningBarcode) return;
+    _isScanningBarcode = true;
+    _currentFailedBarcode = barcode;
+
+    HapticFeedback.lightImpact();
+    await _stopImageStream();
+
+    if (mounted) {
+      context.read<FoodScanBloc>().add(ScanBarcodeRequested(barcode));
     }
   }
 
@@ -131,6 +328,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
     setState(() => _isCapturing = true);
     try {
+      await _stopImageStream();
       final image = await controller.takePicture();
       if (!mounted) return;
 
@@ -147,7 +345,12 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         _selectedImage = image;
         _croppedImage = XFile(croppedFile.path);
       });
-      _analyzeImage(croppedFile.path);
+
+      if (_isScanningNutritionLabel) {
+        _processNutritionLabelOcr(croppedFile.path);
+      } else {
+        _analyzeImage(croppedFile.path);
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -159,6 +362,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   Future<void> _pickFromGallery() async {
+    await _stopImageStream();
     final image = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (image == null || !mounted) return;
 
@@ -166,7 +370,215 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       _selectedImage = image;
       _croppedImage = null;
     });
-    _analyzeImage(image.path);
+
+    if (_isScanningNutritionLabel) {
+      _processNutritionLabelOcr(image.path);
+    } else {
+      _analyzeImage(image.path);
+    }
+  }
+
+  Future<void> _processNutritionLabelOcr(String path) async {
+    // Show a loading indicator
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(color: Color(0xFF00A6B7)),
+        );
+      },
+    );
+
+    try {
+      final inputImage = InputImage.fromFilePath(path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      final parsed = NutritionOcrParser.parseNutritionText(recognizedText.text);
+
+      // Close the loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Open the verify/edit nutrition dialog
+      _openNutritionManualEntry(parsed);
+    } catch (e) {
+      debugPrint('OCR processing error: $e');
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loader
+        // Fallback to manual entry with empty values
+        _openNutritionManualEntry(null);
+      }
+    }
+  }
+
+  void _openNutritionManualEntry(Map<String, double>? parsed) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return NutritionManualEntryDialog(
+          barcode: _currentFailedBarcode ?? '',
+          initialName: '',
+          parsedNutrition: parsed,
+          onSave: ({
+            required String name,
+            required double quantity,
+            required String unit,
+            required double calories,
+            required double proteinG,
+            required double carbsG,
+            required double fatG,
+            required double fiberG,
+            required double sugarG,
+            required double sodiumMg,
+          }) {
+            final bloc = context.read<FoodScanBloc>();
+            bloc.add(AddCustomNutritionItemRequested(
+              barcode: _currentFailedBarcode ?? '',
+              name: name,
+              quantity: quantity,
+              unit: unit,
+              calories: calories,
+              proteinG: proteinG,
+              carbsG: carbsG,
+              fatG: fatG,
+              fiberG: fiberG,
+              sugarG: sugarG,
+              sodiumMg: sodiumMg,
+              source: parsed != null ? 'ocr' : 'manual',
+            ));
+
+            // Clean up state
+            setState(() {
+              _isScanningNutritionLabel = false;
+              _currentFailedBarcode = null;
+              _selectedImage = null;
+              _croppedImage = null;
+            });
+          },
+        );
+      },
+    ).then((_) {
+      // If dialog was dismissed without saving, reset scanner
+      if (_currentFailedBarcode != null) {
+        _restartScanning();
+      }
+    });
+  }
+
+  void _showLookupFailureOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final bgColor = isDark ? const Color(0xFF1E1E24) : Colors.white;
+        final textColor = isDark ? Colors.white : const Color(0xFF1C1C1C);
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Product Not Found',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'We couldn\'t find details for barcode "${_currentFailedBarcode}". How would you like to proceed?',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  setState(() {
+                    _isScanningNutritionLabel = true;
+                    _isScanningBarcode = false;
+                    _detectedQrPoints = [];
+                  });
+                  // Restart stream to let them take photo of label
+                  final controller = _cameraController;
+                  if (controller != null && controller.value.isInitialized) {
+                    _startImageStream(controller);
+                  }
+                },
+                icon: const Icon(Icons.document_scanner_outlined),
+                label: const Text('Scan Nutrition Label'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF00A6B7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _openNutritionManualEntry(null);
+                },
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('Enter Details Manually'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF00A6B7),
+                  side: const BorderSide(color: Color(0xFF00A6B7)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _restartScanning();
+                },
+                child: const Text('Cancel & Scan Another'),
+                style: TextButton.styleFrom(
+                  foregroundColor: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _restartScanning() {
+    setState(() {
+      _selectedImage = null;
+      _croppedImage = null;
+      _isScanningBarcode = false;
+      _isScanningNutritionLabel = false;
+      _currentFailedBarcode = null;
+      _detectedQrPoints = [];
+    });
+    final controller = _cameraController;
+    if (controller != null && controller.value.isInitialized) {
+      _startImageStream(controller);
+    }
   }
 
   void _analyzeImage(String path) {
@@ -189,7 +601,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         setState(() {
           _selectedImage = null;
           _croppedImage = null;
+          _isScanningBarcode = false;
+          _detectedQrPoints = [];
         });
+        final controller = _cameraController;
+        if (controller != null && controller.value.isInitialized) {
+          _startImageStream(controller);
+        }
       }
     });
   }
@@ -215,9 +633,6 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
       listenWhen: (previous, current) {
-        // Prevent duplicate navigation / page pushes:
-        // If the previous state was already a detail-view state, we are already
-        // showing the detail page. In that case, do not push another screen.
         final wasInDetail = previous is RecognitionSucceeded ||
             previous is RecognitionLowConfidence ||
             previous is NutritionLoaded ||
@@ -226,11 +641,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         return !wasInDetail &&
             (current is RecognitionSucceeded ||
              current is RecognitionLowConfidence ||
+             current is NutritionLoaded ||
              current is RecognitionFailed);
       },
       listener: (context, state) {
         if (state is RecognitionSucceeded ||
-            state is RecognitionLowConfidence) {
+            state is RecognitionLowConfidence ||
+            state is NutritionLoaded) {
+          _stopImageStream();
           if (widget.isEditingImage) {
             final bloc = context.read<FoodScanBloc>();
             Navigator.of(context).pushAndRemoveUntil(
@@ -246,13 +664,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             _openDetail(context);
           }
         } else if (state is RecognitionFailed) {
-          setState(() {
-            _selectedImage = null;
-            _croppedImage = null;
-          });
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+          if (state.failure is BarcodeNotFoundFailure) {
+            _showLookupFailureOptions();
+          } else {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+            _restartScanning();
+          }
         }
       },
       builder: (context, state) {
@@ -287,6 +706,56 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     child: CustomPaint(
                       painter: ScannerOverlayPainter(
                         strokeColor: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              // Dynamic QR outline overlay when detected
+              if (_cameraController != null &&
+                  _cameraController!.value.isInitialized &&
+                  state is! RecognizingFood &&
+                  _detectedQrPoints.isNotEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: QrOutlinePainter(
+                        points: _detectedQrPoints,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_isScanningNutritionLabel)
+                Positioned(
+                  top: 90,
+                  left: 20,
+                  right: 20,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF00A6B7), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.document_scanner_outlined, color: Color(0xFF00A6B7)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Align the nutrition facts table inside the frame and tap Capture.',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -824,6 +1293,49 @@ Future<File> cropCapturedImage({
     return croppedFile;
   } catch (_) {
     return File(imagePath);
+  }
+}
+
+class QrOutlinePainter extends CustomPainter {
+  final List<Offset> points;
+  final Color color;
+
+  QrOutlinePainter({
+    required this.points,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 4) return;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    path.moveTo(points[0].dx, points[0].dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    path.close();
+
+    // Draw the outline path
+    canvas.drawPath(path, paint);
+
+    // Draw a translucent fill overlay inside the QR code region
+    final fillPaint = Paint()
+      ..color = color.withValues(alpha: 0.15)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant QrOutlinePainter oldDelegate) {
+    return oldDelegate.points != points || oldDelegate.color != color;
   }
 }
 

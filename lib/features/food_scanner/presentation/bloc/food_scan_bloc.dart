@@ -51,6 +51,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     on<ScanBarcodeRequested>(_onScanBarcodeRequested);
     on<RetryRecognitionRequested>(_onRetryRecognitionRequested);
     on<UpdateMealImageRequested>(_onUpdateMealImageRequested);
+    on<AddCustomNutritionItemRequested>(_onAddCustomNutritionItemRequested);
   }
 
   @override
@@ -658,8 +659,21 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       (failure) {
         emit(RecognitionFailed(failure));
       },
-      (item) {
-        emit(BarcodeScanned(item));
+      (nutritionInfo) {
+        NutritionInfo resolvedInfo = nutritionInfo;
+        if (_isZeroPlaceholder(nutritionInfo)) {
+          logger.w('Scanned barcode "${nutritionInfo.per.name}" is all zeros (placeholder). Resolving offline.');
+          resolvedInfo = _estimateOfflineNutrition(nutritionInfo.per);
+        }
+
+        _currentItems = [resolvedInfo.per];
+        _currentNutrition = [resolvedInfo];
+        _currentImage = null;
+        emit(NutritionLoaded(
+          image: null,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ));
       },
     );
   }
@@ -679,6 +693,59 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   ) async {
     _currentImage = event.image;
     _emitCurrentState(emit);
+  }
+
+  Future<void> _onAddCustomNutritionItemRequested(
+    AddCustomNutritionItemRequested event,
+    Emitter<FoodScanState> emit,
+  ) async {
+    _preLoadingStateType = state.runtimeType;
+    emit(LoadingNutrition(
+      image: _currentImage,
+      items: _currentItems,
+      nutrition: _currentNutrition,
+    ));
+
+    // Create FoodItem domain entity
+    final foodItem = FoodItem(
+      id: event.barcode.isNotEmpty ? event.barcode : uuid.v4(),
+      name: event.name,
+      confidenceScore: 1.0,
+      servingDescription: '${event.quantity} ${event.unit}',
+      quantity: event.quantity,
+      unit: event.unit,
+    );
+
+    // Create NutritionInfo domain entity
+    final nutritionInfo = NutritionInfo(
+      calories: event.calories,
+      proteinG: event.proteinG,
+      carbsG: event.carbsG,
+      fatG: event.fatG,
+      fiberG: event.fiberG,
+      sugarG: event.sugarG,
+      sodiumMg: event.sodiumMg,
+      per: foodItem,
+    );
+
+    _currentItems = List<FoodItem>.of(_currentItems)..add(foodItem);
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(nutritionInfo);
+
+    // Save to cache and remote database progressively in the background
+    if (event.barcode.isNotEmpty) {
+      nutritionRepository.saveProprietaryProduct(
+        event.barcode,
+        event.name,
+        nutritionInfo,
+        event.source,
+      );
+    }
+
+    emit(NutritionLoaded(
+      image: _currentImage,
+      items: _currentItems,
+      nutrition: _currentNutrition,
+    ));
   }
 
   void _reset() {
@@ -701,7 +768,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     'salmon': {'calories': 208, 'protein': 20.0, 'carbs': 0.0, 'fat': 13.0, 'fiber': 0.0, 'sugar': 0.0, 'sodium': 59},
     'avocado': {'calories': 160, 'protein': 2.0, 'carbs': 8.5, 'fat': 15.0, 'fiber': 6.7, 'sugar': 0.7, 'sodium': 7},
     'oats': {'calories': 389, 'protein': 16.9, 'carbs': 66.3, 'fat': 6.9, 'fiber': 10.6, 'sugar': 0.0, 'sodium': 2},
-    'samosa': {'calories': 260, 'protein': 4.5, 'carbs': 24.0, 'fat': 17.0, 'fiber': 1.5, 'sugar': 1.0, 'sodium': 380},
+    'samosa': {'calories': 262, 'protein': 4.5, 'carbs': 24.0, 'fat': 17.0, 'fiber': 1.5, 'sugar': 1.0, 'sodium': 380},
     'french fries': {'calories': 312, 'protein': 3.4, 'carbs': 41.0, 'fat': 15.0, 'fiber': 3.8, 'sugar': 0.3, 'sodium': 210},
     'fries': {'calories': 312, 'protein': 3.4, 'carbs': 41.0, 'fat': 15.0, 'fiber': 3.8, 'sugar': 0.3, 'sodium': 210},
     'gulab jamun': {'calories': 320, 'protein': 4.0, 'carbs': 52.0, 'fat': 11.0, 'fiber': 0.8, 'sugar': 44.0, 'sodium': 110},
@@ -710,6 +777,30 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     'burger': {'calories': 295, 'protein': 17.0, 'carbs': 24.0, 'fat': 14.0, 'fiber': 1.5, 'sugar': 4.0, 'sodium': 500},
     'cake': {'calories': 350, 'protein': 3.0, 'carbs': 55.0, 'fat': 14.0, 'fiber': 1.0, 'sugar': 38.0, 'sodium': 320},
     'sweet': {'calories': 380, 'protein': 4.0, 'carbs': 60.0, 'fat': 14.0, 'fiber': 1.0, 'sugar': 50.0, 'sodium': 150},
+    'paneer tikka': {'calories': 180, 'protein': 12.0, 'carbs': 6.0, 'fat': 12.0, 'fiber': 1.0, 'sugar': 2.0, 'sodium': 400},
+    'paneer': {'calories': 265, 'protein': 18.0, 'carbs': 1.2, 'fat': 20.0, 'fiber': 0.0, 'sugar': 1.2, 'sodium': 18},
+    'roti': {'calories': 260, 'protein': 8.0, 'carbs': 45.0, 'fat': 3.0, 'fiber': 7.0, 'sugar': 0.5, 'sodium': 150},
+    'chapati': {'calories': 260, 'protein': 8.0, 'carbs': 45.0, 'fat': 3.0, 'fiber': 7.0, 'sugar': 0.5, 'sodium': 150},
+    'dal makhani': {'calories': 150, 'protein': 5.0, 'carbs': 16.0, 'fat': 7.0, 'fiber': 4.5, 'sugar': 1.0, 'sodium': 350},
+    'dal tadka': {'calories': 110, 'protein': 6.0, 'carbs': 15.0, 'fat': 3.5, 'fiber': 5.0, 'sugar': 0.5, 'sodium': 300},
+    'dal': {'calories': 110, 'protein': 6.0, 'carbs': 15.0, 'fat': 3.5, 'fiber': 5.0, 'sugar': 0.5, 'sodium': 300},
+    'biryani': {'calories': 160, 'protein': 8.0, 'carbs': 21.0, 'fat': 5.0, 'fiber': 1.8, 'sugar': 1.0, 'sodium': 300},
+    'pulav': {'calories': 130, 'protein': 3.0, 'carbs': 24.0, 'fat': 2.5, 'fiber': 1.5, 'sugar': 0.5, 'sodium': 250},
+    'idli': {'calories': 120, 'protein': 3.5, 'carbs': 25.0, 'fat': 0.5, 'fiber': 1.5, 'sugar': 0.2, 'sodium': 120},
+    'dosa': {'calories': 168, 'protein': 3.9, 'carbs': 29.0, 'fat': 3.7, 'fiber': 1.5, 'sugar': 0.5, 'sodium': 180},
+    'masala dosa': {'calories': 205, 'protein': 4.2, 'carbs': 32.0, 'fat': 6.5, 'fiber': 2.2, 'sugar': 1.0, 'sodium': 250},
+    'jalebi': {'calories': 400, 'protein': 2.0, 'carbs': 80.0, 'fat': 8.0, 'fiber': 0.5, 'sugar': 70.0, 'sodium': 50},
+    'aloo paratha': {'calories': 210, 'protein': 4.5, 'carbs': 35.0, 'fat': 6.0, 'fiber': 3.0, 'sugar': 1.0, 'sodium': 280},
+    'paratha': {'calories': 258, 'protein': 5.0, 'carbs': 40.0, 'fat': 9.0, 'fiber': 3.0, 'sugar': 1.0, 'sodium': 300},
+    'butter chicken': {'calories': 230, 'protein': 16.0, 'carbs': 8.0, 'fat': 15.0, 'fiber': 1.0, 'sugar': 4.0, 'sodium': 450},
+    'chole bhature': {'calories': 280, 'protein': 7.0, 'carbs': 35.0, 'fat': 12.0, 'fiber': 5.0, 'sugar': 2.0, 'sodium': 480},
+    'chole': {'calories': 140, 'protein': 6.0, 'carbs': 18.0, 'fat': 5.0, 'fiber': 6.0, 'sugar': 2.0, 'sodium': 380},
+    'khichdi': {'calories': 100, 'protein': 3.5, 'carbs': 18.0, 'fat': 1.5, 'fiber': 2.5, 'sugar': 0.5, 'sodium': 200},
+    'upma': {'calories': 130, 'protein': 3.0, 'carbs': 22.0, 'fat': 3.5, 'fiber': 2.0, 'sugar': 1.0, 'sodium': 250},
+    'poha': {'calories': 160, 'protein': 2.8, 'carbs': 30.0, 'fat': 3.0, 'fiber': 1.5, 'sugar': 1.0, 'sodium': 220},
+    'sambhar': {'calories': 60, 'protein': 2.0, 'carbs': 8.0, 'fat': 2.0, 'fiber': 2.5, 'sugar': 1.5, 'sodium': 320},
+    'pav bhaji': {'calories': 160, 'protein': 3.0, 'carbs': 20.0, 'fat': 8.0, 'fiber': 3.0, 'sugar': 2.5, 'sodium': 400},
+    'raita': {'calories': 60, 'protein': 3.0, 'carbs': 5.0, 'fat': 3.0, 'fiber': 0.5, 'sugar': 4.0, 'sodium': 120},
   };
 
   NutritionInfo _estimateOfflineNutrition(FoodItem item) {

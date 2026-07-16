@@ -101,3 +101,49 @@ class UpdateMealImageRequested extends FoodScanEvent {
   @override
   List<Object?> get props => [image];
 }
+
+class AddCustomNutritionItemRequested extends FoodScanEvent {
+  final String barcode;
+  final String name;
+  final double quantity;
+  final String unit;
+  final double calories;
+  final double proteinG;
+  final double carbsG;
+  final double fatG;
+  final double fiberG;
+  final double sugarG;
+  final double sodiumMg;
+  final String source;
+
+  const AddCustomNutritionItemRequested({
+    required this.barcode,
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.calories,
+    required this.proteinG,
+    required this.carbsG,
+    required this.fatG,
+    required this.fiberG,
+    required this.sugarG,
+    required this.sodiumMg,
+    required this.source,
+  });
+
+  @override
+  List<Object?> get props => [
+        barcode,
+        name,
+        quantity,
+        unit,
+        calories,
+        proteinG,
+        carbsG,
+        fatG,
+        fiberG,
+        sugarG,
+        sodiumMg,
+        source,
+      ];
+}
