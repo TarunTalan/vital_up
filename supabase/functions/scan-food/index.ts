@@ -96,6 +96,7 @@ class GeminiVisionProvider implements VisionProvider {
 Rules:
 - Return 1-3 most likely food items
 - Be specific about food type and preparation
+- If the food belongs to a specific regional cuisine (e.g., Indian), use its native/common name (e.g., 'Paneer Butter Masala' instead of 'Indian cheese curry')
 - Estimate portion size visually
 - Do NOT include calorie or macro numbers
 - Return ONLY the JSON array, no other text`;
@@ -551,27 +552,295 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { image, search_query, get_nutrition, fdc_id } = body;
+    const { image, search_query, get_nutrition, fdc_id, barcode } = body;
 
-    // Handle search query (manual food search)
+    // Handle barcode lookup
+    if (barcode) {
+      const barcodeStr = barcode.toString().trim();
+      console.log(`Processing barcode lookup request for: "${barcodeStr}"`);
+      
+      // 1. Try our own proprietary database first
+      try {
+        const { data: propProduct, error: propError } = await supabase
+          .from('proprietary_products')
+          .select('*')
+          .eq('barcode', barcodeStr)
+          .maybeSingle();
+
+        if (!propError && propProduct) {
+          console.log(`Proprietary database hit for barcode: "${barcodeStr}" -> "${propProduct.product_name}"`);
+          return jsonResponse({
+            productName: propProduct.product_name,
+            servingSize: propProduct.serving_size || '100g',
+            nutriments: {
+              calories: Number(propProduct.calories ?? 0),
+              protein: Number(propProduct.protein_g ?? 0),
+              carbs: Number(propProduct.carbs_g ?? 0),
+              fat: Number(propProduct.fat_g ?? 0),
+              fiber: Number(propProduct.fiber_g ?? 0),
+              sugar: Number(propProduct.sugar_g ?? 0),
+              sodium: Number(propProduct.sodium_mg ?? 0),
+            }
+          }, 200);
+        }
+      } catch (err) {
+        console.error('Error reading from proprietary_products table:', err);
+      }
+
+      // Helper function to cache results in the proprietary database in the background
+      const saveToProprietary = async (productName: string, servingSize: string, nutriments: any, source: string) => {
+        try {
+          const { error } = await supabase
+            .from('proprietary_products')
+            .upsert({
+              barcode: barcodeStr,
+              product_name: productName,
+              serving_size: servingSize,
+              calories: Number(nutriments.calories ?? 0),
+              protein_g: Number(nutriments.protein ?? 0),
+              carbs_g: Number(nutriments.carbs ?? 0),
+              fat_g: Number(nutriments.fat ?? 0),
+              fiber_g: Number(nutriments.fiber ?? 0),
+              sugar_g: Number(nutriments.sugar ?? 0),
+              sodium_mg: Number(nutriments.sodium ?? 0),
+              source: source,
+              updated_at: new Date().toISOString(),
+            });
+          if (error) {
+            console.error(`Failed to write to proprietary_products: ${error.message}`);
+          }
+        } catch (e) {
+          console.error(`Error saving to proprietary_products:`, e);
+        }
+      };
+
+      // 2. Try Open Food Facts next (Indian subdomain / India filtered)
+      try {
+        const offResponse = await fetch(`https://in.openfoodfacts.org/api/v0/product/${barcodeStr}.json`);
+        if (offResponse.ok) {
+          const offData = await offResponse.json();
+          const product = offData.product;
+          if (offData.status === 1 && product && typeof product === 'object') {
+            const productName = product.product_name || product.product_name_en;
+            const nutriments = product.nutriments || {};
+            
+            const hasCalories = nutriments['energy-kcal_serving'] || nutriments['energy-kcal_100g'] || nutriments['energy-kcal'];
+            const hasMacros = nutriments['proteins_100g'] || nutriments['carbohydrates_100g'] || nutriments['fat_100g'];
+            
+            if (productName && (hasCalories || hasMacros)) {
+              console.log(`Open Food Facts success for barcode: "${barcodeStr}" -> "${productName}"`);
+              const responsePayload = {
+                productName,
+                servingSize: product.serving_size || '100g',
+                nutriments: {
+                  calories: Number(nutriments['energy-kcal_serving'] ?? nutriments['energy-kcal_100g'] ?? nutriments['energy-kcal'] ?? 0),
+                  protein: Number(nutriments['proteins_serving'] ?? nutriments['proteins_100g'] ?? nutriments['proteins'] ?? 0),
+                  carbs: Number(nutriments['carbohydrates_serving'] ?? nutriments['carbohydrates_100g'] ?? nutriments['carbohydrates'] ?? 0),
+                  fat: Number(nutriments['fat_serving'] ?? nutriments['fat_100g'] ?? nutriments['fat'] ?? 0),
+                  fiber: Number(nutriments['fiber_serving'] ?? nutriments['fiber_100g'] ?? nutriments['fiber'] ?? 0),
+                  sugar: Number(nutriments['sugars_serving'] ?? nutriments['sugars_100g'] ?? nutriments['sugars'] ?? 0),
+                  sodium: Number(nutriments['sodium_serving'] ?? nutriments['sodium_100g'] ?? nutriments['sodium'] ?? 0) * 1000.0,
+                }
+              };
+              
+              // Cache in proprietary DB in the background
+              await saveToProprietary(
+                responsePayload.productName,
+                responsePayload.servingSize,
+                responsePayload.nutriments,
+                'off'
+              );
+
+              return jsonResponse(responsePayload, 200);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching from Open Food Facts:', e);
+      }
+      
+      // 3. Fallback to Gemini with Google Search Grounding to find product name and nutrition!
+      console.log(`Open Food Facts incomplete or missing for barcode: "${barcodeStr}". Invoking Gemini Search Grounding fallback...`);
+      try {
+        const prompt = `Identify the product name, brand, serving size description, and nutrition information (calories in kcal, protein in g, carbs in g, fat in g, fiber in g, sugar in g, sodium in mg) for the product with barcode "${barcodeStr}". Focus on Indian databases/grocery stores (like Blinkit, BigBasket, Zepto) if it starts with 890. Return the response in this exact JSON structure:
+{
+  "productName": "Product Name",
+  "servingSize": "serving size (e.g. '100g' or '1 pack (90g)')",
+  "calories": 150.0,
+  "protein": 5.0,
+  "carbs": 12.0,
+  "fat": 8.0,
+  "fiber": 2.0,
+  "sugar": 4.0,
+  "sodium": 200.0
+}`;
+
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              tools: [{ googleSearch: {} }],
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: 'application/json',
+              },
+            }),
+          }
+        );
+        
+        if (geminiResponse.ok) {
+          const resData = await geminiResponse.json();
+          const text = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const parsed = JSON.parse(text);
+            console.log(`Gemini Search Grounding fallback success for barcode: "${barcodeStr}" -> "${parsed.productName}"`);
+            const responsePayload = {
+              productName: parsed.productName || 'Unknown Product',
+              servingSize: parsed.servingSize || '100g',
+              nutriments: {
+                calories: parsed.calories ?? 0,
+                protein: parsed.protein ?? 0,
+                carbs: parsed.carbs ?? 0,
+                fat: parsed.fat ?? 0,
+                fiber: parsed.fiber ?? 0,
+                sugar: parsed.sugar ?? 0,
+                sodium: parsed.sodium ?? 0,
+              }
+            };
+            
+            // Cache in proprietary DB in the background
+            await saveToProprietary(
+              responsePayload.productName,
+              responsePayload.servingSize,
+              responsePayload.nutriments,
+              'gemini_grounding'
+            );
+
+            return jsonResponse(responsePayload, 200);
+          }
+        }
+      } catch (geminiErr) {
+        console.error('Gemini Search Grounding fallback failed:', geminiErr);
+      }
+      
+      return jsonResponse({ error: 'Barcode not found' }, 404);
+    }
+
+    // Handle search query (manual food search) — fuzzy proprietary + USDA merge
     if (search_query) {
-      const foods = await searchUSDA(search_query, usdaApiKey, supabase);
-      const items = foods.map((food: any) => ({
-        id: food.fdcId?.toString() || food.description,
-        name: food.description,
-        fdc_id: food.fdcId?.toString(),
-        confidence_score: 1.0,
-        serving_description: '100g',
-        quantity: 1.0,
-        unit: 'serving',
-      }));
+      const queryStr = search_query.toString().trim();
+      console.log(`Processing search_query: "${queryStr}"`);
+
+      // Run proprietary fuzzy search and USDA search in parallel
+      const [proprietaryResults, usdaFoods] = await Promise.allSettled([
+        supabase.rpc('search_products_fuzzy', { p_query: queryStr, p_limit: 8 }),
+        searchUSDA(queryStr, usdaApiKey, supabase),
+      ]);
+
+      const items: any[] = [];
+      const seenNames = new Set<string>();
+
+      // 1. Add proprietary results first (highest trust — user-contributed, FSSAI-sourced)
+      if (proprietaryResults.status === 'fulfilled' && !proprietaryResults.value.error) {
+        const propRows: any[] = proprietaryResults.value.data ?? [];
+        for (const row of propRows) {
+          const nameLower = row.product_name.toLowerCase();
+          if (!seenNames.has(nameLower)) {
+            seenNames.add(nameLower);
+            items.push({
+              id: row.barcode || row.product_name,
+              name: row.product_name,
+              fdc_id: null,
+              source: 'proprietary',
+              serving_description: row.serving_size ?? '100g',
+              quantity: 1.0,
+              unit: 'serving',
+              // Full nutrition payload so client can prefill the dialog immediately
+              nutrition: {
+                calories: Number(row.calories ?? 0),
+                protein: Number(row.protein_g ?? 0),
+                carbs: Number(row.carbs_g ?? 0),
+                fat: Number(row.fat_g ?? 0),
+                fiber: Number(row.fiber_g ?? 0),
+                sugar: Number(row.sugar_g ?? 0),
+                sodium: Number(row.sodium_mg ?? 0),
+              },
+            });
+          }
+        }
+        console.log(`Proprietary fuzzy search returned ${propRows.length} results.`);
+      } else if (proprietaryResults.status === 'rejected') {
+        console.error('Proprietary fuzzy search RPC failed:', proprietaryResults.reason);
+      }
+
+      // 2. Append USDA results that aren't already covered by proprietary results
+      if (usdaFoods.status === 'fulfilled') {
+        for (const food of usdaFoods.value) {
+          const nameLower = (food.description ?? '').toLowerCase();
+          if (!seenNames.has(nameLower)) {
+            seenNames.add(nameLower);
+            items.push({
+              id: food.fdcId?.toString() || food.description,
+              name: food.description,
+              fdc_id: food.fdcId?.toString(),
+              source: 'usda',
+              serving_description: '100g',
+              quantity: 1.0,
+              unit: 'serving',
+              // USDA requires a separate get_nutrition call to get full macros
+              nutrition: null,
+            });
+          }
+        }
+      }
 
       return jsonResponse({ items }, 200);
     }
 
-    // Handle nutrition lookup by FDC ID
+    // Handle nutrition lookup by FDC ID or Proprietary Name/Barcode
     if (get_nutrition && fdc_id) {
-      let numericId = fdc_id.toString().trim();
+      const idStr = fdc_id.toString().trim();
+      
+      // 1. Check proprietary DB first (exact match by barcode or name)
+      try {
+        const { data: propData, error: propError } = await supabase
+          .from('proprietary_products')
+          .select('*')
+          .or(`barcode.eq."${idStr}",product_name.eq."${idStr}"`)
+          .maybeSingle();
+          
+        if (!propError && propData) {
+          console.log(`Proprietary DB hit in get_nutrition for: "${idStr}"`);
+          
+          const servingDescription = body.serving_description || propData.serving_size || '100g';
+          const userPortionInGrams = parsePortionSize(servingDescription) * 100;
+          
+          let propServingSizeGrams = 100;
+          if (propData.serving_size) {
+            propServingSizeGrams = parsePortionSize(propData.serving_size) * 100;
+          }
+          const scaleFactor = userPortionInGrams / propServingSizeGrams;
+          
+          return jsonResponse({
+            calories: Number(propData.calories ?? 0) * scaleFactor,
+            protein_g: Number(propData.protein_g ?? 0) * scaleFactor,
+            carbs_g: Number(propData.carbs_g ?? 0) * scaleFactor,
+            fat_g: Number(propData.fat_g ?? 0) * scaleFactor,
+            fiber_g: Number(propData.fiber_g ?? 0) * scaleFactor,
+            sugar_g: Number(propData.sugar_g ?? 0) * scaleFactor,
+            sodium_mg: Number(propData.sodium_mg ?? 0) * scaleFactor,
+            additional_nutrients: [],
+          }, 200);
+        }
+      } catch (e) {
+        console.error('Proprietary DB lookup error in get_nutrition:', e);
+      }
+
+      // 2. Fall back to USDA FDC lookup
+      let numericId = idStr;
       const isNumeric = /^\d+$/.test(numericId);
       
       if (!isNumeric) {
@@ -884,17 +1153,41 @@ Deno.serve(async (req) => {
     // Log recognition
     await logRecognition(supabase, user.id, servedBy, latency, 0);
 
-    // Match with USDA
+    // Match with proprietary database and USDA
     const items = [];
     for (const result of results) {
-      const usdaFoods = await searchUSDA(result.candidateName, usdaApiKey, supabase);
-      const bestMatch = usdaFoods[0];
+      const queryStr = result.candidateName;
 
-      if (bestMatch) {
+      // Run proprietary fuzzy search and USDA search in parallel
+      const [proprietaryResults, usdaFoods] = await Promise.allSettled([
+        supabase.rpc('search_products_fuzzy', { p_query: queryStr, p_limit: 1 }),
+        searchUSDA(queryStr, usdaApiKey, supabase),
+      ]);
+
+      let bestProprietaryMatch = null;
+      if (proprietaryResults.status === 'fulfilled' && !proprietaryResults.value.error && proprietaryResults.value.data?.length > 0) {
+        bestProprietaryMatch = proprietaryResults.value.data[0];
+      }
+
+      const bestUsdaMatch = usdaFoods.status === 'fulfilled' ? usdaFoods.value[0] : null;
+
+      if (bestProprietaryMatch) {
         items.push({
-          id: bestMatch.fdcId?.toString() || result.candidateName,
+          id: bestProprietaryMatch.barcode || bestProprietaryMatch.product_name,
+          name: result.candidateName, // Keep the AI's label for display
+          fdc_id: null,
+          source: 'proprietary',
+          confidence_score: result.confidenceHint,
+          serving_description: bestProprietaryMatch.serving_size ?? result.estimatedPortionDescription,
+          quantity: 1.0,
+          unit: 'serving',
+        });
+      } else if (bestUsdaMatch) {
+        items.push({
+          id: bestUsdaMatch.fdcId?.toString() || result.candidateName,
           name: result.candidateName,
-          fdc_id: bestMatch.fdcId?.toString(),
+          fdc_id: bestUsdaMatch.fdcId?.toString(),
+          source: 'usda',
           confidence_score: result.confidenceHint,
           serving_description: result.estimatedPortionDescription,
           quantity: 1.0,
