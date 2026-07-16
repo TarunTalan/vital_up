@@ -519,61 +519,42 @@ int _computeHealthScore({
   required double cholesterolMg,
   required List<String> foodNames,
 }) {
-  // Start with a base score based on macro split deviation (max deviation is 1.2)
-  final deviation =
-      (proteinRatio - 0.3).abs() +
-      (carbRatio - 0.4).abs() +
-      (fatRatio - 0.3).abs();
-  
-  // For low-calorie meals (like snacks or single whole fruits), we scale down the deviation penalty
-  // because snacks/fruits are naturally unbalanced (e.g. an apple is 100% carbs, almonds are 100% fat).
-  // If calories < 300, we scale the deviation penalty down linearly.
-  double deviationWeight = 40.0;
-  if (totalCalories < 300) {
-    deviationWeight = 10.0 + ((totalCalories - 100).clamp(0.0, 200.0) / 200.0) * 30.0;
-  }
-  
-  // Base score ranges from 52 to 100 (when deviationWeight is 40)
-  double score = 100 - (deviation * deviationWeight);
-  
-  // Bonus for fiber (+4.0 points per gram, max +15)
-  score += (fiberG * 4.0).clamp(0.0, 15.0);
-  
-  // Penalty for sugar (-1.0 points per gram, max -45)
-  // Scientific adjustment: if fiber is present, it slows down sugar absorption (lowering glycemic impact).
-  // We discount the sugar penalty based on the fiber-to-sugar ratio.
-  double sugarPenalty = sugarG * 1.0;
+  // 1. Calculate Essential/Good macros score (0 to 100)
+  // Protein (target >= 20% of macros)
+  final proteinPoints = (proteinRatio * 200.0).clamp(0.0, 50.0);
+  // Fiber (target >= 3g per serving or generally high fiber)
+  final fiberPoints = (fiberG * 5.0).clamp(0.0, 50.0);
+  final essentialScore = proteinPoints + fiberPoints;
+
+  // 2. Calculate Bad/Harmful macros score (0 to 100)
+  // Sugar (apply discount if fiber is present to offset natural fruit sugars)
+  double adjustedSugar = sugarG;
   if (fiberG > 0 && sugarG > 0) {
-    final fiberToSugarRatio = fiberG / (sugarG * 0.2); // healthy target is 1:5 fiber-to-sugar
-    final sugarDiscount = fiberToSugarRatio.clamp(0.0, 1.0);
-    sugarPenalty = sugarPenalty * (1.0 - sugarDiscount);
+    final fiberToSugarRatio = fiberG / (sugarG * 0.2); // 1:5 target ratio
+    final discount = fiberToSugarRatio.clamp(0.0, 0.8); // Up to 80% discount for high fiber
+    adjustedSugar = sugarG * (1.0 - discount);
   }
-  score -= sugarPenalty.clamp(0.0, 45.0);
+  final sugarPoints = (adjustedSugar * 1.0).clamp(0.0, 30.0);
+  // Sodium (target < 140mg, penalize above that)
+  final sodiumPoints = (sodiumMg / 15.0).clamp(0.0, 30.0);
+  // Saturated Fat (target < 4g)
+  final satFatPoints = (saturatedFatG * 4.0).clamp(0.0, 20.0);
+  // Trans Fat (extremely bad, immediate penalty)
+  final transFatPoints = (transFatG * 20.0).clamp(0.0, 10.0);
+  final badScore = sugarPoints + sodiumPoints + satFatPoints + transFatPoints;
+
+  // 3. Compute continuous health score based on the user's buckets:
+  // - High essential + Low bad => High rating (>= 80)
+  // - Low essential + Low bad => Medium rating (55 to 70)
+  // - High bad (or low essential + high bad) => Low rating (< 50)
   
-  // Penalty for sodium (-1 point per 50mg, max -30)
-  score -= (sodiumMg / 50.0).clamp(0.0, 30.0);
-
-  // Penalty for saturated fat (high saturated fat is unhealthy).
-  // If more than 10% of total calories come from saturated fat, apply penalty (max -30).
-  double satFatRatio = (saturatedFatG * 9) / (totalCalories > 0 ? totalCalories : 1);
-  if (satFatRatio > 0.10) {
-    score -= ((satFatRatio - 0.10) * 100.0).clamp(0.0, 30.0);
-  }
-
-  // Penalty for trans fat (extremely harmful, 0g is the only healthy amount, max -40).
-  if (transFatG > 0) {
-    score -= (transFatG * 5.0).clamp(0.0, 40.0);
-  }
-
-  // Penalty for cholesterol (excessive cholesterol is harmful, max -20).
-  if (cholesterolMg > 100.0) {
-    score -= ((cholesterolMg - 100.0) / 20.0).clamp(0.0, 20.0);
-  }
-
-  // Extra penalty for excessive fat ratio (> 35% of total macronutrient weight, max -25)
-  if (fatRatio > 0.35) {
-    score -= ((fatRatio - 0.35) * 50.0).clamp(0.0, 25.0);
-  }
+  double score = 65.0; // Start at a neutral medium base
+  
+  // Add positive influence from essential macros
+  score += essentialScore * 0.4;
+  
+  // Subtract negative influence from bad macros (heavier weight to make sure bad items drop to low rating)
+  score -= badScore * 1.1;
 
   // Keyword-based Junk Food Penalty
   bool isJunkFood(String name) {
@@ -590,14 +571,14 @@ int _computeHealthScore({
       'burger', 'pizza', 'donut', 'crisps', 'chips', 'soda', 'coke', 
       'candy', 'sweet', 'cake', 'waffle', 'chocolate', 'nugget', 
       'hot dog', 'hotdog', 'milkshake', 'cookie', 'brownie', 'pastry',
-      'syrup'
+      'syrup', 'jalebi', 'ladoo', 'barfi'
     ];
     return keywords.any((k) => lower.contains(k));
   }
 
   final junkCount = foodNames.where(isJunkFood).length;
-  score -= (junkCount * 18.0).clamp(0.0, 45.0);
-  
+  score -= junkCount * 25.0; // Strong penalty for recognized junk foods
+
   return score.clamp(1.0, 100.0).round();
 }
 
