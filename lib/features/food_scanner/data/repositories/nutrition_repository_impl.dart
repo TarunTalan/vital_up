@@ -10,6 +10,8 @@ import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/barcode_cache.dart';
+import 'package:vital_up/core/database/collections/offline_food.dart';
+import 'package:isar_community/isar.dart';
 
 class NutritionRepositoryImpl implements NutritionRepository {
   final Dio dio;
