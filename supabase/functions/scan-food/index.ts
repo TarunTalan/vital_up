@@ -532,8 +532,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')!;
-    const groqApiKey = Deno.env.get('GROQ_API_KEY')!;
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY_FOOD_SCANNER')!;
+    const groqApiKey = Deno.env.get('GROQ_API_KEY_FOOD_SCANNER')!;
     const usdaApiKey = Deno.env.get('USDA_FDC_API_KEY') || 'DEMO_KEY';
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
