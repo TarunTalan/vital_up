@@ -75,7 +75,7 @@ The original plan (FatSecret Image Recognition) requires a paid/gated Platform A
 - On a Gemini quota/429 error, fall back to the Groq vision model with the same prompt template and expected JSON shape.
 - **Log `servedBy` (Gemini vs Groq) plus latency and any retry count for every recognition request.** Write this to a Postgres table (e.g. `recognition_logs`) rather than only console logs — cheap to add now, useful later for noticing when Gemini's free tier has quietly gotten stingier, and useful for the premium-tier quota enforcement in §11.
 - Call USDA FDC search server-side (keeps the USDA key off the client too), and cache repeated searches for common foods (e.g. "banana", "grilled chicken breast") in a small Postgres cache table (`food_search_cache`) keyed by normalized query string, with a TTL check done in application code (Edge Functions don't have a built-in cache layer, so a table is simplest given Postgres is already there).
-- Store `GEMINI_API_KEY`, `GROQ_API_KEY`, and `USDA_FDC_API_KEY` as **Supabase Edge Function secrets** (`supabase secrets set ...`), never in client code or committed config.
+- Store `GEMINI_API_KEY_FOOD_SCANNER`, `GROQ_API_KEY_FOOD_SCANNER`, and `USDA_FDC_API_KEY` as **Supabase Edge Function secrets** (`supabase secrets set ...`), never in client code or committed config.
 - Return normalized JSON to the app: candidate items with FDC IDs attached where matched, so the app never has to re-search. **Do not include `servedBy` in the client-facing payload** — it's a server-side log field only.
 - Before doing any recognition work, check the caller's scan quota (see §11.2) via a Postgres query/RPC — reject over-quota requests with HTTP 402/403 before spending a Gemini/Groq call.
 
