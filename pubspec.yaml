@@ -65,6 +65,8 @@ dependencies:
   google_fonts: ^8.1.0
   flutter_svg: ^2.0.10+1
   google_sign_in: ^6.2.1
+  app_usage: ^4.1.0
+  android_intent_plus: ^6.0.0
 
 dev_dependencies:
   flutter_test:

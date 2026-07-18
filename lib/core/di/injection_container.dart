@@ -26,6 +26,9 @@ import 'package:vital_up/features/diet_plan/domain/usecases/generate_meal_plan.d
 import 'package:vital_up/features/diet_plan/domain/usecases/get_cached_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart' as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
+
 
 final GetIt sl = GetIt.instance;
 
@@ -112,4 +115,8 @@ Future<void> initDependencies() async {
       getCachedMealPlan: sl<GetCachedMealPlan>(),
     ),
   );
+
+  // 10. Dashboard / Screen Time
+  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService());
+  sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
 }

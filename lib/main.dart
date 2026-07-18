@@ -13,6 +13,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,7 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
+        BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
       ],
       child: MaterialApp.router(
         title: 'VitalUp',
