@@ -7,6 +7,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import '../widgets/screen_time_card.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -219,13 +220,7 @@ class _HomeTab extends StatelessWidget {
                 progress: 0.72,
               ),
               const SizedBox(height: 12),
-              const _RestMetricCard(
-                title: 'Screen Time',
-                value: '3h 54m',
-                subtitle: 'About usual for you',
-                iconAsset: 'assets/icons/Watch.svg',
-                progress: 0.72,
-              ),
+              const ScreenTimeCard(),
             ],
           ),
         ),
