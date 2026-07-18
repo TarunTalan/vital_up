@@ -8,6 +8,11 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import '../widgets/screen_time_card.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -39,19 +44,22 @@ class _DashboardPageState extends State<DashboardPage> {
           context.goNamed('onboarding');
         }
       },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        extendBody: true,
-        body: _buildSelectedTab(context),
-        bottomNavigationBar: _selectedIndex == 1
-            ? null
-            : _BottomNavBar(
-                items: _items,
-                selectedIndex: _selectedIndex,
-                onItemSelected: (index) {
-                  setState(() => _selectedIndex = index);
-                },
-              ),
+      child: BlocProvider<DietPlanCubit>(
+        create: (context) => sl<DietPlanCubit>()..loadTodayMealPlan(),
+        child: Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          extendBody: true,
+          body: _buildSelectedTab(context),
+          bottomNavigationBar: _selectedIndex == 1
+              ? null
+              : _BottomNavBar(
+                  items: _items,
+                  selectedIndex: _selectedIndex,
+                  onItemSelected: (index) {
+                    setState(() => _selectedIndex = index);
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -66,10 +74,12 @@ class _DashboardPageState extends State<DashboardPage> {
             extra: imagePath,
           ),
         ),
-      2 => const _SimpleTab(
+      2 => _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',
           icon: Icons.favorite_rounded,
+          buttonLabel: 'Generate AI Diet Plan',
+          onButtonTap: () => context.pushNamed('diet-plan-prefs'),
         ),
       _ => _ProfileTab(onLogout: () => _showLogoutDialog(context)),
     };
@@ -210,7 +220,14 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 24),
               const _DashboardSegmentedTabs(),
               const SizedBox(height: 25),
-              const _DietPlanCard(),
+              BlocBuilder<DietPlanCubit, DietPlanState>(
+                builder: (context, state) {
+                  if (state is DietPlanLoaded) {
+                    return _ActiveDietPlanDetails(plan: state.mealPlan);
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               const SizedBox(height: 25),
               const _RestMetricCard(
                 title: 'Sleep',
@@ -714,48 +731,147 @@ class _BottomNavItem {
   const _BottomNavItem(this.label, this.iconAsset);
 }
 
-class _DietPlanCard extends StatelessWidget {
-  const _DietPlanCard();
+class _ActiveDietPlanDetails extends StatelessWidget {
+  final MealPlan plan;
+
+  const _ActiveDietPlanDetails({required this.plan});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Active Diet Plan',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF111111),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 220,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              PieChart(
+                PieChartData(
+                  sectionsSpace: 4,
+                  centerSpaceRadius: 60,
+                  sections: [
+                    PieChartSectionData(
+                      color: Colors.redAccent,
+                      value: plan.totalProtein.toDouble(),
+                      title: '${plan.totalProtein}g\nPro',
+                      radius: 30,
+                      titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PieChartSectionData(
+                      color: Colors.blueAccent,
+                      value: plan.totalCarbs.toDouble(),
+                      title: '${plan.totalCarbs}g\nCarb',
+                      radius: 30,
+                      titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PieChartSectionData(
+                      color: Colors.orangeAccent,
+                      value: plan.totalFat.toDouble(),
+                      title: '${plan.totalFat}g\nFat',
+                      radius: 30,
+                      titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${plan.totalCalories}',
+                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF111111)),
+                  ),
+                  Text(
+                    'kcal',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...plan.meals.map((meal) => _MealCard(meal: meal)),
+      ],
+    );
+  }
+}
+
+class _MealCard extends StatelessWidget {
+  final Meal meal;
+
+  const _MealCard({required this.meal});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return InkWell(
-      onTap: () => context.pushNamed('diet-plan-prefs'),
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                meal.name,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF111111)),
               ),
-              child: Icon(Icons.restaurant_menu, color: colors.primary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('AI Diet Plan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Generate a personalized meal plan', style: theme.textTheme.bodySmall),
-                ],
+              Text(
+                '${meal.calories} kcal',
+                style: theme.textTheme.titleSmall?.copyWith(color: colors.primary),
               ),
-            ),
-            Icon(Icons.arrow_forward_ios, color: colors.primary, size: 16),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'P: ${meal.protein}g  C: ${meal.carbs}g  F: ${meal.fat}g',
+            style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF4E4E4E)),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          ...meal.items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF111111))),
+                    Expanded(
+                        child: Text(
+                      item,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: const Color(0xFF111111)),
+                    )),
+                  ],
+                ),
+              )),
+        ],
       ),
     );
   }
