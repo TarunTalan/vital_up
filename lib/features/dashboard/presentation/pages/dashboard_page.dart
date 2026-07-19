@@ -8,6 +8,7 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import '../widgets/screen_time_card.dart';
+import '../widgets/sleep_card.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -229,13 +230,7 @@ class _HomeTab extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 25),
-              const _RestMetricCard(
-                title: 'Sleep',
-                value: '6h 43m',
-                subtitle: 'Good night of rest',
-                iconAsset: 'assets/icons/sleep.svg',
-                progress: 0.72,
-              ),
+              const SleepCard(),
               const SizedBox(height: 12),
               const ScreenTimeCard(),
             ],

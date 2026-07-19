@@ -28,12 +28,13 @@ const SleepLogCacheSchema = CollectionSchema(
       type: IsarType.dateTime,
     ),
     r'isSynced': PropertySchema(id: 2, name: r'isSynced', type: IsarType.bool),
+    r'source': PropertySchema(id: 3, name: r'source', type: IsarType.string),
     r'startTime': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'startTime',
       type: IsarType.dateTime,
     ),
-    r'userId': PropertySchema(id: 4, name: r'userId', type: IsarType.string),
+    r'userId': PropertySchema(id: 5, name: r'userId', type: IsarType.string),
   },
 
   estimateSize: _sleepLogCacheEstimateSize,
@@ -71,6 +72,7 @@ int _sleepLogCacheEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.source.length * 3;
   bytesCount += 3 + object.userId.length * 3;
   return bytesCount;
 }
@@ -84,8 +86,9 @@ void _sleepLogCacheSerialize(
   writer.writeLong(offsets[0], object.durationMinutes);
   writer.writeDateTime(offsets[1], object.endTime);
   writer.writeBool(offsets[2], object.isSynced);
-  writer.writeDateTime(offsets[3], object.startTime);
-  writer.writeString(offsets[4], object.userId);
+  writer.writeString(offsets[3], object.source);
+  writer.writeDateTime(offsets[4], object.startTime);
+  writer.writeString(offsets[5], object.userId);
 }
 
 SleepLogCache _sleepLogCacheDeserialize(
@@ -99,8 +102,9 @@ SleepLogCache _sleepLogCacheDeserialize(
   object.endTime = reader.readDateTime(offsets[1]);
   object.id = id;
   object.isSynced = reader.readBool(offsets[2]);
-  object.startTime = reader.readDateTime(offsets[3]);
-  object.userId = reader.readString(offsets[4]);
+  object.source = reader.readString(offsets[3]);
+  object.startTime = reader.readDateTime(offsets[4]);
+  object.userId = reader.readString(offsets[5]);
   return object;
 }
 
@@ -118,8 +122,10 @@ P _sleepLogCacheDeserializeProp<P>(
     case 2:
       return (reader.readBool(offset)) as P;
     case 3:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 4:
+      return (reader.readDateTime(offset)) as P;
+    case 5:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -458,6 +464,147 @@ extension SleepLogCacheQueryFilter
   }
 
   QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'source',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'source',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'source',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'source', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
+  sourceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'source', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterFilterCondition>
   startTimeEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -701,6 +848,18 @@ extension SleepLogCacheQuerySortBy
     });
   }
 
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> sortBySource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> sortBySourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.desc);
+    });
+  }
+
   QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> sortByStartTime() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'startTime', Sort.asc);
@@ -780,6 +939,18 @@ extension SleepLogCacheQuerySortThenBy
     });
   }
 
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> thenBySource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.asc);
+    });
+  }
+
+  QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> thenBySourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'source', Sort.desc);
+    });
+  }
+
   QueryBuilder<SleepLogCache, SleepLogCache, QAfterSortBy> thenByStartTime() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'startTime', Sort.asc);
@@ -827,6 +998,14 @@ extension SleepLogCacheQueryWhereDistinct
     });
   }
 
+  QueryBuilder<SleepLogCache, SleepLogCache, QDistinct> distinctBySource({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'source', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<SleepLogCache, SleepLogCache, QDistinct> distinctByStartTime() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'startTime');
@@ -865,6 +1044,12 @@ extension SleepLogCacheQueryProperty
   QueryBuilder<SleepLogCache, bool, QQueryOperations> isSyncedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isSynced');
+    });
+  }
+
+  QueryBuilder<SleepLogCache, String, QQueryOperations> sourceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'source');
     });
   }
 

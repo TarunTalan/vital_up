@@ -67,6 +67,7 @@ dependencies:
   google_sign_in: ^6.2.1
   app_usage: ^4.1.0
   android_intent_plus: ^6.0.0
+  health: 13.0.0
 
 dev_dependencies:
   flutter_test:
