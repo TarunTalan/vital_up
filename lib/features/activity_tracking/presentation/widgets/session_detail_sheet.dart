@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
+import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
@@ -11,10 +14,11 @@ Future<(String?, String?)?> showSessionDetailSheet(
     BuildContext context, {
       required HistoryEntry entry,
     }) {
+  final theme = Theme.of(context);
   return showModalBottomSheet<(String?, String?)>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: theme.colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -32,25 +36,21 @@ class _SessionDetailSheet extends StatefulWidget {
 }
 
 class _SessionDetailSheetState extends State<_SessionDetailSheet> {
-  late final TextEditingController _tagController;
-  late final TextEditingController _noteController;
+  late String _tag;
+  late String _note;
 
   @override
   void initState() {
     super.initState();
-    _tagController = TextEditingController(text: widget.entry.annotation?.tag ?? '');
-    _noteController = TextEditingController(text: widget.entry.annotation?.note ?? '');
-  }
-
-  @override
-  void dispose() {
-    _tagController.dispose();
-    _noteController.dispose();
-    super.dispose();
+    _tag = widget.entry.annotation?.tag ?? '';
+    _note = widget.entry.annotation?.note ?? '';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final session = widget.entry.session;
 
     return Padding(
@@ -70,7 +70,7 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3E3E3),
+                  color: colors.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -78,20 +78,20 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(activityTypeIcon(session.activityType), color: const Color(0xFF2BC7D8)),
+                Icon(activityTypeIcon(session.activityType), color: colors.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     session.activityType.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colors.onSurface),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${formatShortDate(session.startTime)} · ${formatTimeOfDay(session.startTime)}',
-                  style: const TextStyle(color: Color(0xFF9A9A9A), fontSize: 12),
+                  style: TextStyle(color: customColors?.grayText ?? const Color(0xFF9A9A9A), fontSize: 12),
                 ),
               ],
             ),
@@ -123,9 +123,14 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: session.targetAchieved
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFF3E0),
+                      ? colors.primary.withOpacity(0.12)
+                      : colors.outline.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: session.targetAchieved
+                        ? colors.primary.withOpacity(0.3)
+                        : colors.outline.withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -133,8 +138,8 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                       Icons.flag_rounded,
                       size: 20,
                       color: session.targetAchieved
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFFF9800),
+                          ? colors.primary
+                          : customColors?.grayText ?? const Color(0xFFFF9800),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -143,9 +148,10 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                         children: [
                           Text(
                             'Target: ${session.targetType == 'distance' ? '${session.targetValue!.toStringAsFixed(1)} km' : '${session.targetValue!.toStringAsFixed(0)} kcal'}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
+                              color: colors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -155,8 +161,8 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: session.targetAchieved
-                                  ? const Color(0xFF4CAF50)
-                                  : const Color(0xFFFF9800),
+                                  ? colors.primary
+                                  : customColors?.grayText ?? const Color(0xFFFF9800),
                             ),
                           ),
                         ],
@@ -167,8 +173,8 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                           ? Icons.check_circle_rounded
                           : Icons.cancel_outlined,
                       color: session.targetAchieved
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFFF9800),
+                          ? colors.primary
+                          : customColors?.grayText ?? const Color(0xFFFF9800),
                       size: 24,
                     ),
                   ],
@@ -177,70 +183,39 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             ],
             if (!session.stepCountReliable) ...[
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 '*Step count may be inaccurate for this session.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                style: TextStyle(fontSize: 11, color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
               ),
             ],
             const SizedBox(height: 20),
-            const Text(
-              'TAG',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _tagController,
-              decoration: InputDecoration(
-                hintText: 'e.g. Morning run, Race day, Recovery',
-                filled: true,
-                fillColor: const Color(0xFFF5F5F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
+            AuthTextField(
+              label: 'TAG',
+              value: _tag,
+              onChange: (val) => setState(() => _tag = val),
+              placeholder: 'e.g. Morning run, Race day, Recovery',
+              reserveErrorSpace: false,
+              singleLine: true,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'NOTE',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1),
+            AuthTextField(
+              label: 'NOTE',
+              value: _note,
+              onChange: (val) => setState(() => _note = val),
+              placeholder: 'How did it feel?',
+              reserveErrorSpace: false,
+              singleLine: false,
             ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _noteController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'How did it feel?',
-                filled: true,
-                fillColor: const Color(0xFFF5F5F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop((
-                  _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
-                  _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
-                  ));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                ),
-              ),
+            const SizedBox(height: 24),
+            PrimaryAuthButton(
+              label: 'Save',
+              isLoading: false,
+              onTap: () {
+                Navigator.of(context).pop((
+                  _tag.trim().isEmpty ? null : _tag.trim(),
+                  _note.trim().isEmpty ? null : _note.trim(),
+                ));
+              },
             ),
           ],
         ),
@@ -257,20 +232,24 @@ class _DetailStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colors.onSurface),
           ),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+            style: TextStyle(fontSize: 11, color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
           ),
         ],
       ),
     );
   }
-}
+}

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'dart:ui';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
@@ -18,6 +20,9 @@ class ActivityHistoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Column(
       children: [
         SizedBox(
@@ -46,18 +51,43 @@ class ActivityHistoryFilterBar extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: TextField(
-            onChanged: onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Search by tag or note',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-              filled: true,
-              fillColor: const Color(0xFFF5F5F5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.light
+                      ? Colors.white.withValues(alpha: 0.80)
+                      : colors.surface.withValues(alpha: 0.80),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: (theme.brightness == Brightness.light
+                            ? const Color(0xFFD8D8D8)
+                            : colors.outline)
+                        .withValues(alpha: 0.72),
+                  ),
+                ),
+                child: TextField(
+                  onChanged: onSearchChanged,
+                  style: TextStyle(color: colors.onSurface, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search by tag or note…',
+                    hintStyle: TextStyle(
+                        color: colors.onSurface.withValues(alpha: 0.4),
+                        fontSize: 14),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        size: 20,
+                        color: colors.onSurface.withValues(alpha: 0.5)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 12),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                  ),
+                ),
               ),
             ),
           ),
@@ -82,6 +112,10 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -89,9 +123,9 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
+          color: selected ? colors.primary : colors.surface,
           border: Border.all(
-            color: selected ? Colors.black : const Color(0xFFE3E3E3),
+            color: selected ? colors.primary : colors.outline.withOpacity(0.5),
           ),
           borderRadius: BorderRadius.circular(20),
         ),
@@ -99,16 +133,16 @@ class _FilterChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 14, color: selected ? Colors.white : Colors.black),
+              Icon(icon, size: 14, color: selected ? (customColors?.buttonText ?? Colors.black) : colors.onSurface),
               const SizedBox(width: 6),
             ],
             Text(
               label.toUpperCase(),
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
-                color: selected ? Colors.white : Colors.black,
+                color: selected ? (customColors?.buttonText ?? Colors.black) : colors.onSurface,
               ),
             ),
           ],
@@ -116,4 +150,4 @@ class _FilterChip extends StatelessWidget {
       ),
     );
   }
-}
+}

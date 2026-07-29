@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 
@@ -20,10 +22,11 @@ class TargetPickerSheet extends StatefulWidget {
     required DistanceUnit distanceUnit,
     required WorkoutPrefsNotifier notifier,
   }) async {
+    final theme = Theme.of(context);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -91,7 +94,11 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final distUnitLabel = widget.distanceUnit.label.toUpperCase();
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -110,18 +117,19 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDDDDD),
+                    color: colors.outline.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'ACTIVITY TARGET',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: 2,
+                  color: colors.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
@@ -129,20 +137,20 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
               // Tab bar
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F0F0),
+                  color: customColors?.tabBarBg ?? colors.outline.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TabBar(
                   controller: _tabs,
                   indicator: BoxDecoration(
-                    color: Colors.black,
+                    color: colors.primary,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: const Color(0xFF888888),
+                  labelColor: customColors?.buttonText ?? Colors.black,
+                  unselectedLabelColor: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
                   labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 13),
+                      fontWeight: FontWeight.w600, fontSize: 13),
                   dividerColor: Colors.transparent,
                   tabs: [
                     Tab(text: 'DISTANCE ($distUnitLabel)'),
@@ -154,7 +162,7 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
 
               // Tab content
               SizedBox(
-                height: 80,
+                height: 70,
                 child: TabBarView(
                   controller: _tabs,
                   children: [
@@ -177,49 +185,22 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(null),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFDDDDDD)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'CLEAR',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF888888),
-                          letterSpacing: 1,
-                        ),
-                      ),
+                    child: SecondaryAuthButton(
+                      label: 'CLEAR',
+                      onTap: () => Navigator.of(context).pop(null),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: PrimaryAuthButton(
+                      label: 'SET TARGET',
+                      isLoading: false,
+                      onTap: () {
                         final type = _tabs.index == 0
                             ? WorkoutTargetType.distance
                             : WorkoutTargetType.calories;
                         _confirm(type);
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'SET TARGET',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -245,32 +226,38 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
       ],
-      style: const TextStyle(
-        fontSize: 32,
-        fontWeight: FontWeight.w900,
-        color: Colors.black,
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: colors.onSurface,
       ),
       decoration: InputDecoration(
         border: InputBorder.none,
         hintText: hint,
-        hintStyle: const TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFCCCCCC),
+        hintStyle: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: colors.outline.withValues(alpha: 0.5),
         ),
         suffixText: suffix,
-        suffixStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF888888),
+        suffixStyle: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
         ),
       ),
     );
   }
 }
+
+

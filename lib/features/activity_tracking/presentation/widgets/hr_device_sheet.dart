@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 
 /// UUID for the standard Bluetooth Heart Rate Service.
 const _kHeartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
@@ -78,10 +79,11 @@ class HrDeviceSheet extends StatefulWidget {
 
   static Future<void> show(
       BuildContext context, HeartRateManager manager) async {
+    final theme = Theme.of(context);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -159,6 +161,10 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.55,
@@ -175,7 +181,7 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDDDDD),
+                    color: colors.outline.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -185,7 +191,7 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
               // Header row
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -193,14 +199,15 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                           'HEART RATE MONITOR',
                           style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2),
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 2,
+                              color: colors.onSurface),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'Pair a BLE heart rate device',
                           style: TextStyle(
-                              fontSize: 13, color: Color(0xFF888888)),
+                              fontSize: 13, color: customColors?.grayText ?? const Color(0xFF888888)),
                         ),
                       ],
                     ),
@@ -211,45 +218,45 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                         await widget.manager.disconnect();
                         if (mounted) setState(() {});
                       },
-                      icon: const Icon(Icons.link_off_rounded, size: 16,
-                          color: Colors.red),
-                      label: const Text('Disconnect',
-                          style: TextStyle(color: Colors.red, fontSize: 12)),
+                      icon: Icon(Icons.link_off_rounded, size: 16,
+                          color: colors.error),
+                      label: Text('Disconnect',
+                          style: TextStyle(color: colors.error, fontSize: 12)),
                     ),
                   if (_isScanning)
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: colors.primary,
                       ),
                     )
                   else
                     IconButton(
                       onPressed: _startScan,
-                      icon: const Icon(Icons.refresh_rounded),
+                      icon: Icon(Icons.refresh_rounded, color: colors.onSurface),
                       tooltip: 'Rescan',
                     ),
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(),
+              Divider(color: colors.outline.withOpacity(0.2)),
 
               // Connected device
               if (widget.manager.connectedDevice != null) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE8F5E9),
+                  leading: CircleAvatar(
+                    backgroundColor: colors.primary.withOpacity(0.12),
                     child: Icon(Icons.favorite_rounded,
-                        color: Colors.red, size: 20),
+                        color: colors.error, size: 20),
                   ),
                   title: Text(
                     widget.manager.connectedDevice!.platformName.isEmpty
                         ? 'HR Monitor'
                         : widget.manager.connectedDevice!.platformName,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: colors.onSurface),
                   ),
                   subtitle: const Text(
                     'Connected',
@@ -262,16 +269,16 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                       final bpm = snap.data;
                       return Text(
                         bpm != null ? '$bpm BPM' : '--',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                          color: colors.error,
                         ),
                       );
                     },
                   ),
                 ),
-                const Divider(),
+                Divider(color: colors.outline.withOpacity(0.2)),
               ],
 
               // Scanned devices list
@@ -283,8 +290,8 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                               ? 'Scanning for heart rate monitors…'
                               : 'No devices found.\nMake sure your device is in pairing mode.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Color(0xFF888888), height: 1.6),
+                          style: TextStyle(
+                              color: customColors?.grayText ?? const Color(0xFF888888), height: 1.6),
                         ),
                       )
                     : ListView.builder(
@@ -299,27 +306,27 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                           final isConnecting = _connectingId == id;
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const CircleAvatar(
-                              backgroundColor: Color(0xFFF5F5F5),
+                            leading: CircleAvatar(
+                              backgroundColor: colors.outline.withOpacity(0.12),
                               child: Icon(Icons.favorite_border_rounded,
-                                  color: Colors.red, size: 20),
+                                  color: colors.error, size: 20),
                             ),
                             title: Text(name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700, color: colors.onSurface)),
                             subtitle:
                                 Text('RSSI: ${r.rssi} dBm',
-                                    style: const TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: 12, color: customColors?.grayText)),
                             trailing: isConnecting
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.black,
+                                      color: colors.primary,
                                     ),
                                   )
-                                : const Icon(Icons.chevron_right_rounded),
+                                : Icon(Icons.chevron_right_rounded, color: colors.outline),
                             onTap:
                                 _connectingId != null ? null : () => _connect(r),
                           );
@@ -333,3 +340,4 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
     );
   }
 }
+

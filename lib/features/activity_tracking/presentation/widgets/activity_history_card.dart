@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
@@ -21,6 +22,9 @@ class ActivityHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final session = entry.session;
     final tag = entry.annotation?.tag;
 
@@ -30,7 +34,7 @@ class ActivityHistoryCard extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        color: const Color(0xFFE53935),
+        color: colors.error,
         child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
       confirmDismiss: (_) async {
@@ -46,7 +50,7 @@ class ActivityHistoryCard extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
+                child: Text('Delete', style: TextStyle(color: colors.error)),
               ),
             ],
           ),
@@ -60,9 +64,15 @@ class ActivityHistoryCard extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFE3E3E3)),
-            borderRadius: BorderRadius.circular(14),
+            color: theme.brightness == Brightness.light 
+                ? Colors.white.withValues(alpha: 0.72) 
+                : colors.surface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: (theme.brightness == Brightness.light 
+                  ? const Color(0xFFD8D8D8) 
+                  : colors.outline).withValues(alpha: 0.72),
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,12 +81,12 @@ class ActivityHistoryCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FBFC),
+                  color: colors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   activityTypeIcon(session.activityType),
-                  color: const Color(0xFF2BC7D8),
+                  color: colors.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -91,17 +101,18 @@ class ActivityHistoryCard extends StatelessWidget {
                             session.activityType.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
                               fontSize: 15,
+                              color: colors.onSurface,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '${formatShortDate(session.startTime)} · ${formatTimeOfDay(session.startTime)}',
-                          style: const TextStyle(
-                            color: Color(0xFF9A9A9A),
+                          style: TextStyle(
+                            color: customColors?.grayText ?? const Color(0xFF9A9A9A),
                             fontSize: 12,
                           ),
                         ),
@@ -139,15 +150,15 @@ class ActivityHistoryCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
+                          color: colors.outline.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           tag,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF555555),
+                            fontWeight: FontWeight.w500,
+                            color: colors.onSurface.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -158,8 +169,8 @@ class ActivityHistoryCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: session.targetAchieved
-                              ? const Color(0xFFE8F5E9)
-                              : const Color(0xFFFFF3E0),
+                              ? colors.primary.withValues(alpha: 0.12)
+                              : colors.outline.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -169,8 +180,8 @@ class ActivityHistoryCard extends StatelessWidget {
                               Icons.flag_rounded,
                               size: 12,
                               color: session.targetAchieved
-                                  ? const Color(0xFF4CAF50)
-                                  : const Color(0xFFFF9800),
+                                  ? colors.primary
+                                  : customColors?.grayText ?? const Color(0xFFFF9800),
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -179,10 +190,10 @@ class ActivityHistoryCard extends StatelessWidget {
                                   : '${session.targetValue!.toStringAsFixed(0)} kcal',
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 color: session.targetAchieved
-                                    ? const Color(0xFF4CAF50)
-                                    : const Color(0xFFFF9800),
+                                    ? colors.primary
+                                    : customColors?.grayText ?? const Color(0xFFFF9800),
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -192,8 +203,8 @@ class ActivityHistoryCard extends StatelessWidget {
                                   : Icons.radio_button_unchecked_rounded,
                               size: 14,
                               color: session.targetAchieved
-                                  ? const Color(0xFF4CAF50)
-                                  : const Color(0xFFFF9800),
+                                  ? colors.primary
+                                  : customColors?.grayText ?? const Color(0xFFFF9800),
                             ),
                           ],
                         ),
@@ -202,7 +213,7 @@ class ActivityHistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFFBDBDBD)),
+              Icon(Icons.chevron_right_rounded, color: colors.outline),
             ],
           ),
         ),
@@ -219,17 +230,21 @@ class _MiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: const Color(0xFF9A9A9A)),
+        Icon(icon, size: 14, color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colors.onSurface),
           ),
         ),
       ],
