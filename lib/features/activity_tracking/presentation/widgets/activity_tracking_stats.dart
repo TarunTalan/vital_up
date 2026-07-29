@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
@@ -91,6 +92,9 @@ class TopStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final progress = _targetProgress;
     final hasBpm = heartRateBpm != null;
 
@@ -110,13 +114,21 @@ class TopStats extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(16),
+        color: (theme.brightness == Brightness.light 
+            ? Colors.white 
+            : colors.surface).withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: (theme.brightness == Brightness.light 
+              ? const Color(0xFFD8D8D8) 
+              : colors.outline).withValues(alpha: 0.72),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: theme.brightness == Brightness.light ? 0.06 : 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -131,11 +143,11 @@ class TopStats extends StatelessWidget {
             children: [
               Text(
                 formatDuration(elapsed),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 40,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                   height: 1.0,
-                  color: Colors.black,
+                  color: colors.onSurface,
                 ),
               ),
               if (hasBpm) ...[
@@ -144,21 +156,21 @@ class TopStats extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
+                    color: colors.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.favorite_rounded,
-                          color: Colors.red, size: 14),
+                      Icon(Icons.favorite_rounded,
+                          color: colors.error, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         '$heartRateBpm',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                          color: colors.error,
                         ),
                       ),
                     ],
@@ -168,13 +180,13 @@ class TopStats extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          const Text(
+          Text(
             'DURATION',
             style: TextStyle(
-              color: Color(0xFF9A9A9A),
+              color: customColors?.grayText ?? const Color(0xFF9A9A9A),
               fontSize: 10,
               letterSpacing: 2.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 4),
@@ -203,7 +215,7 @@ class TopStats extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.flag_rounded, size: 12, color: Color(0xFF9A9A9A)),
+                Icon(Icons.flag_rounded, size: 12, color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: ClipRRect(
@@ -211,9 +223,9 @@ class TopStats extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 6,
-                      backgroundColor: const Color(0xFFEEEEEE),
+                      backgroundColor: colors.outline.withValues(alpha: 0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        progress >= 1.0 ? Colors.green : Colors.black,
+                        progress >= 1.0 ? Colors.green : colors.primary,
                       ),
                     ),
                   ),
@@ -221,10 +233,10 @@ class TopStats extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   _targetLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF666666),
+                    fontWeight: FontWeight.w600,
+                    color: customColors?.grayText ?? const Color(0xFF666666),
                   ),
                 ),
               ],
@@ -249,6 +261,10 @@ class StatColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -257,11 +273,11 @@ class StatColumn extends StatelessWidget {
           child: Text(
             value,
             maxLines: 1,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               height: 1.0,
-              color: Colors.black,
+              color: colors.onSurface,
             ),
           ),
         ),
@@ -270,15 +286,15 @@ class StatColumn extends StatelessWidget {
           label,
           maxLines: 2,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF9A9A9A),
+          style: TextStyle(
+            color: customColors?.grayText ?? const Color(0xFF9A9A9A),
             fontSize: 8.5,
             letterSpacing: 0.4,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w500,
             height: 1.2,
           ),
         ),
       ],
     );
   }
-}
+}

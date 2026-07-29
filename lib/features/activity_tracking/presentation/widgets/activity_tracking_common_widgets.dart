@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 
 /// Small circular icon button used for the back button and similar
 /// floating controls over the map.
@@ -14,8 +15,9 @@ class RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       elevation: 4,
       shape: const CircleBorder(),
       child: InkWell(
@@ -25,7 +27,7 @@ class RoundIconButton extends StatelessWidget {
           width: 36,
           height: 36,
           alignment: Alignment.center,
-          child: Icon(icon, color: Colors.black, size: 18),
+          child: Icon(icon, color: theme.colorScheme.onSurface, size: 18),
         ),
       ),
     );
@@ -43,8 +45,9 @@ class ZoomResetButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       elevation: 4,
       shape: const CircleBorder(),
       child: InkWell(
@@ -56,9 +59,9 @@ class ZoomResetButton extends StatelessWidget {
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.my_location_rounded,
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
             size: 18,
           ),
         ),
@@ -85,18 +88,20 @@ class OfflineMapIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final customColors = theme.extension<VitalUpColors>();
     IconData icon;
     Color color;
 
     if (isReady) {
       icon = Icons.offline_pin_rounded;
-      color = const Color(0xFF47B85A);
+      color = const Color(0xFF47B85A); // standard success green is fine
     } else if (isDownloading) {
       icon = Icons.downloading_rounded;
-      color = const Color(0xFF2BC7D8);
+      color = theme.colorScheme.primary; // Brand primary cyan
     } else {
       icon = Icons.download_for_offline_rounded;
-      color = const Color(0xFF777777);
+      color = customColors?.grayText ?? const Color(0xFF777777);
     }
 
     return GestureDetector(
@@ -108,4 +113,4 @@ class OfflineMapIcon extends StatelessWidget {
       ),
     );
   }
-}
+}

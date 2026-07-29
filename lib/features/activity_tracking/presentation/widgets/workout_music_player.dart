@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
 
 class WorkoutMusicPlayer extends StatelessWidget {
@@ -35,8 +36,11 @@ class WorkoutMusicPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     if (trackName == 'None') return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final isStory = trackName.startsWith('Story:');
-    const containerColor = Color(0xFF1B1A22);
+    final containerColor = colors.surface;
     final isExternal = trackName.startsWith('Player:');
 
     return LayoutBuilder(
@@ -55,23 +59,23 @@ class WorkoutMusicPlayer extends StatelessWidget {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: const Color(0xFF2BC7D8).withOpacity(0.1),
+                color: colors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Color(0xFF2BC7D8)),
+                        valueColor: AlwaysStoppedAnimation(colors.primary),
                       ),
                     )
                   : (isPlaying
-                      ? const _MusicVisualizer(color: Color(0xFF2BC7D8))
+                      ? _MusicVisualizer(color: colors.primary)
                       : Icon(
                           isStory ? Icons.mic_rounded : Icons.music_note_rounded,
-                          color: const Color(0xFF2BC7D8),
+                          color: colors.primary,
                           size: 20,
                         )),
             );
@@ -86,9 +90,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
               isStory ? 'NARRATIVE STORY' : 'ACTIVITY SOUNDTRACK',
               style: TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 1.5,
-                color: Colors.white.withOpacity(0.6),
+                color: colors.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 2),
@@ -96,10 +100,10 @@ class WorkoutMusicPlayer extends StatelessWidget {
               trackName.replaceFirst('Story: ', '').replaceFirst('Music: ', ''),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
               ),
             ),
           ],
@@ -109,7 +113,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
           onPressed: onFavoriteToggle,
           icon: Icon(
             isFavorited ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            color: isFavorited ? Colors.red.shade400 : Colors.white,
+            color: isFavorited ? Colors.red : colors.onSurface,
             size: 20,
           ),
           padding: const EdgeInsets.all(4),
@@ -118,9 +122,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
 
         final prevButton = IconButton(
           onPressed: onPrevious,
-          icon: const Icon(
+          icon: Icon(
             Icons.skip_previous_rounded,
-            color: Colors.white,
+            color: colors.onSurface,
             size: 22,
           ),
           padding: const EdgeInsets.all(4),
@@ -131,7 +135,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
           onPressed: onPlayPause,
           icon: Icon(
             isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-            color: const Color(0xFF2BC7D8),
+            color: colors.primary,
             size: 30,
           ),
           padding: const EdgeInsets.all(4),
@@ -140,9 +144,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
 
         final nextButton = IconButton(
           onPressed: onNext,
-          icon: const Icon(
+          icon: Icon(
             Icons.skip_next_rounded,
-            color: Colors.white,
+            color: colors.onSurface,
             size: 22,
           ),
           padding: const EdgeInsets.all(4),
@@ -151,9 +155,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
 
         final discardButton = IconButton(
           onPressed: onDiscard,
-          icon: const Icon(
+          icon: Icon(
             Icons.close_rounded,
-            color: Colors.white60,
+            color: colors.onSurface.withValues(alpha: 0.6),
             size: 18,
           ),
           padding: const EdgeInsets.all(4),
@@ -163,9 +167,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
 
         final minimizeButton = IconButton(
           onPressed: onMinimizeToggle,
-          icon: const Icon(
+          icon: Icon(
             Icons.close_fullscreen_rounded,
-            color: Colors.white60,
+            color: colors.onSurface.withValues(alpha: 0.6),
             size: 18,
           ),
           padding: const EdgeInsets.all(4),
@@ -180,14 +184,21 @@ class WorkoutMusicPlayer extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2BC7D8).withOpacity(0.3), width: 1),
-                boxShadow: const [
+                color: theme.brightness == Brightness.light 
+                    ? Colors.white.withValues(alpha: 0.72) 
+                    : colors.surface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: (theme.brightness == Brightness.light 
+                      ? const Color(0xFFD8D8D8) 
+                      : colors.outline).withValues(alpha: 0.72),
+                  width: 1,
+                ),
+                boxShadow: [
                   BoxShadow(
-                    color: Colors.black26,
+                    color: Colors.black.withValues(alpha: theme.brightness == Brightness.light ? 0.06 : 0.3),
                     blurRadius: 8,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   )
                 ],
               ),
@@ -200,10 +211,10 @@ class WorkoutMusicPlayer extends StatelessWidget {
                       trackName.replaceFirst('Story: ', '').replaceFirst('Music: ', ''),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
                       ),
                     ),
                   ),
@@ -216,9 +227,9 @@ class WorkoutMusicPlayer extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     onPressed: onMinimizeToggle,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.open_in_full_rounded,
-                      color: Colors.white70,
+                      color: colors.onSurface.withValues(alpha: 0.7),
                       size: 16,
                     ),
                     padding: EdgeInsets.zero,
@@ -237,14 +248,21 @@ class WorkoutMusicPlayer extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2BC7D8).withOpacity(0.3), width: 1),
-              boxShadow: const [
+              color: theme.brightness == Brightness.light 
+                  ? Colors.white.withValues(alpha: 0.72) 
+                  : colors.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(
+                color: (theme.brightness == Brightness.light 
+                    ? const Color(0xFFD8D8D8) 
+                    : colors.outline).withValues(alpha: 0.72),
+                width: 1,
+              ),
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
+                  color: Colors.black.withValues(alpha: theme.brightness == Brightness.light ? 0.06 : 0.3),
                   blurRadius: 8,
-                  offset: Offset(0, 4),
+                  offset: const Offset(0, 4),
                 )
               ],
             ),
@@ -267,7 +285,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 10),
-                          const Divider(color: Colors.white10, height: 1, thickness: 0.5),
+                          Divider(color: colors.outline.withValues(alpha: 0.15), height: 1, thickness: 0.5),
                           const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -317,6 +335,8 @@ class _AudioProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final audioService = sl<WorkoutAudioService>();
 
     return StreamBuilder<Duration>(
@@ -348,10 +368,10 @@ class _AudioProgressBar extends StatelessWidget {
                       trackHeight: 3,
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                       overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                      activeTrackColor: const Color(0xFF2BC7D8),
-                      inactiveTrackColor: Colors.white24,
-                      thumbColor: const Color(0xFF2BC7D8),
-                      overlayColor: const Color(0xFF2BC7D8).withOpacity(0.2),
+                      activeTrackColor: colors.primary,
+                      inactiveTrackColor: colors.outline.withValues(alpha: 0.3),
+                      thumbColor: colors.primary,
+                      overlayColor: colors.primary.withValues(alpha: 0.2),
                     ),
                     child: Slider(
                       min: 0.0,
@@ -370,17 +390,17 @@ class _AudioProgressBar extends StatelessWidget {
                     children: [
                       Text(
                         formatDuration(position),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: Colors.white60,
+                          color: colors.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
                         formatDuration(duration),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: Colors.white60,
+                          color: colors.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -465,3 +485,4 @@ class _MusicVisualizerState extends State<_MusicVisualizer> with SingleTickerPro
     );
   }
 }
+

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
+
 
 /// Row of activity type buttons (walk/run/cycle/more) shown while idle.
 class ActivitySelector extends StatelessWidget {
@@ -67,19 +70,36 @@ class ActivityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Expanded(
       child: InkWell(
         onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           height: 52,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: selected
+                ? colors.primary.withValues(alpha: 0.12)
+                : (theme.brightness == Brightness.light
+                    ? Colors.white.withValues(alpha: 0.72)
+                    : colors.surface.withValues(alpha: 0.72)),
+            borderRadius: BorderRadius.circular(13),
             border: Border.all(
-              color: selected ? Colors.black : const Color(0xFFE3E3E3),
+              color: selected
+                  ? colors.primary
+                  : (theme.brightness == Brightness.light
+                      ? const Color(0xFFD8D8D8)
+                      : colors.outline).withValues(alpha: 0.72),
               width: selected ? 2 : 1,
             ),
           ),
-          child: Icon(icon, size: 22, color: Colors.black),
+          child: Icon(
+            icon,
+            size: 22,
+            color: selected ? colors.primary : colors.onSurface,
+          ),
         ),
       ),
     );
@@ -100,6 +120,8 @@ class MoreActivitiesButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final isCustomSelected = selected != ActivityType.walk &&
         selected != ActivityType.run &&
         selected != ActivityType.cycle;
@@ -109,7 +131,7 @@ class MoreActivitiesButton extends StatelessWidget {
         onTap: enabled
             ? () {
           // Show dialog with additional activity options
-          showDialog(
+          showSmoothDialog(
             context: context,
             builder: (context) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -121,10 +143,11 @@ class MoreActivitiesButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    leading: Icon(activityTypeIcon(ActivityType.walk)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    leading: Icon(activityTypeIcon(ActivityType.walk), color: colors.onSurface),
                     title: const Text('Walking'),
                     trailing: selected == ActivityType.walk
-                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        ? Icon(Icons.check_rounded, color: colors.primary)
                         : null,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -132,10 +155,11 @@ class MoreActivitiesButton extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: Icon(activityTypeIcon(ActivityType.run)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    leading: Icon(activityTypeIcon(ActivityType.run), color: colors.onSurface),
                     title: const Text('Running'),
                     trailing: selected == ActivityType.run
-                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        ? Icon(Icons.check_rounded, color: colors.primary)
                         : null,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -143,10 +167,11 @@ class MoreActivitiesButton extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: Icon(activityTypeIcon(ActivityType.cycle)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    leading: Icon(activityTypeIcon(ActivityType.cycle), color: colors.onSurface),
                     title: const Text('Cycling'),
                     trailing: selected == ActivityType.cycle
-                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        ? Icon(Icons.check_rounded, color: colors.primary)
                         : null,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -154,10 +179,11 @@ class MoreActivitiesButton extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: Icon(activityTypeIcon(ActivityType.trekking)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    leading: Icon(activityTypeIcon(ActivityType.trekking), color: colors.onSurface),
                     title: const Text('Trekking'),
                     trailing: selected == ActivityType.trekking
-                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        ? Icon(Icons.check_rounded, color: colors.primary)
                         : null,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -165,10 +191,11 @@ class MoreActivitiesButton extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: Icon(activityTypeIcon(ActivityType.climbing)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    leading: Icon(activityTypeIcon(ActivityType.climbing), color: colors.onSurface),
                     title: const Text('Climbing'),
                     trailing: selected == ActivityType.climbing
-                        ? const Icon(Icons.check_rounded, color: Colors.black)
+                        ? Icon(Icons.check_rounded, color: colors.primary)
                         : null,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -181,12 +208,22 @@ class MoreActivitiesButton extends StatelessWidget {
           );
         }
             : null,
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           height: 52,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isCustomSelected
+                ? colors.primary.withValues(alpha: 0.12)
+                : (theme.brightness == Brightness.light
+                    ? Colors.white.withValues(alpha: 0.72)
+                    : colors.surface.withValues(alpha: 0.72)),
+            borderRadius: BorderRadius.circular(13),
             border: Border.all(
-              color: isCustomSelected ? Colors.black : const Color(0xFFE3E3E3),
+              color: isCustomSelected
+                  ? colors.primary
+                  : (theme.brightness == Brightness.light
+                      ? const Color(0xFFD8D8D8)
+                      : colors.outline).withValues(alpha: 0.72),
               width: isCustomSelected ? 2 : 1,
             ),
           ),
@@ -194,7 +231,7 @@ class MoreActivitiesButton extends StatelessWidget {
             child: Icon(
               isCustomSelected ? activityTypeIcon(selected) : Icons.more_horiz_rounded,
               size: 22,
-              color: Colors.black,
+              color: isCustomSelected ? colors.primary : colors.onSurface,
             ),
           ),
         ),
@@ -231,6 +268,9 @@ class StartPauseControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
     final isIdle = state is TrackingIdle || state is TrackingCompleted;
     final isInProgress = state is TrackingInProgress;
 
@@ -242,17 +282,15 @@ class StartPauseControl extends StatelessWidget {
             height: 52,
             child: OutlinedButton(
               onPressed: onMusicTap ?? () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Music integration coming soon')),
-                );
+                showErrorSnackBar(context, 'Music integration is currently unavailable');
               },
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.black, width: 1),
-                shape: const RoundedRectangleBorder(),
-                backgroundColor: Colors.white,
+                side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: colors.surface,
                 padding: EdgeInsets.zero,
               ),
-              child: const Icon(Icons.music_note_rounded, color: Colors.black, size: 20),
+              child: Icon(Icons.music_note_rounded, color: colors.onSurface, size: 20),
             ),
           ),
           const SizedBox(width: 8),
@@ -262,10 +300,10 @@ class StartPauseControl extends StatelessWidget {
               child: FilledButton(
                 onPressed: onStart,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  backgroundColor: colors.primary,
+                  foregroundColor: customColors?.buttonText ?? Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -279,7 +317,7 @@ class StartPauseControl extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             letterSpacing: 1.5,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w600,
                             height: 1.2,
                           ),
                         ),
@@ -288,13 +326,13 @@ class StartPauseControl extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 12,
                             letterSpacing: 1.5,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w600,
                             height: 1.2,
                           ),
                         ),
                       ],
                     ),
-                    const Icon(Icons.arrow_forward_rounded, size: 22),
+                    Icon(Icons.arrow_forward_rounded, color: customColors?.buttonText ?? Colors.black, size: 22),
                   ],
                 ),
               ),
@@ -307,12 +345,12 @@ class StartPauseControl extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onSettingsTap,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.black, width: 1),
-                shape: const RoundedRectangleBorder(),
-                backgroundColor: Colors.white,
+                side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: colors.surface,
                 padding: EdgeInsets.zero,
               ),
-              child: const Icon(Icons.settings_rounded, color: Colors.black, size: 20),
+              child: Icon(Icons.settings_rounded, color: colors.onSurface, size: 20),
             ),
           ),
         ],
@@ -334,22 +372,23 @@ class StartPauseControl extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onStop,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.black, width: 2),
-                shape: const RoundedRectangleBorder(),
-                backgroundColor: Colors.white,
+                side: BorderSide(color: colors.error, width: 2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: colors.surface,
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.stop_rounded, color: Colors.black, size: 18),
-                  SizedBox(width: 4),
+                  Icon(Icons.stop_rounded, color: colors.error, size: 18),
+                  const SizedBox(width: 4),
                   Text(
                     'FINISH',
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 0.5,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
+                      color: colors.error,
                     ),
                   ),
                 ],
@@ -364,12 +403,12 @@ class StartPauseControl extends StatelessWidget {
           child: OutlinedButton(
             onPressed: () => onLockToggle(true),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 1),
-              shape: const RoundedRectangleBorder(),
-              backgroundColor: Colors.white,
+              side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: colors.surface,
               padding: EdgeInsets.zero,
             ),
-            child: const Icon(Icons.lock_rounded, color: Colors.black, size: 18),
+            child: Icon(Icons.lock_rounded, color: colors.onSurface, size: 18),
           ),
         ),
         const SizedBox(width: 8),
@@ -377,25 +416,26 @@ class StartPauseControl extends StatelessWidget {
           child: SizedBox(
             height: 52,
             child: isInProgress
-                ? FilledButton(
+                ? OutlinedButton(
               onPressed: onPause,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: colors.primary, width: 2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: colors.surface,
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.pause_rounded, size: 18),
-                  SizedBox(width: 4),
+                  Icon(Icons.pause_rounded, color: colors.primary, size: 18),
+                  const SizedBox(width: 4),
                   Text(
                     'PAUSE',
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 0.5,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
+                      color: colors.primary,
                     ),
                   ),
                 ],
@@ -404,24 +444,24 @@ class StartPauseControl extends StatelessWidget {
                 : FilledButton(
               onPressed: onResume,
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(),
+                backgroundColor: colors.primary,
+                foregroundColor: customColors?.buttonText ?? Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  const Text(
                     'RESUME',
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 0.5,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, color: customColors?.buttonText ?? Colors.black, size: 18),
                 ],
               ),
             ),
@@ -454,15 +494,20 @@ class _SlidingButtonState extends State<SlidingButton> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double maxDistance = constraints.maxWidth - 46 - 8;
+        final double maxDistance = constraints.maxWidth - 44 - 8;
 
         return Container(
           height: 52,
           decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(0),
+            color: theme.brightness == Brightness.light ? const Color(0xFFF2F2F2) : colors.outline.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Stack(
@@ -471,11 +516,11 @@ class _SlidingButtonState extends State<SlidingButton> {
               Center(
                 child: Text(
                   widget.label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.onSurface.withValues(alpha: 0.7),
                     fontSize: 12,
                     letterSpacing: 1.5,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -511,15 +556,22 @@ class _SlidingButtonState extends State<SlidingButton> {
                     }
                   },
                   child: Container(
-                    width: 46,
-                    height: 46,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.rectangle,
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.primary.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.arrow_forward_rounded,
-                      color: Colors.black,
+                      color: customColors?.buttonText ?? Colors.black,
                       size: 22,
                     ),
                   ),
@@ -531,4 +583,4 @@ class _SlidingButtonState extends State<SlidingButton> {
       },
     );
   }
-}
+}
