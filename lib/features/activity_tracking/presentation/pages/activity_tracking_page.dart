@@ -7,7 +7,9 @@ import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
+
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
@@ -343,9 +345,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         setState(() {
           _isDownloadingMap = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to download offline tiles: ${e.toString()}')),
-        );
+        showErrorSnackBar(context, 'Failed to download offline tiles: ${e.toString()}');
       }
     }
   }
@@ -409,21 +409,22 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   void _updateRoute(List<TrackPoint> points) {
-    if (_polylineAnnotationManager == null || points.length < 2) return;
+    if (_polylineAnnotationManager == null || points.length < 2 || !mounted) return;
 
     _polylineAnnotationManager!.deleteAll();
 
     final coordinates = points.map((p) => [p.longitude, p.latitude]).toList();
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     _polylineAnnotationManager!.create(mbx.PolylineAnnotationOptions(
       geometry: mbx.LineString(coordinates: coordinates.map((c) => mbx.Position(c[0], c[1])).toList()),
-      lineColor: const Color(0xFF2BC7D8).toARGB32(),
+      lineColor: primaryColor.toARGB32(),
       lineWidth: 5.0,
     ));
   }
 
   void _updateStartPoint(TrackPoint? point) {
-    if (_startPointAnnotationManager == null || point == null) return;
+    if (_startPointAnnotationManager == null || point == null || !mounted) return;
 
     _startPointAnnotationManager!.deleteAll();
 
@@ -437,14 +438,15 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   void _updatePuck(TrackPoint? point) {
-    if (_circleAnnotationManager == null || point == null) return;
+    if (_circleAnnotationManager == null || point == null || !mounted) return;
 
     _circleAnnotationManager!.deleteAll();
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     _circleAnnotationManager!.create(mbx.CircleAnnotationOptions(
       geometry: mbx.Point(coordinates: mbx.Position(point.longitude, point.latitude)),
       circleRadius: 8.0,
-      circleColor: const Color(0xFF3BB5C8).toARGB32(),
+      circleColor: primaryColor.toARGB32(),
       circleStrokeWidth: 2.0,
       circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
     ));
@@ -468,12 +470,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return BlocConsumer<ActivityTrackingBloc, ActivityTrackingState>(
       listener: (context, state) {
         if (state is TrackingPermissionDenied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          showErrorSnackBar(context, state.message);
         } else if (state is TrackingInProgress) {
           // Voice coach updates
           if (_prefsNotifier.value.voiceCoachEnabled) {
@@ -606,13 +608,11 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           canPop: state is TrackingIdle || state is TrackingCompleted,
           onPopInvokedWithResult: (didPop, result) {
             if (!didPop) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Stop the activity to exit')),
-              );
+              showErrorSnackBar(context, 'Stop the activity to exit');
             }
           },
           child: Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: theme.scaffoldBackgroundColor,
             body: Stack(
               children: [
                 // Map fills the background
@@ -710,10 +710,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         AnimatedOpacity(
-                          opacity: _isUiVisible ? 1.0 : 0.0,
+                          opacity: (_isUiVisible && !_isCountingDown) ? 1.0 : 0.0,
                           duration: const Duration(milliseconds: 300),
                           child: IgnorePointer(
-                            ignoring: !_isUiVisible,
+                            ignoring: !(_isUiVisible && !_isCountingDown),
                             child: Padding(
                               padding: const EdgeInsets.only(right: 12, bottom: 12),
                               child: ZoomResetButton(
@@ -731,18 +731,19 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                           ),
                         ),
                         AnimatedOpacity(
-                          opacity: _isUiVisible ? 1.0 : 0.0,
+                          opacity: (_isUiVisible && !_isCountingDown) ? 1.0 : 0.0,
                           duration: const Duration(milliseconds: 300),
                           child: IgnorePointer(
-                            ignoring: !_isUiVisible,
+                            ignoring: !(_isUiVisible && !_isCountingDown),
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   ValueListenableBuilder<WorkoutPrefs>(
                                     valueListenable: _prefsNotifier,
-                                    builder: (_, prefs, __) {
+                                    builder: (context, prefs, __) {
                                       final isExternal = prefs.preferredPlayerPackage != 'builtIn';
                                       final displayTrack = isExternal
                                           ? 'Player: ${prefs.preferredPlayerPackage.split('.').last.toUpperCase()}'
@@ -782,7 +783,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                              },
                                              onPlayPause: () {
                                                if (isExternal) {
-                                                 _playWorkoutAudio();
+                                                  _playWorkoutAudio();
                                                } else {
                                                  final audioService = sl<WorkoutAudioService>();
                                                  if (audioService.isPlaying) {

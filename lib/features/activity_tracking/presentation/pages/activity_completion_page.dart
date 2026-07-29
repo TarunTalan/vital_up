@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_common_widgets.dart';
 
 /// Full screen shown after an activity is stopped and saved. Displays the
 /// finished session's stats with a back button in the top-left corner.
@@ -22,45 +24,67 @@ class ActivityCompletionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) onBack();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-                child: RoundIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  onPressed: onBack,
-                ),
+        extendBodyBehindAppBar: true,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Center(
+              child: BackIcon(
+                onClick: onBack,
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                  child: _CompletionStats(
-                    elapsed: Duration(seconds: session.totalDurationSeconds),
-                    distanceMeters: session.totalDistanceMeters,
-                    calories: session.calories,
-                    avgPace: session.avgPaceSecondsPerKm,
-                    steps: session.steps,
-                    stepCountReliable: session.stepCountReliable,
-                    activityType: session.activityType,
-                    targetType: session.targetType,
-                    targetValue: session.targetValue,
-                    targetAchieved: session.targetAchieved,
-                    onNewActivity: onNewActivity,
-                    onViewHistory: onViewHistory,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
+          title: Text(
+            'ACTIVITY RESULT',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2,
+              color: colors.onSurface,
+            ),
+          ),
+        ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/bg.png',
+              fit: BoxFit.cover,
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  AppTheme.hPadding, 12, AppTheme.hPadding, 24),
+                child: _CompletionStats(
+                  elapsed: Duration(seconds: session.totalDurationSeconds),
+                  distanceMeters: session.totalDistanceMeters,
+                  calories: session.calories,
+                  avgPace: session.avgPaceSecondsPerKm,
+                  steps: session.steps,
+                  stepCountReliable: session.stepCountReliable,
+                  activityType: session.activityType,
+                  targetType: session.targetType,
+                  targetValue: session.targetValue,
+                  targetAchieved: session.targetAchieved,
+                  onNewActivity: onNewActivity,
+                  onViewHistory: onViewHistory,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -98,42 +122,54 @@ class _CompletionStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(16),
+            color: theme.brightness == Brightness.light 
+                ? Colors.white.withValues(alpha: 0.72) 
+                : colors.surface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: (theme.brightness == Brightness.light 
+                  ? const Color(0xFFD8D8D8) 
+                  : colors.outline).withValues(alpha: 0.72),
+            ),
           ),
           child: Column(
             children: [
               Text(
                 activityType.label.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF777777),
+                  fontWeight: FontWeight.w600,
+                  color: customColors?.grayText ?? const Color(0xFF777777),
                   letterSpacing: 2,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 formatDistanceKm(distanceMeters),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 48,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
                   height: 1.0,
                 ),
               ),
-              const Text(
+              Text(
                 'KILOMETERS',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF777777),
+                  fontWeight: FontWeight.w500,
+                  color: customColors?.grayText ?? const Color(0xFF777777),
                   letterSpacing: 2,
                 ),
               ),
@@ -186,13 +222,13 @@ class _CompletionStats extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: targetAchieved
-                  ? const Color(0xFFE8F5E9)
-                  : const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(12),
+                  ? colors.primary.withValues(alpha: 0.12)
+                  : colors.outline.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(
                 color: targetAchieved
-                    ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
-                    : const Color(0xFFFF9800).withValues(alpha: 0.3),
+                    ? colors.primary.withValues(alpha: 0.3)
+                    : colors.outline.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
@@ -203,8 +239,8 @@ class _CompletionStats extends StatelessWidget {
                       : Icons.flag_rounded,
                   size: 28,
                   color: targetAchieved
-                      ? const Color(0xFF4CAF50)
-                      : const Color(0xFFFF9800),
+                      ? colors.primary
+                      : customColors?.grayText ?? const Color(0xFFFF9800),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -217,10 +253,10 @@ class _CompletionStats extends StatelessWidget {
                             : 'Target Not Reached',
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                           color: targetAchieved
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFE65100),
+                              ? colors.primary
+                              : colors.onSurface.withValues(alpha: 0.8),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -228,10 +264,10 @@ class _CompletionStats extends StatelessWidget {
                         targetType == 'distance'
                             ? '🎯 ${targetValue!.toStringAsFixed(1)} km'
                             : '🎯 ${targetValue!.toStringAsFixed(0)} kcal',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF555555),
+                          fontWeight: FontWeight.w500,
+                          color: colors.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -243,8 +279,8 @@ class _CompletionStats extends StatelessWidget {
                       : Icons.cancel_outlined,
                   size: 28,
                   color: targetAchieved
-                      ? const Color(0xFF4CAF50)
-                      : const Color(0xFFFF9800),
+                      ? colors.primary
+                      : customColors?.grayText ?? const Color(0xFFFF9800),
                 ),
               ],
             ),
@@ -254,41 +290,17 @@ class _CompletionStats extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: onViewHistory,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.black, width: 2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'View History',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
+              child: SecondaryAuthButton(
+                label: 'View History',
+                onTap: onViewHistory,
               ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: ElevatedButton(
-                onPressed: onNewActivity,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'New Activity',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
+              child: PrimaryAuthButton(
+                label: 'New Activity',
+                isLoading: false,
+                onTap: onNewActivity,
               ),
             ),
           ],
@@ -311,26 +323,36 @@ class _CompletionStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE3E3E3)),
-        borderRadius: BorderRadius.circular(12),
+        color: theme.brightness == Brightness.light 
+            ? Colors.white.withValues(alpha: 0.72) 
+            : colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: (theme.brightness == Brightness.light 
+              ? const Color(0xFFD8D8D8) 
+              : colors.outline).withValues(alpha: 0.72),
+        ),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 24, color: const Color(0xFF2BC7D8)),
+          Icon(icon, size: 24, color: colors.primary),
           const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               value,
               maxLines: 1,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -339,10 +361,10 @@ class _CompletionStatCard extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF777777),
+              fontWeight: FontWeight.w500,
+              color: customColors?.grayText ?? const Color(0xFF777777),
               letterSpacing: 1,
             ),
           ),
@@ -351,3 +373,5 @@ class _CompletionStatCard extends StatelessWidget {
     );
   }
 }
+
+

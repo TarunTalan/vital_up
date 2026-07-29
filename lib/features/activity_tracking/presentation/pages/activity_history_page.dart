@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
@@ -28,98 +30,136 @@ class _ActivityHistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      extendBodyBehindAppBar: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.black,
-        title: const Text(
-          'Activity History',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
+        foregroundColor: colors.onSurface,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Center(
+            child: BackIcon(
+              onClick: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
+        title: Text(
+          'ACTIVITY HISTORY',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2,
+            color: colors.onSurface,
+          ),
         ),
       ),
-      body: BlocBuilder<ActivityHistoryBloc, ActivityHistoryState>(
-        builder: (context, state) {
-          if (state is ActivityHistoryLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is ActivityHistoryError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(state.message, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: () =>
-                          context.read<ActivityHistoryBloc>().add(LoadActivityHistory()),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final loaded = state as ActivityHistoryLoaded;
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<ActivityHistoryBloc>().add(LoadActivityHistory());
-            },
-            child: Column(
-              children: [
-                _HistorySummary(state: loaded),
-                const SizedBox(height: 12),
-                ActivityHistoryFilterBar(
-                  selectedType: loaded.activityTypeFilter,
-                  onTypeSelected: (type) =>
-                      context.read<ActivityHistoryBloc>().add(FilterByActivityType(type)),
-                  onSearchChanged: (query) =>
-                      context.read<ActivityHistoryBloc>().add(SearchHistory(query)),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: loaded.visibleEntries.isEmpty
-                      ? const _EmptyHistory()
-                      : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: loaded.visibleEntries.length,
-                    itemBuilder: (context, index) {
-                      final entry = loaded.visibleEntries[index];
-                      return ActivityHistoryCard(
-                        entry: entry,
-                        onTap: () async {
-                          final result = await showSessionDetailSheet(
-                            context,
-                            entry: entry,
-                          );
-                          if (result != null && context.mounted) {
-                            final (tag, note) = result;
-                            context.read<ActivityHistoryBloc>().add(
-                              UpdateSessionAnnotation(
-                                sessionId: entry.session.id,
-                                tag: tag,
-                                note: note,
-                              ),
-                            );
-                          }
-                        },
-                        onDelete: () => context
-                            .read<ActivityHistoryBloc>()
-                            .add(DeleteSessionFromHistory(entry.session.id)),
-                      );
-                    },
-                  ),
-                ),
-              ],
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg.png',
+              fit: BoxFit.cover,
             ),
-          );
-        },
+          ),
+          GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: SafeArea(
+              child: BlocBuilder<ActivityHistoryBloc, ActivityHistoryState>(
+                builder: (context, state) {
+                  if (state is ActivityHistoryLoading) {
+                    return Center(child: CircularProgressIndicator(color: colors.primary));
+                  }
+
+                  if (state is ActivityHistoryError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(state.message, textAlign: TextAlign.center, style: TextStyle(color: colors.onSurface)),
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: () =>
+                                  context.read<ActivityHistoryBloc>().add(LoadActivityHistory()),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: colors.primary),
+                                foregroundColor: colors.primary,
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final loaded = state as ActivityHistoryLoaded;
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<ActivityHistoryBloc>().add(LoadActivityHistory());
+                    },
+                    color: colors.primary,
+                    child: Column(
+                      children: [
+                        _HistorySummary(state: loaded),
+                        const SizedBox(height: 12),
+                        ActivityHistoryFilterBar(
+                          selectedType: loaded.activityTypeFilter,
+                          onTypeSelected: (type) =>
+                              context.read<ActivityHistoryBloc>().add(FilterByActivityType(type)),
+                          onSearchChanged: (query) =>
+                              context.read<ActivityHistoryBloc>().add(SearchHistory(query)),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: loaded.visibleEntries.isEmpty
+                              ? const _EmptyHistory()
+                              : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: loaded.visibleEntries.length,
+                            itemBuilder: (context, index) {
+                              final entry = loaded.visibleEntries[index];
+                              return ActivityHistoryCard(
+                                entry: entry,
+                                onTap: () async {
+                                  final result = await showSessionDetailSheet(
+                                    context,
+                                    entry: entry,
+                                  );
+                                  if (result != null && context.mounted) {
+                                    final (tag, note) = result;
+                                    context.read<ActivityHistoryBloc>().add(
+                                      UpdateSessionAnnotation(
+                                        sessionId: entry.session.id,
+                                        tag: tag,
+                                        note: note,
+                                      ),
+                                    );
+                                  }
+                                },
+                                onDelete: () => context
+                                    .read<ActivityHistoryBloc>()
+                                    .add(DeleteSessionFromHistory(entry.session.id)),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -132,12 +172,22 @@ class _HistorySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(16),
+        color: theme.brightness == Brightness.light 
+            ? Colors.white.withValues(alpha: 0.72) 
+            : colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: (theme.brightness == Brightness.light 
+              ? const Color(0xFFD8D8D8) 
+              : colors.outline).withValues(alpha: 0.72),
+        ),
       ),
       child: Row(
         children: [
@@ -179,6 +229,10 @@ class _SummaryStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Column(
       children: [
         FittedBox(
@@ -186,7 +240,7 @@ class _SummaryStat extends StatelessWidget {
           child: Text(
             value,
             maxLines: 1,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colors.onSurface),
           ),
         ),
         const SizedBox(height: 2),
@@ -194,10 +248,10 @@ class _SummaryStat extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 9,
-            color: Color(0xFF9A9A9A),
-            fontWeight: FontWeight.w700,
+            color: customColors?.grayText ?? const Color(0xFF9A9A9A),
+            fontWeight: FontWeight.w500,
             letterSpacing: 0.8,
           ),
         ),
@@ -211,22 +265,26 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.history_rounded, size: 48, color: Color(0xFFBDBDBD)),
+            Icon(Icons.history_rounded, size: 48, color: colors.outline),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No activities match',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: colors.onSurface),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Try a different filter or search term.',
-              style: TextStyle(color: Color(0xFF9A9A9A)),
+              style: TextStyle(color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -234,4 +292,4 @@ class _EmptyHistory extends StatelessWidget {
       ),
     );
   }
-}
+}

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/favorite_audio.dart';
@@ -24,13 +26,6 @@ class WorkoutAudioPage extends StatefulWidget {
 
   @override
   State<WorkoutAudioPage> createState() => _WorkoutAudioPageState();
-}
-
-class _AudioPageTheme {
-  static const Color background = Color(0xFF0F0E13);
-  static const Color cardColor = Color(0xFF1B1A22);
-  static const Color accentColor = Color(0xFF2BC7D8);
-  static const Color subtitleColor = Color(0xFFAAAAAA);
 }
 
 class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
@@ -84,10 +79,6 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
       });
     }
   }
-
-  // Removed external app methods
-
-
 
   Future<void> _toggleFavorite(String trackId, String title, String subtitle, String source) async {
     final isar = _isarService.isar;
@@ -151,65 +142,92 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     return Scaffold(
-      backgroundColor: _AudioPageTheme.background,
+      extendBodyBehindAppBar: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+        surfaceTintColor: Colors.transparent,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Center(
+            child: BackIcon(
+              onClick: () => Navigator.of(context).pop(),
+            ),
+          ),
         ),
-        title: const Text(
+        title: Text(
           'Workout Soundtrack',
           style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+            color: colors.onSurface,
+            fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
       ),
-      body: ValueListenableBuilder<WorkoutPrefs>(
-        valueListenable: widget.notifier,
-        builder: (context, prefs, _) {
-          return DefaultTabController(
-            length: 3,
-            child: Column(
-              children: [
-                // TabBar control
-                const TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: _AudioPageTheme.accentColor,
-                  unselectedLabelColor: _AudioPageTheme.subtitleColor,
-                  indicatorColor: _AudioPageTheme.accentColor,
-                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  tabs: [
-                    Tab(text: 'In-App Stories'),
-                    Tab(text: 'Local Audio'),
-                    Tab(text: 'Favorites'),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Tab Content
-                Expanded(
-                  child: TabBarView(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          SafeArea(
+            child: ValueListenableBuilder<WorkoutPrefs>(
+              valueListenable: widget.notifier,
+              builder: (context, prefs, _) {
+                return DefaultTabController(
+                  length: 3,
+                  child: Column(
                     children: [
-                      _buildStoriesTab(prefs),
-                      _buildLocalTab(prefs),
-                      _buildFavoritesTab(prefs),
+                      // TabBar control
+                      TabBar(
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        labelColor: colors.primary,
+                        unselectedLabelColor: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
+                        indicatorColor: colors.primary,
+                        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        dividerColor: Colors.transparent,
+                        tabs: const [
+                          Tab(text: 'In-App Stories'),
+                          Tab(text: 'Local Audio'),
+                          Tab(text: 'Favorites'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Tab Content
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildStoriesTab(prefs),
+                            _buildLocalTab(prefs),
+                            _buildFavoritesTab(prefs),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildStoriesTab(WorkoutPrefs prefs) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     final storyTracks = [
       (
         'None',
@@ -265,14 +283,20 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
         final downloadingProgress = _downloadProgress[title];
 
         return Card(
-          color: _AudioPageTheme.cardColor,
+          color: theme.brightness == Brightness.light 
+              ? Colors.white.withValues(alpha: 0.72) 
+              : colors.surface.withValues(alpha: 0.72),
           elevation: 0,
           margin: const EdgeInsets.symmetric(vertical: 6),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(13),
             side: BorderSide(
-              color: isSelected ? _AudioPageTheme.accentColor : Colors.transparent,
-              width: 1.5,
+              color: (isSelected 
+                  ? colors.primary 
+                  : (theme.brightness == Brightness.light 
+                      ? const Color(0xFFD8D8D8) 
+                      : colors.outline)).withValues(alpha: 0.72),
+              width: isSelected ? 2 : 1,
             ),
           ),
           child: ListTile(
@@ -297,11 +321,11 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
             ),
             title: Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colors.onSurface),
             ),
             subtitle: Text(
               subtitle,
-              style: const TextStyle(fontSize: 11, color: _AudioPageTheme.subtitleColor),
+              style: TextStyle(fontSize: 11, color: customColors?.grayText ?? const Color(0xFFAAAAAA)),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -314,27 +338,27 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                       child: CircularProgressIndicator(
                         value: downloadingProgress,
                         strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation(Colors.grey),
+                        valueColor: AlwaysStoppedAnimation(colors.primary),
                       ),
                     )
                   else if (isDownloadedOffline)
-                    const Icon(Icons.offline_pin_rounded, color: Colors.grey, size: 20)
+                    Icon(Icons.offline_pin_rounded, color: colors.outline, size: 20)
                   else
                     IconButton(
-                      icon: const Icon(Icons.download_rounded, color: _AudioPageTheme.subtitleColor, size: 20),
+                      icon: Icon(Icons.download_rounded, color: colors.outline, size: 20),
                       onPressed: () => _startDownload(title, downloadUrl, title, 'Curated Audio'),
                     ),
                   const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(
                       _isFavorited(title) ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: _isFavorited(title) ? Colors.red : _AudioPageTheme.subtitleColor,
+                      color: _isFavorited(title) ? Colors.red : colors.outline,
                       size: 20,
                     ),
                     onPressed: () => _toggleFavorite(title, title, 'Curated Audio', 'preset'),
                   ),
                 ],
-                if (isSelected) const Icon(Icons.check_circle_rounded, color: _AudioPageTheme.accentColor),
+                if (isSelected) Icon(Icons.check_circle_rounded, color: colors.primary),
               ],
             ),
           ),
@@ -344,8 +368,12 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
   }
 
   Widget _buildLocalTab(WorkoutPrefs prefs) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     if (_isLoadingLocal) {
-      return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_AudioPageTheme.accentColor)));
+      return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(colors.primary)));
     }
 
     if (_localSongs.isEmpty) {
@@ -355,17 +383,17 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.music_note_rounded, size: 64, color: _AudioPageTheme.subtitleColor),
+              Icon(Icons.music_note_rounded, size: 64, color: colors.outline),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'No local audio files found',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurface, fontSize: 14),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Grant media storage permissions to scan local device MP3 files.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: _AudioPageTheme.subtitleColor, fontSize: 12),
+                style: TextStyle(color: customColors?.grayText ?? const Color(0xFFAAAAAA), fontSize: 12),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -374,11 +402,11 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                   if (granted) _loadLocalSongs();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _AudioPageTheme.accentColor,
-                  foregroundColor: Colors.black,
+                  backgroundColor: colors.primary,
+                  foregroundColor: customColors?.buttonText ?? Colors.black,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
-                child: const Text('Grant Access', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Grant Access', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -395,14 +423,20 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
         final isSelected = prefs.backgroundAudioTrack == trackName;
 
         return Card(
-          color: _AudioPageTheme.cardColor,
+          color: theme.brightness == Brightness.light 
+              ? Colors.white.withValues(alpha: 0.72) 
+              : colors.surface.withValues(alpha: 0.72),
           elevation: 0,
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(13),
             side: BorderSide(
-              color: isSelected ? _AudioPageTheme.accentColor : Colors.transparent,
-              width: 1.5,
+              color: (isSelected 
+                  ? colors.primary 
+                  : (theme.brightness == Brightness.light 
+                      ? const Color(0xFFD8D8D8) 
+                      : colors.outline)).withValues(alpha: 0.72),
+              width: isSelected ? 2 : 1,
             ),
           ),
           child: ListTile(
@@ -423,17 +457,17 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
               trackId: trackName,
               isSelected: isSelected,
               defaultIcon: Icons.music_note_rounded,
-              defaultColor: _AudioPageTheme.accentColor,
+              defaultColor: colors.primary,
               fallbackWidget: QueryArtworkWidget(
                 id: song.id,
                 type: ArtworkType.AUDIO,
                 nullArtworkWidget: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF22212A),
+                  decoration: BoxDecoration(
+                    color: colors.outline.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.music_note_rounded, color: _AudioPageTheme.subtitleColor, size: 20),
+                  child: Icon(Icons.music_note_rounded, color: colors.outline, size: 20),
                 ),
               ),
             ),
@@ -441,13 +475,13 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
               song.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colors.onSurface),
             ),
             subtitle: Text(
               song.artist ?? 'Unknown Artist',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: _AudioPageTheme.subtitleColor),
+              style: TextStyle(fontSize: 11, color: customColors?.grayText ?? const Color(0xFFAAAAAA)),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -455,12 +489,12 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                 IconButton(
                   icon: Icon(
                     _isFavorited(trackName) ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    color: _isFavorited(trackName) ? Colors.red : _AudioPageTheme.subtitleColor,
+                    color: _isFavorited(trackName) ? Colors.red : colors.outline,
                     size: 20,
                   ),
                   onPressed: () => _toggleFavorite(trackName, song.title, song.artist ?? 'Unknown Artist', 'local'),
                 ),
-                if (isSelected) const Icon(Icons.check_circle_rounded, color: _AudioPageTheme.accentColor),
+                if (isSelected) Icon(Icons.check_circle_rounded, color: colors.primary),
               ],
             ),
           ),
@@ -469,24 +503,26 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     );
   }
 
-  // Removed _buildAppsTab
-
   Widget _buildFavoritesTab(WorkoutPrefs prefs) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final customColors = theme.extension<VitalUpColors>();
+
     if (_favorites.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite_border_rounded, size: 64, color: _AudioPageTheme.subtitleColor),
-            SizedBox(height: 16),
+            Icon(Icons.favorite_border_rounded, size: 64, color: colors.outline),
+            const SizedBox(height: 16),
             Text(
               'No favorite soundtracks yet',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+              style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurface, fontSize: 14),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               'Toggle the heart button on any track to add it here.',
-              style: TextStyle(color: _AudioPageTheme.subtitleColor, fontSize: 11),
+              style: TextStyle(color: customColors?.grayText ?? const Color(0xFFAAAAAA), fontSize: 11),
             ),
           ],
         ),
@@ -508,14 +544,20 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
         if (isLocal) leadIcon = Icons.music_note_rounded;
 
         return Card(
-          color: _AudioPageTheme.cardColor,
+          color: theme.brightness == Brightness.light 
+              ? Colors.white.withValues(alpha: 0.72) 
+              : colors.surface.withValues(alpha: 0.72),
           elevation: 0,
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(13),
             side: BorderSide(
-              color: isSelected ? _AudioPageTheme.accentColor : Colors.transparent,
-              width: 1.5,
+              color: (isSelected 
+                  ? colors.primary 
+                  : (theme.brightness == Brightness.light 
+                      ? const Color(0xFFD8D8D8) 
+                      : colors.outline)).withValues(alpha: 0.72),
+              width: isSelected ? 2 : 1,
             ),
           ),
           child: ListTile(
@@ -542,15 +584,15 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
               trackId: fav.trackId,
               isSelected: isSelected,
               defaultIcon: leadIcon,
-              defaultColor: _AudioPageTheme.accentColor,
+              defaultColor: colors.primary,
             ),
             title: Text(
               fav.title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.onSurface),
             ),
             subtitle: Text(
               fav.subtitle,
-              style: const TextStyle(fontSize: 11, color: _AudioPageTheme.subtitleColor),
+              style: TextStyle(fontSize: 11, color: customColors?.grayText ?? const Color(0xFFAAAAAA)),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -559,7 +601,7 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                   icon: const Icon(Icons.favorite_rounded, color: Colors.red, size: 20),
                   onPressed: () => _toggleFavorite(fav.trackId, fav.title, fav.subtitle, fav.audioSource),
                 ),
-                if (isSelected) const Icon(Icons.check_circle_rounded, color: _AudioPageTheme.accentColor),
+                if (isSelected) Icon(Icons.check_circle_rounded, color: colors.primary),
               ],
             ),
           ),
@@ -723,3 +765,4 @@ class _MusicVisualizerState extends State<MusicVisualizer> with SingleTickerProv
     );
   }
 }
+
