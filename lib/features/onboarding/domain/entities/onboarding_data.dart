@@ -10,7 +10,10 @@ class OnboardingData extends Equatable {
   final String weightUnit;
   final String height;
   final String heightUnit;
-  final String oxygenLevel;
+  final String calorieGoal;
+  final String targetWeight;
+  final String targetWeightUnit;
+  final String goalDurationMonths;
   final String healthConditions;
   final String allergies;
   final String medicines;
@@ -32,7 +35,10 @@ class OnboardingData extends Equatable {
     this.weightUnit = "kg",
     this.height = "",
     this.heightUnit = "cm",
-    this.oxygenLevel = "",
+    this.calorieGoal = "",
+    this.targetWeight = "",
+    this.targetWeightUnit = "kg",
+    this.goalDurationMonths = "3",
     this.healthConditions = "",
     this.allergies = "",
     this.medicines = "",
@@ -55,7 +61,10 @@ class OnboardingData extends Equatable {
     String? weightUnit,
     String? height,
     String? heightUnit,
-    String? oxygenLevel,
+    String? calorieGoal,
+    String? targetWeight,
+    String? targetWeightUnit,
+    String? goalDurationMonths,
     String? healthConditions,
     String? allergies,
     String? medicines,
@@ -77,7 +86,10 @@ class OnboardingData extends Equatable {
       weightUnit: weightUnit ?? this.weightUnit,
       height: height ?? this.height,
       heightUnit: heightUnit ?? this.heightUnit,
-      oxygenLevel: oxygenLevel ?? this.oxygenLevel,
+      calorieGoal: calorieGoal ?? this.calorieGoal,
+      targetWeight: targetWeight ?? this.targetWeight,
+      targetWeightUnit: targetWeightUnit ?? this.targetWeightUnit,
+      goalDurationMonths: goalDurationMonths ?? this.goalDurationMonths,
       healthConditions: healthConditions ?? this.healthConditions,
       allergies: allergies ?? this.allergies,
       medicines: medicines ?? this.medicines,
@@ -102,7 +114,10 @@ class OnboardingData extends Equatable {
         weightUnit,
         height,
         heightUnit,
-        oxygenLevel,
+        calorieGoal,
+        targetWeight,
+        targetWeightUnit,
+        goalDurationMonths,
         healthConditions,
         allergies,
         medicines,
