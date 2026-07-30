@@ -1,49 +1,45 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:app_usage/app_usage.dart' as app_usage_pkg;
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import '../../domain/entities/app_usage_info.dart';
 
-class ScreenTimeService with WidgetsBindingObserver {
+class ScreenTimeService {
   static const MethodChannel _channel = MethodChannel('com.example.vital_up/usage_stats');
   
-  // iOS fallback tracking
-  DateTime? _appResumedTime;
-  Duration _iosForegroundDuration = Duration.zero;
+  // App Usage Filtering
+  static const List<String> _ignoredPackages = [
+    'launcher', 'systemui', 'incallui', 'com.android.settings', 
+    'com.android.providers', 'com.google.android.gms', 
+    'com.android.vending', 'com.sec.android.app',
+    'com.miui', 'com.samsung.android', 'com.google.android.permissioncontroller',
+    'com.android.permissioncontroller', 'com.google.android.setupwizard',
+    'com.google.android.apps.wellbeing', 'com.android.server.telecom',
+    'com.google.android.as', 'android.uid.system', 'com.android.server'
+  ];
 
-  ScreenTimeService() {
-    if (Platform.isIOS) {
-      WidgetsBinding.instance.addObserver(this);
-      _appResumedTime = DateTime.now();
-    }
-  }
-
-  void dispose() {
-    if (Platform.isIOS) {
-      WidgetsBinding.instance.removeObserver(this);
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (!Platform.isIOS) return;
-
-    if (state == AppLifecycleState.resumed) {
-      _appResumedTime = DateTime.now();
-    } else if (state == AppLifecycleState.paused) {
-      if (_appResumedTime != null) {
-        _iosForegroundDuration += DateTime.now().difference(_appResumedTime!);
-        _appResumedTime = null;
-      }
-    }
-  }
+  static const Map<String, String> _appNameMappings = {
+    'com.whatsapp': 'WhatsApp',
+    'com.instagram.android': 'Instagram',
+    'com.google.android.youtube': 'YouTube',
+    'com.twitter.android': 'X (Twitter)',
+    'com.facebook.katana': 'Facebook',
+    'com.snapchat.android': 'Snapchat',
+    'com.zhiliaoapp.musically': 'TikTok',
+    'com.google.android.apps.messaging': 'Messages',
+    'com.google.android.dialer': 'Phone',
+    'com.google.android.contacts': 'Contacts',
+    'com.google.android.gm': 'Gmail',
+    'com.android.chrome': 'Chrome',
+    'com.spotify.music': 'Spotify',
+    'com.netflix.mediaclient': 'Netflix',
+    'org.telegram.messenger': 'Telegram',
+    'com.linkedin.android': 'LinkedIn',
+    'com.reddit.frontpage': 'Reddit',
+    'com.discord': 'Discord'
+  };
 
   Future<bool> hasPermission() async {
-    if (Platform.isIOS) return true; // In-app tracking needs no special permission
     try {
       final bool hasPermission = await _channel.invokeMethod('checkUsageStatsPermission');
       return hasPermission;
@@ -53,35 +49,17 @@ class ScreenTimeService with WidgetsBindingObserver {
   }
 
   Future<void> openSettings() async {
-    if (!Platform.isIOS) {
-      const intent = AndroidIntent(
-        action: 'android.settings.USAGE_ACCESS_SETTINGS',
-        flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
-      );
-      await intent.launch();
-    }
+    const intent = AndroidIntent(
+      action: 'android.settings.USAGE_ACCESS_SETTINGS',
+      flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
+    );
+    await intent.launch();
   }
 
   Future<List<AppUsageInfo>> getUsageStats() async {
-    if (Platform.isIOS) {
-      // Calculate current session duration if still in foreground
-      Duration totalDuration = _iosForegroundDuration;
-      if (_appResumedTime != null) {
-        totalDuration += DateTime.now().difference(_appResumedTime!);
-      }
-      
-      return [
-        AppUsageInfo(
-          appName: 'VitalUp (In-App)',
-          packageName: 'com.example.vital_up',
-          usageDuration: totalDuration,
-        )
-      ];
-    }
-
     try {
       final endDate = DateTime.now();
-      final startDate = DateTime(endDate.year, endDate.month, endDate.day); // Today
+      final startDate = DateTime(endDate.year, endDate.month, endDate.day); // Today exactly at midnight local time
 
       final List<AppUsageInfo> infoList = [];
       final List<AppUsageInfo> usage = await _fetchAppUsage(startDate, endDate);
@@ -102,21 +80,46 @@ class ScreenTimeService with WidgetsBindingObserver {
   
   Future<List<AppUsageInfo>> _fetchAppUsage(DateTime startDate, DateTime endDate) async {
     try {
-      List<AppUsageInfo> result = await app_usage_pkg.AppUsage().getAppUsage(startDate, endDate).then((infos) {
-          return infos.map((i) {
-            String resolvedName = i.appName;
-            if (i.packageName == 'com.instagram.android') resolvedName = 'Instagram';
-            
-            return AppUsageInfo(
-              appName: resolvedName,
-              packageName: i.packageName,
-              usageDuration: i.usage,
-            );
-          }).toList();
+      final Map<dynamic, dynamic>? rawStats = await _channel.invokeMethod('getExactUsageStats', {
+        'start': startDate.millisecondsSinceEpoch,
+        'end': endDate.millisecondsSinceEpoch
       });
+      
+      if (rawStats == null) return [];
+      
+      List<AppUsageInfo> result = [];
+      
+      rawStats.forEach((key, value) {
+        final pkg = key.toString().toLowerCase();
+        final durationMillis = (value as num).toInt();
+        
+        // Skip system packages
+        if (_ignoredPackages.any((ignore) => pkg.contains(ignore))) {
+          return; // continue in forEach
+        }
+
+        // Apply robust naming map
+        String resolvedName = _appNameMappings[key.toString()] ?? key.toString();
+        
+        // Fallback cleaner
+        if (resolvedName == key.toString()) {
+          final parts = resolvedName.split('.');
+          resolvedName = parts.last;
+          if (resolvedName.isNotEmpty) {
+            resolvedName = resolvedName[0].toUpperCase() + resolvedName.substring(1);
+          }
+        }
+
+        result.add(AppUsageInfo(
+          appName: resolvedName,
+          packageName: key.toString(),
+          usageDuration: Duration(milliseconds: durationMillis),
+        ));
+      });
+      
       return result;
     } catch (exception) {
-      throw Exception('Failed to get app usage: $exception');
+      throw Exception('Failed to get exact app usage: $exception');
     }
   }
 }
