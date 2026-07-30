@@ -13,6 +13,11 @@ class UserProfileCache {
   late String email;
   String? displayName;
   String? photoUrl;
-  
+
+  // Health goals (set during onboarding)
+  int? dailyCalorieGoal;
+  double? targetWeightKg;
+  int? goalDurationMonths;
+
   DateTime? lastSyncedAt;
 }

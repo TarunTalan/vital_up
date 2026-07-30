@@ -39,6 +39,7 @@ import 'package:vital_up/features/food_scanner/domain/usecases/scan_barcode.dart
 import 'package:vital_up/features/food_scanner/domain/usecases/scan_food_image.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/save_meal_log.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -187,5 +188,11 @@ Future<void> initDependencies() async {
     nutritionRepository: sl<NutritionRepository>(),
     uuid: sl<Uuid>(),
     logger: sl<Logger>(),
+  ));
+
+  sl.registerFactory(() => MealLogBloc(
+    getMealLogHistory: sl<GetMealLogHistory>(),
+    deleteMealLog: sl<DeleteMealLog>(),
+    isarService: sl<IsarService>(),
   ));
 }
