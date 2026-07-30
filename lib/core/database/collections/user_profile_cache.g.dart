@@ -17,29 +17,44 @@ const UserProfileCacheSchema = CollectionSchema(
   name: r'UserProfileCache',
   id: 6727096250389556981,
   properties: {
-    r'displayName': PropertySchema(
+    r'dailyCalorieGoal': PropertySchema(
       id: 0,
+      name: r'dailyCalorieGoal',
+      type: IsarType.long,
+    ),
+    r'displayName': PropertySchema(
+      id: 1,
       name: r'displayName',
       type: IsarType.string,
     ),
-    r'email': PropertySchema(id: 1, name: r'email', type: IsarType.string),
+    r'email': PropertySchema(id: 2, name: r'email', type: IsarType.string),
+    r'goalDurationMonths': PropertySchema(
+      id: 3,
+      name: r'goalDurationMonths',
+      type: IsarType.long,
+    ),
     r'lastSyncedAt': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'lastSyncedAt',
       type: IsarType.dateTime,
     ),
     r'photoUrl': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'photoUrl',
       type: IsarType.string,
     ),
     r'supabaseId': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'supabaseId',
       type: IsarType.string,
     ),
+    r'targetWeightKg': PropertySchema(
+      id: 7,
+      name: r'targetWeightKg',
+      type: IsarType.double,
+    ),
     r'username': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'username',
       type: IsarType.string,
     ),
@@ -104,12 +119,15 @@ void _userProfileCacheSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.displayName);
-  writer.writeString(offsets[1], object.email);
-  writer.writeDateTime(offsets[2], object.lastSyncedAt);
-  writer.writeString(offsets[3], object.photoUrl);
-  writer.writeString(offsets[4], object.supabaseId);
-  writer.writeString(offsets[5], object.username);
+  writer.writeLong(offsets[0], object.dailyCalorieGoal);
+  writer.writeString(offsets[1], object.displayName);
+  writer.writeString(offsets[2], object.email);
+  writer.writeLong(offsets[3], object.goalDurationMonths);
+  writer.writeDateTime(offsets[4], object.lastSyncedAt);
+  writer.writeString(offsets[5], object.photoUrl);
+  writer.writeString(offsets[6], object.supabaseId);
+  writer.writeDouble(offsets[7], object.targetWeightKg);
+  writer.writeString(offsets[8], object.username);
 }
 
 UserProfileCache _userProfileCacheDeserialize(
@@ -119,13 +137,16 @@ UserProfileCache _userProfileCacheDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = UserProfileCache();
-  object.displayName = reader.readStringOrNull(offsets[0]);
-  object.email = reader.readString(offsets[1]);
+  object.dailyCalorieGoal = reader.readLongOrNull(offsets[0]);
+  object.displayName = reader.readStringOrNull(offsets[1]);
+  object.email = reader.readString(offsets[2]);
+  object.goalDurationMonths = reader.readLongOrNull(offsets[3]);
   object.id = id;
-  object.lastSyncedAt = reader.readDateTimeOrNull(offsets[2]);
-  object.photoUrl = reader.readStringOrNull(offsets[3]);
-  object.supabaseId = reader.readString(offsets[4]);
-  object.username = reader.readString(offsets[5]);
+  object.lastSyncedAt = reader.readDateTimeOrNull(offsets[4]);
+  object.photoUrl = reader.readStringOrNull(offsets[5]);
+  object.supabaseId = reader.readString(offsets[6]);
+  object.targetWeightKg = reader.readDoubleOrNull(offsets[7]);
+  object.username = reader.readString(offsets[8]);
   return object;
 }
 
@@ -137,16 +158,22 @@ P _userProfileCacheDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
-    case 2:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 3:
       return (reader.readStringOrNull(offset)) as P;
-    case 4:
+    case 2:
       return (reader.readString(offset)) as P;
+    case 3:
+      return (reader.readLongOrNull(offset)) as P;
+    case 4:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -363,6 +390,79 @@ extension UserProfileCacheQueryWhere
 
 extension UserProfileCacheQueryFilter
     on QueryBuilder<UserProfileCache, UserProfileCache, QFilterCondition> {
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'dailyCalorieGoal'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'dailyCalorieGoal'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dailyCalorieGoal', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dailyCalorieGoal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dailyCalorieGoal',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  dailyCalorieGoalBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dailyCalorieGoal',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
   displayNameIsNull() {
     return QueryBuilder.apply(this, (query) {
@@ -659,6 +759,79 @@ extension UserProfileCacheQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'email', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'goalDurationMonths'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'goalDurationMonths'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'goalDurationMonths', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'goalDurationMonths',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'goalDurationMonths',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  goalDurationMonthsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'goalDurationMonths',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
       );
     });
   }
@@ -1092,6 +1265,99 @@ extension UserProfileCacheQueryFilter
   }
 
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'targetWeightKg'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'targetWeightKg'),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgEqualTo(double? value, {double epsilon = Query.epsilon}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'targetWeightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'targetWeightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'targetWeightKg',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
+  targetWeightKgBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'targetWeightKg',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterFilterCondition>
   usernameEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1242,6 +1508,20 @@ extension UserProfileCacheQueryLinks
 extension UserProfileCacheQuerySortBy
     on QueryBuilder<UserProfileCache, UserProfileCache, QSortBy> {
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByDailyCalorieGoal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailyCalorieGoal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByDailyCalorieGoalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailyCalorieGoal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
   sortByDisplayName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'displayName', Sort.asc);
@@ -1265,6 +1545,20 @@ extension UserProfileCacheQuerySortBy
   sortByEmailDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByGoalDurationMonths() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalDurationMonths', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByGoalDurationMonthsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalDurationMonths', Sort.desc);
     });
   }
 
@@ -1311,6 +1605,20 @@ extension UserProfileCacheQuerySortBy
   }
 
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByTargetWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'targetWeightKg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  sortByTargetWeightKgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'targetWeightKg', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
   sortByUsername() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'username', Sort.asc);
@@ -1327,6 +1635,20 @@ extension UserProfileCacheQuerySortBy
 
 extension UserProfileCacheQuerySortThenBy
     on QueryBuilder<UserProfileCache, UserProfileCache, QSortThenBy> {
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByDailyCalorieGoal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailyCalorieGoal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByDailyCalorieGoalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailyCalorieGoal', Sort.desc);
+    });
+  }
+
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
   thenByDisplayName() {
     return QueryBuilder.apply(this, (query) {
@@ -1351,6 +1673,20 @@ extension UserProfileCacheQuerySortThenBy
   thenByEmailDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'email', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByGoalDurationMonths() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalDurationMonths', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByGoalDurationMonthsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalDurationMonths', Sort.desc);
     });
   }
 
@@ -1410,6 +1746,20 @@ extension UserProfileCacheQuerySortThenBy
   }
 
   QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByTargetWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'targetWeightKg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
+  thenByTargetWeightKgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'targetWeightKg', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QAfterSortBy>
   thenByUsername() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'username', Sort.asc);
@@ -1427,6 +1777,13 @@ extension UserProfileCacheQuerySortThenBy
 extension UserProfileCacheQueryWhereDistinct
     on QueryBuilder<UserProfileCache, UserProfileCache, QDistinct> {
   QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
+  distinctByDailyCalorieGoal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dailyCalorieGoal');
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
   distinctByDisplayName({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'displayName', caseSensitive: caseSensitive);
@@ -1438,6 +1795,13 @@ extension UserProfileCacheQueryWhereDistinct
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'email', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
+  distinctByGoalDurationMonths() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'goalDurationMonths');
     });
   }
 
@@ -1463,6 +1827,13 @@ extension UserProfileCacheQueryWhereDistinct
   }
 
   QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
+  distinctByTargetWeightKg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'targetWeightKg');
+    });
+  }
+
+  QueryBuilder<UserProfileCache, UserProfileCache, QDistinct>
   distinctByUsername({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'username', caseSensitive: caseSensitive);
@@ -1478,6 +1849,13 @@ extension UserProfileCacheQueryProperty
     });
   }
 
+  QueryBuilder<UserProfileCache, int?, QQueryOperations>
+  dailyCalorieGoalProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dailyCalorieGoal');
+    });
+  }
+
   QueryBuilder<UserProfileCache, String?, QQueryOperations>
   displayNameProperty() {
     return QueryBuilder.apply(this, (query) {
@@ -1488,6 +1866,13 @@ extension UserProfileCacheQueryProperty
   QueryBuilder<UserProfileCache, String, QQueryOperations> emailProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'email');
+    });
+  }
+
+  QueryBuilder<UserProfileCache, int?, QQueryOperations>
+  goalDurationMonthsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'goalDurationMonths');
     });
   }
 
@@ -1508,6 +1893,13 @@ extension UserProfileCacheQueryProperty
   supabaseIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'supabaseId');
+    });
+  }
+
+  QueryBuilder<UserProfileCache, double?, QQueryOperations>
+  targetWeightKgProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'targetWeightKg');
     });
   }
 

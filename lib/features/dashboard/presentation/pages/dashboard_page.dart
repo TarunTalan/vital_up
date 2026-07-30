@@ -8,6 +8,10 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -55,7 +59,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
-      0 => const _HomeTab(),
+      0 => BlocProvider<MealLogBloc>(
+          create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+          child: _HomeTab(
+            onScanMeal: () => setState(() => _selectedIndex = 1),
+          ),
+        ),
       1 => FoodScannerPage(
           onBack: () => setState(() => _selectedIndex = 0),
         ),
@@ -99,7 +108,8 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab();
+  final VoidCallback? onScanMeal;
+  const _HomeTab({this.onScanMeal});
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +132,13 @@ class _HomeTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 150, 20, 128),
             children: [
               const _InsightCard(),
+              const SizedBox(height: 16),
+              NutritionSummaryCard(
+                onViewAll: () {
+                  context.pushNamed('meal-log-history');
+                },
+                onScanMeal: onScanMeal,
+              ),
               const SizedBox(height: 26),
               SizedBox(
                 height: 110,
