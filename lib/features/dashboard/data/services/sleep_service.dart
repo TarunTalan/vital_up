@@ -98,7 +98,7 @@ class SleepService {
     final now = DateTime.now();
     final yesterday = now.subtract(const Duration(hours: 24));
     
-    final logs = await _isarService.isar.sleepLogCache
+    final logs = await _isarService.isar.sleepLogCaches
         .filter()
         .startTimeGreaterThan(yesterday)
         .sortByStartTimeDesc()
@@ -135,7 +135,7 @@ class SleepService {
       ..isSynced = false;
       
     await _isarService.isar.writeTxn(() async {
-      await _isarService.isar.sleepLogCache.put(log);
+      await _isarService.isar.sleepLogCaches.put(log);
     });
     
     return SleepSessionInfo(
