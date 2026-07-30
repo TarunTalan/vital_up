@@ -19,7 +19,10 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final height = await _onboardingDataStore.getHeight();
     final heightUnit = await _onboardingDataStore.getHeightUnit();
     final savedStep = await _onboardingDataStore.getCurrentStep();
-    final oxygenLevel = await _onboardingDataStore.getOxygenLevel();
+    final calorieGoal = await _onboardingDataStore.getCalorieGoal();
+    final targetWeight = await _onboardingDataStore.getTargetWeight();
+    final targetWeightUnit = await _onboardingDataStore.getTargetWeightUnit();
+    final goalDurationMonths = await _onboardingDataStore.getGoalDurationMonths();
     final healthConditions = await _onboardingDataStore.getHealthConditions();
     final medicines = await _onboardingDataStore.getMedicines();
     final allergies = await _onboardingDataStore.getAllergies();
@@ -38,7 +41,10 @@ class OnboardingCubit extends Cubit<OnboardingData> {
       weightUnit: weightUnit.isEmpty ? "kg" : weightUnit,
       height: height,
       heightUnit: heightUnit.isEmpty ? "cm" : heightUnit,
-      oxygenLevel: oxygenLevel,
+      calorieGoal: calorieGoal,
+      targetWeight: targetWeight,
+      targetWeightUnit: targetWeightUnit,
+      goalDurationMonths: goalDurationMonths,
       healthConditions: healthConditions,
       medicines: medicines,
       allergies: allergies,
@@ -77,9 +83,20 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     await _onboardingDataStore.saveHeight(height, unit);
   }
 
-  Future<void> updateOxygenLevel(String level) async {
-    emit(state.copyWith(oxygenLevel: level));
-    await _onboardingDataStore.saveOxygenLevel(level);
+  Future<void> updateGoals({
+    required String calorieGoal,
+    required String targetWeight,
+    required String targetWeightUnit,
+    required String goalDurationMonths,
+  }) async {
+    emit(state.copyWith(
+      calorieGoal: calorieGoal,
+      targetWeight: targetWeight,
+      targetWeightUnit: targetWeightUnit,
+      goalDurationMonths: goalDurationMonths,
+    ));
+    await _onboardingDataStore.saveGoals(
+      calorieGoal, targetWeight, targetWeightUnit, goalDurationMonths);
   }
 
   Future<void> updateHealthConditions(String conditions) async {

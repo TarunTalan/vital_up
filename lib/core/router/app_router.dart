@@ -10,6 +10,7 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/blood_pressure_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/bpm_page.dart';
@@ -17,7 +18,7 @@ import 'package:vital_up/features/onboarding/presentation/pages/extra_details_pa
 import 'package:vital_up/features/onboarding/presentation/pages/height_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/info_and_permission_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/onboarding_entry_point.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/ox_level_page.dart';
+import 'package:vital_up/features/onboarding/presentation/pages/goals.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/personal_details_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/sleep_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
@@ -138,6 +139,14 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/meal-log-history',
+        name: 'meal-log-history',
+        pageBuilder: (context, state) => FadeSlidePageRoute(
+          key: state.pageKey,
+          child: const MealLogHistoryPage(),
+        ),
+      ),
+      GoRoute(
         path: '/health-onboarding',
         name: 'health-onboarding',
         pageBuilder: (context, state) => FadeSlidePageRoute(
@@ -187,9 +196,9 @@ class AppRouter {
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
           child: BloodPressurePage(
-            onNext: () => context.goNamed('health-ox-level'),
+            onNext: () => context.goNamed('health-goals'),
             onBack: () => context.goNamed('health-bpm'),
-            onSkip: () => context.goNamed('health-ox-level'),
+            onSkip: () => context.goNamed('health-goals'),
           ),
         ),
       ),
@@ -206,11 +215,11 @@ class AppRouter {
         ),
       ),
       GoRoute(
-        path: '/health-onboarding/ox-level',
-        name: 'health-ox-level',
+        path: '/health-onboarding/goals',
+        name: 'health-goals',
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
-          child: OxLevelPage(
+          child: GoalsPage(
             onNext: () => context.goNamed('health-activity'),
             onBack: () => context.goNamed('health-blood-pressure'),
             onSkip: () => context.goNamed('health-activity'),
@@ -224,7 +233,7 @@ class AppRouter {
           key: state.pageKey,
           child: ActivityPage(
             onNext: () => context.goNamed('health-sleep'),
-            onBack: () => context.goNamed('health-ox-level'),
+            onBack: () => context.goNamed('health-goals'),
             onSkip: () => context.goNamed('health-sleep'),
           ),
         ),
