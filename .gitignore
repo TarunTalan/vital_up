@@ -41,6 +41,12 @@ migrate_working_dir/
 **/GeneratedPluginRegistrant.h
 **/GeneratedPluginRegistrant.m
 **/GeneratedPluginRegistrant.java
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+**/.plugin_symlinks/
+linux/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugin_registrant.h
 
 # Symbolication related
 app.*.symbols

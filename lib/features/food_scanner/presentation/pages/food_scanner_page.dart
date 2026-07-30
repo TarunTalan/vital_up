@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -24,6 +25,8 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_ocr_parser.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_manual_entry_dialog.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/accuracy_info_dialog.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -629,6 +632,18 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     }
   }
 
+  void _handleBack() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        context.goNamed('dashboard');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
@@ -676,9 +691,15 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       },
       builder: (context, state) {
         final isRecognizing = state is RecognizingFood;
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            _handleBack();
+          },
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
             children: [
               Positioned.fill(child: _buildCameraLayer()),
               Positioned.fill(
@@ -768,13 +789,17 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                       Row(
                         children: [
                           BackIcon(
-                            onClick: widget.onBack ??
-                                () => Navigator.of(context).maybePop(),
+                            onClick: _handleBack,
                           ),
                           const Spacer(),
                           _ScannerIconButton(
                             iconAsset: 'assets/icons/info_icon.svg',
-                            onTap: () {},
+                            onTap: () {
+                              showSmoothDialog(
+                                context: context,
+                                builder: (context) => const AccuracyInfoDialog(),
+                              );
+                            },
                             size: 26,
                           ),
                         ],
@@ -818,10 +843,11 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                 ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildCameraLayer() {
     if (_permissionDenied) {

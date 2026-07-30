@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 
 class FoodItemEditDialog extends StatefulWidget {
@@ -66,18 +67,21 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final colors = theme.extension<VitalUpColors>();
     
     // Theme-matching translucent glass background colors
     final dialogBgColor = isDark 
-        ? const Color(0xE6121315) 
-        : const Color(0xF2FFFFFF);
-    final borderColor = isDark 
+        ? const Color(0xE61C1C1C) 
+        : const Color(0xF2FEFEFE);
+    final borderColor = colors?.inputBorder ?? (isDark 
         ? const Color(0xFF343434) 
-        : const Color(0xFFD8D8D8);
+        : const Color(0xFFD8D8D8));
     final fieldFillColor = isDark 
         ? Colors.white.withValues(alpha: 0.05) 
         : Colors.black.withValues(alpha: 0.03);
-    const actionColor = Color(0xFF00A6B7);
+    
+    final primaryColor = theme.primaryColor;
+    final primaryButtonTextColor = colors?.buttonText ?? const Color(0xFF0C0C0C);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -103,13 +107,13 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                   child: Text(
                     widget.item == null ? 'Add Food Item' : 'Edit Food Item',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       fontSize: 20,
                       color: isDark ? Colors.white : const Color(0xFF1C1C1C),
                     ),
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
                 // Content
                 Flexible(
                   child: SingleChildScrollView(
@@ -119,7 +123,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                       children: [
                         Text(
                           'Food Name',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
                           ),
@@ -133,16 +137,16 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                             hintStyle: TextStyle(color: theme.hintColor),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide(color: borderColor),
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide(color: borderColor),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: actionColor, width: 2),
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                             ),
                             filled: true,
                             fillColor: fieldFillColor,
@@ -151,7 +155,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                         const SizedBox(height: 18),
                         Text(
                           'Quantity',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
                           ),
@@ -161,7 +165,6 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              flex: 3,
                               child: TextField(
                                 controller: _quantityController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -171,16 +174,16 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                                   hintStyle: TextStyle(color: theme.hintColor),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(color: actionColor, width: 2),
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                                   ),
                                   filled: true,
                                   fillColor: fieldFillColor,
@@ -189,25 +192,29 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              flex: 2,
                               child: DropdownButtonFormField<String>(
                                 value: _selectedUnit,
                                 isExpanded: true,
                                 style: theme.textTheme.bodyLarge,
                                 dropdownColor: dialogBgColor,
+                                borderRadius: BorderRadius.circular(16),
+                                icon: Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: isDark ? Colors.white70 : const Color(0xFF5F6368),
+                                ),
                                 decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(color: actionColor, width: 2),
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                                   ),
                                   filled: true,
                                   fillColor: fieldFillColor,
@@ -215,10 +222,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                                 items: _units.map((unit) {
                                   return DropdownMenuItem(
                                     value: unit,
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(unit),
-                                    ),
+                                    child: Text(unit),
                                   );
                                 }).toList(),
                                 onChanged: (value) {
@@ -234,17 +238,17 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: actionColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: actionColor.withValues(alpha: 0.2)),
+                            color: primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.info_outline_rounded,
                                 size: 20,
-                                color: actionColor,
+                                color: primaryColor,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -263,7 +267,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                     ),
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
                 // Actions
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -273,31 +277,31 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: TextButton.styleFrom(
-                          foregroundColor: actionColor,
+                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF5F6368),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         child: const Text(
                           'Cancel',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: _handleSave,
                         style: FilledButton.styleFrom(
-                          backgroundColor: actionColor,
-                          foregroundColor: Colors.white,
+                          backgroundColor: primaryColor,
+                          foregroundColor: primaryButtonTextColor,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         child: Text(
                           widget.item == null ? 'Add' : 'Save',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
