@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 
@@ -198,7 +199,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF00A6B7))),
+        builder: (context) => Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor)),
       );
 
       final repository = GetIt.instance<NutritionRepository>();
@@ -288,11 +289,14 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final colors = theme.extension<VitalUpColors>();
 
-    final dialogBgColor = isDark ? const Color(0xE6121315) : const Color(0xF2FFFFFF);
-    final borderColor = isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8);
+    final dialogBgColor = isDark ? const Color(0xE61C1C1C) : const Color(0xF2FEFEFE);
+    final borderColor = colors?.inputBorder ?? (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8));
     final fieldFillColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03);
-    const actionColor = Color(0xFF00A6B7);
+    
+    final primaryColor = theme.primaryColor;
+    final primaryButtonTextColor = colors?.buttonText ?? const Color(0xFF0C0C0C);
 
     Widget buildField({
       required String label,
@@ -325,16 +329,16 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                   suffixText: suffix,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(color: borderColor),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(color: borderColor),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: actionColor, width: 1.5),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                   ),
                   filled: true,
                   fillColor: fieldFillColor,
@@ -371,7 +375,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     children: [
                       Icon(
                         widget.parsedNutrition != null ? Icons.document_scanner_outlined : Icons.edit_note_rounded,
-                        color: actionColor,
+                        color: primaryColor,
                         size: 26,
                       ),
                       const SizedBox(width: 10),
@@ -379,7 +383,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                         child: Text(
                           widget.parsedNutrition != null ? 'Verify Nutrition Label' : 'Enter Product Details',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                             fontSize: 18,
                             color: isDark ? Colors.white : const Color(0xFF1C1C1C),
                           ),
@@ -388,7 +392,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     ],
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
                 // Form Fields
                 Flexible(
                   child: SingleChildScrollView(
@@ -398,7 +402,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                       children: [
                         Text(
                           'Product Name',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
                           ),
@@ -421,7 +425,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                 color: Colors.transparent,
                                 elevation: 4.0,
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(16),
                                   child: BackdropFilter(
                                     filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                                     child: Container(
@@ -429,14 +433,14 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                       constraints: const BoxConstraints(maxHeight: 220),
                                       decoration: BoxDecoration(
                                         color: bgColor,
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(16),
                                         border: Border.all(color: borderColor),
                                       ),
                                       child: ListView.separated(
                                         padding: EdgeInsets.zero,
                                         shrinkWrap: true,
                                         itemCount: options.length,
-                                        separatorBuilder: (_, __) => const Divider(height: 1),
+                                        separatorBuilder: (_, __) => Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
                                         itemBuilder: (BuildContext context, int index) {
                                           final option = options.elementAt(index);
                                           return ListTile(
@@ -451,14 +455,14 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                             subtitle: Text(
                                               option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
                                               style: TextStyle(
-                                                color: option.isOffline ? const Color(0xFF00A6B7) : Colors.grey,
+                                                color: option.isOffline ? primaryColor : Colors.grey,
                                                 fontSize: 10,
                                               ),
                                             ),
                                             trailing: Icon(
                                               option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
                                               size: 15,
-                                              color: option.isOffline ? const Color(0xFF00A6B7) : Colors.grey,
+                                              color: option.isOffline ? primaryColor : Colors.grey,
                                             ),
                                             onTap: () => onSelected(option),
                                           );
@@ -472,7 +476,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                           },
                           fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
                             if (textEditingController.text != _nameController.text) {
-                              textEditingController.text = _nameController.text;
+                                textEditingController.text = _nameController.text;
                             }
                             textEditingController.addListener(() {
                               _nameController.text = textEditingController.text;
@@ -486,16 +490,16 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                 hintText: 'e.g., Haldiram\'s Bhujia',
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide(color: borderColor),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide(color: borderColor),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: actionColor, width: 1.5),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                                 ),
                                 filled: true,
                                 fillColor: fieldFillColor,
@@ -510,7 +514,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                               flex: 3,
                               child: Text(
                                 'Serving size',
-                                style: theme.textTheme.bodyMedium?.copyWith(
+                                style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w600,
                                   color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
                                 ),
@@ -526,16 +530,16 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                 decoration: InputDecoration(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: actionColor, width: 1.5),
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                                   ),
                                   filled: true,
                                   fillColor: fieldFillColor,
@@ -547,21 +551,27 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                               flex: 2,
                               child: DropdownButtonFormField<String>(
                                 value: _selectedUnit,
+                                isExpanded: true,
                                 style: theme.textTheme.bodyMedium,
                                 dropdownColor: dialogBgColor,
+                                borderRadius: BorderRadius.circular(16),
+                                icon: Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: isDark ? Colors.white70 : const Color(0xFF5F6368),
+                                ),
                                 decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: borderColor),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: actionColor, width: 1.5),
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
                                   ),
                                   filled: true,
                                   fillColor: fieldFillColor,
@@ -582,12 +592,11 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                           ],
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'Nutrition Information',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: actionColor,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -602,7 +611,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     ),
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
                 // Action buttons
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -612,28 +621,31 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: TextButton.styleFrom(
-                          foregroundColor: actionColor,
+                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF5F6368),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         child: const Text(
                           'Cancel',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: _handleSave,
                         style: FilledButton.styleFrom(
-                          backgroundColor: actionColor,
-                          foregroundColor: Colors.white,
+                          backgroundColor: primaryColor,
+                          foregroundColor: primaryButtonTextColor,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         child: const Text(
                           'Submit',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],

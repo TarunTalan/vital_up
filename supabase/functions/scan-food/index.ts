@@ -117,7 +117,7 @@ Rules:
 
 class GroqVisionProvider implements VisionProvider {
   private apiKey: string;
-  private model: string = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  private model: string = 'qwen/qwen3.6-27b';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -241,77 +241,27 @@ class VisionProviderChain {
     return name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
   }
 
-  // Calls BOTH providers concurrently (instead of stopping at the first
-  // success) so that a single hallucinated/incorrect result from one model
-  // can be caught and corrected using the other. This directly targets the
-  // "Groq/Gemini sometimes give wrong output" problem: a single-provider
-  // fallback chain never notices when the first provider that happens to
-  // answer is simply wrong.
+  // Calls providers sequentially (Gemini first, then falling back to Groq)
+  // to avoid consuming free-tier API quotas from both providers on every request.
   async recognize(imageBase64: string): Promise<{ results: VisionResponse[]; servedBy: string }> {
-    const settled = await Promise.allSettled(
-      this.providers.map(p => this.recognizeWithRetry(p, imageBase64))
-    );
-
-    const successes: { provider: VisionProvider; results: VisionResponse[] }[] = [];
     const errors: string[] = [];
-
-    settled.forEach((outcome, i) => {
-      const provider = this.providers[i];
-      if (outcome.status === 'fulfilled') {
-        successes.push({ provider, results: outcome.value });
-      } else {
-        errors.push(`${provider.constructor.name}: ${(outcome.reason as Error).message}`);
-        console.error(`${provider.constructor.name}: ${(outcome.reason as Error).message}`);
+    
+    for (const provider of this.providers) {
+      try {
+        console.log(`Trying vision provider: ${provider.constructor.name}...`);
+        const results = await this.recognizeWithRetry(provider, imageBase64);
+        return {
+          results,
+          servedBy: this.providerName(provider),
+        };
+      } catch (error) {
+        const errorMsg = (error as Error).message;
+        errors.push(`${provider.constructor.name}: ${errorMsg}`);
+        console.warn(`${provider.constructor.name} failed: ${errorMsg}. Falling back...`);
       }
-    });
-
-    if (successes.length === 0) {
-      throw new Error(`All vision providers failed | ${errors.join(' || ')}`);
     }
 
-    if (successes.length === 1) {
-      return {
-        results: successes[0].results,
-        servedBy: this.providerName(successes[0].provider),
-      };
-    }
-
-    // Both providers responded — reconcile rather than blindly trusting
-    // whichever happened to be first (previously: Gemini, always, if it
-    // didn't throw). If their top guesses agree (same normalized food name),
-    // average the confidence and prefer that consensus item first. If they
-    // disagree, keep both providers' top items but rank the higher-confidence
-    // one first, and note in servedBy that this was a cross-checked result.
-    const [a, b] = successes;
-    const topA = a.results[0];
-    const topB = b.results[0];
-
-    if (topA && topB && this.normalizeName(topA.candidateName) === this.normalizeName(topB.candidateName)) {
-      const merged: VisionResponse = {
-        candidateName: topA.candidateName,
-        estimatedPortionDescription: topA.confidenceHint >= topB.confidenceHint
-          ? topA.estimatedPortionDescription
-          : topB.estimatedPortionDescription,
-        confidenceHint: Math.min(1, (topA.confidenceHint + topB.confidenceHint) / 2 + 0.1),
-      };
-      const rest = a.results.slice(1);
-      return {
-        results: [merged, ...rest],
-        servedBy: `${this.providerName(a.provider)}+${this.providerName(b.provider)} (agreed)`,
-      };
-    }
-
-    // Disagreement: surface the higher-confidence provider's full result set
-    // first, but keep the other provider's top guess as a fallback candidate
-    // so a wrong first guess still leaves the correct one reachable.
-    const [primary, secondary] = (a.results[0]?.confidenceHint ?? 0) >= (b.results[0]?.confidenceHint ?? 0)
-      ? [a, b]
-      : [b, a];
-
-    return {
-      results: [...primary.results, secondary.results[0]].filter(Boolean),
-      servedBy: `${this.providerName(primary.provider)} (disagreed with ${this.providerName(secondary.provider)})`,
-    };
+    throw new Error(`All vision providers failed | ${errors.join(' || ')}`);
   }
 }
 
@@ -360,46 +310,73 @@ async function searchUSDA(query: string, apiKey: string, supabase?: any): Promis
     'concentrate', 'syrup', 'paste', 'puree',
   ];
 
+  const DESCRIPTOR_WORDS = new Set([
+    'whole', 'raw', 'fresh', 'cooked', 'canned', 'boiled', 'baked', 'grilled',
+    'roasted', 'fried', 'steamed', 'large', 'medium', 'small', 'slice', 'slices',
+    'piece', 'pieces', 'bag', 'pack', 'bottle', 'can', 'cup', 'bowl', 'organic',
+    'natural', 'pure', 'generic', 'wild', 'farmed', 'cultivated'
+  ]);
+
   const scoredFoods = foods.map((food: any) => {
     let score = 0;
     const foodNameLower = food.description.toLowerCase();
     const queryLower = query.toLowerCase();
 
-    // Prefer Foundation and SR Legacy data types
+    // 1. Base DataType Boosts (small tie-breakers only)
     if (food.dataType === 'Foundation') {
-      score += 10;
+      score += 3;
     } else if (food.dataType === 'SR Legacy') {
-      score += 8;
-    } else if (food.dataType === 'Branded') {
+      score += 2;
+    } else if (food.dataType === 'Survey (FNDDS)') {
       score += 1;
     }
 
-    // Prefer exact name matches
+    // 2. Exact or Substring Matches on full query
     if (foodNameLower === queryLower) {
-      score += 5;
+      score += 100;
+    } else if (foodNameLower.startsWith(queryLower)) {
+      score += 60;
     } else if (foodNameLower.includes(queryLower)) {
-      score += 3;
+      score += 40;
     }
 
-    // Prefer the USDA convention of naming raw/whole foods as
-    // "<Food>, raw" — this is usually exactly what a generic query like
-    // "potato" or "banana" means.
-    if (new RegExp(`^${queryLower}s?,\\s*raw\\b`).test(foodNameLower)) {
-      score += 6;
-    }
+    // 3. Word-by-Word Matching
+    const queryWords = queryLower.split(/[^a-z0-9]+/i).filter(Boolean);
+    let matchedCoreWords = 0;
 
-    // Penalize processed/derivative forms UNLESS the user's own query
-    // mentioned that form (e.g. searching "potato flour" should still find
-    // potato flour).
+    queryWords.forEach((word) => {
+      // Match word boundary and support plural 's'
+      const wordRegex = new RegExp(`\\b${word}s?\\b`, 'i');
+      if (wordRegex.test(foodNameLower)) {
+        if (DESCRIPTOR_WORDS.has(word)) {
+          score += 2; // Descriptors get minor weight
+        } else {
+          score += 25; // Core food words get major weight
+          matchedCoreWords++;
+        }
+      }
+    });
+
+    // 4. Boost USDA standard naming conventions (e.g. "<Food>, raw")
+    queryWords.forEach((word) => {
+      if (!DESCRIPTOR_WORDS.has(word)) {
+        const rawConventionRegex = new RegExp(`^${word}s?,\\s*raw\\b`, 'i');
+        if (rawConventionRegex.test(foodNameLower)) {
+          score += 15;
+        }
+      }
+    });
+
+    // 5. Penalize processed/derivative forms UNLESS the user's query mentioned them
     for (const word of PROCESSED_FORM_WORDS) {
       if (foodNameLower.includes(word) && !queryLower.includes(word)) {
-        score -= 8;
+        score -= 15;
       }
     }
 
-    // Penalize foods with very long descriptions (likely multi-ingredient products)
-    if (food.description.length > 50) {
-      score -= 2;
+    // 6. Penalize foods with very long descriptions (likely complex items)
+    if (food.description.length > 60) {
+      score -= 5;
     }
 
     return { ...food, score };
@@ -442,6 +419,83 @@ async function getUSDANutrition(fdcId: string, apiKey: string): Promise<any> {
   }
 
   return response.json();
+}
+
+async function getIndianOrFallbackNutrition(foodName: string, geminiApiKey: string): Promise<any> {
+  const prompt = `Provide the standard nutritional values per 100g for "${foodName}" (focusing on Indian Food Composition Tables (IFCT) or standard USDA/generic equivalents). Return the response in this exact JSON structure:
+{
+  "calories": 150.0,
+  "protein": 5.0,
+  "carbs": 12.0,
+  "fat": 8.0,
+  "fiber": 2.0,
+  "sugar": 4.0,
+  "sodium": 200.0
+}`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ googleSearch: {} }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return JSON.parse(text);
+      }
+    }
+  } catch (e) {
+    console.error(`Gemini grounding fallback failed for ${foodName}:`, e);
+  }
+  return null;
+}
+
+async function saveRecipeToProprietary(supabase: any, productName: string, nutriments: any, source: string) {
+  try {
+    const { data } = await supabase
+      .from('proprietary_products')
+      .select('id')
+      .eq('product_name', productName)
+      .maybeSingle();
+
+    if (!data) {
+      const { error } = await supabase
+        .from('proprietary_products')
+        .insert({
+          product_name: productName,
+          serving_size: '100g',
+          calories: Number(nutriments.calories ?? 0),
+          protein_g: Number(nutriments.protein ?? 0),
+          carbs_g: Number(nutriments.carbs ?? 0),
+          fat_g: Number(nutriments.fat ?? 0),
+          fiber_g: Number(nutriments.fiber ?? 0),
+          sugar_g: Number(nutriments.sugar ?? 0),
+          sodium_mg: Number(nutriments.sodium ?? 0),
+          source: source,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) {
+        console.error(`Failed to insert into proprietary_products: ${error.message}`);
+      } else {
+        console.log(`Saved fallback recipe "${productName}" to proprietary_products cache.`);
+      }
+    }
+  } catch (e) {
+    console.error(`Error saving to proprietary_products cache:`, e);
+  }
 }
 
 async function logRecognition(
@@ -1075,7 +1129,7 @@ Deno.serve(async (req) => {
       });
 
       const findEnergy = (predicate: (name: string) => boolean) =>
-        energyNutrients.find((n: any) => predicate((n.nutrient?.name ?? n.name ?? '').toLowerCase()));
+        energyNutrients.find((n: any) => predicate((n.nutrient?.name ?? n.name ?? n.nutrientName ?? '').toLowerCase()));
 
       const standardEnergy = findEnergy(name => name === 'energy');
       const atwaterGeneral = findEnergy(name => name.includes('atwater general'));
@@ -1153,9 +1207,8 @@ Deno.serve(async (req) => {
     // Log recognition
     await logRecognition(supabase, user.id, servedBy, latency, 0);
 
-    // Match with proprietary database and USDA
-    const items = [];
-    for (const result of results) {
+    // Match with proprietary database and USDA in parallel for all candidates
+    const matchPromises = results.map(async (result) => {
       const queryStr = result.candidateName;
 
       // Run proprietary fuzzy search and USDA search in parallel
@@ -1171,8 +1224,34 @@ Deno.serve(async (req) => {
 
       const bestUsdaMatch = usdaFoods.status === 'fulfilled' ? usdaFoods.value[0] : null;
 
+      // If matches are missing or poor (e.g. score < 20 in USDA and no proprietary match),
+      // we invoke the Gemini Search Grounding fallback to fetch accurate nutritional values
+      // for Indian recipes/dishes (like Roti, Samosa, Paneer Tikka, Dosa).
+      const isPoorMatch = !bestProprietaryMatch && (!bestUsdaMatch || bestUsdaMatch.score < 20);
+
+      if (isPoorMatch) {
+        console.log(`Poor match for candidate "${queryStr}" (USDA score: ${bestUsdaMatch?.score ?? 'none'}). Running Gemini Grounding fallback...`);
+        const fallbackNutrients = await getIndianOrFallbackNutrition(queryStr, geminiApiKey);
+        
+        if (fallbackNutrients) {
+          // Cache in the proprietary database so future get_nutrition lookups (by name) succeed instantly
+          await saveRecipeToProprietary(supabase, queryStr, fallbackNutrients, 'gemini_grounding_fallback');
+          
+          return {
+            id: queryStr,
+            name: queryStr,
+            fdc_id: queryStr, // Pass name as fdc_id so get_nutrition matches it in proprietary table
+            source: 'proprietary',
+            confidence_score: result.confidenceHint,
+            serving_description: result.estimatedPortionDescription,
+            quantity: 1.0,
+            unit: 'serving',
+          };
+        }
+      }
+
       if (bestProprietaryMatch) {
-        items.push({
+        return {
           id: bestProprietaryMatch.barcode || bestProprietaryMatch.product_name,
           name: result.candidateName, // Keep the AI's label for display
           fdc_id: null,
@@ -1181,9 +1260,9 @@ Deno.serve(async (req) => {
           serving_description: bestProprietaryMatch.serving_size ?? result.estimatedPortionDescription,
           quantity: 1.0,
           unit: 'serving',
-        });
+        };
       } else if (bestUsdaMatch) {
-        items.push({
+        return {
           id: bestUsdaMatch.fdcId?.toString() || result.candidateName,
           name: result.candidateName,
           fdc_id: bestUsdaMatch.fdcId?.toString(),
@@ -1192,9 +1271,9 @@ Deno.serve(async (req) => {
           serving_description: result.estimatedPortionDescription,
           quantity: 1.0,
           unit: 'serving',
-        });
+        };
       } else {
-        items.push({
+        return {
           id: result.candidateName,
           name: result.candidateName,
           fdc_id: null,
@@ -1202,9 +1281,11 @@ Deno.serve(async (req) => {
           serving_description: result.estimatedPortionDescription,
           quantity: 1.0,
           unit: 'serving',
-        });
+        };
       }
-    }
+    });
+
+    const items = await Promise.all(matchPromises);
 
     return jsonResponse({ items }, 200);
 

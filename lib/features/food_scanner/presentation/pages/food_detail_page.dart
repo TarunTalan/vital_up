@@ -14,6 +14,9 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/food_item_edit_dialog.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_utils.dart';
+import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/accuracy_info_dialog.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -67,26 +70,33 @@ class FoodDetailPage extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: _FoodScannerStyle.onBackground,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: Color(0xFF1C1C1C),
+        leadingWidth: 56,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: BackIcon(
+              onClick: () => Navigator.of(context).maybePop(),
+            ),
           ),
         ),
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(
+            icon: Icon(
               Icons.ios_share_rounded,
-              color: Color(0xFF1C1C1C),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           IconButton(
-            onPressed: () {},
-            icon: const Icon(
+            onPressed: () {
+              showSmoothDialog(
+                context: context,
+                builder: (context) => const AccuracyInfoDialog(),
+              );
+            },
+            icon: Icon(
               Icons.info_outline_rounded,
-              color: Color(0xFF1C1C1C),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(width: 8),
