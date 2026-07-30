@@ -57,14 +57,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.4"
-  app_usage:
-    dependency: "direct main"
-    description:
-      name: app_usage
-      sha256: "4b2f192896bcaf074c1191484d5a37f12aeaaa75d3f56c401c05576833836b11"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.1.0"
   args:
     dependency: transitive
     description:

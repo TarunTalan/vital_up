@@ -17,10 +17,54 @@ class MainActivity : FlutterActivity() {
             if (call.method == "checkUsageStatsPermission") {
                 val hasPermission = checkUsageStatsPermission()
                 result.success(hasPermission)
+            } else if (call.method == "getExactUsageStats") {
+                val start = call.argument<Long>("start") ?: 0L
+                val end = call.argument<Long>("end") ?: System.currentTimeMillis()
+                val stats = getExactUsageStats(start, end)
+                result.success(stats)
             } else {
                 result.notImplemented()
             }
         }
+    }
+
+    private fun getExactUsageStats(startTime: Long, endTime: Long): Map<String, Long> {
+        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val events = usageStatsManager.queryEvents(startTime, endTime)
+        val event = android.app.usage.UsageEvents.Event()
+        
+        val startTimes = HashMap<String, Long>()
+        val totalUsage = HashMap<String, Long>()
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val packageName = event.packageName
+            val time = event.timeStamp
+            
+            if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND || event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                startTimes[packageName] = time
+            } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND || event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
+                val start = startTimes[packageName]
+                if (start != null) {
+                    val duration = time - start
+                    val currentTotal = totalUsage[packageName] ?: 0L
+                    totalUsage[packageName] = currentTotal + duration
+                    startTimes.remove(packageName)
+                }
+            }
+        }
+        
+        // Handle apps still open
+        val endCap = Math.min(System.currentTimeMillis(), endTime)
+        for ((packageName, start) in startTimes) {
+            val duration = endCap - start
+            if (duration > 0) {
+               val currentTotal = totalUsage[packageName] ?: 0L
+               totalUsage[packageName] = currentTotal + duration
+            }
+        }
+
+        return totalUsage
     }
 
     private fun checkUsageStatsPermission(): Boolean {

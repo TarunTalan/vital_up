@@ -232,7 +232,8 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 25),
               const SleepCard(),
               const SizedBox(height: 12),
-              const ScreenTimeCard(),
+              if (Theme.of(context).platform == TargetPlatform.android)
+                const ScreenTimeCard(),
             ],
           ),
         ),
