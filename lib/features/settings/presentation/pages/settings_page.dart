@@ -137,7 +137,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vColors = theme.extension<VitalUpColors>();
-    final isDark = theme.brightness == Brightness.dark;
 
     return AuthBackground(
       child: Scaffold(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -69,9 +70,9 @@ class IsarService {
         await isar.offlineFoods.putAll(foods);
       });
 
-      print('Seeded ${foods.length} popular Indian food items into Isar offline database.');
+      debugPrint('Seeded ${foods.length} popular Indian food items into Isar offline database.');
     } catch (e) {
-      print('Error seeding offline foods: $e');
+      debugPrint('Error seeding offline foods: $e');
     }
   }
 
@@ -79,7 +80,7 @@ class IsarService {
     // Run asynchronously to not block UI/app startup
     Future.microtask(() async {
       try {
-        print('IsarService: Starting background offline food sync...');
+        debugPrint('IsarService: Starting background offline food sync...');
 
         // Fetch top 100 recently updated/added proprietary products
         final response = await supabase
@@ -87,11 +88,6 @@ class IsarService {
             .select()
             .order('updated_at', ascending: false)
             .limit(100);
-
-        if (response == null || response is! List) {
-          print('IsarService: No proprietary products found to sync.');
-          return;
-        }
 
         final List<dynamic> products = response;
         if (products.isEmpty) {
@@ -130,13 +126,13 @@ class IsarService {
           await isar.writeTxn(() async {
             await isar.offlineFoods.putAll(newFoods);
           });
-          print('IsarService: Background sync completed. Added ${newFoods.length} new items from remote DB.');
+          debugPrint('IsarService: Background sync completed. Added ${newFoods.length} new items from remote DB.');
         } else {
-          print('IsarService: Background sync completed. No new items to add.');
+          debugPrint('IsarService: Background sync completed. No new items to add.');
         }
       } catch (e) {
         // Silently catch and log to prevent crashes if connection fails
-        print('IsarService: Background sync failed: $e');
+        debugPrint('IsarService: Background sync failed: $e');
       }
     });
   }
