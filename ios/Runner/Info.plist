@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+    	<string>VitalUp uses the camera to scan food.</string>
+    	<key>NSPhotoLibraryUsageDescription</key>
+    	<string>VitalUp uses your photo library so you can choose food images to scan.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>VitalUp uses your location to track walking, running, and cycling distance.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
@@ -27,6 +28,26 @@ import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan
 import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source.dart';
+import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source_impl.dart';
+import 'package:vital_up/features/food_scanner/data/repositories/food_recognition_repository_impl.dart';
+import 'package:vital_up/features/food_scanner/data/repositories/meal_log_repository_impl.dart';
+import 'package:vital_up/features/food_scanner/data/repositories/meal_recommendation_repository_impl.dart';
+import 'package:vital_up/features/food_scanner/data/repositories/nutrition_repository_impl.dart';
+import 'package:vital_up/features/food_scanner/data/repositories/subscription_repository_impl.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/meal_log_repository.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/meal_recommendation_repository.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
+import 'package:vital_up/features/food_scanner/domain/repositories/subscription_repository.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/delete_meal_log.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommendation.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/scan_barcode.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/scan_food_image.dart';
+import 'package:vital_up/features/food_scanner/domain/usecases/save_meal_log.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource_impl.dart';
@@ -135,12 +156,98 @@ Future<void> initDependencies() async {
   );
   sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
 
+  // 9. Food Scan Clean Architecture Layers
+  sl.registerLazySingleton<Uuid>(() => const Uuid());
+
+  sl.registerLazySingleton<MealLogLocalDataSource>(
+    () => MealLogLocalDataSourceImpl(
+      isarService: sl<IsarService>(),
+      uuid: sl<Uuid>(),
+    ),
+  );
+
+  sl.registerLazySingleton<FoodRecognitionRepository>(
+    () => FoodRecognitionRepositoryImpl(
+      logger: sl<Logger>(),
+      supabaseClient: sl<SupabaseClient>(),
+    ),
+  );
+
+  sl.registerLazySingleton<NutritionRepository>(
+    () => NutritionRepositoryImpl(
+      dio: sl<Dio>(),
+      logger: sl<Logger>(),
+      supabaseClient: sl<SupabaseClient>(),
+      isarService: sl<IsarService>(),
+    ),
+  );
+
+  sl.registerLazySingleton<SubscriptionRepository>(
+    () => SubscriptionRepositoryImpl(
+      supabaseClient: sl<SupabaseClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<MealLogRepository>(
+    () => MealLogRepositoryImpl(
+      localDataSource: sl<MealLogLocalDataSource>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<MealRecommendationRepository>(
+    () => MealRecommendationRepositoryImpl(),
+  );
+
+  sl.registerLazySingleton<ScanFoodImage>(
+    () => ScanFoodImage(
+      foodRecognitionRepository: sl<FoodRecognitionRepository>(),
+      nutritionRepository: sl<NutritionRepository>(),
+    ),
+  );
+
+  sl.registerLazySingleton<ScanBarcode>(
+    () => ScanBarcode(nutritionRepository: sl<NutritionRepository>()),
+  );
+
+  sl.registerLazySingleton<SaveMealLog>(
+    () => SaveMealLog(mealLogRepository: sl<MealLogRepository>()),
+  );
+
+  sl.registerLazySingleton<GetMealLogHistory>(
+    () => GetMealLogHistory(mealLogRepository: sl<MealLogRepository>()),
+  );
+
+  sl.registerLazySingleton<DeleteMealLog>(
+    () => DeleteMealLog(mealLogRepository: sl<MealLogRepository>()),
+  );
+
+  sl.registerLazySingleton<GetMealRecommendation>(
+    () => GetMealRecommendation(mealRecommendationRepository: sl<MealRecommendationRepository>()),
+  );
+
+  sl.registerFactory(() => FoodScanBloc(
+    scanFoodImage: sl<ScanFoodImage>(),
+    scanBarcode: sl<ScanBarcode>(),
+    saveMealLog: sl<SaveMealLog>(),
+    getMealRecommendation: sl<GetMealRecommendation>(),
+    nutritionRepository: sl<NutritionRepository>(),
+    uuid: sl<Uuid>(),
+    logger: sl<Logger>(),
+  ));
+
+  sl.registerFactory(() => MealLogBloc(
+    getMealLogHistory: sl<GetMealLogHistory>(),
+    deleteMealLog: sl<DeleteMealLog>(),
+    isarService: sl<IsarService>(),
+  ));
   // 9. Diet Plan
   sl.registerLazySingleton<DietPlanRemoteDataSource>(
-    () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
+        () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
   );
   sl.registerLazySingleton<DietPlanRepository>(
-    () => DietPlanRepositoryImpl(
+        () => DietPlanRepositoryImpl(
       remoteDataSource: sl<DietPlanRemoteDataSource>(),
       isarService: sl<IsarService>(),
     ),
@@ -149,7 +256,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton(() => GetActiveMealPlan(sl<DietPlanRepository>()));
   sl.registerLazySingleton(() => SetActiveMealPlan(sl<DietPlanRepository>()));
   sl.registerFactory(
-    () => DietPlanCubit(
+        () => DietPlanCubit(
       generateMealPlan: sl<GenerateMealPlan>(),
       getActiveMealPlan: sl<GetActiveMealPlan>(),
       setActiveMealPlan: sl<SetActiveMealPlan>(),
@@ -158,10 +265,10 @@ Future<void> initDependencies() async {
 
   // 10. Profile Screen Dependencies
   sl.registerLazySingleton<ProfileRemoteDataSource>(
-    () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+        () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
   );
   sl.registerLazySingleton<ProfileRepository>(
-    () => ProfileRepositoryImpl(
+        () => ProfileRepositoryImpl(
       remoteDataSource: sl<ProfileRemoteDataSource>(),
       isarService: sl<IsarService>(),
       logger: sl<Logger>(),
@@ -171,10 +278,10 @@ Future<void> initDependencies() async {
 
   // 11. Settings Dependencies
   sl.registerLazySingleton<SettingsLocalDataSource>(
-    () => SettingsLocalDataSourceImpl(sharedPreferences: sl<SharedPreferences>()),
+        () => SettingsLocalDataSourceImpl(sharedPreferences: sl<SharedPreferences>()),
   );
   sl.registerLazySingleton<SettingsRepository>(
-    () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
+        () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
   );
   sl.registerFactory(() => SettingsCubit(settingsRepository: sl<SettingsRepository>()));
 
@@ -183,63 +290,63 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<AppDatabase>(() => driftDb);
 
   sl.registerLazySingleton<ActivityRepository>(
-    () => ActivityRepositoryImpl(sl<AppDatabase>()),
+        () => ActivityRepositoryImpl(sl<AppDatabase>()),
   );
   sl.registerLazySingleton<ActivityHistoryRepository>(
-    () => ActivityHistoryRepositoryImpl(
+        () => ActivityHistoryRepositoryImpl(
       activityRepository: sl<ActivityRepository>(),
       sharedPreferences: sl<SharedPreferences>(),
     ),
   );
   sl.registerLazySingleton<MapTileRepository>(
-    () => MapTileRepositoryImpl(),
+        () => MapTileRepositoryImpl(),
   );
 
   sl.registerLazySingleton<LocationTrackingRepository>(
-    () => LocationTrackingRepositoryImpl(),
+        () => LocationTrackingRepositoryImpl(),
   );
   sl.registerLazySingleton<StepCounterRepository>(
-    () => StepCounterRepositoryImpl(),
+        () => StepCounterRepositoryImpl(),
   );
 
   // Use cases
   sl.registerLazySingleton(
-    () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
+        () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
   );
   sl.registerLazySingleton(
-    () => GetLiveStepsStream(sl<StepCounterRepository>()),
+        () => GetLiveStepsStream(sl<StepCounterRepository>()),
   );
   sl.registerLazySingleton(
-    () => StartTrackingSession(sl<LocationTrackingRepository>()),
+        () => StartTrackingSession(sl<LocationTrackingRepository>()),
   );
   sl.registerLazySingleton(
-    () => PauseTrackingSession(),
+        () => PauseTrackingSession(),
   );
   sl.registerLazySingleton(
-    () => ResumeTrackingSession(),
+        () => ResumeTrackingSession(),
   );
   sl.registerLazySingleton(
-    () => StopAndSaveSession(sl<ActivityRepository>()),
+        () => StopAndSaveSession(sl<ActivityRepository>()),
   );
   sl.registerLazySingleton(
-    () => GetSessionHistory(sl<ActivityRepository>()),
+        () => GetSessionHistory(sl<ActivityRepository>()),
   );
   sl.registerLazySingleton(
-    () => GetActivityHistory(sl<ActivityHistoryRepository>()),
+        () => GetActivityHistory(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-    () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
+        () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
+        () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-    () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
+        () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
   );
 
   // Bloc
   sl.registerFactory(
-    () => ActivityTrackingBloc(
+        () => ActivityTrackingBloc(
       getLiveLocationStream: sl<GetLiveLocationStream>(),
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
@@ -247,7 +354,7 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(
-    () => ActivityHistoryBloc(
+        () => ActivityHistoryBloc(
       getActivityHistory: sl<GetActivityHistory>(),
       saveSessionAnnotation: sl<SaveSessionAnnotation>(),
       deleteActivitySession: sl<DeleteActivitySession>(),

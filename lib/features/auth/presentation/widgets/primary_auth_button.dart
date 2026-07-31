@@ -74,26 +74,29 @@ class PrimaryAuthButton extends StatelessWidget {
                       valueColor: AlwaysStoppedAnimation<Color>(fgColor),
                     ),
                   )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        label,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: fgColor,
-                            ),
-                      ),
-                      if (showRightArrow) ...[
-                        const SizedBox(width: 8.0),
-                        SvgPicture.asset(
-                          'assets/icons/right_arrow.svg',
-                          width: 16,
-                          height: 16,
-                          colorFilter: ColorFilter.mode(fgColor, BlendMode.srcIn),
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: fgColor,
+                              ),
                         ),
+                        if (showRightArrow) ...[
+                          const SizedBox(width: 8.0),
+                          SvgPicture.asset(
+                            'assets/icons/right_arrow.svg',
+                            width: 16,
+                            height: 16,
+                            colorFilter: ColorFilter.mode(fgColor, BlendMode.srcIn),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
           ),
         ),
