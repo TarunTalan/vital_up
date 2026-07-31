@@ -26,6 +26,10 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_prefere
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
+import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 
 class AppRouter {
   AppRouter._();
@@ -297,6 +301,17 @@ class AppRouter {
             child: DietPlanResultPage(params: extra),
           );
         },
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        pageBuilder: (context, state) => FadeSlidePageRoute(
+          key: state.pageKey,
+          child: BlocProvider<SettingsCubit>(
+            create: (context) => sl<SettingsCubit>()..loadSettings(),
+            child: const SettingsPage(),
+          ),
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
