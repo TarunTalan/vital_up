@@ -3,19 +3,13 @@ import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:vital_up/core/theme/app_theme.dart';
 
 class BpmPage extends StatefulWidget {
   final VoidCallback? onNext;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
-  const BpmPage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const BpmPage({super.key, this.onNext, this.onBack, this.onSkip});
 
   @override
   State<BpmPage> createState() => _BpmPageState();
@@ -42,7 +36,9 @@ class _BpmPageState extends State<BpmPage> {
       onBack: widget.onBack ?? () {},
       onSkip: widget.onSkip ?? () {},
       onNext: () {
-        context.read<OnboardingCubit>().updateHealthVitals(bpm: bpm?.toString() ?? '');
+        context.read<OnboardingCubit>().updateHealthVitals(
+          bpm: bpm?.toString() ?? '',
+        );
         widget.onNext?.call();
       },
       title: "Let’s check your heart",
@@ -52,7 +48,6 @@ class _BpmPageState extends State<BpmPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-
           OnboardingNumberField<int>(
             value: bpm,
             min: 20,
@@ -66,22 +61,27 @@ class _BpmPageState extends State<BpmPage> {
           const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
           Text(
             "Beats per minute",
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.grey,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
-          
+
           SizedBox(
-            width: OnboardingStyle.numberFieldWidth + OnboardingStyle.numberFieldHeight,
-            height: OnboardingStyle.numberFieldWidth + OnboardingStyle.numberFieldHeight,
+            width:
+                OnboardingStyle.numberFieldWidth +
+                OnboardingStyle.numberFieldHeight,
+            height:
+                OnboardingStyle.numberFieldWidth +
+                OnboardingStyle.numberFieldHeight,
             child: const HeartAnimation(),
           ),
-          
+
           const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
-          
+
           const NoteRow(
-            text: "This is the number of times your heart beats in one minute when you are calm and relaxed.",
+            text:
+                "This is the number of times your heart beats in one minute when you are calm and relaxed.",
           ),
         ],
       ),
@@ -96,7 +96,8 @@ class HeartAnimation extends StatefulWidget {
   State<HeartAnimation> createState() => _HeartAnimationState();
 }
 
-class _HeartAnimationState extends State<HeartAnimation> with SingleTickerProviderStateMixin {
+class _HeartAnimationState extends State<HeartAnimation>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _heartScaleAnimation;
   late Animation<double> _glowRadiusAnimation;
@@ -133,7 +134,9 @@ class _HeartAnimationState extends State<HeartAnimation> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final imagePath = isDark ? 'assets/icons/heart.svg' : 'assets/icons/heart.svg';
+    final imagePath = isDark
+        ? 'assets/icons/heart.svg'
+        : 'assets/icons/heart.svg';
 
     return AnimatedBuilder(
       animation: _controller,
@@ -151,10 +154,7 @@ class _HeartAnimationState extends State<HeartAnimation> with SingleTickerProvid
               ),
             ),
             // Foreground heart layer (scales up and down)
-            Transform.scale(
-              scale: _heartScaleAnimation.value,
-              child: child,
-            ),
+            Transform.scale(scale: _heartScaleAnimation.value, child: child),
           ],
         );
       },
@@ -181,28 +181,28 @@ class _GlowPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final minDimension = size.shortestSide;
     final drawRadius = minDimension * radiusMultiplier;
-    
+
     if (drawRadius <= 0) return;
 
     final paint = Paint()
       ..shader = RadialGradient(
         colors: [
           // Use the raw opacity value (hits 1.0 fully when enlarged)
-          const Color(0xFFFF3DBF).withOpacity(opacity), 
-          const Color(0xFFFF6FD8).withOpacity(opacity * 0.3), // Lighter midway
+          const Color(0xFFFF3DBF).withValues(alpha: opacity),
+          const Color(
+            0xFFFF6FD8,
+          ).withValues(alpha: opacity * 0.3), // Lighter midway
           const Color(0x00FFD6F1), // Fade to transparent
         ],
         stops: const [0.0, 0.35, 1.0], // Starts fading much earlier
-      ).createShader(Rect.fromCircle(
-        center: center,
-        radius: drawRadius,
-      ));
+      ).createShader(Rect.fromCircle(center: center, radius: drawRadius));
 
     canvas.drawCircle(center, drawRadius, paint);
   }
 
   @override
   bool shouldRepaint(covariant _GlowPainter oldDelegate) {
-    return oldDelegate.radiusMultiplier != radiusMultiplier || oldDelegate.opacity != opacity;
+    return oldDelegate.radiusMultiplier != radiusMultiplier ||
+        oldDelegate.opacity != opacity;
   }
 }

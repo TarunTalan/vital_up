@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
@@ -10,12 +9,7 @@ class BloodPressurePage extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
-  const BloodPressurePage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const BloodPressurePage({super.key, this.onNext, this.onBack, this.onSkip});
 
   @override
   State<BloodPressurePage> createState() => _BloodPressurePageState();
@@ -34,7 +28,7 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
     } else {
       topBp = 120;
     }
-    
+
     if (state.bloodPressureBottom.isNotEmpty) {
       bottomBp = int.tryParse(state.bloodPressureBottom);
     } else {
@@ -60,8 +54,6 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
       nextEnabled: true,
       child: Column(
         children: [
-
-          
           // Blood Pressure Inputs (reusable fields)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -83,15 +75,15 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
                   const SizedBox(height: 6.0),
                   Text(
                     "Top number",
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.grey,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: Colors.grey),
                   ),
                 ],
               ),
-              
+
               const SizedBox(width: OnboardingStyle.sectionSpacingMedium),
-              
+
               Column(
                 children: [
                   OnboardingNumberField<int>(
@@ -108,26 +100,27 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
                   const SizedBox(height: 6.0),
                   Text(
                     "Bottom number",
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.grey,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ],
           ),
-          
+
           const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
-          
+
           // Heart Icon - switch to dark SVG in dark mode
           _buildHeartIcon(context),
-          
+
           const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
-          
+
           // note
           const NoteRow(
-            text: "These are two numbers usually written together when your pressure is checked.",
+            text:
+                "These are two numbers usually written together when your pressure is checked.",
           ),
         ],
       ),

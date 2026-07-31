@@ -111,7 +111,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                   Text(
                     "We only collect what's needed for your wellness.",
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -234,7 +234,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
 
   Widget _buildChoicesBox(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final bgColor = showErrors ? colors.error.withOpacity(0.12) : const Color.fromRGBO(186, 186, 186, 0.13);
+    final bgColor = showErrors ? colors.error.withValues(alpha: 0.12) : const Color.fromRGBO(186, 186, 186, 0.13);
     final borderColor = showErrors ? colors.error : const Color.fromRGBO(186, 186, 186, 0.27);
 
     return ClipRRect(
@@ -339,7 +339,7 @@ class _ToggleRow extends StatelessWidget {
             child: Divider(
               height: 1,
               thickness: 1,
-              color: OnboardingColors.fieldBorder.withOpacity(0.1),
+              color: OnboardingColors.fieldBorder.withValues(alpha: 0.1),
             ),
           ),
         Row(
@@ -374,9 +374,9 @@ class _ToggleRow extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onChanged(val);
                 },
-                activeColor: Theme.of(context).colorScheme.background,
+                activeThumbColor: Theme.of(context).colorScheme.surface,
                 activeTrackColor: Theme.of(context).colorScheme.primary,
-                inactiveThumbColor: Theme.of(context).colorScheme.background,
+                inactiveThumbColor: Theme.of(context).colorScheme.surface,
                 inactiveTrackColor: uncheckedTrack,
               ),
             ),

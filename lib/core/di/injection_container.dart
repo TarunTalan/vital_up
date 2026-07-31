@@ -39,6 +39,34 @@ import 'package:vital_up/features/settings/data/datasources/settings_local_datas
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 import 'package:vital_up/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/location_tracking_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/step_counter_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/location_tracking_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/step_counter_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
+import 'package:vital_up/core/database/drift_database.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/activity_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/start_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/pause_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/resume_tracking_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_save_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_session_history.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/save_session_annotation.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_session_stream.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
+import 'package:vital_up/features/activity_tracking/domain/repositories/activity_history_repository.dart';
+import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
+import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
+import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -149,4 +177,86 @@ Future<void> initDependencies() async {
     () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
   );
   sl.registerFactory(() => SettingsCubit(settingsRepository: sl<SettingsRepository>()));
+
+  // 9. Activity tracking (Drift DB and Repositories)
+  final driftDb = AppDatabase();
+  sl.registerLazySingleton<AppDatabase>(() => driftDb);
+
+  sl.registerLazySingleton<ActivityRepository>(
+    () => ActivityRepositoryImpl(sl<AppDatabase>()),
+  );
+  sl.registerLazySingleton<ActivityHistoryRepository>(
+    () => ActivityHistoryRepositoryImpl(
+      activityRepository: sl<ActivityRepository>(),
+      sharedPreferences: sl<SharedPreferences>(),
+    ),
+  );
+  sl.registerLazySingleton<MapTileRepository>(
+    () => MapTileRepositoryImpl(),
+  );
+
+  sl.registerLazySingleton<LocationTrackingRepository>(
+    () => LocationTrackingRepositoryImpl(),
+  );
+  sl.registerLazySingleton<StepCounterRepository>(
+    () => StepCounterRepositoryImpl(),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(
+    () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetLiveStepsStream(sl<StepCounterRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => StartTrackingSession(sl<LocationTrackingRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => PauseTrackingSession(),
+  );
+  sl.registerLazySingleton(
+    () => ResumeTrackingSession(),
+  );
+  sl.registerLazySingleton(
+    () => StopAndSaveSession(sl<ActivityRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSessionHistory(sl<ActivityRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetActivityHistory(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
+  );
+
+  // Bloc
+  sl.registerFactory(
+    () => ActivityTrackingBloc(
+      getLiveLocationStream: sl<GetLiveLocationStream>(),
+      getLiveStepsStream: sl<GetLiveStepsStream>(),
+      stopAndSaveSession: sl<StopAndSaveSession>(),
+      authRepository: sl<AuthRepository>(),
+    ),
+  );
+  sl.registerFactory(
+    () => ActivityHistoryBloc(
+      getActivityHistory: sl<GetActivityHistory>(),
+      saveSessionAnnotation: sl<SaveSessionAnnotation>(),
+      deleteActivitySession: sl<DeleteActivitySession>(),
+    ),
+  );
+
+  // Audio Services
+  sl.registerLazySingleton<WorkoutAudioService>(() => WorkoutAudioService());
+  sl.registerLazySingleton<LocalAudioQueryService>(() => LocalAudioQueryService());
+  sl.registerLazySingleton<InAppAudioDownloader>(() => InAppAudioDownloader(sl<IsarService>()));
+  sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
 }

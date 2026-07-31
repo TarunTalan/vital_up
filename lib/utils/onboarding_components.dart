@@ -144,7 +144,7 @@ class OnboardingLayout extends StatelessWidget {
                                   child: Text(
                                     subtitle!,
                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -420,7 +420,7 @@ class _OnboardingNumberFieldState<T extends num> extends State<OnboardingNumberF
       borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
     );
     final colors = Theme.of(context).colorScheme;
-    final bgColor = widget.isError ? colors.error.withOpacity(0.12) : OnboardingColors.fieldBackground;
+    final bgColor = widget.isError ? colors.error.withValues(alpha: 0.12) : OnboardingColors.fieldBackground;
     final borderColor = widget.isError ? colors.error : OnboardingColors.fieldBorder;
 
     return Row(

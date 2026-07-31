@@ -46,3 +46,21 @@ app.*.map.json
 
 # Sensitive config files
 lib/core/config/supabase_config.dart
+
+# Flutter plugin generated files
+.flutter-plugins
+.flutter-plugins-dependencies
+/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+/android/GeneratedPluginRegistrant.java
+/ios/Flutter/GeneratedPluginRegistrant.h
+/ios/Flutter/GeneratedPluginRegistrant.m
+/ios/Runner/GeneratedPluginRegistrant.h
+/ios/Runner/GeneratedPluginRegistrant.m
+/macos/Flutter/GeneratedPluginRegistrant.swift
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+flutter_export_environment.sh
