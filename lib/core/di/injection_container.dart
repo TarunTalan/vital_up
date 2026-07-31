@@ -28,6 +28,18 @@ import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
+import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource_impl.dart';
+import 'package:vital_up/features/profile/domain/repositories/profile_repository.dart';
+import 'package:vital_up/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
+
+import 'package:vital_up/features/settings/data/datasources/settings_local_datasource.dart';
+import 'package:vital_up/features/settings/data/datasources/settings_local_datasource_impl.dart';
+import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
+import 'package:vital_up/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+
 final GetIt sl = GetIt.instance;
 
 Future<void> initDependencies() async {
@@ -115,4 +127,26 @@ Future<void> initDependencies() async {
       setActiveMealPlan: sl<SetActiveMealPlan>(),
     ),
   );
+
+  // 10. Profile Screen Dependencies
+  sl.registerLazySingleton<ProfileRemoteDataSource>(
+    () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+  );
+  sl.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepositoryImpl(
+      remoteDataSource: sl<ProfileRemoteDataSource>(),
+      isarService: sl<IsarService>(),
+      logger: sl<Logger>(),
+    ),
+  );
+  sl.registerFactory(() => ProfileCubit(profileRepository: sl<ProfileRepository>()));
+
+  // 11. Settings Dependencies
+  sl.registerLazySingleton<SettingsLocalDataSource>(
+    () => SettingsLocalDataSourceImpl(sharedPreferences: sl<SharedPreferences>()),
+  );
+  sl.registerLazySingleton<SettingsRepository>(
+    () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
+  );
+  sl.registerFactory(() => SettingsCubit(settingsRepository: sl<SettingsRepository>()));
 }
