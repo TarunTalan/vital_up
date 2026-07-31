@@ -36,11 +36,13 @@ class AuthRepositoryImpl implements AuthRepository {
           id: Supabase.instance.client.auth.currentUser?.id ?? 'usr_1',
           email: Supabase.instance.client.auth.currentUser?.email ?? '$username@example.com',
           displayName: username,
+          weightKg: Supabase.instance.client.auth.currentUser?.userMetadata?['weight_kg']?.toDouble(),
         );
         await _localDataSource.saveUser(jsonEncode({
           'id': user.id,
           'email': user.email,
           'displayName': user.displayName,
+          'weightKg': user.weightKg,
         }));
 
         return Right(user);
@@ -96,12 +98,14 @@ class AuthRepositoryImpl implements AuthRepository {
             id: currentUser.id,
             email: currentUser.email ?? email,
             displayName: currentUser.userMetadata?['username'] ?? email.split('@')[0],
+            weightKg: currentUser.userMetadata?['weight_kg']?.toDouble(),
           );
           
           await _localDataSource.saveUser(jsonEncode({
             'id': user.id,
             'email': user.email,
             'displayName': user.displayName,
+            'weightKg': user.weightKg,
           }));
         }
         return const Right(null);
@@ -288,12 +292,14 @@ class AuthRepositoryImpl implements AuthRepository {
           displayName: currentUser.userMetadata?['full_name'] ??
               currentUser.userMetadata?['name'] ??
               'Google User',
+          weightKg: currentUser.userMetadata?['weight_kg']?.toDouble(),
         );
 
         await _localDataSource.saveUser(jsonEncode({
           'id': user.id,
           'email': user.email,
           'displayName': user.displayName,
+          'weightKg': user.weightKg,
         }));
 
         return Right(user);
@@ -330,6 +336,7 @@ class AuthRepositoryImpl implements AuthRepository {
           email: map['email'],
           displayName: map['displayName'],
           photoUrl: map['photoUrl'],
+          weightKg: map['weightKg']?.toDouble(),
         ));
       }
       return const Right(null);

@@ -167,7 +167,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: _showErrors && _nameError() != null
                     ? Theme.of(context).colorScheme.error
-                    : colors.onSurface.withOpacity(0.7),
+                    : colors.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -199,7 +199,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
                     ? Theme.of(context).colorScheme.error
                     : (_calculateAge() != null
                         ? const Color.fromRGBO(15, 117, 134, 1)
-                        : colors.onSurface.withOpacity(0.7)),
+                        : colors.onSurface.withValues(alpha: 0.7)),
               ),
             ),
           ),
@@ -249,7 +249,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: _showErrors && (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female")
                     ? Theme.of(context).colorScheme.error
-                    : colors.onSurface.withOpacity(0.7),
+                    : colors.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),

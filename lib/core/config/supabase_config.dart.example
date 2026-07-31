@@ -1,4 +1,6 @@
 class SupabaseConfig {
   static const String url = 'YOUR_SUPABASE_URL';
   static const String publishableKey = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
+  static const String mapboxAccessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+  static const String googleWebClientId = 'YOUR_GOOGLE_WEB_CLIENT_ID';
 }

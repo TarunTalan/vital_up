@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,7 +7,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+// import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
@@ -100,8 +101,8 @@ class _DashboardPageState extends State<DashboardPage> {
           value: _dietPlanCubit,
           child: const _HomeTab(),
         ),
-      1 => FoodScannerPage(
-          onBack: () {
+      // 1 => FoodScannerPage(
+      //     onBack: () {
             if (_selectedIndex == 0) return;
             setState(() {
               _navigationQueue.remove(0);
@@ -109,11 +110,11 @@ class _DashboardPageState extends State<DashboardPage> {
               _selectedIndex = 0;
             });
           },
-          onNavigateToDetail: (imagePath) => context.pushNamed(
-            'food-detail',
-            extra: imagePath,
-          ),
-        ),
+      //     onNavigateToDetail: (imagePath) => context.pushNamed(
+      //       'food-detail',
+      //       extra: imagePath,
+      //     ),
+      //   ),
       2 => const _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',
@@ -167,61 +168,18 @@ class _HomeTab extends StatelessWidget {
 
     return Stack(
       children: [
+        // Background - Full Screen
         Positioned.fill(
           child: Image.asset(
             'assets/images/bg.png',
             fit: BoxFit.cover,
           ),
         ),
-        SafeArea(
+        // Scrollable Content
+        Positioned.fill(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 128),
+            padding: const EdgeInsets.fromLTRB(20, 150, 20, 128), // 150pt top padding to start below fixed header
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Good morning',
-                          style: theme.textTheme.displayMedium?.copyWith(
-                            fontSize: 28,
-                            height: 1.08,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Tuesday, January 13',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: customColors?.grayText,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: colors.primary.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: colors.primary.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.calendar_month_rounded,
-                      color: colors.primary,
-                      size: 25,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 44),
               const _InsightCard(),
               const SizedBox(height: 26),
               SizedBox(
@@ -229,24 +187,25 @@ class _HomeTab extends StatelessWidget {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
-                  children: const [
-                    _MetricChip(
+                  children: [
+                    const _MetricChip(
                       label: 'Steps',
                       iconAsset: 'assets/icons/active.svg',
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Water',
                       iconAsset: 'assets/icons/drop.svg',
                     ),
                     _MetricChip(
                       label: 'Workout',
                       iconAsset: 'assets/icons/moderate.svg',
+                      onTap: () => context.pushNamed('activity-tracking'),
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Mood',
                       iconAsset: 'assets/icons/smile.svg',
                     ),
-                    _MetricChip(
+                    const _MetricChip(
                       label: 'Sleep',
                       iconAsset: 'assets/icons/sleep.svg',
                     ),
@@ -260,30 +219,6 @@ class _HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               const _DashboardSegmentedTabs(),
-              const SizedBox(height: 25),
-              BlocBuilder<DietPlanCubit, DietPlanState>(
-                builder: (context, state) {
-                  if (state is DietPlanLoaded) {
-                    return _ActiveDietPlanCard(
-                      plan: state.mealPlan,
-                      onTap: () async {
-                        await context.pushNamed('diet-plan-result', extra: {'mode': 'cached'});
-                        if (context.mounted) {
-                          context.read<DietPlanCubit>().loadActiveMealPlan();
-                        }
-                      },
-                    );
-                  }
-                  return _DietPlanCard(
-                    onTap: () async {
-                      await context.pushNamed('diet-plan-prefs');
-                      if (context.mounted) {
-                        context.read<DietPlanCubit>().loadActiveMealPlan();
-                      }
-                    },
-                  );
-                },
-              ),
               const SizedBox(height: 25),
               const _RestMetricCard(
                 title: 'Sleep',
@@ -301,6 +236,79 @@ class _HomeTab extends StatelessWidget {
                 progress: 0.72,
               ),
             ],
+          ),
+        ),
+        // Fixed Top Bar
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.7),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.5, 1.0],
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Good morning',
+                              style: theme.textTheme.displayMedium?.copyWith(
+                                fontSize: 28,
+                                height: 1.08,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tuesday, January 13',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: customColors?.grayText,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: colors.primary.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.calendar_month_rounded,
+                          color: colors.primary,
+                          size: 25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -357,10 +365,12 @@ class _InsightCard extends StatelessWidget {
 class _MetricChip extends StatelessWidget {
   final String label;
   final String iconAsset;
+  final VoidCallback? onTap;
 
   const _MetricChip({
     required this.label,
     required this.iconAsset,
+    this.onTap,
   });
 
   @override
@@ -368,44 +378,49 @@ class _MetricChip extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 9),
-      padding: const EdgeInsets.symmetric(vertical: 17),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.74),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 9),
+        padding: const EdgeInsets.symmetric(vertical: 17),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.74),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: SvgPicture.asset(
-                iconAsset,
-                width: 22,
-                height: 22,
-                colorFilter: ColorFilter.mode(colors.primary, BlendMode.srcIn),
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  iconAsset,
+                  width: 22,
+                  height: 22,
+                  colorFilter:
+                      ColorFilter.mode(colors.primary, BlendMode.srcIn),
+                ),
               ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            label,
-            style: textTheme.labelMedium?.copyWith(
-              fontSize: 12,
-              color: const Color(0xFF111111),
+            const Spacer(),
+            Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(
+                fontSize: 12,
+                color: const Color(0xFF111111),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -478,6 +493,7 @@ class _RestMetricCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
+      constraints: const BoxConstraints(minHeight: 196),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 20, 52, 18),
       decoration: BoxDecoration(
@@ -637,34 +653,33 @@ class _BottomNavBar extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: Container(
-          height: 68,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(34),
-            border: Border.all(
-              color: colors.outline.withValues(alpha: 0.30),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (var i = 0; i < items.length; i++)
-                Expanded(
-                  child: _NavItem(
-                    item: items[i],
-                    selected: selectedIndex == i,
-                    onTap: () => onItemSelected(i),
-                  ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              height: 68,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(34),
+                border: Border.all(
+                  color: colors.outline.withValues(alpha: 0.20),
                 ),
-            ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  for (var i = 0; i < items.length; i++)
+                    Expanded(
+                      child: _NavItem(
+                        item: items[i],
+                        selected: selectedIndex == i,
+                        onTap: () => onItemSelected(i),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

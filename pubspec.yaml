@@ -65,6 +65,27 @@ dependencies:
   google_fonts: ^8.1.0
   flutter_svg: ^2.0.10+1
   google_sign_in: ^6.2.1
+  geolocator: ^13.0.2
+  pedometer: ^4.0.2
+  drift: ^2.16.0
+  sqlite3_flutter_libs: ^0.5.20
+  path: ^1.9.0
+  mapbox_maps_flutter: ^2.25.1
+  flutter_foreground_task: ^9.2.2
+  injectable: ^2.4.1
+  uuid: ^4.4.0
+
+  # Activity Tracking extras
+  flutter_tts: ^4.1.0
+  flutter_blue_plus: ^1.35.3
+  just_audio: ^0.9.42
+  audio_session: ^0.1.21
+  just_audio_background: ^0.0.1-beta.15
+  on_audio_query_forked: ^2.9.1
+  on_audio_query_android: ^1.1.0
+  permission_handler: ^11.3.1
+  url_launcher: ^6.3.0
+
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +94,8 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.9
   isar_community_generator: ^3.3.2
+  drift_dev: ^2.16.0
+  injectable_generator: ^2.6.1
 
   flutter_lints: ^6.0.0
 
@@ -90,6 +113,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/audio/
 
   fonts:
     - family: SFProRounded
