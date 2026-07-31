@@ -30,6 +30,8 @@ import 'package:vital_up/features/dashboard/data/services/screen_time_service.da
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
 
 
 final GetIt sl = GetIt.instance;
@@ -124,4 +126,7 @@ Future<void> initDependencies() async {
   
   sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>()));
   sl.registerFactory(() => SleepCubit(sl<SleepService>()));
+  
+  sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>()));
+  sl.registerFactory(() => WaterIntakeCubit(sl<WaterIntakeService>()));
 }
