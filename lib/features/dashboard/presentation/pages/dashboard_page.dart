@@ -9,6 +9,8 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
+import '../widgets/water_intake_card.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -45,8 +47,19 @@ class _DashboardPageState extends State<DashboardPage> {
           context.goNamed('onboarding');
         }
       },
-      child: BlocProvider<DietPlanCubit>(
-        create: (context) => sl<DietPlanCubit>()..loadTodayMealPlan(),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<DietPlanCubit>(
+            create: (context) => sl<DietPlanCubit>()..loadTodayMealPlan(),
+          ),
+          BlocProvider<WaterIntakeCubit>(
+            create: (context) {
+              final authState = context.read<AuthCubit>().state;
+              final userId = authState is AuthAuthenticated ? authState.user.id : 'unknown';
+              return sl<WaterIntakeCubit>()..loadData(userId);
+            },
+          ),
+        ],
         child: Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           extendBody: true,
@@ -231,6 +244,8 @@ class _HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 25),
               const SleepCard(),
+              const SizedBox(height: 12),
+              const WaterIntakeCard(),
               const SizedBox(height: 12),
               if (Theme.of(context).platform == TargetPlatform.android)
                 const ScreenTimeCard(),
