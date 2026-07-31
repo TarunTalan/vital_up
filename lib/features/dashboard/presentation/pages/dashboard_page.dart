@@ -10,6 +10,8 @@ import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_p
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
+import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -20,17 +22,21 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
+  late final ProfileCubit _profileCubit;
   int _selectedIndex = 0;
+  final List<int> _navigationQueue = [0];
 
   @override
   void initState() {
     super.initState();
     _dietPlanCubit = sl<DietPlanCubit>()..loadActiveMealPlan();
+    _profileCubit = sl<ProfileCubit>();
   }
 
   @override
   void dispose() {
     _dietPlanCubit.close();
+    _profileCubit.close();
     super.dispose();
   }
 
@@ -54,19 +60,36 @@ class _DashboardPageState extends State<DashboardPage> {
           context.goNamed('onboarding');
         }
       },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        extendBody: true,
-        body: _buildSelectedTab(context),
-        bottomNavigationBar: _selectedIndex == 1
-            ? null
-            : _BottomNavBar(
-                items: _items,
-                selectedIndex: _selectedIndex,
-                onItemSelected: (index) {
-                  setState(() => _selectedIndex = index);
-                },
-              ),
+      child: PopScope(
+        canPop: _navigationQueue.length <= 1,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (_navigationQueue.length > 1) {
+            setState(() {
+              _navigationQueue.removeLast();
+              _selectedIndex = _navigationQueue.last;
+            });
+          }
+        },
+        child: Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          extendBody: true,
+          body: _buildSelectedTab(context),
+          bottomNavigationBar: _selectedIndex == 1
+              ? null
+              : _BottomNavBar(
+                  items: _items,
+                  selectedIndex: _selectedIndex,
+                  onItemSelected: (index) {
+                    if (_selectedIndex == index) return;
+                    setState(() {
+                      _navigationQueue.remove(index);
+                      _navigationQueue.add(index);
+                      _selectedIndex = index;
+                    });
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -78,7 +101,14 @@ class _DashboardPageState extends State<DashboardPage> {
           child: const _HomeTab(),
         ),
       1 => FoodScannerPage(
-          onBack: () => setState(() => _selectedIndex = 0),
+          onBack: () {
+            if (_selectedIndex == 0) return;
+            setState(() {
+              _navigationQueue.remove(0);
+              _navigationQueue.add(0);
+              _selectedIndex = 0;
+            });
+          },
           onNavigateToDetail: (imagePath) => context.pushNamed(
             'food-detail',
             extra: imagePath,
@@ -89,7 +119,10 @@ class _DashboardPageState extends State<DashboardPage> {
           subtitle: 'Your personal health assistant.',
           icon: Icons.favorite_rounded,
         ),
-      _ => _ProfileTab(onLogout: () => _showLogoutDialog(context)),
+      _ => BlocProvider.value(
+          value: _profileCubit,
+          child: ProfilePage(onLogout: () => _showLogoutDialog(context)),
+        ),
     };
   }
 
@@ -583,56 +616,7 @@ class _SimpleTab extends StatelessWidget {
   }
 }
 
-class _ProfileTab extends StatelessWidget {
-  final VoidCallback onLogout;
-
-  const _ProfileTab({required this.onLogout});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final customColors = theme.extension<VitalUpColors>();
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.hPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Profile', style: theme.textTheme.displayMedium),
-            const SizedBox(height: 6),
-            Text(
-              'Manage your VitalUp account.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: customColors?.grayText,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                Icons.person_rounded,
-                color: theme.colorScheme.primary,
-              ),
-              title: const Text('VitalUp User'),
-              subtitle: const Text('Health profile active'),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: AppTheme.buttonHeight,
-              child: OutlinedButton.icon(
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Logout'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// Placeholder _ProfileTab has been replaced by ProfilePage
 
 class _BottomNavBar extends StatelessWidget {
   final List<_BottomNavItem> items;
