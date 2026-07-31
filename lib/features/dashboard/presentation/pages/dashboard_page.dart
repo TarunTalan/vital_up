@@ -98,8 +98,15 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
-      0 => BlocProvider<MealLogBloc>(
-          create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+      0 => MultiBlocProvider(
+          providers: [
+            BlocProvider<MealLogBloc>(
+              create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+            ),
+            BlocProvider.value(
+              value: _dietPlanCubit,
+            ),
+          ],
           child: _HomeTab(
             onScanMeal: () => setState(() => _selectedIndex = 1),
           ),
@@ -182,6 +189,31 @@ class _HomeTab extends StatelessWidget {
                 onScanMeal: onScanMeal,
               ),
               const SizedBox(height: 26),
+              BlocBuilder<DietPlanCubit, DietPlanState>(
+                builder: (context, state) {
+                  if (state is DietPlanLoaded && state.mealPlan != null) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 26),
+                      child: _ActiveDietPlanCard(
+                        plan: state.mealPlan,
+                        onTap: () {
+                          context.pushNamed('diet-plan-result', extra: {
+                            'plan': state.mealPlan,
+                          });
+                        },
+                      ),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 26),
+                    child: _DietPlanCard(
+                      onTap: () {
+                        context.pushNamed('diet-plan-prefs');
+                      },
+                    ),
+                  );
+                },
+              ),
               SizedBox(
                 height: 110,
                 child: ListView(
