@@ -622,15 +622,9 @@ class OnboardingDateField extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 alignment: Alignment.centerLeft,
                 decoration: BoxDecoration(
-                  color: isError 
-                      ? AppTheme.errorLightColor.withValues(alpha: 0.1) 
-                      : const Color(0xFFD8D8D8).withValues(alpha: 0.3),
+                  color: bgColor,
                   borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-                  border: Border.all(
-                    color: isError 
-                        ? AppTheme.errorLightColor 
-                        : const Color(0xFFD8D8D8),
-                  ),
+                  border: Border.all(color: bdColor),
                 ),
                 child: Text(
                   value.isEmpty ? placeholder : value,

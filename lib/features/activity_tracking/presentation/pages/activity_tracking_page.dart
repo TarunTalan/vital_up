@@ -235,12 +235,13 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   @override
   void dispose() {
+    _prefsNotifier.removeListener(_onPrefsChanged);
+
     // Reset selected track to None, stop playback, and reset TTS/voice coach on exit
     _prefsNotifier.setBackgroundAudioTrack('None');
     _stopWorkoutAudio();
     _voiceCoach.stop();
 
-    _prefsNotifier.removeListener(_onPrefsChanged);
     _positionSubscription?.cancel();
     _hrSubscription?.cancel();
     _hrManager.dispose();
