@@ -7,7 +7,11 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-// import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
@@ -43,10 +47,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   static const _items = [
     _BottomNavItem('Home', 'assets/icons/home.svg'),
-    _BottomNavItem(
-      'Scan',
-      'assets/icons/scanner.svg',
-    ),
+    _BottomNavItem('Scan', 'assets/icons/scanner.svg'),
     _BottomNavItem('Vita', 'assets/icons/vita.svg'),
     _BottomNavItem('Profile', 'assets/icons/profile.svg'),
   ];
@@ -97,24 +98,15 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
-      0 => BlocProvider.value(
-          value: _dietPlanCubit,
-          child: const _HomeTab(),
+      0 => BlocProvider<MealLogBloc>(
+          create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+          child: _HomeTab(
+            onScanMeal: () => setState(() => _selectedIndex = 1),
+          ),
         ),
-      // 1 => FoodScannerPage(
-      //     onBack: () {
-            if (_selectedIndex == 0) return;
-            setState(() {
-              _navigationQueue.remove(0);
-              _navigationQueue.add(0);
-              _selectedIndex = 0;
-            });
-          },
-      //     onNavigateToDetail: (imagePath) => context.pushNamed(
-      //       'food-detail',
-      //       extra: imagePath,
-      //     ),
-      //   ),
+      1 => FoodScannerPage(
+          onBack: () => setState(() => _selectedIndex = 0),
+        ),
       2 => const _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',
@@ -158,7 +150,8 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab();
+  final VoidCallback? onScanMeal;
+  const _HomeTab({this.onScanMeal});
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +174,13 @@ class _HomeTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 150, 20, 128), // 150pt top padding to start below fixed header
             children: [
               const _InsightCard(),
+              const SizedBox(height: 16),
+              NutritionSummaryCard(
+                onViewAll: () {
+                  context.pushNamed('meal-log-history');
+                },
+                onScanMeal: onScanMeal,
+              ),
               const SizedBox(height: 26),
               SizedBox(
                 height: 110,
@@ -808,7 +808,7 @@ class _DietPlanCard extends StatelessWidget {
 }
 
 class _ActiveDietPlanCard extends StatelessWidget {
-  final dynamic plan; 
+  final dynamic plan;
   final VoidCallback onTap;
 
   const _ActiveDietPlanCard({required this.plan, required this.onTap});

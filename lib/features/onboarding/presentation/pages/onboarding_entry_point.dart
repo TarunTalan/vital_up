@@ -47,8 +47,8 @@ class _OnboardingEntryPointState extends State<OnboardingEntryPoint> {
       case 'bpm':
         routeName = 'health-bpm';
         break;
-      case 'ox_level':
-        routeName = 'health-ox-level';
+      case 'goals':
+        routeName = 'health-goals';
         break;
       case 'activity':
         routeName = 'health-activity';

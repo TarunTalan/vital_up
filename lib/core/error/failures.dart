@@ -28,3 +28,23 @@ class DatabaseFailure extends Failure {
 class ValidationFailure extends Failure {
   const ValidationFailure([super.message = 'Invalid input details provided.']);
 }
+
+class NoFoodDetectedFailure extends Failure {
+  const NoFoodDetectedFailure([super.message = 'No food was detected in the image. Please try again with a clearer photo.']);
+}
+
+class LowConfidenceFailure extends Failure {
+  const LowConfidenceFailure([super.message = 'Food recognition confidence is low. Please review and confirm the detected items.']);
+}
+
+class BarcodeNotFoundFailure extends Failure {
+  const BarcodeNotFoundFailure([super.message = 'Barcode not found in database. Please try manual search.']);
+}
+
+class RecognitionUnavailableFailure extends Failure {
+  const RecognitionUnavailableFailure([super.message = 'Food recognition is temporarily busy. Please try again shortly.']);
+}
+
+class ScanQuotaExceededFailure extends Failure {
+  const ScanQuotaExceededFailure([super.message = 'You have reached your monthly scan limit. Upgrade to Premium for unlimited scans.']);
+}

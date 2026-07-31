@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:vital_up/core/database/isar_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,11 @@ void main() async {
 
     // Initialize dependency injection (database, network, storage, etc.)
     await di.initDependencies();
+
+    // Trigger background sync of popular products to offline DB
+    final isarService = sl<IsarService>();
+    final supabase = sl<SupabaseClient>();
+    isarService.syncOfflineFoodsBackground(supabase);
   } catch (e, stackTrace) {
     debugPrint('INITIALIZATION ERROR: $e');
     debugPrint(stackTrace.toString());
