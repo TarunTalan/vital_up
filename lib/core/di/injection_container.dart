@@ -28,6 +28,12 @@ import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan
 import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart' as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
 import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source.dart';
 import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source_impl.dart';
 import 'package:vital_up/features/food_scanner/data/repositories/food_recognition_repository_impl.dart';
@@ -88,6 +94,7 @@ import 'package:vital_up/features/activity_tracking/services/workout_audio_servi
 import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
+
 
 final GetIt sl = GetIt.instance;
 
@@ -366,4 +373,14 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<LocalAudioQueryService>(() => LocalAudioQueryService());
   sl.registerLazySingleton<InAppAudioDownloader>(() => InAppAudioDownloader(sl<IsarService>()));
   sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
+  // 10. Dashboard / Screen Time / Sleep
+  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService());
+  sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
+
+  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>()));
+  sl.registerFactory(() => SleepCubit(sl<SleepService>()));
+
+  sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>()));
+  sl.registerFactory(() => WaterIntakeCubit(sl<WaterIntakeService>()));
 }
+

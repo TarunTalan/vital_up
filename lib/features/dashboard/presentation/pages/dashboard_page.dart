@@ -17,6 +17,17 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.d
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import '../widgets/screen_time_card.dart';
+import '../widgets/sleep_card.dart';
+import '../widgets/water_intake_card.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
+import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -62,35 +73,55 @@ class _DashboardPageState extends State<DashboardPage> {
           context.goNamed('onboarding');
         }
       },
-      child: PopScope(
-        canPop: _navigationQueue.length <= 1,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          if (_navigationQueue.length > 1) {
-            setState(() {
-              _navigationQueue.removeLast();
-              _selectedIndex = _navigationQueue.last;
-            });
-          }
-        },
-        child: Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          extendBody: true,
-          body: _buildSelectedTab(context),
-          bottomNavigationBar: _selectedIndex == 1
-              ? null
-              : _BottomNavBar(
-                  items: _items,
-                  selectedIndex: _selectedIndex,
-                  onItemSelected: (index) {
-                    if (_selectedIndex == index) return;
-                    setState(() {
-                      _navigationQueue.remove(index);
-                      _navigationQueue.add(index);
-                      _selectedIndex = index;
-                    });
-                  },
-                ),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<DietPlanCubit>.value(
+            value: _dietPlanCubit,
+          ),
+          BlocProvider<WaterIntakeCubit>(
+            create: (context) {
+              final authState = context.read<AuthCubit>().state;
+              final userId = authState is AuthAuthenticated ? authState.user.id : 'unknown';
+              return sl<WaterIntakeCubit>()..loadData(userId);
+            },
+          ),
+          BlocProvider<ScreenTimeCubit>(
+            create: (context) => sl<ScreenTimeCubit>()..loadStats(),
+          ),
+          BlocProvider<SleepCubit>(
+            create: (context) => sl<SleepCubit>()..loadSleepData(),
+          ),
+        ],
+        child: PopScope(
+          canPop: _navigationQueue.length <= 1,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            if (_navigationQueue.length > 1) {
+              setState(() {
+                _navigationQueue.removeLast();
+                _selectedIndex = _navigationQueue.last;
+              });
+            }
+          },
+          child: Scaffold(
+            backgroundColor: theme.scaffoldBackgroundColor,
+            extendBody: true,
+            body: _buildSelectedTab(context),
+            bottomNavigationBar: _selectedIndex == 1
+                ? null
+                : _BottomNavBar(
+                    items: _items,
+                    selectedIndex: _selectedIndex,
+                    onItemSelected: (index) {
+                      if (_selectedIndex == index) return;
+                      setState(() {
+                        _navigationQueue.remove(index);
+                        _navigationQueue.add(index);
+                        _selectedIndex = index;
+                      });
+                    },
+                  ),
+          ),
         ),
       ),
     );
@@ -98,15 +129,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
-      0 => MultiBlocProvider(
-          providers: [
-            BlocProvider<MealLogBloc>(
-              create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
-            ),
-            BlocProvider.value(
-              value: _dietPlanCubit,
-            ),
-          ],
+      0 => BlocProvider<MealLogBloc>(
+          create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
           child: _HomeTab(
             onScanMeal: () => setState(() => _selectedIndex = 1),
           ),
@@ -114,10 +138,12 @@ class _DashboardPageState extends State<DashboardPage> {
       1 => FoodScannerPage(
           onBack: () => setState(() => _selectedIndex = 0),
         ),
-      2 => const _SimpleTab(
+      2 => _SimpleTab(
           title: 'Vita',
           subtitle: 'Your personal health assistant.',
           icon: Icons.favorite_rounded,
+          buttonLabel: 'Generate AI Diet Plan',
+          onButtonTap: () => context.pushNamed('diet-plan-prefs'),
         ),
       _ => BlocProvider.value(
           value: _profileCubit,
@@ -191,7 +217,7 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 26),
               BlocBuilder<DietPlanCubit, DietPlanState>(
                 builder: (context, state) {
-                  if (state is DietPlanLoaded && state.mealPlan != null) {
+                  if (state is DietPlanLoaded) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 26),
                       child: _ActiveDietPlanCard(
@@ -252,21 +278,11 @@ class _HomeTab extends StatelessWidget {
               const SizedBox(height: 24),
               const _DashboardSegmentedTabs(),
               const SizedBox(height: 25),
-              const _RestMetricCard(
-                title: 'Sleep',
-                value: '6h 43m',
-                subtitle: 'Good night of rest',
-                iconAsset: 'assets/icons/sleep.svg',
-                progress: 0.72,
-              ),
-              const SizedBox(height: 12),
-              const _RestMetricCard(
-                title: 'Screen Time',
-                value: '3h 54m',
-                subtitle: 'About usual for you',
-                iconAsset: 'assets/icons/Watch.svg',
-                progress: 0.72,
-              ),
+              const WaterIntakeCard(),
+              const SizedBox(height: 16),
+              const SleepCard(),
+              const SizedBox(height: 16),
+              const ScreenTimeCard(),
             ],
           ),
         ),
@@ -504,105 +520,7 @@ class _DashboardSegmentedTabs extends StatelessWidget {
   }
 }
 
-class _RestMetricCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final String iconAsset;
-  final double progress;
 
-  const _RestMetricCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.iconAsset,
-    required this.progress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Container(
-      constraints: const BoxConstraints(minHeight: 196),
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 20, 52, 18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFD8F2DC),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: SvgPicture.asset(
-                    iconAsset,
-                    width: 23,
-                    height: 23,
-                    colorFilter: const ColorFilter.mode(
-                      Color(0xFF111111),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF161616),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            value,
-            style: theme.textTheme.displayLarge?.copyWith(
-              fontSize: 36,
-              height: 1,
-              fontWeight: FontWeight.w300,
-              color: const Color(0xFF111111),
-            ),
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              color: const Color(0xFF47B85A),
-              backgroundColor: colors.outline.withValues(alpha: 0.25),
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 14,
-              color: const Color(0xFF777777),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SimpleTab extends StatelessWidget {
   final String title;
@@ -793,6 +711,7 @@ class _BottomNavItem {
 
 class _DietPlanCard extends StatelessWidget {
   final VoidCallback onTap;
+
   const _DietPlanCard({required this.onTap});
 
   @override
@@ -806,16 +725,18 @@ class _DietPlanCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colors.primary.withValues(alpha: 0.1),
+          color: Colors.white.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
+          ),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.2),
+                color: colors.primary.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.restaurant_menu, color: colors.primary),
@@ -825,13 +746,24 @@ class _DietPlanCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('AI Diet Plan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'AI Diet Plan',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF111111),
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Generate a personalized meal plan', style: theme.textTheme.bodySmall),
+                  Text(
+                    'Generate your personalized meal plan',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF4E4E4E),
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: colors.primary, size: 16),
+            const Icon(Icons.arrow_forward_ios, color: Color(0xFF111111), size: 16),
           ],
         ),
       ),

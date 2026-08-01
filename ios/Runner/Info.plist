@@ -85,5 +85,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>We need access to your sleep data to provide personalized insights.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>We need access to your sleep data to provide personalized insights.</string>
 </dict>
 </plist>

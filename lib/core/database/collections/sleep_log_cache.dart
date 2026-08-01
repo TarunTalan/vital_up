@@ -14,5 +14,7 @@ class SleepLogCache {
   
   late int durationMinutes;
   
+  String source = 'manual';
+  
   bool isSynced = false;
 }
