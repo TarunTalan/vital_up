@@ -62,6 +62,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   bool _isUiVisible = true;
   bool _isLocked = true;
   bool _isCountingDown = false;
+  bool _hasCenteredCamera = false;
 
   final DistanceUnitNotifier _unitNotifier = DistanceUnitNotifier();
   final WorkoutPrefsNotifier _prefsNotifier = WorkoutPrefsNotifier();
@@ -283,6 +284,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           _currentPosition = point;
         });
         _updatePuck(point);
+        _initialCenterCamera(position.latitude, position.longitude);
       }
     });
   }
@@ -364,6 +366,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     );
   }
 
+  void _initialCenterCamera(double lat, double lng) {
+    if (_hasCenteredCamera || _mapboxMap == null) return;
+    _hasCenteredCamera = true;
+    _centerCamera(lat, lng, zoom: 16.0);
+  }
+
   void _onMapCreated(mbx.MapboxMap map) async {
     _mapboxMap = map;
 
@@ -386,12 +394,18 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _circleAnnotationManager = await map.annotations.createCircleAnnotationManager();
     _startPointAnnotationManager = await map.annotations.createCircleAnnotationManager();
 
+    // Center camera immediately if we already have a position from the stream
+    if (_currentPosition != null) {
+      _initialCenterCamera(_currentPosition!.latitude, _currentPosition!.longitude);
+      _updatePuck(_currentPosition);
+    }
+
     // Center camera on user's current location initially with appropriate zoom
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-      _centerCamera(position.latitude, position.longitude, zoom: 16.0);
+      _initialCenterCamera(position.latitude, position.longitude);
 
       // Update initial position puck
       final point = TrackPoint(
@@ -536,8 +550,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                 },
                 onViewHistory: () {
                   bloc.add(ResetTracking());
-                  Navigator.of(context).pop();
-                  context.pushReplacementNamed('activity-history');
+                  context.pushNamed('activity-history');
                 },
               ),
             ),

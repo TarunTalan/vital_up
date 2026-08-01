@@ -54,15 +54,17 @@ void showSmoothSnackBar(
   required Color iconColor,
   IconData icon = Icons.info_outline_rounded,
   Duration duration = const Duration(seconds: 4),
+  SnackBarAction? action,
 }) {
   if (!context.mounted) return;
   
   ScaffoldMessenger.of(context).clearSnackBars();
-  ScaffoldMessenger.of(context).showSnackBar(
+  final controller = ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       duration: duration,
       margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+      action: action,
       content: Row(
         children: [
           Icon(
@@ -78,15 +80,24 @@ void showSmoothSnackBar(
       ),
     ),
   );
+
+  if (action != null) {
+    Future.delayed(duration, () {
+      try {
+        controller.close();
+      } catch (_) {}
+    });
+  }
 }
 
 /// Show a consistent success snackbar with the cyan primary theme color.
-void showSuccessSnackBar(BuildContext context, String message) {
+void showSuccessSnackBar(BuildContext context, String message, {SnackBarAction? action}) {
   showSmoothSnackBar(
     context,
     message: message,
     iconColor: const Color(0xFF19C3E0),
     icon: Icons.check_circle_outline_rounded,
+    action: action,
   );
 }
 

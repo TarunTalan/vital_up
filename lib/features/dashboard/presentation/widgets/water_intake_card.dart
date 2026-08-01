@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/widgets/water_wave_animation.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import '../cubit/water_intake_cubit.dart';
 import '../cubit/water_intake_state.dart';
 
@@ -29,19 +30,17 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
       listener: (context, state) {
         if (state is WaterIntakeLoaded && state.todayLogs.isNotEmpty) {
           final addedAmount = state.todayLogs.last.amountMl;
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text('Added $addedAmount ml of water'),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  onPressed: () {
-                    context.read<WaterIntakeCubit>().undoLast();
-                  },
-                ),
-              ),
-            );
+          showSuccessSnackBar(
+            context,
+            'Added $addedAmount ml of water',
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: const Color(0xFF19C3E0),
+              onPressed: () {
+                context.read<WaterIntakeCubit>().undoLast();
+              },
+            ),
+          );
         }
       },
       builder: (context, state) {
