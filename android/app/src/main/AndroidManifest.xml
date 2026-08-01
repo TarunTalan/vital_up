@@ -37,7 +37,7 @@
         android:required="false" />
 
     <application
-        android:label="vital_up"
+        android:label="VitalUp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <meta-data

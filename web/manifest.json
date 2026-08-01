@@ -1,6 +1,6 @@
 {
-    "name": "vital_up",
-    "short_name": "vital_up",
+    "name": "VitalUp",
+    "short_name": "VitalUp",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
