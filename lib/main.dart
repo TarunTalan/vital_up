@@ -16,6 +16,8 @@ import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +66,8 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
+        BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
+        BlocProvider(create: (context) => sl<SleepCubit>()..loadSleepData()),
       ],
       child: MaterialApp.router(
         title: 'VitalUp',
