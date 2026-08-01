@@ -132,21 +132,27 @@ class GroqVisionProvider implements VisionProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: this.getPrompt(),
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that outputs in JSON. Return ONLY the JSON object. Do not include any thought process, thinking steps, <think> tags, or explanations. Start your output directly with {.',
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: this.getPrompt(),
               },
-            },
-          ],
-        }],
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${imageBase64}`,
+                },
+              },
+            ],
+          }
+        ],
         temperature: 0.1,
         max_tokens: 1024,
         response_format: { type: 'json_object' },
@@ -192,7 +198,7 @@ Rules:
 - Be specific about food type and preparation
 - Estimate portion size visually
 - Do NOT include calorie or macro numbers
-- Return ONLY the JSON object, no other text`;
+- Do not output any thought process, explanations, or <think> tags. Start your response directly with the JSON object.`;
   }
 
   private validateAndNormalize(data: any): VisionResponse[] {
@@ -602,6 +608,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('JWT verification failed:', authError);
       return jsonResponse({ error: 'Invalid token' }, 401);
     }
 
