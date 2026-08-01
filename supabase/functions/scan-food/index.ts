@@ -1119,29 +1119,67 @@ Deno.serve(async (req) => {
       });
 
       // --- Calories ---
-      // Prefer the standard "Energy" value in kcal (USDA id 1008). Some
-      // Foundation Foods entries don't include id 1008 at all and only
-      // provide the Atwater-factor-derived energy values — without a
-      // fallback this silently produced 0 calories for those foods.
+      // Prefer the standard "Energy" value in kcal (USDA id 1008 / unit 'kcal').
+      // Some Foundation Foods entries don't include id 1008 at all and only
+      // provide the Atwater-factor-derived energy values.
+      // If we only find Energy in kJ (unit 'kj'), we convert it to kcal by dividing by 4.184.
       const energyNutrients = nutrients.filter((n: any) => {
         const name = (n.nutrient?.name ?? n.name ?? n.nutrientName ?? '').toLowerCase();
         return name.includes('energy');
       });
 
-      const findEnergy = (predicate: (name: string) => boolean) =>
-        energyNutrients.find((n: any) => predicate((n.nutrient?.name ?? n.name ?? n.nutrientName ?? '').toLowerCase()));
+      const findEnergy = (predicate: (name: string, unit: string) => boolean) =>
+        energyNutrients.find((n: any) => {
+          const name = (n.nutrient?.name ?? n.name ?? n.nutrientName ?? '').toLowerCase();
+          const unit = (n.nutrient?.unitName ?? n.unitName ?? n.nutrient?.unitName ?? '').toLowerCase();
+          return predicate(name, unit);
+        });
 
-      const standardEnergy = findEnergy(name => name === 'energy');
-      const atwaterGeneral = findEnergy(name => name.includes('atwater general'));
-      const atwaterSpecific = findEnergy(name => name.includes('atwater specific'));
+      // 1. Try to find kcal-based energy
+      let standardEnergy = findEnergy((name, unit) => name === 'energy' && unit.includes('kcal'));
+      let atwaterGeneral = findEnergy((name, unit) => name.includes('atwater general') && unit.includes('kcal'));
+      let atwaterSpecific = findEnergy((name, unit) => name.includes('atwater specific') && unit.includes('kcal'));
+
+      // Fallback: If not found, try to find any energy that is NOT kJ
+      if (!standardEnergy) {
+        standardEnergy = findEnergy((name, unit) => name === 'energy' && !unit.includes('kj'));
+      }
+      if (!atwaterGeneral) {
+        atwaterGeneral = findEnergy((name, unit) => name.includes('atwater general') && !unit.includes('kj'));
+      }
+      if (!atwaterSpecific) {
+        atwaterSpecific = findEnergy((name, unit) => name.includes('atwater specific') && !unit.includes('kj'));
+      }
 
       const chosenEnergy = standardEnergy ?? atwaterGeneral ?? atwaterSpecific;
 
       if (chosenEnergy) {
-        nutritionData.calories = chosenEnergy.amount ?? chosenEnergy.nutrient?.amount ?? chosenEnergy.value ?? 0;
-        console.log(`Calories source: ${chosenEnergy.nutrient?.name ?? chosenEnergy.name ?? chosenEnergy.nutrientName} = ${nutritionData.calories} kcal`);
+        const rawValue = chosenEnergy.amount ?? chosenEnergy.nutrient?.amount ?? chosenEnergy.value ?? 0;
+        const unit = (chosenEnergy.nutrient?.unitName ?? chosenEnergy.unitName ?? '').toLowerCase();
+        
+        if (unit.includes('kj')) {
+          // Convert kJ to kcal
+          nutritionData.calories = rawValue / 4.184;
+          console.log(`Calories source (converted from kJ): ${chosenEnergy.nutrient?.name ?? chosenEnergy.name ?? chosenEnergy.nutrientName} = ${rawValue} kJ -> ${nutritionData.calories} kcal`);
+        } else {
+          nutritionData.calories = rawValue;
+          console.log(`Calories source: ${chosenEnergy.nutrient?.name ?? chosenEnergy.name ?? chosenEnergy.nutrientName} = ${nutritionData.calories} kcal`);
+        }
       } else {
-        console.log('No energy nutrient (standard or Atwater) found in USDA response');
+        // Fallback to any Energy entry (e.g. kJ-only)
+        const anyEnergy = findEnergy(() => true);
+        if (anyEnergy) {
+          const rawValue = anyEnergy.amount ?? anyEnergy.nutrient?.amount ?? anyEnergy.value ?? 0;
+          const unit = (anyEnergy.nutrient?.unitName ?? anyEnergy.unitName ?? '').toLowerCase();
+          if (unit.includes('kj')) {
+            nutritionData.calories = rawValue / 4.184;
+          } else {
+            nutritionData.calories = rawValue;
+          }
+          console.log(`Calories source (fallback): ${anyEnergy.nutrient?.name ?? anyEnergy.name ?? anyEnergy.nutrientName} = ${rawValue} ${unit} -> ${nutritionData.calories} kcal`);
+        } else {
+          console.log('No energy nutrient (standard or Atwater) found in USDA response');
+        }
       }
 
       console.log(`Energy nutrients found: ${JSON.stringify(energyNutrients.map((n: any) => ({

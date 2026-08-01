@@ -132,13 +132,13 @@ serve(async (req) => {
       try {
         let aiResponseText = "";
 
-        const timeoutMs = attempt === 1 ? 13000 : 8000;
+        const timeoutMs = attempt === 1 ? 20000 : 15000;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         console.time(`GeminiCall_Attempt${attempt}`);
         const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
           {
             method: "POST",
             headers: {

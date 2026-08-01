@@ -70,8 +70,21 @@ class NutritionRepositoryImpl implements NutritionRepository {
             ))
             .toList() ?? [];
         
+        double caloriesVal = (data['calories'] as num?)?.toDouble() ?? 0.0;
+
+        // Safeguard: Check if the returned calories value is actually in kJ (kilojoules)
+        // If we find an 'Energy' nutrient with unit 'kJ' and matching value, we convert it to kcal.
+        final hasKjEnergy = additionalNutrientsList.any((n) =>
+            (n.name.toLowerCase() == 'energy' || n.id == '1062') &&
+            n.unit.toLowerCase() == 'kj' &&
+            (n.value - caloriesVal).abs() < 0.1);
+
+        if (hasKjEnergy && caloriesVal > 0) {
+          caloriesVal = caloriesVal / 4.184;
+        }
+
         final nutritionInfo = NutritionInfo(
-          calories: (data['calories'] as num?)?.toDouble() ?? 0.0,
+          calories: caloriesVal,
           proteinG: (data['protein_g'] as num?)?.toDouble() ?? 0.0,
           carbsG: (data['carbs_g'] as num?)?.toDouble() ?? 0.0,
           fatG: (data['fat_g'] as num?)?.toDouble() ?? 0.0,
