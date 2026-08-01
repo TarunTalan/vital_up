@@ -34,6 +34,10 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   @override
   Future<Either<Failure, List<FoodItem>>> recognizeFood(File image) async {
     logger.i('recognizeFood called with image: ${image.path}');
+    if (supabaseClient.auth.currentSession?.accessToken == null) {
+      logger.e('recognizeFood failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    }
     try {
       final cacheKey = image.path;
       if (_cache.containsKey(cacheKey)) {
@@ -108,6 +112,10 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
 
   @override
   Future<Either<Failure, List<FoodItem>>> searchByName(String query) async {
+    if (supabaseClient.auth.currentSession?.accessToken == null) {
+      logger.e('searchByName failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    }
     try {
       final response = await supabaseClient.functions.invoke(
         'scan-food',

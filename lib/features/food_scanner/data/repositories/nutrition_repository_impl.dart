@@ -40,6 +40,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
 
   @override
   Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item) async {
+    if (supabaseClient.auth.currentSession?.accessToken == null) {
+      logger.e('getNutrition failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    }
     try {
       // Get USDA API key from Supabase Edge Function or environment
       final response = await supabaseClient.functions.invoke(
@@ -311,6 +315,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
 
       // 3. Fallback: Query the Supabase Edge Function (checks proprietary DB first, then OFF global, then Gemini search grounding)
       logger.i('Tertiary lookup: Querying Edge Function for barcode: "$cleanBarcode"');
+      if (supabaseClient.auth.currentSession?.accessToken == null) {
+        logger.e('lookupBarcode fallback failed: No active session found.');
+        return const Left(ServerFailure('User is not authenticated. Please log in.'));
+      }
       final response = await supabaseClient.functions.invoke(
         'scan-food',
         body: {
@@ -506,6 +514,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
 
   @override
   Future<Either<Failure, List<FoodItem>>> searchByName(String query) async {
+    if (supabaseClient.auth.currentSession?.accessToken == null) {
+      logger.e('searchByName failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    }
     try {
       final response = await supabaseClient.functions.invoke(
         'scan-food',
