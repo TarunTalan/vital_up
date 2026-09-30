@@ -1099,32 +1099,23 @@ class _CaptureButton extends StatelessWidget {
             shape: BoxShape.circle,
             color: AppColors.cameraCaptureRing,
           ),
-          child: Container(
-            width: AppDimens.captureButtonInner,
-            height: AppDimens.captureButtonInner,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.cameraControlFill,
-              shape: BoxShape.circle,
-            ),
-            child: isLoading
-                ? const SizedBox.square(
-                    dimension: AppDimens.iconLg,
-                    child: CircularProgressIndicator(
-                      color: AppColors.darker,
-                      strokeWidth: AppDimens.borderThick,
-                    ),
-                  )
-                : SvgPicture.asset(
-                    'assets/icons/camera.svg',
-                    width: AppDimens.iconLg,
-                    height: AppDimens.iconLg,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.darker,
-                      BlendMode.srcIn,
-                    ),
+          child: isLoading
+              ? const SizedBox.square(
+                  dimension: AppDimens.iconLg,
+                  child: CircularProgressIndicator(
+                    color: AppColors.white,
+                    strokeWidth: AppDimens.borderThick,
                   ),
-          ),
+                )
+              : SvgPicture.asset(
+                  'assets/icons/camera.svg',
+                  width: AppDimens.iconLg,
+                  height: AppDimens.iconLg,
+                  colorFilter: const ColorFilter.mode(
+                    AppColors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
         ),
       ),
     );
