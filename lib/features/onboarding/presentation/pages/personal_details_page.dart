@@ -144,9 +144,10 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
         setState(() => _showErrors = false);
         context.goNamed('health-height');
       },
-      title: "First, let's get to know you",
+      title: "About you",
       nextEnabled: true,
       showSkip: false,
+      showBack: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,7 +195,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
                     ? "You must be at least 13 years old"
                     : (age != null
                         ? "Age: $age"
-                        : "Enter your date of birth in DD/MM/YYYY format")),
+                        : "Enter your DOB in DD/MM/YYYY format")),
             style: context.text.bodyLarge?.copyWith(
               color: dobError
                   ? errorColor
@@ -303,17 +304,28 @@ class _GenderButton extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onClick,
-            child: Center(
-              child: SvgPicture.asset(
-                gender == "male" ? 'assets/icons/gender_male.svg' : 'assets/icons/gender_female.svg',
-                width: iconSize,
-                height: iconSize,
-                placeholderBuilder: (BuildContext context) => Icon(
-                  gender == "male" ? Icons.male : Icons.female,
-                  size: iconSize,
-                  color: accent,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SvgPicture.asset(
+                  gender == "male" ? 'assets/icons/gender_male.svg' : 'assets/icons/gender_female.svg',
+                  width: iconSize,
+                  height: iconSize,
+                  placeholderBuilder: (BuildContext context) => Icon(
+                    gender == "male" ? Icons.male : Icons.female,
+                    size: iconSize,
+                    color: accent,
+                  ),
                 ),
-              ),
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  gender == "male" ? "Male" : "Female",
+                  style: context.text.bodyLarge?.copyWith(
+                    color: isSelected ? context.colors.onSurface : context.vColors.grayText,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

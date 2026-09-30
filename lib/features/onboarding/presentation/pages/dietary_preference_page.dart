@@ -56,8 +56,8 @@ class _DietaryPreferencePageState extends State<DietaryPreferencePage> {
         );
         widget.onNext?.call();
       },
-      title: "Any dietary preferences?",
-      subtitle: "This helps us tailor your diet plan accurately.",
+      title: "Dietary preferences",
+      subtitle: "To tailor your diet plan accurately.",
       nextEnabled: true,
       child: Column(
         children: [

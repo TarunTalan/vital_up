@@ -39,8 +39,8 @@ class _WeightPageState extends State<WeightPage> {
         setState(() => _showErrors = false);
         context.goNamed('health-dietary-preference');
       },
-      title: "How much do you weigh?",
-      subtitle: "This helps us calculate your BMI accurately.",
+      title: "Your weight",
+      subtitle: "To accurately calculate your BMI.",
       nextEnabled: true,
       fullBleedChild: true,
       titleBottomSpace: AppDimens.space16,
