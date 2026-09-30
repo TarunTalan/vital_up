@@ -1,33 +1,32 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_bottom_nav.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
-import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
-import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
-import 'package:vital_up/core/di/injection_container.dart';
-import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
+import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
 import '../widgets/water_intake_card.dart';
-import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
-import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart';
-import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
-import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
-import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
-import 'package:vital_up/core/di/injection_container.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -57,16 +56,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   static const _items = [
-    _BottomNavItem('Home', 'assets/icons/home.svg'),
-    _BottomNavItem('Scan', 'assets/icons/scanner.svg'),
-    _BottomNavItem('Vita', 'assets/icons/vita.svg'),
-    _BottomNavItem('Profile', 'assets/icons/profile.svg'),
+    AppBottomNavItem('Home', 'assets/icons/home.svg'),
+    AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
+    AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
+    AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, state) {
         if (state is AuthUnauthenticated) {
@@ -104,12 +101,12 @@ class _DashboardPageState extends State<DashboardPage> {
             }
           },
           child: Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
+            backgroundColor: context.theme.scaffoldBackgroundColor,
             extendBody: true,
             body: _buildSelectedTab(context),
             bottomNavigationBar: _selectedIndex == 1
                 ? null
-                : _BottomNavBar(
+                : AppBottomNav(
                     items: _items,
                     selectedIndex: _selectedIndex,
                     onItemSelected: (index) {
@@ -153,7 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final errorColor = context.colors.error;
     final cubit = context.read<AuthCubit>();
 
     showSmoothDialog(
@@ -167,14 +164,12 @@ class _DashboardPageState extends State<DashboardPage> {
             child: const Text('Cancel'),
           ),
           TextButton(
+            style: TextButton.styleFrom(foregroundColor: errorColor),
             onPressed: () {
               Navigator.of(context).pop();
               cubit.logout();
             },
-            child: Text(
-              'Logout',
-              style: TextStyle(color: colors.error),
-            ),
+            child: const Text('Logout'),
           ),
         ],
       ),
@@ -188,178 +183,144 @@ class _HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    // With Scaffold.extendBody the floating nav bar height is reported as
+    // bottom padding, so content always clears it.
+    final bottomInset = context.safePadding.bottom + AppDimens.sectionGap;
 
     return Stack(
       children: [
-        // Background - Full Screen
         Positioned.fill(
           child: Image.asset(
             'assets/images/bg.png',
             fit: BoxFit.cover,
           ),
         ),
-        // Scrollable Content
-        Positioned.fill(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 150, 20, 128), // 150pt top padding to start below fixed header
-            children: [
-              const _InsightCard(),
-              const SizedBox(height: 16),
-              NutritionSummaryCard(
-                onViewAll: () {
-                  context.pushNamed('meal-log-history');
-                },
-                onScanMeal: onScanMeal,
+        Column(
+          children: [
+            AppPageHeader(
+              showBack: false,
+              title: _greeting(DateTime.now()),
+              subtitle: DateFormat('EEEE, MMMM d').format(DateTime.now()),
+              action: const AppHeaderAction(
+                tooltip: 'Calendar',
+                icon: _SvgIcon('assets/icons/calendar.svg'),
               ),
-              const SizedBox(height: 26),
-              BlocBuilder<DietPlanCubit, DietPlanState>(
-                builder: (context, state) {
-                  if (state is DietPlanLoaded) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 26),
-                      child: _ActiveDietPlanCard(
-                        plan: state.mealPlan,
-                        onTap: () {
-                          context.pushNamed('diet-plan-result', extra: {
-                            'plan': state.mealPlan,
-                          });
-                        },
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 26),
-                    child: _DietPlanCard(
-                      onTap: () {
-                        context.pushNamed('diet-plan-prefs');
-                      },
-                    ),
-                  );
-                },
-              ),
-              SizedBox(
-                height: 110,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  children: [
-                    const _MetricChip(
-                      label: 'Steps',
-                      iconAsset: 'assets/icons/active.svg',
-                    ),
-                    const _MetricChip(
-                      label: 'Water',
-                      iconAsset: 'assets/icons/drop.svg',
-                    ),
-                    _MetricChip(
-                      label: 'Workout',
-                      iconAsset: 'assets/icons/moderate.svg',
-                      onTap: () => context.pushNamed('activity-tracking'),
-                    ),
-                    const _MetricChip(
-                      label: 'Mood',
-                      iconAsset: 'assets/icons/smile.svg',
-                    ),
-                    const _MetricChip(
-                      label: 'Sleep',
-                      iconAsset: 'assets/icons/sleep.svg',
-                    ),
-                  ],
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  top: AppDimens.sectionGap,
+                  bottom: bottomInset,
                 ),
-              ),
-              const SizedBox(height: 24),
-              Divider(
-                color: colors.outline.withValues(alpha: 0.45),
-                height: 1,
-              ),
-              const SizedBox(height: 24),
-              const _DashboardSegmentedTabs(),
-              const SizedBox(height: 25),
-              const WaterIntakeCard(),
-              const SizedBox(height: 16),
-              const SleepCard(),
-              const SizedBox(height: 16),
-              const ScreenTimeCard(),
-            ],
-          ),
-        ),
-        // Fixed Top Bar
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.7),
-                      Colors.white.withValues(alpha: 0.0),
-                    ],
-                    stops: const [0.5, 1.0],
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Good morning',
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontSize: 28,
-                                height: 1.08,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tuesday, January 13',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: customColors?.grayText,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+                child: ResponsiveCenter(
+                  child: Padding(
+                    padding: context.pagePadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _InsightCard(),
+                        const SizedBox(height: AppDimens.cardGap),
+                        NutritionSummaryCard(
+                          onViewAll: () {
+                            context.pushNamed('meal-log-history');
+                          },
+                          onScanMeal: onScanMeal,
                         ),
-                      ),
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: colors.primary.withValues(alpha: 0.18),
+                        const SizedBox(height: AppDimens.cardGap),
+                        BlocBuilder<DietPlanCubit, DietPlanState>(
+                          builder: (context, state) {
+                            if (state is DietPlanLoaded) {
+                              return _ActiveDietPlanCard(
+                                plan: state.mealPlan,
+                                onTap: () {
+                                  context.pushNamed('diet-plan-result', extra: {
+                                    'plan': state.mealPlan,
+                                  });
+                                },
+                              );
+                            }
+                            return _DietPlanCard(
+                              onTap: () {
+                                context.pushNamed('diet-plan-prefs');
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AppDimens.sectionGap),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _QuickActionTile(
+                                label: 'Steps',
+                                iconAsset: 'assets/icons/footprints.svg',
+                              ),
+                              const _QuickActionTile(
+                                label: 'Water',
+                                iconAsset: 'assets/icons/drop.svg',
+                              ),
+                              _QuickActionTile(
+                                label: 'Workout',
+                                iconAsset: 'assets/icons/barbell.svg',
+                                onTap: () => context.pushNamed('activity-tracking'),
+                              ),
+                              const _QuickActionTile(
+                                label: 'Mood',
+                                iconAsset: 'assets/icons/smiley.svg',
+                              ),
+                              const _QuickActionTile(
+                                label: 'Sleep',
+                                iconAsset: 'assets/icons/moon_stars.svg',
+                              ),
+                            ],
                           ),
                         ),
-                        child: Icon(
-                          Icons.calendar_month_rounded,
-                          color: colors.primary,
-                          size: 25,
+                        const SizedBox(height: AppDimens.sectionGap),
+                        Divider(
+                          color: context.vColors.divider,
+                          height: AppDimens.borderThin,
+                          thickness: AppDimens.borderThin,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: AppDimens.sectionGap),
+                        const _DashboardSegmentedTabs(),
+                        const SizedBox(height: AppDimens.sectionGap),
+                        const WaterIntakeCard(),
+                        const SizedBox(height: AppDimens.cardGap),
+                        const SleepCard(),
+                        const SizedBox(height: AppDimens.cardGap),
+                        const ScreenTimeCard(),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+/// SVG that picks up the surrounding [IconTheme] colour and size.
+class _SvgIcon extends StatelessWidget {
+  final String asset;
+  const _SvgIcon(this.asset);
+
+  @override
+  Widget build(BuildContext context) {
+    final iconTheme = IconTheme.of(context);
+    final size = iconTheme.size ?? AppDimens.iconLg;
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(
+        iconTheme.color ?? context.colors.primary,
+        BlendMode.srcIn,
+      ),
     );
   }
 }
@@ -369,40 +330,19 @@ class _InsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
+    return AppCard(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 17, 12, 17),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFFD8D8D8).withValues(alpha: 0.72),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const AppCaption("Today's insights"),
+          const SizedBox(height: AppDimens.cardInnerGap),
           Text(
-            "TODAY'S INSIGHTS",
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.7,
-              color: const Color(0xFF777777),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            "You've been most active between 9-11am this week.\n"
-            'Consider scheduling important tasks during this time\n'
+            "You've been most active between 9-11am this week. "
+            'Consider scheduling important tasks during this time '
             'when your energy is naturally higher.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 14,
-              height: 1.25,
-              color: const Color(0xFF101010),
-            ),
+            style: context.text.bodyMedium
+                ?.copyWith(color: context.colors.onSurface),
           ),
         ],
       ),
@@ -410,12 +350,13 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-class _MetricChip extends StatelessWidget {
+/// Figma quick-action tile: 80w glass tile, 40 icon badge + small 12 label.
+class _QuickActionTile extends StatelessWidget {
   final String label;
   final String iconAsset;
   final VoidCallback? onTap;
 
-  const _MetricChip({
+  const _QuickActionTile({
     required this.label,
     required this.iconAsset,
     this.onTap,
@@ -423,52 +364,30 @@ class _MetricChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return InkWell(
+    return AppCard(
+      width: context.w(AppDimens.quickActionWidth),
+      margin: const EdgeInsets.only(right: AppDimens.space8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space4,
+        vertical: AppDimens.space20,
+      ),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        width: 80,
-        margin: const EdgeInsets.only(right: 9),
-        padding: const EdgeInsets.symmetric(vertical: 17),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.74),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.16),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: SvgPicture.asset(
-                  iconAsset,
-                  width: 22,
-                  height: 22,
-                  colorFilter:
-                      ColorFilter.mode(colors.primary, BlendMode.srcIn),
-                ),
-              ),
-            ),
-            const Spacer(),
-            Text(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(width: double.infinity),
+          AppIconBadge(icon: _SvgIcon(iconAsset)),
+          const SizedBox(height: AppDimens.space12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
               label,
-              style: textTheme.labelMedium?.copyWith(
-                fontSize: 12,
-                color: const Color(0xFF111111),
-              ),
+              maxLines: 1,
+              style: context.text.labelSmall
+                  ?.copyWith(color: context.colors.onSurface),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -479,37 +398,45 @@ class _DashboardSegmentedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     const tabs = ['Move', 'Rest', 'Fuel', 'Vitals'];
+    const selected = 'Rest';
+    final v = context.vColors;
 
     return Container(
-      height: 50,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppDimens.space8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFD8D8D8).withValues(alpha: 0.76),
-        ),
+        color: v.glassFill,
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        border: Border.all(color: v.glassBorder!),
       ),
       child: Row(
         children: [
           for (final tab in tabs)
             Expanded(
               child: Container(
-                height: 42,
+                constraints:
+                    const BoxConstraints(minHeight: AppDimens.segmentHeight),
                 alignment: Alignment.center,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppDimens.space4),
                 decoration: BoxDecoration(
-                  color: tab == 'Rest' ? colors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
+                  color: tab == selected
+                      ? context.colors.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                  boxShadow: tab == selected ? AppShadows.segment : null,
                 ),
-                child: Text(
-                  tab,
-                  style: textTheme.labelLarge?.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF111111),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    tab,
+                    maxLines: 1,
+                    style: context.text.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: tab == selected
+                          ? v.buttonText
+                          : context.colors.onSurface,
+                    ),
                   ),
                 ),
               ),
@@ -519,8 +446,6 @@ class _DashboardSegmentedTabs extends StatelessWidget {
     );
   }
 }
-
-
 
 class _SimpleTab extends StatelessWidget {
   final String title;
@@ -539,96 +464,35 @@ class _SimpleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final customColors = theme.extension<VitalUpColors>();
-
     return SafeArea(
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.hPadding),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 56, color: theme.colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(title, style: theme.textTheme.displaySmall),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: customColors?.grayText,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(context.gutter),
+          child: ResponsiveCenter(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIconBadge(
+                  size: AppDimens.iconBadgeLarge * 2,
+                  icon: Icon(icon),
                 ),
-              ),
-              if (buttonLabel != null && onButtonTap != null) ...[
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: AppTheme.buttonHeight,
-                  child: FilledButton(
-                    onPressed: onButtonTap,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: customColors?.buttonText,
-                    ),
-                    child: Text(buttonLabel!),
+                const SizedBox(height: AppDimens.space16),
+                Text(title, style: context.text.headlineSmall),
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: context.text.bodyMedium
+                      ?.copyWith(color: context.vColors.grayText),
+                ),
+                if (buttonLabel != null && onButtonTap != null) ...[
+                  const SizedBox(height: AppDimens.sectionGap),
+                  AppPrimaryButton(
+                    label: buttonLabel!,
+                    onTap: onButtonTap!,
                   ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Placeholder _ProfileTab has been replaced by ProfilePage
-
-class _BottomNavBar extends StatelessWidget {
-  final List<_BottomNavItem> items;
-  final int selectedIndex;
-  final ValueChanged<int> onItemSelected;
-
-  const _BottomNavBar({
-    required this.items,
-    required this.selectedIndex,
-    required this.onItemSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(34),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              height: 68,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(34),
-                border: Border.all(
-                  color: colors.outline.withValues(alpha: 0.20),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  for (var i = 0; i < items.length; i++)
-                    Expanded(
-                      child: _NavItem(
-                        item: items[i],
-                        selected: selectedIndex == i,
-                        onTap: () => onItemSelected(i),
-                      ),
-                    ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -637,76 +501,49 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
-  final _BottomNavItem item;
-  final bool selected;
-  final VoidCallback onTap;
+/// Shared row layout for the diet-plan cards.
+class _DietPlanRow extends StatelessWidget {
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String subtitle;
 
-  const _NavItem({
-    required this.item,
-    required this.selected,
-    required this.onTap,
+  const _DietPlanRow({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final iconColor =
-        selected ? theme.colorScheme.primary : const Color(0xFF111111);
-    final textColor =
-        selected ? const Color(0xFF111111) : const Color(0xFF4E4E4E);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedScale(
-        scale: selected ? 1.05 : 1.0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+    final onSurface = context.colors.onSurface;
+    return Row(
+      children: [
+        AppIconBadge(color: accent, icon: Icon(icon)),
+        const SizedBox(width: AppDimens.space12),
+        Expanded(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween<double>(
-                  begin: selected ? 26 : 22,
-                  end: selected ? 26 : 22,
-                ),
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                builder: (context, iconSize, child) {
-                  return SvgPicture.asset(
-                    item.iconAsset,
-                    width: iconSize,
-                    height: iconSize,
-                    colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                  );
-                },
+              Text(
+                title,
+                style: context.text.titleSmall?.copyWith(color: onSurface),
               ),
-              const SizedBox(height: 1),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                style: theme.textTheme.labelSmall!.copyWith(
-                  fontSize: 12,
-                  color: textColor,
-                ),
-                child: Text(item.label),
+              const SizedBox(height: AppDimens.space4),
+              Text(
+                subtitle,
+                style: context.text.bodyMedium
+                    ?.copyWith(color: context.vColors.grayText),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(width: AppDimens.space8),
+        Icon(Icons.arrow_forward_ios, color: onSurface, size: AppDimens.iconXs),
+      ],
     );
   }
-}
-
-class _BottomNavItem {
-  final String label;
-  final String iconAsset;
-
-  const _BottomNavItem(this.label, this.iconAsset);
 }
 
 class _DietPlanCard extends StatelessWidget {
@@ -716,56 +553,15 @@ class _DietPlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return InkWell(
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPaddingCompact,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.16),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.restaurant_menu, color: colors.primary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AI Diet Plan',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF111111),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Generate your personalized meal plan',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF4E4E4E),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Color(0xFF111111), size: 16),
-          ],
-        ),
+      child: _DietPlanRow(
+        icon: Icons.restaurant_menu,
+        accent: context.colors.primary,
+        title: 'AI Diet Plan',
+        subtitle: 'Generate your personalized meal plan',
       ),
     );
   }
@@ -779,43 +575,26 @@ class _ActiveDietPlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return InkWell(
+    final v = context.vColors;
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPaddingCompact,
+      tint: v.successTint,
+      borderColor: v.success!.withValues(alpha: 0.3),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFD8F2DC),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: const Color(0xFF47B85A).withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF47B85A).withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.restaurant, color: Color(0xFF111111)),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Active Diet Plan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF111111))),
-                  const SizedBox(height: 4),
-                  Text('${plan.totalCalories} kcal • ${plan.meals.length} meals', style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF4E4E4E))),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Color(0xFF111111), size: 16),
-          ],
-        ),
+      child: _DietPlanRow(
+        icon: Icons.restaurant,
+        accent: v.success!,
+        title: 'Active Diet Plan',
+        subtitle: '${plan.totalCalories} kcal • ${plan.meals.length} meals',
       ),
     );
   }
+}
+
+String _greeting(DateTime now) {
+  final hour = now.hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }

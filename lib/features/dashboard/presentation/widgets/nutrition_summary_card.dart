@@ -1,9 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'dashboard_card_header.dart';
 
 /// Today's nutrition summary card shown on the Dashboard home tab.
 /// Requires [MealLogBloc] to be provided above this widget in the tree.
@@ -25,7 +29,10 @@ class NutritionSummaryCard extends StatelessWidget {
     return BlocBuilder<MealLogBloc, MealLogState>(
       builder: (context, state) {
         if (state is MealLogLoading) {
-          return const _LoadingCard();
+          return const AppCard(
+            width: double.infinity,
+            child: DashboardCardLoading(),
+          );
         }
         if (state is MealLogLoaded) {
           return _LoadedCard(state: state, onViewAll: onViewAll, onScanMeal: onScanMeal);
@@ -36,32 +43,6 @@ class NutritionSummaryCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Loading skeleton
-// ─────────────────────────────────────────────────────────────────
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return _CardShell(
-      child: SizedBox(
-        height: 140,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: colors.primary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Loaded state card
-// ─────────────────────────────────────────────────────────────────
 class _LoadedCard extends StatelessWidget {
   final MealLogLoaded state;
   final VoidCallback? onViewAll;
@@ -75,40 +56,20 @@ class _LoadedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return _CardShell(
+    return AppCard(
+      width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──────────────────────────────────────────────
-          Row(
-            children: [
-              Text(
-                "Today's Nutrition",
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurface,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: onViewAll,
-                child: Text(
-                  'View All →',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-            ],
+          DashboardCardHeader(
+            title: "Today's Nutrition",
+            iconAsset: 'assets/icons/fork_knife.svg',
+            trailing: TextButton(
+              onPressed: onViewAll,
+              child: const Text('View All →'),
+            ),
           ),
-          const SizedBox(height: 16),
-
-          // ── Calorie ring + macros ────────────────────────────────
+          const SizedBox(height: AppDimens.cardInnerGap),
           Row(
             children: [
               _CalorieRing(
@@ -116,7 +77,7 @@ class _LoadedCard extends StatelessWidget {
                 goal: state.dailyCalorieGoal?.toDouble(),
                 progress: state.calorieProgress,
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: AppDimens.space20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,42 +88,42 @@ class _LoadedCard extends StatelessWidget {
                       maxValue: (state.dailyCalorieGoal != null)
                           ? (state.dailyCalorieGoal! * 0.3 / 4)
                           : 120,
-                      color: const Color(0xFF5B8DEF),
+                      color: AppColors.protein,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppDimens.space8),
                     _MacroBar(
                       label: 'Carbs',
                       value: state.totalCarbsG,
                       maxValue: (state.dailyCalorieGoal != null)
                           ? (state.dailyCalorieGoal! * 0.5 / 4)
                           : 250,
-                      color: const Color(0xFF6DC16D),
+                      color: AppColors.carbs,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppDimens.space8),
                     _MacroBar(
                       label: 'Fat',
                       value: state.totalFatG,
                       maxValue: (state.dailyCalorieGoal != null)
                           ? (state.dailyCalorieGoal! * 0.2 / 9)
                           : 65,
-                      color: const Color(0xFFEF8C5B),
+                      color: AppColors.fat,
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // ── Meal slot row ────────────────────────────────────────
+          const SizedBox(height: AppDimens.cardInnerGap),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: MealType.values.map((mealType) {
               final logged = state.loggedMealTypes.contains(mealType);
-              return _MealSlot(
-                mealType: mealType,
-                logged: logged,
-                onTap: logged ? null : onScanMeal,
+              return Expanded(
+                child: _MealSlot(
+                  mealType: mealType,
+                  logged: logged,
+                  onTap: logged ? null : onScanMeal,
+                ),
               );
             }).toList(),
           ),
@@ -172,9 +133,6 @@ class _LoadedCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Calorie ring (arc progress)
-// ─────────────────────────────────────────────────────────────────
 class _CalorieRing extends StatelessWidget {
   final double calories;
   final double? goal;
@@ -188,45 +146,38 @@ class _CalorieRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final p = progress ?? 0;
-
-    return SizedBox(
-      width: 80,
-      height: 80,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(80, 80),
-            painter: _RingPainter(
-              progress: p,
-              trackColor: colors.surfaceContainerHighest,
-              progressColor: colors.primary,
+    return SizedBox.square(
+      dimension: context.w(AppDimens.calorieRing),
+      child: CustomPaint(
+        painter: _RingPainter(
+          progress: progress ?? 0,
+          trackColor: context.vColors.track!,
+          progressColor: context.colors.primary,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppDimens.space12),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  calories.toInt().toString(),
+                  style: context.text.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.onSurface,
+                    height: 1,
+                  ),
+                ),
+                Text(
+                  goal != null ? '/ ${goal!.toInt()}' : 'kcal',
+                  style: context.text.labelSmall
+                      ?.copyWith(color: context.vColors.grayText),
+                ),
+              ],
             ),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                calories.toInt().toString(),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: colors.onSurface,
-                  height: 1,
-                ),
-              ),
-              Text(
-                goal != null ? '/ ${goal!.toInt()}' : 'kcal',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: colors.onSurface.withValues(alpha: 0.55),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -245,9 +196,9 @@ class _RingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    const strokeWidth = AppDimens.progressHeight;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 6;
-    const strokeWidth = 8.0;
+    final radius = (size.width - strokeWidth) / 2;
     const startAngle = -math.pi / 2;
 
     final trackPaint = Paint()
@@ -274,12 +225,11 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress ||
+      oldDelegate.trackColor != trackColor ||
+      oldDelegate.progressColor != progressColor;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Macro bar
-// ─────────────────────────────────────────────────────────────────
 class _MacroBar extends StatelessWidget {
   final String label;
   final double value;
@@ -295,7 +245,6 @@ class _MacroBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final progress = maxValue > 0 ? (value / maxValue).clamp(0.0, 1.0) : 0.0;
 
     return Column(
@@ -303,43 +252,36 @@ class _MacroBar extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: colors.onSurface.withValues(alpha: 0.6),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.labelSmall
+                    ?.copyWith(color: context.vColors.grayText),
               ),
             ),
-            const Spacer(),
             Text(
               '${value.toInt()}g',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: colors.onSurface,
+              style: context.text.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colors.onSurface,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 3),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: color.withValues(alpha: 0.18),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 5,
-          ),
+        const SizedBox(height: AppDimens.space4),
+        AppProgressBar(
+          value: progress,
+          color: color,
+          trackColor: color.withValues(alpha: 0.18),
+          height: AppDimens.space6,
         ),
       ],
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Meal slot chip
-// ─────────────────────────────────────────────────────────────────
 class _MealSlot extends StatelessWidget {
   final MealType mealType;
   final bool logged;
@@ -371,75 +313,53 @@ class _MealSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final primary = context.colors.primary;
+    final v = context.vColors;
 
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 40,
-            height: 40,
+            duration: AppDurations.fast,
+            width: AppDimens.iconBadge,
+            height: AppDimens.iconBadge,
             decoration: BoxDecoration(
-              color: logged
-                  ? colors.primary.withValues(alpha: 0.15)
-                  : colors.surfaceContainerHighest,
+              color: logged ? v.primaryTint : v.glassFill,
               shape: BoxShape.circle,
               border: Border.all(
-                color: logged ? colors.primary : colors.outline.withValues(alpha: 0.3),
-                width: 1.5,
+                color: logged ? primary : v.glassBorder!,
+                width: AppDimens.borderThin,
               ),
             ),
             child: Center(
-              child: Text(_emoji, style: const TextStyle(fontSize: 16)),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(_emoji, style: context.text.titleSmall),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: logged
-                  ? colors.primary
-                  : colors.onSurface.withValues(alpha: 0.5),
+          const SizedBox(height: AppDimens.space4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              _label,
+              maxLines: 1,
+              style: context.text.labelSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: logged ? primary : v.grayText,
+              ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppDimens.space2),
           Icon(
             logged ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
-            size: 12,
-            color: logged
-                ? colors.primary
-                : colors.onSurface.withValues(alpha: 0.3),
+            size: AppDimens.iconXs,
+            color: logged ? primary : v.grayText,
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Glassmorphic card shell
-// ─────────────────────────────────────────────────────────────────
-class _CardShell extends StatelessWidget {
-  final Widget child;
-  const _CardShell({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.80),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outline.withValues(alpha: 0.25),
-        ),
-      ),
-      child: child,
     );
   }
 }
