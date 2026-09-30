@@ -12,6 +12,7 @@ import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
@@ -106,7 +107,7 @@ class MyApp extends StatelessWidget {
                 },
               ),
             ],
-            child: previewChild,
+            child: ResponsiveTextScale(child: previewChild),
           );
         },
       ),
