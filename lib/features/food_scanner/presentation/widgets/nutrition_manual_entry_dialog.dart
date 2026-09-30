@@ -2,6 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 
@@ -287,16 +290,14 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final colors = theme.extension<VitalUpColors>();
+    final v = context.vColors;
+    final primary = context.colors.primary;
 
-    final dialogBgColor = isDark ? const Color(0xE61C1C1C) : const Color(0xF2FEFEFE);
-    final borderColor = colors?.inputBorder ?? (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8));
-    final fieldFillColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03);
-    
-    final primaryColor = theme.primaryColor;
-    final primaryButtonTextColor = colors?.buttonText ?? const Color(0xFF0C0C0C);
+    // Compact variant of the theme input for dense nutrition rows.
+    const compactPadding = EdgeInsets.symmetric(
+      horizontal: AppDimens.space12,
+      vertical: AppDimens.space12,
+    );
 
     Widget buildField({
       required String label,
@@ -305,43 +306,30 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       TextInputType keyboardType = TextInputType.number,
     }) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: AppDimens.space12),
         child: Row(
           children: [
             Expanded(
               flex: 3,
               child: Text(
                 label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+                style: context.text.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: v.grayText,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppDimens.space8),
             Expanded(
               flex: 4,
               child: TextField(
                 controller: controller,
                 keyboardType: keyboardType,
-                style: theme.textTheme.bodyMedium,
+                style: context.text.bodyMedium,
                 decoration: InputDecoration(
                   suffixText: suffix,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: fieldFillColor,
+                  isDense: true,
+                  contentPadding: compactPadding,
                 ),
               ),
             ),
@@ -353,16 +341,22 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(
+          sigmaX: AppDimens.glassBlur / 2,
+          sigmaY: AppDimens.glassBlur / 2,
+        ),
         child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 420),
-            decoration: BoxDecoration(
-              color: dialogBgColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.gutter,
+            vertical: AppDimens.space24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimens.radiusDialog),
+            side: BorderSide(color: v.hairline!),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppDimens.maxContentWidth,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -370,104 +364,98 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
               children: [
                 // Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppDimens.space20,
+                    AppDimens.space20,
+                    AppDimens.space20,
+                    AppDimens.space12,
+                  ),
                   child: Row(
                     children: [
-                      Icon(
-                        widget.parsedNutrition != null ? Icons.document_scanner_outlined : Icons.edit_note_rounded,
-                        color: primaryColor,
-                        size: 26,
+                      AppIconBadge(
+                        icon: Icon(
+                          widget.parsedNutrition != null ? Icons.document_scanner_outlined : Icons.edit_note_rounded,
+                          color: primary,
+                        ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppDimens.space12),
                       Expanded(
                         child: Text(
                           widget.parsedNutrition != null ? 'Verify Nutrition Label' : 'Enter Product Details',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 18,
-                            color: isDark ? Colors.white : const Color(0xFF1C1C1C),
-                          ),
+                          style: context.text.headlineSmall,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
+                const Divider(),
                 // Form Fields
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppDimens.space20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Product Name',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppDimens.inputLabelGap),
+                          child: Text('Product Name', style: context.text.titleSmall),
                         ),
-                        const SizedBox(height: 6),
-                        Autocomplete<AutocompleteSuggestion>(
+                        LayoutBuilder(
+                          builder: (context, fieldConstraints) => Autocomplete<AutocompleteSuggestion>(
                           optionsBuilder: (TextEditingValue textEditingValue) {
                             return _fetchSuggestions(textEditingValue.text);
                           },
                           displayStringForOption: (AutocompleteSuggestion option) => option.name,
                           onSelected: _onSuggestionSelected,
                           optionsViewBuilder: (context, onSelected, options) {
-                            final isDark = Theme.of(context).brightness == Brightness.dark;
-                            final bgColor = isDark ? const Color(0xE61E1E24) : const Color(0xF2FFFFFF);
-                            final borderColor = isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8);
+                            final grey = context.vColors.grayText;
+                            final divider = context.vColors.divider;
 
                             return Align(
                               alignment: Alignment.topLeft,
                               child: Material(
                                 color: Colors.transparent,
-                                elevation: 4.0,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                    child: Container(
-                                      width: 320,
-                                      constraints: const BoxConstraints(maxHeight: 220),
-                                      decoration: BoxDecoration(
-                                        color: bgColor,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: borderColor),
-                                      ),
-                                      child: ListView.separated(
-                                        padding: EdgeInsets.zero,
-                                        shrinkWrap: true,
-                                        itemCount: options.length,
-                                        separatorBuilder: (_, __) => Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
-                                        itemBuilder: (BuildContext context, int index) {
-                                          final option = options.elementAt(index);
-                                          return ListTile(
-                                            dense: true,
-                                            title: Text(
-                                              option.name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : Colors.black87,
-                                              ),
+                                child: Container(
+                                  width: fieldConstraints.maxWidth,
+                                  constraints: BoxConstraints(
+                                    maxHeight: context.hFraction(0.3),
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.vColors.surfaceElevated,
+                                    borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+                                    border: Border.all(color: context.vColors.hairline!),
+                                    boxShadow: AppShadows.elevated,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+                                    child: ListView.separated(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, _) => Divider(color: divider),
+                                      itemBuilder: (BuildContext context, int index) {
+                                        final option = options.elementAt(index);
+                                        final tone = option.isOffline ? primary : grey;
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(
+                                            option.name,
+                                            style: context.text.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.w600,
                                             ),
-                                            subtitle: Text(
-                                              option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
-                                              style: TextStyle(
-                                                color: option.isOffline ? primaryColor : Colors.grey,
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                            trailing: Icon(
-                                              option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
-                                              size: 15,
-                                              color: option.isOffline ? primaryColor : Colors.grey,
-                                            ),
-                                            onTap: () => onSelected(option),
-                                          );
-                                        },
-                                      ),
+                                          ),
+                                          subtitle: Text(
+                                            option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
+                                            style: context.text.bodySmall?.copyWith(color: tone),
+                                          ),
+                                          trailing: Icon(
+                                            option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
+                                            size: AppDimens.iconXs,
+                                            color: tone,
+                                          ),
+                                          onTap: () => onSelected(option),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
@@ -485,96 +473,51 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                             return TextField(
                               controller: textEditingController,
                               focusNode: focusNode,
-                              style: theme.textTheme.bodyMedium,
-                              decoration: InputDecoration(
+                              style: context.text.bodyMedium,
+                              decoration: const InputDecoration(
                                 hintText: 'e.g., Haldiram\'s Bhujia',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide(color: borderColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide(color: borderColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: fieldFillColor,
                               ),
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
+                        ),
+                        const SizedBox(height: AppDimens.space16),
                         Row(
                           children: [
                             Expanded(
                               flex: 3,
-                              child: Text(
-                                'Serving size',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                                ),
-                              ),
+                              child: Text('Serving size', style: context.text.titleSmall),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppDimens.space8),
                             Expanded(
                               flex: 2,
                               child: TextField(
                                 controller: _quantityController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: theme.textTheme.bodyMedium,
-                                decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: fieldFillColor,
+                                style: context.text.bodyMedium,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: compactPadding,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppDimens.space8),
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<String>(
-                                value: _selectedUnit,
+                                key: ValueKey(_selectedUnit),
+                                initialValue: _selectedUnit,
                                 isExpanded: true,
-                                style: theme.textTheme.bodyMedium,
-                                dropdownColor: dialogBgColor,
-                                borderRadius: BorderRadius.circular(16),
+                                style: context.text.bodyMedium,
+                                dropdownColor: v.surfaceElevated,
+                                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
                                 icon: Icon(
                                   Icons.keyboard_arrow_down_rounded,
-                                  color: isDark ? Colors.white70 : const Color(0xFF5F6368),
+                                  color: v.grayText,
                                 ),
-                                decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: fieldFillColor,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: compactPadding,
                                 ),
                                 items: _units.map((unit) {
                                   return DropdownMenuItem(
@@ -591,15 +534,9 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Nutrition Information',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: primaryColor,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: AppDimens.space16),
+                        AppCaption('Nutrition Information', color: primary),
+                        const SizedBox(height: AppDimens.space12),
                         buildField(label: 'Calories', controller: _caloriesController, suffix: 'kcal'),
                         buildField(label: 'Protein', controller: _proteinController, suffix: 'g'),
                         buildField(label: 'Carbohydrates', controller: _carbsController, suffix: 'g'),
@@ -611,41 +548,23 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     ),
                   ),
                 ),
-                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
+                const Divider(),
                 // Action buttons
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.all(AppDimens.space16),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: TextButton.styleFrom(
-                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF5F6368),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: AppSecondaryButton(
+                          label: 'Cancel',
+                          onTap: () => Navigator.of(context).pop(),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _handleSave,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: primaryButtonTextColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Submit',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                      const SizedBox(width: AppDimens.buttonGap),
+                      Expanded(
+                        child: AppPrimaryButton(
+                          label: 'Submit',
+                          onTap: _handleSave,
                         ),
                       ),
                     ],

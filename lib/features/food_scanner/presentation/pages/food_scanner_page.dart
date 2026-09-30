@@ -27,8 +27,17 @@ import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_oc
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_manual_entry_dialog.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/accuracy_info_dialog.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 final GetIt _sl = GetIt.instance;
+
+/// Scan-frame geometry, shared by the overlay painter, the captured preview
+/// card and [cropCapturedImage] so the crop always matches what is drawn.
+const double _scanFrameInset = AppDimens.gutter;
+const double _scanFrameHeightFraction = 0.35;
+const double _scanFrameLift = AppDimens.space40;
 
 class FoodScannerPage extends StatelessWidget {
   final VoidCallback? onBack;
@@ -387,8 +396,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF00A6B7)),
+        return Center(
+          child: CircularProgressIndicator(color: context.colors.primary),
         );
       },
     );
@@ -471,24 +480,20 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   void _showLookupFailureOptions() {
-    showModalBottomSheet<void>(
+    showAppBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
+      showDragHandle: false,
       builder: (BuildContext context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final bgColor = isDark ? const Color(0xFF1E1E24) : Colors.white;
-        final textColor = isDark ? Colors.white : const Color(0xFF1C1C1C);
+        final grey = context.vColors.grayText;
 
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            context.gutter,
+            AppDimens.space24,
+            context.gutter,
+            AppDimens.space16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -496,25 +501,20 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             children: [
               Text(
                 'Product Not Found',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
+                style: context.text.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppDimens.space12),
               Text(
-                'We couldn\'t find details for barcode "${_currentFailedBarcode}". How would you like to proceed?',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                ),
+                'We couldn\'t find details for barcode "$_currentFailedBarcode". How would you like to proceed?',
+                style: context.text.bodyMedium?.copyWith(color: grey),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () {
+              const SizedBox(height: AppDimens.space24),
+              AppPrimaryButton(
+                label: 'Scan Nutrition Label',
+                leadingIcon: const Icon(Icons.document_scanner_outlined),
+                onTap: () {
                   Navigator.of(context).pop();
                   setState(() {
                     _isScanningNutritionLabel = true;
@@ -527,39 +527,26 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     _startImageStream(controller);
                   }
                 },
-                icon: const Icon(Icons.document_scanner_outlined),
-                label: const Text('Scan Nutrition Label'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF00A6B7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
+              const SizedBox(height: AppDimens.space12),
+              AppSecondaryButton(
+                label: 'Enter Details Manually',
+                leadingIcon: const Icon(Icons.edit_note_rounded),
+                onTap: () {
                   Navigator.of(context).pop();
                   _openNutritionManualEntry(null);
                 },
-                icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('Enter Details Manually'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF00A6B7),
-                  side: const BorderSide(color: Color(0xFF00A6B7)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppDimens.space8),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _restartScanning();
                 },
-                child: const Text('Cancel & Scan Another'),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
+                style: TextButton.styleFrom(foregroundColor: grey),
+                child: Text(
+                  'Cancel & Scan Another',
+                  style: context.text.labelLarge?.copyWith(color: grey),
                 ),
               ),
             ],
@@ -698,7 +685,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             _handleBack();
           },
           child: Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: AppColors.black,
             body: Stack(
             children: [
               Positioned.fill(child: _buildCameraLayer()),
@@ -709,9 +696,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.48),
+                        AppColors.black.withValues(alpha: 0.48),
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.55),
+                        AppColors.black.withValues(alpha: 0.55),
                       ],
                     ),
                   ),
@@ -724,11 +711,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                   state is! RecognizingFood)
                 Positioned.fill(
                   child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: ScannerOverlayPainter(
-                        strokeColor: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
+                    child: CustomPaint(painter: ScannerOverlayPainter()),
                   ),
                 ),
               // Dynamic QR outline overlay when detected
@@ -741,49 +724,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     child: CustomPaint(
                       painter: QrOutlinePainter(
                         points: _detectedQrPoints,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              if (_isScanningNutritionLabel)
-                Positioned(
-                  top: 90,
-                  left: 20,
-                  right: 20,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF00A6B7), width: 1.5),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.document_scanner_outlined, color: Color(0xFF00A6B7)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Align the nutrition facts table inside the frame and tap Capture.',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        color: context.colors.primary,
                       ),
                     ),
                   ),
                 ),
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  padding: const EdgeInsets.all(_scanFrameInset),
                   child: Column(
                     children: [
                       Row(
@@ -800,10 +748,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                                 builder: (context) => const AccuracyInfoDialog(),
                               );
                             },
-                            size: 26,
                           ),
                         ],
                       ),
+                      if (_isScanningNutritionLabel) ...[
+                        const SizedBox(height: AppDimens.space16),
+                        const _NutritionLabelHint(),
+                      ],
                       const Spacer(),
                       if (_croppedImage != null || _selectedImage != null) ...[
                         _ScannedPreviewCard(
@@ -811,22 +762,28 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                           onEdit: _pickFromGallery,
                           onAdd: () => _analyzeImage((_croppedImage ?? _selectedImage)!.path),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: AppDimens.space16),
                       ],
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _ScannerIconButton(
                             iconAsset: 'assets/icons/gallery_add.svg',
                             onTap: isRecognizing ? () {} : _pickFromGallery,
                           ),
+                          const Flexible(
+                            child: SizedBox(width: AppDimens.scanBarGap),
+                          ),
                           _CaptureButton(
                             isLoading: _isCapturing,
                             onTap: _capturePhoto,
                           ),
+                          const Flexible(
+                            child: SizedBox(width: AppDimens.scanBarGap),
+                          ),
                           _ScannerIconButton(
                             iconAsset: 'assets/icons/flash.svg',
-                            color: _torchEnabled ? Colors.yellow : Colors.white,
+                            active: _torchEnabled,
                             onTap: _toggleFlash,
                           ),
                         ],
@@ -898,50 +855,44 @@ class _RecognizingOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Display the captured image in the background (full size to avoid zoom jumps)
         Positioned.fill(
           child: Image.file(
             image,
             fit: BoxFit.cover,
           ),
         ),
-        // 2. Apply glassmorphic blur filter on top of the image
         Positioned.fill(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.35),
+            filter: ImageFilter.blur(
+              sigmaX: AppDimens.headerBlur / 2,
+              sigmaY: AppDimens.headerBlur / 2,
+            ),
+            child: ColoredBox(
+              color: AppColors.black.withValues(alpha: 0.35),
             ),
           ),
         ),
-        // 3. Center loading card
         Center(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: AppDimens.cardPaddingLarge,
+            margin: const EdgeInsets.symmetric(horizontal: AppDimens.space40),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(20),
+              color: AppColors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(AppDimens.radiusDialog),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.12),
-                width: 1.5,
+                color: AppColors.white.withValues(alpha: 0.12),
               ),
             ),
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                VitalUpLoader(
-                  size: 80,
-                  iconSize: 26,
-                ),
-                SizedBox(height: 20),
+                const VitalUpLoader(),
+                const SizedBox(height: AppDimens.space20),
                 Text(
                   'Analysing your meal...',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                  textAlign: TextAlign.center,
+                  style: context.text.titleSmall?.copyWith(
+                    color: AppColors.white,
                   ),
                 ),
               ],
@@ -983,14 +934,9 @@ class _ScannerLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF101316),
-      child: const Center(
-        child: VitalUpLoader(
-          size: 80,
-          iconSize: 26,
-        ),
-      ),
+    return const ColoredBox(
+      color: AppColors.cameraBackdrop,
+      child: Center(child: VitalUpLoader()),
     );
   }
 }
@@ -1009,53 +955,73 @@ class _ScannerMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF101316),
-      padding: const EdgeInsets.all(24),
+      color: AppColors.cameraBackdrop,
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        AppDimens.space24,
+        context.gutter,
+        AppDimens.space24 +
+            AppDimens.captureButtonSize +
+            context.safePadding.bottom,
+      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Text(
             message,
             textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+            style: context.text.bodyLarge?.copyWith(color: AppColors.white),
           ),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onTap, child: Text(buttonLabel)),
+          const SizedBox(height: AppDimens.space12),
+          AppPrimaryButton(label: buttonLabel, onTap: onTap),
         ],
       ),
     );
   }
 }
 
-class _ScannerIconButton extends StatelessWidget {
-  final String iconAsset;
-  final VoidCallback onTap;
-  final Color color;
-  final double size;
-
-  const _ScannerIconButton({
-    required this.iconAsset,
-    required this.onTap,
-    this.color = Colors.white,
-    this.size = 32,
-  });
+/// Hint banner shown while the user frames a nutrition-facts label.
+class _NutritionLabelHint extends StatelessWidget {
+  const _NutritionLabelHint();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: SizedBox(
-        width: 50,
-        height: 50,
-        child: Center(
-          child: SvgPicture.asset(
-            iconAsset,
-            width: size,
-            height: size,
-            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    final primary = context.colors.primary;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppDimens.glassBlur / 2,
+          sigmaY: AppDimens.glassBlur / 2,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space12,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.black.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+            border: Border.all(color: primary, width: AppDimens.borderThick),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.document_scanner_outlined,
+                color: primary,
+                size: AppDimens.iconLg,
+              ),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: Text(
+                  'Align the nutrition facts table inside the frame and tap Capture.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1063,6 +1029,55 @@ class _ScannerIconButton extends StatelessWidget {
   }
 }
 
+/// Figma `bars & panels/ scan` side button: 48dp translucent-white circle,
+/// "elevated" shadow, 24dp dark icon.
+class _ScannerIconButton extends StatelessWidget {
+  final String iconAsset;
+  final VoidCallback onTap;
+  final bool active;
+
+  const _ScannerIconButton({
+    required this.iconAsset,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = active ? context.colors.primary : AppColors.cameraControlFill;
+    return Container(
+      width: AppDimens.backButtonSize,
+      height: AppDimens.backButtonSize,
+      decoration: BoxDecoration(
+        color: fill,
+        shape: BoxShape.circle,
+        boxShadow: AppShadows.elevated,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: SvgPicture.asset(
+              iconAsset,
+              width: AppDimens.iconLg,
+              height: AppDimens.iconLg,
+              colorFilter: const ColorFilter.mode(
+                AppColors.darker,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Figma scan-bar shutter: 72dp translucent ring around a 54dp white disc
+/// with the camera glyph.
 class _CaptureButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onTap;
@@ -1071,33 +1086,45 @@ class _CaptureButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: Container(
-        width: 78,
-        height: 78,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
-        ),
-        child: Center(
-          child: isLoading
-              ? const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
+    return Semantics(
+      button: true,
+      label: 'Capture',
+      child: GestureDetector(
+        onTap: isLoading ? null : onTap,
+        child: Container(
+          width: AppDimens.captureButtonSize,
+          height: AppDimens.captureButtonSize,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.cameraCaptureRing,
+          ),
+          child: Container(
+            width: AppDimens.captureButtonInner,
+            height: AppDimens.captureButtonInner,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.cameraControlFill,
+              shape: BoxShape.circle,
+            ),
+            child: isLoading
+                ? const SizedBox.square(
+                    dimension: AppDimens.iconLg,
+                    child: CircularProgressIndicator(
+                      color: AppColors.darker,
+                      strokeWidth: AppDimens.borderThick,
+                    ),
+                  )
+                : SvgPicture.asset(
+                    'assets/icons/camera.svg',
+                    width: AppDimens.iconLg,
+                    height: AppDimens.iconLg,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.darker,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                )
-              : Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+          ),
         ),
       ),
     );
@@ -1117,60 +1144,66 @@ class _ScannedPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.sizeOf(context).height;
-    final double cardHeight = screenHeight * 0.35;
+    final cardHeight = context.screenHeight * _scanFrameHeightFraction;
 
-    return Align(
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: MediaQuery.sizeOf(context).width - 40.0,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              Image.file(
-                File(imagePath),
-                width: double.infinity,
-                height: cardHeight,
-                fit: BoxFit.cover,
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: onEdit,
-                      icon: SvgPicture.asset(
-                        'assets/icons/edit.svg',
-                        width: 22,
-                        height: 22,
-                        colorFilter: const ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      onPressed: onAdd,
-                      icon: SvgPicture.asset(
-                        'assets/icons/plus.svg',
-                        width: 22,
-                        height: 22,
-                        colorFilter: const ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Image.file(
+            File(imagePath),
+            width: double.infinity,
+            height: cardHeight,
+            fit: BoxFit.cover,
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.all(AppDimens.space8),
+            child: FoodImageActionPill(onEdit: onEdit, onAdd: onAdd),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small translucent pill with edit / add actions overlaid on a food photo
+/// (Figma food scanner/info image chips).
+class FoodImageActionPill extends StatelessWidget {
+  final VoidCallback onEdit;
+  final VoidCallback? onAdd;
+
+  const FoodImageActionPill({super.key, required this.onEdit, this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget action(String asset, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimens.space8),
+            child: SvgPicture.asset(
+              asset,
+              width: AppDimens.iconMd,
+              height: AppDimens.iconMd,
+              colorFilter: const ColorFilter.mode(
+                AppColors.darker,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        );
+
+    return Material(
+      color: AppColors.cameraControlFill,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          action('assets/icons/edit.svg', onEdit),
+          if (onAdd != null) action('assets/icons/plus.svg', onAdd!),
+        ],
       ),
     );
   }
@@ -1183,10 +1216,10 @@ class ScannerOverlayPainter extends CustomPainter {
   final Color strokeColor;
 
   ScannerOverlayPainter({
-    this.barrierColor = const Color(0x66000000),
-    this.borderRadius = 24.0,
-    this.strokeWidth = 3.0,
-    this.strokeColor = Colors.white,
+    this.barrierColor = AppColors.cameraScrim,
+    this.borderRadius = AppDimens.scanFrameRadius,
+    this.strokeWidth = AppDimens.borderThick,
+    this.strokeColor = AppColors.white,
   });
 
   @override
@@ -1195,10 +1228,10 @@ class ScannerOverlayPainter extends CustomPainter {
     final double height = size.height;
 
     // Viewport has the exact same dimensions as the captured preview card
-    final double boxWidth = width - 40.0;
-    final double boxHeight = height * 0.35;
+    final double boxWidth = width - 2 * _scanFrameInset;
+    final double boxHeight = height * _scanFrameHeightFraction;
     final double left = (width - boxWidth) / 2;
-    final double top = (height - boxHeight) / 2 - 40; // offset upwards slightly for aesthetic balance
+    final double top = (height - boxHeight) / 2 - _scanFrameLift;
     final Rect rect = Rect.fromLTWH(left, top, boxWidth, boxHeight);
     final RRect rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
 
@@ -1213,7 +1246,7 @@ class ScannerOverlayPainter extends CustomPainter {
     // 2. Draw the viewport outline with low opacity
     final Paint outlinePaint = Paint()
       ..color = strokeColor.withValues(alpha: 0.18)
-      ..strokeWidth = 1.0
+      ..strokeWidth = AppDimens.borderThin
       ..style = PaintingStyle.stroke;
     canvas.drawRRect(rrect, outlinePaint);
 
@@ -1224,7 +1257,7 @@ class ScannerOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    const double lineLength = 20.0; // bracket arm length
+    final double lineLength = math.min(AppDimens.scanFrameBracket, math.min(boxWidth, boxHeight) / 3);
 
     // Top Left Corner
     canvas.drawPath(
@@ -1288,10 +1321,10 @@ Future<File> cropCapturedImage({
     final double sh = screenHeight;
 
     // Viewport coordinates matching the custom painter overlay
-    final double boxWidth = sw - 40.0;
-    final double boxHeight = sh * 0.35;
+    final double boxWidth = sw - 2 * _scanFrameInset;
+    final double boxHeight = sh * _scanFrameHeightFraction;
     final double boxLeft = (sw - boxWidth) / 2;
-    final double boxTop = (sh - boxHeight) / 2 - 40;
+    final double boxTop = (sh - boxHeight) / 2 - _scanFrameLift;
 
     // Camera preview uses BoxFit.cover, so we calculate the scale and offsets
     final double scale = math.max(sw / imgW, sh / imgH);
@@ -1338,7 +1371,7 @@ class QrOutlinePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0
+      ..strokeWidth = AppDimens.borderThick * 2
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 

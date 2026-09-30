@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_recommendation.dart';
 
 class MealRecommendationWidget extends StatelessWidget {
@@ -11,58 +13,48 @@ class MealRecommendationWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.green[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.lightbulb_outline,
-                  color: Colors.green[700],
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Recommendation',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[700],
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              recommendation.message,
-              style: TextStyle(
-                color: Colors.green[900],
-                fontSize: 14,
+    final v = context.vColors;
+    return AppCard(
+      padding: AppDimens.cardPaddingCompact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconBadge(
+                color: v.success,
+                icon: const Icon(Icons.lightbulb_outline_rounded),
               ),
-            ),
-            if (recommendation.reasonTags.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: recommendation.reasonTags
-                    .map((tag) => Chip(
-                          label: Text(
-                            _formatTag(tag),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          backgroundColor: Colors.green[100],
-                          labelStyle: TextStyle(color: Colors.green[900]),
-                        ))
-                    .toList(),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: Text('Recommendation', style: context.text.titleSmall),
               ),
             ],
+          ),
+          const SizedBox(height: AppDimens.space12),
+          Text(recommendation.message, style: context.text.bodyMedium),
+          if (recommendation.reasonTags.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.space12),
+            Wrap(
+              spacing: AppDimens.space8,
+              runSpacing: AppDimens.space8,
+              children: recommendation.reasonTags
+                  .map((tag) => Chip(
+                        label: Text(
+                          _formatTag(tag),
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        backgroundColor: v.successTint,
+                        side: BorderSide(
+                          color: v.success!.withValues(alpha: 0.27),
+                        ),
+                      ))
+                  .toList(),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
