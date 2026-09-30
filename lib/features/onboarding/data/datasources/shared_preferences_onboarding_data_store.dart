@@ -43,6 +43,12 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   Future<String> getGoalDurationMonths() async => _prefs.getString('onboarding_goal_duration_months') ?? '3';
 
   @override
+  Future<String> getGoalType() async => _prefs.getString('onboarding_goal_type') ?? '';
+
+  @override
+  Future<String> getWeeklyPace() async => _prefs.getString('onboarding_weekly_pace') ?? '';
+
+  @override
   Future<String> getHealthConditions() async => _prefs.getString('onboarding_health_conditions') ?? '';
 
   @override
@@ -89,11 +95,18 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   }
 
   @override
-  Future<void> saveGoals(String calorieGoal, String targetWeight, String targetWeightUnit, String goalDurationMonths) async {
+  Future<void> saveGoals(String calorieGoal, String targetWeight, String targetWeightUnit, String goalDurationMonths, String goalType, String weeklyPace) async {
     await _prefs.setString('onboarding_calorie_goal', calorieGoal);
     await _prefs.setString('onboarding_target_weight', targetWeight);
     await _prefs.setString('onboarding_target_weight_unit', targetWeightUnit);
     await _prefs.setString('onboarding_goal_duration_months', goalDurationMonths);
+    await _prefs.setString('onboarding_goal_type', goalType);
+    await _prefs.setString('onboarding_weekly_pace', weeklyPace);
+  }
+
+  @override
+  Future<void> saveCalorieGoal(String calorieGoal) async {
+    await _prefs.setString('onboarding_calorie_goal', calorieGoal);
   }
 
   @override

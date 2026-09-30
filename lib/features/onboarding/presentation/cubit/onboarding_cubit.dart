@@ -2,9 +2,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/onboarding_data.dart';
 import '../../data/datasources/onboarding_data_store.dart';
 import '../../domain/repositories/onboarding_repository.dart';
+import '../../domain/usecases/calculate_calorie_goal.dart';
 class OnboardingCubit extends Cubit<OnboardingData> {
   final OnboardingDataStore _onboardingDataStore;
   final OnboardingRepository _onboardingRepository;
+  final CalculateCalorieGoal _calculateCalorieGoal = const CalculateCalorieGoal();
 
   OnboardingCubit(this._onboardingDataStore, this._onboardingRepository) : super(const OnboardingData()) {
     _loadSavedData();
@@ -23,6 +25,8 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final targetWeight = await _onboardingDataStore.getTargetWeight();
     final targetWeightUnit = await _onboardingDataStore.getTargetWeightUnit();
     final goalDurationMonths = await _onboardingDataStore.getGoalDurationMonths();
+    final goalType = await _onboardingDataStore.getGoalType();
+    final weeklyPace = await _onboardingDataStore.getWeeklyPace();
     final healthConditions = await _onboardingDataStore.getHealthConditions();
     final medicines = await _onboardingDataStore.getMedicines();
     final allergies = await _onboardingDataStore.getAllergies();
@@ -45,6 +49,8 @@ class OnboardingCubit extends Cubit<OnboardingData> {
       targetWeight: targetWeight,
       targetWeightUnit: targetWeightUnit,
       goalDurationMonths: goalDurationMonths,
+      goalType: goalType,
+      weeklyPace: weeklyPace,
       healthConditions: healthConditions,
       medicines: medicines,
       allergies: allergies,
@@ -83,20 +89,30 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     await _onboardingDataStore.saveHeight(height, unit);
   }
 
+  /// Saves the goal step. The calorie goal itself is derived later, once
+  /// activity level is known (see [submitOnboardingDataToBackend]).
   Future<void> updateGoals({
-    required String calorieGoal,
+    required String goalType,
+    required String weeklyPace,
     required String targetWeight,
     required String targetWeightUnit,
     required String goalDurationMonths,
   }) async {
     emit(state.copyWith(
-      calorieGoal: calorieGoal,
+      goalType: goalType,
+      weeklyPace: weeklyPace,
       targetWeight: targetWeight,
       targetWeightUnit: targetWeightUnit,
       goalDurationMonths: goalDurationMonths,
     ));
     await _onboardingDataStore.saveGoals(
-      calorieGoal, targetWeight, targetWeightUnit, goalDurationMonths);
+      state.calorieGoal,
+      targetWeight,
+      targetWeightUnit,
+      goalDurationMonths,
+      goalType,
+      weeklyPace,
+    );
   }
 
   Future<void> updateHealthConditions(String conditions) async {
@@ -178,6 +194,13 @@ class OnboardingCubit extends Cubit<OnboardingData> {
 
   Future<void> submitOnboardingDataToBackend() async {
     emit(state.copyWith(status: SubmissionStatus.submitting, errorMessage: null));
+
+    // Personalised calorie goal from TDEE + chosen pace.
+    final calorieGoal = _calculateCalorieGoal(state);
+    if (calorieGoal != null) {
+      emit(state.copyWith(calorieGoal: calorieGoal.toString()));
+      await _onboardingDataStore.saveCalorieGoal(calorieGoal.toString());
+    }
 
     final result = await _onboardingRepository.submitOnboardingData(state);
 
