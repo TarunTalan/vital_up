@@ -48,7 +48,7 @@ class _ActivityPageState extends State<ActivityPage> {
   @override
   Widget build(BuildContext context) {
     return OnboardingLayout(
-      step: 7,
+      step: 6,
       onBack: widget.onBack ?? () {},
       onSkip: widget.onSkip ?? () {},
       onNext: () {
@@ -57,7 +57,7 @@ class _ActivityPageState extends State<ActivityPage> {
         );
         widget.onNext?.call();
       },
-      title: "How active are you usually?",
+      title: "Activity level",
       subtitle:
           "This helps us suggest goals that feel right for your daily life.",
       nextEnabled: true,

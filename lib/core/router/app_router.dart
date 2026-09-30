@@ -14,15 +14,13 @@ import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.da
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/blood_pressure_page.dart';
+
 import 'package:vital_up/features/onboarding/presentation/pages/dietary_preference_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/extra_details_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/height_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/info_and_permission_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/onboarding_entry_point.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/goals.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/personal_details_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/sleep_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_mode_select_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_preferences_page.dart';
@@ -38,7 +36,7 @@ class AppRouter {
   AppRouter._();
 
   static final GoRouter router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/health-onboarding/personal-details',
     routes: [
       GoRoute(
         path: '/splash',
@@ -190,39 +188,17 @@ class AppRouter {
           child: const WeightPage(),
         ),
       ),
-      GoRoute(
-        path: '/health-onboarding/extra-details',
-        name: 'health-extra-details',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
-          key: state.pageKey,
-          child: ExtraDetailsPage(
-            onNext: () => context.goNamed('health-info-permission'),
-            onBack: () => context.goNamed('health-sleep'),
-            onSkip: () => context.goNamed('health-info-permission'),
-          ),
-        ),
-      ),
-      GoRoute(
-        path: '/health-onboarding/blood-pressure',
-        name: 'health-blood-pressure',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
-          key: state.pageKey,
-          child: BloodPressurePage(
-            onNext: () => context.goNamed('health-goals'),
-            onBack: () => context.goNamed('health-dietary-preference'),
-            onSkip: () => context.goNamed('health-goals'),
-          ),
-        ),
-      ),
+
+
       GoRoute(
         path: '/health-onboarding/dietary-preference',
         name: 'health-dietary-preference',
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
           child: DietaryPreferencePage(
-            onNext: () => context.goNamed('health-blood-pressure'),
+            onNext: () => context.goNamed('health-goals'),
             onBack: () => context.goNamed('health-weight'),
-            onSkip: () => context.goNamed('health-blood-pressure'),
+            onSkip: () => context.goNamed('health-goals'),
           ),
         ),
       ),
@@ -233,7 +209,7 @@ class AppRouter {
           key: state.pageKey,
           child: GoalsPage(
             onNext: () => context.goNamed('health-activity'),
-            onBack: () => context.goNamed('health-blood-pressure'),
+            onBack: () => context.goNamed('health-dietary-preference'),
             onSkip: () => context.goNamed('health-activity'),
           ),
         ),
@@ -244,24 +220,13 @@ class AppRouter {
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
           child: ActivityPage(
-            onNext: () => context.goNamed('health-sleep'),
+            onNext: () => context.goNamed('health-info-permission'),
             onBack: () => context.goNamed('health-goals'),
-            onSkip: () => context.goNamed('health-sleep'),
+            onSkip: () => context.goNamed('health-info-permission'),
           ),
         ),
       ),
-      GoRoute(
-        path: '/health-onboarding/sleep',
-        name: 'health-sleep',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
-          key: state.pageKey,
-          child: SleepPage(
-            onNext: () => context.goNamed('health-extra-details'),
-            onBack: () => context.goNamed('health-activity'),
-            onSkip: () => context.goNamed('health-extra-details'),
-          ),
-        ),
-      ),
+
       GoRoute(
         path: '/health-onboarding/info-permission',
         name: 'health-info-permission',

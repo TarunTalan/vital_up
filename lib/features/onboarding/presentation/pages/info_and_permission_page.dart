@@ -46,7 +46,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
       builder: (context, state) {
         final isSubmitting = state.status == SubmissionStatus.submitting;
         return OnboardingLayout(
-          step: 10,
+          step: 7,
           handleSystemBack: false,
           onBack: widget.onBack ?? () {},
           onSkip: widget.onSkip ?? () {},
@@ -56,8 +56,8 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
               : () {
                   context.read<OnboardingCubit>().submitOnboardingDataToBackend();
                 },
-          title: "Your health data stays with you",
-          subtitle: "We only collect what's needed for your wellness.",
+          title: "Data privacy",
+          subtitle: "We only collect what's needed.",
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

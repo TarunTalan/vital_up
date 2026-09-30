@@ -39,8 +39,8 @@ class _HeightPageState extends State<HeightPage> {
         setState(() => _showErrors = false);
         context.goNamed('health-weight');
       },
-      title: "How tall are you?",
-      subtitle: "Used only to tailor health insights. You can update this anytime.",
+      title: "Your height",
+      subtitle: "To tailor your health insights.",
       nextEnabled: true,
       child: _HeightContent(
         onValidityChange: (valid) {
