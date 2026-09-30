@@ -70,6 +70,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         activity: healthRes?['activity'] as String? ?? '',
         sleep: healthRes?['sleep'] as String? ?? '',
         photoUrl: photoUrl.isEmpty ? null : photoUrl,
+        dailyCalorieGoal: (healthRes?['calorie_goal'] as num?)?.toInt(),
       );
     } catch (e) {
       logger.e('Error fetching profile from Supabase: $e');

@@ -23,6 +23,9 @@ class ProfileEntity extends Equatable {
   final String sleep;
   final String? photoUrl;
 
+  /// Daily calorie goal calculated at the end of onboarding.
+  final int? dailyCalorieGoal;
+
   const ProfileEntity({
     required this.id,
     required this.username,
@@ -45,6 +48,7 @@ class ProfileEntity extends Equatable {
     this.activity = '',
     this.sleep = '',
     this.photoUrl,
+    this.dailyCalorieGoal,
   });
 
   ProfileEntity copyWith({
@@ -69,6 +73,7 @@ class ProfileEntity extends Equatable {
     String? activity,
     String? sleep,
     String? photoUrl,
+    int? dailyCalorieGoal,
   }) {
     return ProfileEntity(
       id: id ?? this.id,
@@ -92,6 +97,7 @@ class ProfileEntity extends Equatable {
       activity: activity ?? this.activity,
       sleep: sleep ?? this.sleep,
       photoUrl: photoUrl ?? this.photoUrl,
+      dailyCalorieGoal: dailyCalorieGoal ?? this.dailyCalorieGoal,
     );
   }
 
@@ -118,5 +124,6 @@ class ProfileEntity extends Equatable {
         activity,
         sleep,
         photoUrl,
+        dailyCalorieGoal,
       ];
 }

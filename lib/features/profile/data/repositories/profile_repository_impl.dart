@@ -35,6 +35,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
             ..email = remoteProfile.email
             ..displayName = remoteProfile.fullName
             ..photoUrl = remoteProfile.photoUrl
+            ..dailyCalorieGoal = remoteProfile.dailyCalorieGoal
             ..lastSyncedAt = DateTime.now();
           await isar.userProfileCaches.putBySupabaseId(cache);
         });
@@ -84,6 +85,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
             ..email = profile.email
             ..displayName = profile.fullName
             ..photoUrl = profile.photoUrl
+            ..dailyCalorieGoal = profile.dailyCalorieGoal
             ..lastSyncedAt = DateTime.now();
           await isar.userProfileCaches.putBySupabaseId(cache);
         });

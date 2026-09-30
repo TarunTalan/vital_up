@@ -23,6 +23,7 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.d
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
@@ -45,7 +46,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _dietPlanCubit = sl<DietPlanCubit>()..loadActiveMealPlan();
-    _profileCubit = sl<ProfileCubit>();
+    // Syncs the profile (incl. calorie goal) into the local cache that the
+    // nutrition card reads.
+    _profileCubit = sl<ProfileCubit>()..loadProfile();
   }
 
   @override
@@ -128,8 +131,15 @@ class _DashboardPageState extends State<DashboardPage> {
     return switch (_selectedIndex) {
       0 => BlocProvider<MealLogBloc>(
           create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
-          child: _HomeTab(
-            onScanMeal: () => setState(() => _selectedIndex = 1),
+          child: BlocListener<ProfileCubit, ProfileState>(
+            bloc: _profileCubit,
+            listenWhen: (_, state) => state is ProfileLoaded,
+            // Re-read so the calorie goal appears once the profile syncs.
+            listener: (context, _) =>
+                context.read<MealLogBloc>().add(const LoadTodaysMeals()),
+            child: _HomeTab(
+              onScanMeal: () => setState(() => _selectedIndex = 1),
+            ),
           ),
         ),
       1 => FoodScannerPage(
