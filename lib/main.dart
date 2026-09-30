@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/router/app_router.dart';
@@ -54,7 +56,12 @@ void main() async {
     debugPrint(stackTrace.toString());
   }
   
-  runApp(const MyApp());
+  runApp(
+    DevicePreview(
+      enabled: !kReleaseMode,
+      builder: (context) => const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -72,11 +79,13 @@ class MyApp extends StatelessWidget {
       child: MaterialApp.router(
         title: 'VitalUp',
         debugShowCheckedModeBanner: false,
+        locale: DevicePreview.locale(context),
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         routerConfig: AppRouter.router,
         builder: (context, child) {
+          final previewChild = DevicePreview.appBuilder(context, child);
           return MultiBlocListener(
             listeners: [
               BlocListener<AuthCubit, AuthState>(
@@ -97,7 +106,7 @@ class MyApp extends StatelessWidget {
                 },
               ),
             ],
-            child: child ?? const SizedBox(),
+            child: previewChild,
           );
         },
       ),
