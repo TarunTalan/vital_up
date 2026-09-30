@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 
 class WaterWaveAnimation extends StatefulWidget {
   final double fillPercentage;
@@ -21,23 +22,24 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
     with TickerProviderStateMixin {
   late AnimationController _waveController;
   late AnimationController _splashController;
+
+  static const Duration _waveDuration = Duration(seconds: 2);
+  static const Duration _fillDuration = Duration(milliseconds: 700);
   
-  double _oldPercentage = 0.0;
   bool _showSplash = false;
 
   @override
   void initState() {
     super.initState();
-    _oldPercentage = widget.fillPercentage;
     
     _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: _waveDuration,
     );
 
     _splashController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: AppDurations.slow,
     );
 
     _waveController.repeat();
@@ -51,7 +53,6 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
         // Trigger splash on add
         _triggerSplash();
       }
-      _oldPercentage = widget.fillPercentage;
     }
   }
   
@@ -93,60 +94,62 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
     final clampedPercentage = widget.fillPercentage.clamp(0.0, 1.0);
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
+      borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+      child: ColoredBox(
         color: widget.backgroundColor,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            // Smoothly animate the height based on fill percentage
-            AnimatedContainer(
-              duration: disableAnimations
-                  ? const Duration(milliseconds: 0)
-                  : const Duration(milliseconds: 700),
-              curve: Curves.easeOutCubic,
-              height: clampedPercentage * 200, // Assuming a fixed height or max height. We'll use a LayoutBuilder if dynamic is needed.
-              child: AnimatedBuilder(
-                animation: _waveController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: _WavePainter(
-                      waveAnimationValue: disableAnimations ? 0.0 : _waveController.value,
-                      waveColor: widget.waveColor,
-                    ),
-                    child: Container(),
-                  );
-                },
-              ),
-            ),
-            
-            // Splash effect overlay
-            if (_showSplash)
-              Positioned(
-                bottom: (clampedPercentage * 200) - 15,
-                child: AnimatedBuilder(
-                  animation: _splashController,
-                  builder: (context, child) {
-                    final scale = 1.0 + (_splashController.value * 0.5);
-                    final opacity = 1.0 - _splashController.value;
-                    return Transform.scale(
-                      scale: scale,
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Container(
-                          width: 40,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: widget.waveColor.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final fillHeight = clampedPercentage * constraints.maxHeight;
+            return Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                AnimatedContainer(
+                  duration: disableAnimations ? Duration.zero : _fillDuration,
+                  curve: Curves.easeOutCubic,
+                  height: fillHeight,
+                  child: AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _WavePainter(
+                          waveAnimationValue:
+                              disableAnimations ? 0.0 : _waveController.value,
+                          waveColor: widget.waveColor,
                         ),
-                      ),
-                    );
-                  },
+                        child: const SizedBox.expand(),
+                      );
+                    },
+                  ),
                 ),
-              ),
-          ],
+                if (_showSplash)
+                  Positioned(
+                    bottom: fillHeight - AppDimens.space16,
+                    child: AnimatedBuilder(
+                      animation: _splashController,
+                      builder: (context, child) {
+                        final scale = 1.0 + (_splashController.value * 0.5);
+                        final opacity = 1.0 - _splashController.value;
+                        return Transform.scale(
+                          scale: scale,
+                          child: Opacity(
+                            opacity: opacity,
+                            child: Container(
+                              width: AppDimens.space40,
+                              height: AppDimens.space20,
+                              decoration: BoxDecoration(
+                                color: widget.waveColor.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(
+                                    AppDimens.radiusPill),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );

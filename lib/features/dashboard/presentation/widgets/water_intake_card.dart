@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/water_wave_animation.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import '../cubit/water_intake_cubit.dart';
 import '../cubit/water_intake_state.dart';
+import 'dashboard_card_header.dart';
 
 class WaterIntakeCard extends StatefulWidget {
   const WaterIntakeCard({super.key});
@@ -17,11 +23,9 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     return BlocConsumer<WaterIntakeCubit, WaterIntakeState>(
       listenWhen: (previous, current) {
-        // If current logs size is greater than previous, a new log was added
+        // A new log was added.
         if (previous is WaterIntakeLoaded && current is WaterIntakeLoaded) {
           return current.todayLogs.length > previous.todayLogs.length;
         }
@@ -35,7 +39,7 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
             'Added $addedAmount ml of water',
             action: SnackBarAction(
               label: 'Undo',
-              textColor: const Color(0xFF19C3E0),
+              textColor: context.colors.primary,
               onPressed: () {
                 context.read<WaterIntakeCubit>().undoLast();
               },
@@ -45,147 +49,98 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
       },
       builder: (context, state) {
         if (state is WaterIntakeLoaded) {
-          final percentage = state.dailyGoalMl > 0 
-              ? (state.currentIntakeMl / state.dailyGoalMl) 
+          final percentage = state.dailyGoalMl > 0
+              ? (state.currentIntakeMl / state.dailyGoalMl)
               : 0.0;
-          
-          return _buildCard(context, theme, state, percentage);
+          return _buildCard(context, state, percentage);
         }
-        
-        return Container(
+        return const AppCard(
           width: double.infinity,
-          height: 200,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
-            ),
-          ),
-          child: const Center(child: CircularProgressIndicator()),
+          child: DashboardCardLoading(),
         );
       },
     );
   }
 
   Widget _buildCard(
-    BuildContext context, 
-    ThemeData theme, 
-    WaterIntakeLoaded state, 
+    BuildContext context,
+    WaterIntakeLoaded state,
     double percentage,
   ) {
-    final colors = theme.colorScheme;
     final int percentageInt = (percentage * 100).clamp(0, 100).toInt();
-    
+
     return Semantics(
       label: '$percentageInt% of daily water goal, ${state.currentIntakeMl} of ${state.dailyGoalMl} milliliters',
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _isExpanded = !_isExpanded;
-          });
-        },
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: const Color(0xFFD8D8D8).withValues(alpha: 0.78),
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            // Top Section (Text & Goal Edit)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Water Intake',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF161616),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '${state.currentIntakeMl}',
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: colors.primary,
-                            ),
-                          ),
-                          Text(
-                            ' / ${state.dailyGoalMl} ml',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF777777),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_rounded, size: 20, color: Color(0xFF777777)),
-                    onPressed: () => _showEditGoalSheet(context, state.dailyGoalMl),
-                    tooltip: 'Edit Daily Goal',
-                  ),
-                ],
-              ),
-            ),
-            
-            // Middle Section (Water Bar)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                height: 120,
-                child: WaterWaveAnimation(
-                  fillPercentage: percentage,
-                  waveColor: const Color(0xFF42A5F5),
-                  backgroundColor: const Color(0xFFE3F2FD).withValues(alpha: 0.5),
+      child: AppCard(
+        width: double.infinity,
+        onTap: () => setState(() => _isExpanded = !_isExpanded),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DashboardCardHeader(
+              title: 'Water Intake',
+              iconAsset: 'assets/icons/drop.svg',
+              trailing: IconButton(
+                icon: Icon(
+                  Icons.edit_rounded,
+                  size: AppDimens.iconMd,
+                  color: context.vColors.grayText,
                 ),
+                onPressed: () => _showEditGoalSheet(context, state.dailyGoalMl),
+                tooltip: 'Edit Daily Goal',
               ),
             ),
-            
-            // Bottom Section (Quick Add Buttons)
+            const SizedBox(height: AppDimens.cardInnerGap),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                DashboardMetric('${state.currentIntakeMl}'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimens.space4),
+                  child: Text(
+                    ' / ${state.dailyGoalMl} ml',
+                    style: context.text.bodyMedium
+                        ?.copyWith(color: context.vColors.grayText),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.cardInnerGap),
+            SizedBox(
+              height: context.h(AppDimens.waterWaveHeight),
+              child: WaterWaveAnimation(
+                fillPercentage: percentage,
+                waveColor: AppColors.water,
+                backgroundColor: AppColors.water.withValues(alpha: 0.12),
+              ),
+            ),
             AnimatedSize(
-              duration: const Duration(milliseconds: 300),
+              duration: AppDurations.slow,
               curve: Curves.easeInOutCubic,
               alignment: Alignment.topCenter,
               child: _isExpanded
                   ? Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      padding: const EdgeInsets.only(top: AppDimens.cardInnerGap),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _QuickAddButton(
+                          const _QuickAddButton(
                             amountMl: 150,
                             label: '150ml',
                             icon: Icons.local_drink_outlined,
                           ),
-                          _QuickAddButton(
+                          const SizedBox(width: AppDimens.space8),
+                          const _QuickAddButton(
                             amountMl: 250,
                             label: '250ml',
                             icon: Icons.local_cafe_outlined,
                           ),
-                          _QuickAddButton(
+                          const SizedBox(width: AppDimens.space8),
+                          const _QuickAddButton(
                             amountMl: 500,
                             label: '500ml',
                             icon: Icons.water_drop_outlined,
                           ),
+                          const SizedBox(width: AppDimens.space8),
                           _QuickAddButton(
                             amountMl: null,
                             label: 'Custom',
@@ -195,20 +150,19 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
                         ],
                       ),
                     )
-                  : const SizedBox(height: 16, width: double.infinity),
+                  : const SizedBox(width: double.infinity),
             ),
           ],
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showEditGoalSheet(BuildContext context, int currentGoal) {
     final controller = TextEditingController(text: currentGoal.toString());
     _showNumberInputSheet(
       context: context,
-      title: 'Daily Water Goal (ml)',
+      title: 'Daily Water Goal',
       controller: controller,
       onSave: () {
         final val = int.tryParse(controller.text);
@@ -223,7 +177,7 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     final controller = TextEditingController();
     _showNumberInputSheet(
       context: context,
-      title: 'Add Water (ml)',
+      title: 'Add Water',
       controller: controller,
       onSave: () {
         final val = int.tryParse(controller.text);
@@ -240,62 +194,93 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     required TextEditingController controller,
     required VoidCallback onSave,
   }) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (sheetContext) => _NumberInputSheet(
+        title: title,
+        controller: controller,
+        onSave: onSave,
       ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+    );
+  }
+}
+
+/// Figma `track/edit/water`: title + close, divider, "Value" field with a
+/// unit suffix, Cancel / Save row.
+class _NumberInputSheet extends StatelessWidget {
+  final String title;
+  final TextEditingController controller;
+  final VoidCallback onSave;
+
+  const _NumberInputSheet({
+    required this.title,
+    required this.controller,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          context.gutter,
+          0,
+          context.gutter,
+          AppDimens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title, style: context.text.headlineSmall),
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space8),
+            Divider(height: AppDimens.borderThin, color: context.vColors.divider),
+            const SizedBox(height: AppDimens.sectionGap),
+            Text('Value', style: context.text.titleSmall),
+            const SizedBox(height: AppDimens.inputLabelGap),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              autofocus: true,
+              decoration: const InputDecoration(hintText: '0', suffixText: 'ml'),
+            ),
+            const SizedBox(height: AppDimens.sectionGap),
+            Row(
+              children: [
+                Expanded(
+                  child: AppSecondaryButton(
+                    label: 'Cancel',
+                    onTap: () => Navigator.pop(context),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: () {
-                    onSave();
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Save'),
+                const SizedBox(width: AppDimens.space16),
+                Expanded(
+                  child: AppPrimaryButton(
+                    label: 'Save',
+                    onTap: () {
+                      onSave();
+                      Navigator.pop(context);
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -315,38 +300,47 @@ class _QuickAddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        if (amountMl != null) {
-          context.read<WaterIntakeCubit>().addWater(amountMl!);
-        } else if (onTapCustom != null) {
-          onTapCustom!();
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
+    final radius = BorderRadius.circular(AppDimens.radiusToast);
+    return Expanded(
       child: Semantics(
         label: 'Add $label of water',
         button: true,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE3F2FD),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: const Color(0xFF1976D2)),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1565C0),
-                ),
+        child: Material(
+          color: AppColors.water.withValues(alpha: 0.15),
+          borderRadius: radius,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: () {
+              if (amountMl != null) {
+                context.read<WaterIntakeCubit>().addWater(amountMl!);
+              } else if (onTapCustom != null) {
+                onTapCustom!();
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space4,
+                vertical: AppDimens.space8,
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: AppDimens.iconLg, color: AppColors.water),
+                  const SizedBox(height: AppDimens.space4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: context.text.labelSmall?.copyWith(
+                        color: AppColors.water,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
