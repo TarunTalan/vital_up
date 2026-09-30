@@ -14,6 +14,8 @@ class OnboardingData extends Equatable {
   final String targetWeight;
   final String targetWeightUnit;
   final String goalDurationMonths;
+  final String goalType;
+  final String weeklyPace;
   final String healthConditions;
   final String allergies;
   final String medicines;
@@ -39,6 +41,8 @@ class OnboardingData extends Equatable {
     this.targetWeight = "",
     this.targetWeightUnit = "kg",
     this.goalDurationMonths = "3",
+    this.goalType = "",
+    this.weeklyPace = "",
     this.healthConditions = "",
     this.allergies = "",
     this.medicines = "",
@@ -65,6 +69,8 @@ class OnboardingData extends Equatable {
     String? targetWeight,
     String? targetWeightUnit,
     String? goalDurationMonths,
+    String? goalType,
+    String? weeklyPace,
     String? healthConditions,
     String? allergies,
     String? medicines,
@@ -90,6 +96,8 @@ class OnboardingData extends Equatable {
       targetWeight: targetWeight ?? this.targetWeight,
       targetWeightUnit: targetWeightUnit ?? this.targetWeightUnit,
       goalDurationMonths: goalDurationMonths ?? this.goalDurationMonths,
+      goalType: goalType ?? this.goalType,
+      weeklyPace: weeklyPace ?? this.weeklyPace,
       healthConditions: healthConditions ?? this.healthConditions,
       allergies: allergies ?? this.allergies,
       medicines: medicines ?? this.medicines,
@@ -118,6 +126,8 @@ class OnboardingData extends Equatable {
         targetWeight,
         targetWeightUnit,
         goalDurationMonths,
+        goalType,
+        weeklyPace,
         healthConditions,
         allergies,
         medicines,
