@@ -13,7 +13,12 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.d
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 
 class DietPlanResultPage extends StatefulWidget {
   final Map<String, dynamic> params;
@@ -105,8 +110,10 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   void _regenerate() {
     final now = DateTime.now();
     if (_lastRegenerateTime != null && now.difference(_lastRegenerateTime!).inSeconds < 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait a moment before trying again.')),
+      showSmoothSnackBar(
+        context,
+        message: 'Please wait a moment before trying again.',
+        iconColor: AppColors.warning,
       );
       return;
     }
@@ -123,188 +130,198 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     super.dispose();
   }
 
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _cubit,
-      child: AuthBackground(
-        child: BlocBuilder<DietPlanCubit, DietPlanState>(
-          builder: (context, state) {
-            return Scaffold(
-              backgroundColor: Colors.transparent,
-              appBar: AppBar(
-                title: const Text('Your Diet Plan'),
-                backgroundColor: Colors.transparent,
-              ),
-              bottomNavigationBar: state is DietPlanLoaded && _mode != 'cached'
-                  ? _buildBottomActions(context, state.mealPlan)
-                  : null,
-              body: Builder(
-                builder: (context) {
-                  if (state is DietPlanLoading) {
-                    return const Center(
+      child: BlocBuilder<DietPlanCubit, DietPlanState>(
+        builder: (context, state) {
+          return AppScaffold(
+            header: const AppPageHeader(title: 'Your Diet Plan'),
+            scrollable: false,
+            padBody: false,
+            bottomBar: state is DietPlanLoaded && _mode != 'cached'
+                ? _buildBottomActions(context, state.mealPlan)
+                : null,
+            body: Builder(
+              builder: (context) {
+                if (state is DietPlanLoading) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const VitalUpLoader(),
+                        const SizedBox(height: AppDimens.space16),
+                        Text(
+                          'Generating your personalized plan...',
+                          textAlign: TextAlign.center,
+                          style: context.text.bodyMedium?.copyWith(
+                            color: context.vColors.grayText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (state is DietPlanLoaded) {
+                  return _buildPlanContent(context, state.mealPlan);
+                } else if (state is DietPlanError) {
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(context.gutter),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          VitalUpLoader(),
-                          SizedBox(height: 16),
-                          Text('Generating your personalized plan...'),
+                          AppIconBadge(
+                            icon: const Icon(Icons.error_outline_rounded),
+                            color: context.colors.error,
+                            size: AppDimens.iconXxl,
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          Text(
+                            state.message,
+                            textAlign: TextAlign.center,
+                            style: context.text.bodyMedium,
+                          ),
+                          const SizedBox(height: AppDimens.sectionGap),
+                          if (_target != null)
+                            AppPrimaryButton(
+                              label: 'Try Again',
+                              onTap: _regenerate,
+                              expand: false,
+                            ),
                         ],
                       ),
-                    );
-                  } else if (state is DietPlanLoaded) {
-                    return _buildPlanContent(context, state.mealPlan);
-                  } else if (state is DietPlanError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                            const SizedBox(height: 16),
-                            Text(state.message, textAlign: TextAlign.center),
-                            const SizedBox(height: 24),
-                            if (_target != null)
-                              FilledButton(
-                                onPressed: _regenerate,
-                                child: const Text('Try Again'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  return const Center(child: Text('No active plan found.'));
-                },
-              ),
-            );
-          },
-        ),
+                    ),
+                  );
+                }
+                return Center(
+                  child: Text(
+                    'No active plan found.',
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.vColors.grayText,
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildBottomActions(BuildContext context, MealPlan plan) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(AppTheme.hPadding, 8, AppTheme.hPadding, 16),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 1,
-              child: SizedBox(
-                height: AppTheme.buttonHeight,
-                child: OutlinedButton(
-                  onPressed: _regenerate,
-                  child: const Text('Regenerate'),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: SizedBox(
-                height: AppTheme.buttonHeight,
-                child: FilledButton(
-                  onPressed: () async {
-                    await _cubit.saveActivePlan(plan);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Active plan saved successfully!')),
-                      );
-                      context.goNamed('dashboard');
-                    }
-                  },
-                  child: const Text('Set as Active Plan'),
-                ),
-              ),
-            ),
-          ],
+    return Row(
+      children: [
+        Expanded(
+          child: AppSecondaryButton(
+            label: 'Regenerate',
+            onTap: _regenerate,
+          ),
         ),
-      ),
+        const SizedBox(width: AppDimens.cardGap),
+        Expanded(
+          flex: 2,
+          child: AppPrimaryButton(
+            label: 'Set as Active Plan',
+            onTap: () async {
+              await _cubit.saveActivePlan(plan);
+              if (context.mounted) {
+                showSuccessSnackBar(context, 'Active plan saved successfully!');
+                context.goNamed('dashboard');
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPlanContent(BuildContext context, MealPlan plan) {
-    final theme = Theme.of(context);
-    
-    return Padding(
-      padding: const EdgeInsets.all(AppTheme.hPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildMacroRing(context, plan),
-          const SizedBox(height: 32),
-          Text('Meals', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView(
-              children: plan.meals.map((m) => _MealCard(meal: m)).toList(),
-            ),
-          ),
-        ],
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        AppDimens.sectionGap,
+        context.gutter,
+        AppDimens.sectionGap,
       ),
+      children: [
+        _buildMacroRing(context, plan),
+        const SizedBox(height: AppDimens.sectionGap),
+        Text('Meals', style: context.text.headlineSmall),
+        const SizedBox(height: AppDimens.cardGap),
+        for (final meal in plan.meals) ...[
+          _MealCard(meal: meal),
+          const SizedBox(height: AppDimens.cardGap),
+        ],
+      ],
     );
   }
 
   Widget _buildMacroRing(BuildContext context, MealPlan plan) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final cardColor = theme.cardTheme.color ?? Colors.white;
-    
-    return Container(
-      height: 220,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
+    final hole = context.w(AppDimens.donutHole);
+    final thickness = context.w(AppDimens.donutThickness);
+    final sectionStyle = context.text.labelSmall?.copyWith(
+      color: AppColors.white,
+      fontWeight: FontWeight.w600,
+    );
+
+    PieChartSectionData section(Color color, int value, String label) {
+      return PieChartSectionData(
+        color: color,
+        value: value.toDouble(),
+        title: '${value}g\n$label',
+        radius: thickness,
+        titleStyle: sectionStyle,
+      );
+    }
+
+    return AppCard(
+      padding: AppDimens.cardPaddingCompact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PieChart(
-            PieChartData(
-              sectionsSpace: 4,
-              centerSpaceRadius: 60,
-              sections: [
-                PieChartSectionData(
-                  color: Colors.redAccent,
-                  value: plan.totalProtein.toDouble(),
-                  title: '${plan.totalProtein}g\nPro',
-                  radius: 30,
-                  titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+          const AppCaption('Daily target'),
+          const SizedBox(height: AppDimens.space12),
+          SizedBox(
+            height: (hole + thickness) * 2 + AppDimens.space8,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: AppDimens.space4,
+                    centerSpaceRadius: hole,
+                    sections: [
+                      section(AppColors.protein, plan.totalProtein, 'Pro'),
+                      section(AppColors.carbs, plan.totalCarbs, 'Carb'),
+                      section(AppColors.fat, plan.totalFat, 'Fat'),
+                    ],
+                  ),
                 ),
-                PieChartSectionData(
-                  color: Colors.blueAccent,
-                  value: plan.totalCarbs.toDouble(),
-                  title: '${plan.totalCarbs}g\nCarb',
-                  radius: 30,
-                  titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                PieChartSectionData(
-                  color: Colors.orangeAccent,
-                  value: plan.totalFat.toDouble(),
-                  title: '${plan.totalFat}g\nFat',
-                  radius: 30,
-                  titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${plan.totalCalories}',
+                        style: AppTextStyles.metric.copyWith(
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+                      Text(
+                        'kcal',
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.vColors.grayText,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${plan.totalCalories}',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'kcal',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-              ),
-            ],
           ),
         ],
       ),
@@ -319,43 +336,56 @@ class _MealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final cardColor = theme.cardTheme.color ?? Colors.white;
+    final v = context.vColors;
+    final grey = v.grayText;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
-      ),
+    return AppCard(
+      padding: AppDimens.cardPaddingCompact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(meal.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              Text('${meal.calories} kcal', style: theme.textTheme.titleSmall?.copyWith(color: colors.primary)),
+              Expanded(
+                child: Text(meal.name, style: context.text.titleSmall),
+              ),
+              const SizedBox(width: AppDimens.space8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.space8,
+                  vertical: AppDimens.space4,
+                ),
+                decoration: BoxDecoration(
+                  color: v.primaryTint,
+                  borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                ),
+                child: Text(
+                  '${meal.calories} kcal',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurface,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text('P: ${meal.protein}g  C: ${meal.carbs}g  F: ${meal.fat}g', style: theme.textTheme.bodySmall),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          ...meal.items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                Expanded(child: Text(item, style: theme.textTheme.bodyMedium)),
-              ],
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            'P: ${meal.protein}g  C: ${meal.carbs}g  F: ${meal.fat}g',
+            style: context.text.bodySmall?.copyWith(color: grey),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          ...meal.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(
+                left: AppDimens.space16,
+                bottom: AppDimens.space4,
+              ),
+              child: Text(
+                item,
+                style: context.text.bodyMedium?.copyWith(color: grey),
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );

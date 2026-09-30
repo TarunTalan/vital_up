@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
+import 'package:vital_up/features/diet_plan/presentation/widgets/diet_plan_number_field.dart';
 
 class ManualTargetPage extends StatefulWidget {
   final Map<String, dynamic> preferences;
@@ -35,9 +39,7 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
     final fat = int.tryParse(_fatController.text);
 
     if (cal == null || cal < 1000 || pro == null || carb == null || fat == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter valid macros (Calories must be >= 1000)')),
-      );
+      showErrorSnackBar(context, 'Please enter valid macros (Calories must be >= 1000)');
       return;
     }
 
@@ -53,91 +55,22 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
     );
   }
 
-  Widget _buildField(String label, String suffix, TextEditingController controller) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final cardColor = theme.cardTheme.color ?? Colors.white;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            suffixText: suffix,
-            filled: true,
-            fillColor: cardColor.withValues(alpha: 0.72),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.3)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colors.primary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
-
-    return AuthBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-        title: const Text('Manual Target'),
-        backgroundColor: Colors.transparent,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.hPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildField('Daily Calories', 'kcal', _calController),
-                      _buildField('Protein', 'g', _proController),
-                      _buildField('Carbohydrates', 'g', _carbController),
-                      _buildField('Fats', 'g', _fatController),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                height: AppTheme.buttonHeight,
-                child: FilledButton(
-                  onPressed: _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: customColors?.buttonText,
-                  ),
-                  child: const Text('Generate Plan'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return AppScaffold(
+      header: const AppPageHeader(title: 'Manual Target'),
+      bottomBar: AppPrimaryButton(label: 'Generate Plan', onTap: _submit),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DietPlanNumberField(label: 'Daily Calories', suffix: 'kcal', controller: _calController),
+          const SizedBox(height: AppDimens.space16),
+          DietPlanNumberField(label: 'Protein', suffix: 'g', controller: _proController),
+          const SizedBox(height: AppDimens.space16),
+          DietPlanNumberField(label: 'Carbohydrates', suffix: 'g', controller: _carbController),
+          const SizedBox(height: AppDimens.space16),
+          DietPlanNumberField(label: 'Fats', suffix: 'g', controller: _fatController),
+        ],
       ),
     );
   }
