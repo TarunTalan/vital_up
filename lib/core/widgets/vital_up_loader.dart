@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_dimens.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 /// Figma "loader animation" (724:5289): four 50dp wellness icons on a
 /// 60dp grid (10dp gaps) that rotate a quarter turn at a time.
@@ -134,46 +135,49 @@ class _VitalUpLoaderState extends State<VitalUpLoader>
 
   @override
   Widget build(BuildContext context) {
+    // Apply a scale factor to make it smaller, and use context.w() to make it responsive
+    final responsiveSize = context.w(widget.size * 0.6);
+    final responsiveIconSize = context.w(widget.iconSize * 0.6);
+
     return Center(
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
           final rotationState = _rotationState();
-          // Icon centres sit iconSize * 0.6 from the middle (Figma: 50dp
-          // icons, 60dp apart).
-          final d = widget.iconSize * 0.6;
+          // Increase multiplier from 0.6 to 0.85 to add more space between the icons
+          final d = responsiveIconSize * 0.85;
 
           return RotationTransition(
             turns: AlwaysStoppedAnimation(rotationState.groupTurns),
             child: SizedBox.square(
-              dimension: widget.size,
+              dimension: responsiveSize,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   _LoaderIcon(
                     assetPath: 'assets/icons/smile.svg',
-                    size: widget.iconSize,
+                    size: responsiveIconSize,
                     offset: Offset(-d, -d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[0],
                   ),
                   _LoaderIcon(
                     assetPath: 'assets/icons/Apple.svg',
-                    size: widget.iconSize,
+                    size: responsiveIconSize,
                     offset: Offset(d, -d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[1],
                   ),
                   _LoaderIcon(
                     assetPath: 'assets/icons/flower.svg',
-                    size: widget.iconSize,
+                    size: responsiveIconSize,
                     offset: Offset(-d, d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[2],
                   ),
                   _LoaderIcon(
                     assetPath: 'assets/icons/drop.svg',
-                    size: widget.iconSize,
+                    size: responsiveIconSize,
                     offset: Offset(d, d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[3],

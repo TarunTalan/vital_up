@@ -89,7 +89,7 @@ class ResponsiveCenter extends StatelessWidget {
 class ResponsiveTextScale extends StatelessWidget {
   final Widget child;
   static const double minSystemScale = 0.85;
-  static const double maxSystemScale = 1.3;
+  static const double maxSystemScale = 1.1;
 
   const ResponsiveTextScale({super.key, required this.child});
 

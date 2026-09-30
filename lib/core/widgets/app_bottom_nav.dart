@@ -34,14 +34,18 @@ class AppBottomNav extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: ResponsiveCenter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            context.gutter,
-            0,
-            context.gutter,
-            AppDimens.navBarBottomOffset,
-          ),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        heightFactor: 1.0,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              context.gutter,
+              0,
+              context.gutter,
+              AppDimens.navBarBottomOffset,
+            ),
           child: Container(
             padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
@@ -66,6 +70,7 @@ class AppBottomNav extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }
