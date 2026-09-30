@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
@@ -36,7 +37,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final cubit = context.read<AuthCubit>();
     final state = context.watch<AuthCubit>().state;
     final isLoading = state is AuthLoading;
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.colors;
 
     return PopScope(
       canPop: false,
@@ -54,9 +55,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+          child: ResponsiveCenter(
               child: Column(
                 children: [
                   AuthHeader(
@@ -64,28 +63,22 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     onBackClick: () => context.goNamed('login'),
                   ),
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
+                    child: SingleChildScrollView(
                           physics: const ClampingScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight,
-                            ),
-                            child: IntrinsicHeight(
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                               child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+                                padding: context.pagePadding,
                                 child: Column(
                                   children: [
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     Text(
                                       'Please enter your registered email to receive a verification code.',
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      style: context.text.bodyLarge?.copyWith(
                                             color: colors.onSurface,
                                           ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     // Email Input Block
                                     StreamBuilder<String>(
                                       stream: cubit.emailStream,
@@ -118,7 +111,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                         );
                                       },
                                     ),
-                                    const Spacer(),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     // Action Button
                                     BlocBuilder<AuthCubit, AuthState>(
                                       builder: (context, state) {
@@ -141,19 +134,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                         );
                                       },
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                   ],
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ],
               ),
-            ),
           ),
         ),
         ),

@@ -1,32 +1,23 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 
-/// A splash screen page that displays a custom brand logo animation
-/// matching the Figma specifications, with added modern micro-interactions
-/// (bounce landing, ripple pulse, subtle glow, punchier bloom).
+/// Splash — Figma "splash screen animation" (57:139):
+/// 1. Launch: the cyan head circle drops in from above.
+/// 2. It lands, and the logo body (arch + heart) blooms out behind it.
+/// 3. The circle grows until the whole screen is cyan.
+/// 4. Tagline: the fill deepens to teal and the white tagline fades in.
+/// Then the page fades out and routes on the session state.
 ///
-/// Coordinate Space: Unified 500x500 viewport scaled to fit 220x220.
-///
-/// Animation Sequence (Total 2800ms — standard splash length):
-/// 1. 0ms to 800ms (Drop Phase):
-///    The initial circle drops from the top of the screen (off-screen Y=-500)
-///    down to its landing position (Y=70) inside the 500x500 box, with a
-///    subtle overshoot/bounce on landing and a slight rotational flourish.
-/// 2. 800ms to 1500ms (Logo Bottom Phase):
-///    The circle remains static in the middle. A soft ripple ring pulses
-///    outward from it on landing. The logo_bottom.svg (Arch, Heart & Body)
-///    blooms outwards from behind the circle with a gentle pop (scale 0.0
-///    to 1.0 with slight overshoot, opacity 0.0 to 1.0) using a transform
-///    origin at the circle's center (Alignment(0.0, -0.42)).
-/// 3. 1500ms to 2100ms (Tagline Phase):
-///    The tagline fades in, scales up slightly, and slides up below the logo.
-/// 4. 2100ms to 2400ms: Holds the completed state.
-/// 5. 2400ms to 2800ms: Entire page fades out to transition.
+/// Logo geometry uses the 500x500 viewBox of `logo_bottom.svg`.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -36,123 +27,97 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  static const int _totalMs = 3000;
 
-  // Phase 1: Drop (0% to 28.6% of timeline)
-  late Animation<double> _dropProgress;
-  late Animation<double> _dropRotation;
+  // Logo viewBox geometry (500x500 space).
+  static const double _viewBox = 500.0;
+  static const double _circleLeft = 175.0;
+  static const double _circleTop = 70.0;
+  static const double _circleSize = 150.0;
+  static const Alignment _circleCenter = Alignment(0.0, -0.42);
 
-  // Ripple pulse on landing (28.6% to ~46.4% of timeline)
-  late Animation<double> _rippleScale;
-  late Animation<double> _rippleOpacity;
+  static Interval _interval(int startMs, int endMs, Curve curve) =>
+      Interval(startMs / _totalMs, endMs / _totalMs, curve: curve);
 
-  // Phase 2: Logo Bottom Bloom (28.6% to 53.6% of timeline)
-  late Animation<double> _logoBottomScale;
-  late Animation<double> _logoBottomOpacity;
-
-  // Phase 3: Tagline (53.6% to 75.0% of timeline)
-  late Animation<double> _taglineOpacity;
-  late Animation<double> _taglineTranslationY;
-  late Animation<double> _taglineScale;
-
-  // Phase 5: Exit (85.7% to 100% of timeline)
-  late Animation<double> _exitOpacity;
+  late final AnimationController _controller;
+  late final Animation<double> _dropProgress;
+  late final Animation<double> _dropRotation;
+  late final Animation<double> _rippleScale;
+  late final Animation<double> _rippleOpacity;
+  late final Animation<double> _logoBottomScale;
+  late final Animation<double> _logoBottomOpacity;
+  late final Animation<double> _fillProgress;
+  late final Animation<double> _tealProgress;
+  late final Animation<double> _taglineOpacity;
+  late final Animation<double> _taglineTranslationY;
+  late final Animation<double> _exitOpacity;
 
   bool _animationCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    // 2800ms duration — standard app splash screen length
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: _totalMs),
     );
 
-    // 1. Drop Progress: 0.0 to 1.0 (0% to 28.6% of timeline)
-    // easeOutBack gives a subtle bounce/overshoot as it lands — feels alive
-    // instead of just stopping dead.
-    _dropProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 800 / 2800, curve: Curves.easeOutBack),
-      ),
+    _dropProgress = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(0, 800, Curves.easeOutBack),
     );
-
-    // Subtle rotational flourish while dropping, settles to 0 on landing.
     _dropRotation = Tween<double>(begin: -0.18, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 800 / 2800, curve: Curves.easeOutCubic),
+        curve: _interval(0, 800, Curves.easeOutCubic),
       ),
     );
-
-    // Ripple ring: pulses outward from the circle right as it lands
     _rippleScale = Tween<double>(begin: 1.0, end: 2.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(800 / 2800, 1300 / 2800, curve: Curves.easeOut),
+        curve: _interval(800, 1300, Curves.easeOut),
       ),
     );
     _rippleOpacity = Tween<double>(begin: 0.45, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(800 / 2800, 1300 / 2800, curve: Curves.easeOut),
+        curve: _interval(800, 1300, Curves.easeOut),
       ),
     );
-
-    // 2. logo_bottom.svg scale & opacity: starts after drop (800ms - 1500ms in 2800ms scale)
-    // easeOutBack gives the bloom a gentle "pop" instead of a flat ease-out.
-    _logoBottomScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _logoBottomScale = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(800, 1450, Curves.easeOutBack),
+    );
+    _logoBottomOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(800, 1450, Curves.easeOut),
+    );
+    _fillProgress = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(1650, 2100, Curves.easeInCubic),
+    );
+    _tealProgress = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(2100, 2400, Curves.easeOut),
+    );
+    _taglineOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: _interval(2150, 2550, Curves.easeOut),
+    );
+    _taglineTranslationY = Tween<double>(begin: AppDimens.space16, end: 0.0)
+        .animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(
-          800 / 2800,
-          1500 / 2800,
-          curve: Curves.easeOutBack,
-        ),
+        curve: _interval(2150, 2550, Curves.easeOut),
       ),
     );
-    _logoBottomOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(800 / 2800, 1500 / 2800, curve: Curves.easeOut),
-      ),
-    );
-
-    // 3. Tagline Opacity (1500ms - 2100ms in 2800ms scale)
-    _taglineOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(1500 / 2800, 2100 / 2800, curve: Curves.easeOut),
-      ),
-    );
-
-    // 4. Tagline Slide
-    _taglineTranslationY = Tween<double>(begin: 15.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(1500 / 2800, 2100 / 2800, curve: Curves.easeOut),
-      ),
-    );
-
-    // Tagline gentle scale-in for a softer, more modern entrance
-    _taglineScale = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(1500 / 2800, 2100 / 2800, curve: Curves.easeOut),
-      ),
-    );
-
-    // 5. Exit Opacity (2400ms - 2800ms in 2800ms scale)
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(2400 / 2800, 1.0, curve: Curves.easeInOut),
+        curve: _interval(2750, _totalMs, Curves.easeInOut),
       ),
     );
 
-    // Start sequence
     _controller.forward().then((_) {
       if (mounted) {
         setState(() => _animationCompleted = true);
@@ -186,31 +151,8 @@ class _SplashPageState extends State<SplashPage>
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthCubit>().state;
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    // Responsive scaling based on design width 360
-    final double scale = (screenWidth / 360.0).clamp(0.8, 1.2);
-
-    // Base multiplier to scale down the 500x500 viewBox to 220x220
-    final double baseScale = 0.44 * scale;
-
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDarkMode ? const Color(0xFF444444) : Colors.white;
-    final taglineColor = isDarkMode
-        ? Colors.white.withValues(alpha: 0.7)
-        : const Color(0xFF444444).withValues(alpha: 0.7);
-
-    // Circle color: white in dark mode (charcoal background) and cyan in light mode (white background)
-    final Color circleColor = isDarkMode
-        ? Colors.white
-        : const Color(0xFF19C3E0);
-
-    // Soft glow accent behind the logo for a bit of modern depth.
-    final Color glowColor = const Color(
-      0xFF19C3E0,
-    ).withValues(alpha: isDarkMode ? 0.08 : 0.10);
-    final showLoaderAfterSplash =
-        _animationCompleted &&
+    final backgroundColor = context.colors.surface;
+    final showLoaderAfterSplash = _animationCompleted &&
         (authState is AuthInitial || authState is AuthLoading);
 
     return BlocListener<AuthCubit, AuthState>(
@@ -219,164 +161,122 @@ class _SplashPageState extends State<SplashPage>
       },
       child: Scaffold(
         backgroundColor: backgroundColor,
-        body: Stack(
-          children: [
-            // Subtle radial glow behind the logo for depth — very understated,
-            // just enough to keep a flat background from feeling static.
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0.0, -0.05),
-                    radius: 0.65,
-                    colors: [glowColor, backgroundColor.withValues(alpha: 0.0)],
+        body: showLoaderAfterSplash
+            ? const VitalUpLoader()
+            : LayoutBuilder(
+                builder: (context, constraints) => AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) => Opacity(
+                    opacity: _exitOpacity.value,
+                    child: _buildFrame(context, constraints.biggest),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildFrame(BuildContext context, Size screen) {
+    final logoSize = context.w(AppDimens.splashLogo);
+    final unit = logoSize / _viewBox;
+    final circleSize = _circleSize * unit;
+    final dropY = (-_viewBox + (_viewBox + _circleTop) * _dropProgress.value) * unit;
+
+    // Scale needed for the head circle to cover the whole screen.
+    final diagonal = math.sqrt(
+      screen.width * screen.width + screen.height * screen.height,
+    );
+    final fillScale = 1.0 + (2 * diagonal / circleSize) * _fillProgress.value;
+    final circleColor =
+        Color.lerp(AppColors.primary, AppColors.teal, _tealProgress.value)!;
+    final filled = _fillProgress.value > 0.0;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Logo + dropping head circle.
+        Center(
+          child: SizedBox.square(
+            dimension: logoSize,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Transform.scale(
+                    scale: _logoBottomScale.value,
+                    alignment: _circleCenter,
+                    child: Opacity(
+                      opacity: _logoBottomOpacity.value.clamp(0.0, 1.0),
+                      child: SvgPicture.asset(
+                        'assets/icons/logo_bottom.svg',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: _circleLeft * unit,
+                  top: _circleTop * unit,
+                  width: circleSize,
+                  height: circleSize,
+                  child: Transform.scale(
+                    scale: _rippleScale.value,
+                    child: Opacity(
+                      opacity: _rippleOpacity.value,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary,
+                            width: AppDimens.borderThick,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: _circleLeft * unit,
+                  top: dropY,
+                  width: circleSize,
+                  height: circleSize,
+                  child: Transform.rotate(
+                    angle: _dropRotation.value,
+                    child: Transform.scale(
+                      scale: fillScale,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: circleColor,
+                          shape: BoxShape.circle,
+                          boxShadow: filled ? null : AppShadows.soft,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Tagline on the teal fill.
+        if (_taglineOpacity.value > 0.0)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.w(AppDimens.space40)),
+            child: Opacity(
+              opacity: _taglineOpacity.value,
+              child: Transform.translate(
+                offset: Offset(0.0, _taglineTranslationY.value),
+                child: Text(
+                  'Caring for your health.\nBecause every detail matters.',
+                  textAlign: TextAlign.center,
+                  style: context.text.headlineSmall?.copyWith(
+                    color: AppColors.lighter,
                   ),
                 ),
               ),
             ),
-            if (showLoaderAfterSplash)
-              const Positioned.fill(child: VitalUpLoader())
-            else
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  // Drop Y coordinate: starts at -500 (off-screen) and lands at Y = 70 inside 500x500 space
-                  final double dropY =
-                      (-500.0 + (500.0 + 70.0) * _dropProgress.value) *
-                      baseScale;
-
-                  return Opacity(
-                    opacity: _exitOpacity.value,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // --- Animated Logo Container (500x500 coordinate space) ---
-                          SizedBox(
-                            width: 500.0 * baseScale,
-                            height: 500.0 * baseScale,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                // 1. logo_bottom.svg (Body, Heart & Arch)
-                                // Rendered BEHIND the circle (first in Stack), pinned in its final
-                                // position. Stays invisible until the circle lands, then blooms
-                                // outwards in place from the circle's center with a gentle pop.
-                                Positioned(
-                                  left: 0,
-                                  top: 0,
-                                  width: 500.0 * baseScale,
-                                  height: 500.0 * baseScale,
-                                  child: Transform.scale(
-                                    scale: _logoBottomScale.value,
-                                    alignment: const Alignment(
-                                      0.0,
-                                      -0.42,
-                                    ), // Exact center of head circle
-                                    child: Opacity(
-                                      opacity: _logoBottomOpacity.value,
-                                      child: SvgPicture.asset(
-                                        'assets/icons/logo_bottom.svg',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // 2. Ripple ring — pulses outward from the circle on landing,
-                                // a small modern flourish that adds motion without noise.
-                                Positioned(
-                                  left: 175.0 * baseScale,
-                                  top: 70.0 * baseScale,
-                                  width: 150.0 * baseScale,
-                                  height: 150.0 * baseScale,
-                                  child: Transform.scale(
-                                    scale: _rippleScale.value,
-                                    child: Opacity(
-                                      opacity: _rippleOpacity.value,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: circleColor,
-                                            width: 2.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // 3. Dropping Circle
-                                // Rendered ON TOP of logo_bottom and the ripple (last in Stack).
-                                // Positioned at exact 500x500 coordinates: left: 175, top: dropY, width: 150, height: 150
-                                // Falls with a slight rotational flourish and settles with a
-                                // gentle overshoot/bounce instead of a hard stop.
-                                Positioned(
-                                  left: 175.0 * baseScale,
-                                  top: dropY,
-                                  width: 150.0 * baseScale,
-                                  height: 150.0 * baseScale,
-                                  child: Transform.rotate(
-                                    angle: _dropRotation.value,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: circleColor,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: circleColor.withValues(
-                                              alpha: 0.35,
-                                            ),
-                                            blurRadius: 24.0 * scale,
-                                            spreadRadius: 1.0 * scale,
-                                            offset: Offset(0, 6.0 * scale),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 15.0 * scale),
-                          // --- Animated Tagline ---
-                          Opacity(
-                            opacity: _taglineOpacity.value,
-                            child: Transform.translate(
-                              offset: Offset(
-                                0.0,
-                                _taglineTranslationY.value * scale,
-                              ),
-                              child: Transform.scale(
-                                scale: _taglineScale.value,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24.0,
-                                  ),
-                                  child: Text(
-                                    'Understand Your Body. Elevate Your Health.',
-                                    style: Theme.of(context).textTheme.bodyLarge
-                                        ?.copyWith(
-                                          color: taglineColor,
-                                          fontSize: 16.0,
-                                          fontWeight: FontWeight.w500,
-                                          letterSpacing: 0.2,
-                                        ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_header.dart';
@@ -44,18 +45,12 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
-    final vColors = Theme.of(context).extension<VitalUpColors>();
-    final colors = Theme.of(context).colorScheme;
+    final v = context.vColors;
+    final colors = context.colors;
 
     // Figma: title changes per tab
     final headerTitle =
         _selectedTab == 0 ? 'Welcome Back' : 'Create an account';
-
-    // Figma tab bar colours from VitalUpColors
-    final tabTextActive =
-        vColors?.tabTextActive ?? AppTheme.lightCustomColors.tabTextActive!;
-    final tabTextInactive =
-        vColors?.tabTextInactive ?? AppTheme.lightCustomColors.tabTextInactive!;
 
     return PopScope(
       canPop: false,
@@ -72,57 +67,57 @@ class _LoginPageState extends State<LoginPage>
         child: Scaffold(
           backgroundColor: Colors.transparent,
         body: AuthBackground(
-          // Figma login screen: floating cyan + mint ellipses
           style: AuthBackgroundStyle.ellipses,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+          child: ResponsiveCenter(
               child: SafeArea(
                 top: false,
                 child: Column(
                   children: [
-                    // Header with back arrow + left-aligned title
                     AuthHeader(
                       headerText: headerTitle,
                       onBackClick: () => context.goNamed('onboarding'),
                     ),
 
-                    // Tab switcher — Figma: shape 18dp, padding (16, 12, 16, 12)
+                    // Figma Tabs/Default: glass track, radius 20, 4dp inset,
+                    // cyan 48dp selected pill (radius 18).
                     Padding(
-                      padding: const EdgeInsets.only(
-                        left: 16.0,
-                        top: 20.0,
-                        right: 16.0,
-                        bottom: 20.0,
+                      padding: EdgeInsets.fromLTRB(
+                        context.gutter,
+                        context.h(AppDimens.space32),
+                        context.gutter,
+                        0,
                       ),
                       child: Container(
-                        height: 56,
+                        padding: const EdgeInsets.all(AppDimens.space4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFBABABA).withValues(alpha: 0.13), // rgba(186, 186, 186, 0.13)
-                          borderRadius: BorderRadius.circular(18), // RoundedCornerShape(size = 18.dp)
+                          color: v.glassFill,
+                          borderRadius:
+                              BorderRadius.circular(AppDimens.radiusInput),
                           border: Border.all(
-                            color: const Color(0xFFBABABA).withValues(alpha: 0.27), // rgba(186, 186, 186, 0.27)
-                            width: 1.0, // 1dp
+                            color: v.glassBorder!,
+                            width: AppDimens.borderThin,
                           ),
                         ),
                         child: TabBar(
                           controller: _tabController,
                           indicatorSize: TabBarIndicatorSize.tab,
                           dividerColor: Colors.transparent,
-                          indicatorPadding: const EdgeInsets.all(4.0),
+                          overlayColor:
+                              const WidgetStatePropertyAll(Colors.transparent),
+                          splashBorderRadius:
+                              BorderRadius.circular(AppDimens.radiusTab),
                           indicator: BoxDecoration(
                             color: colors.primary,
-                            borderRadius: BorderRadius.circular(18), // RoundedCornerShape(size = 18.dp)
+                            borderRadius:
+                                BorderRadius.circular(AppDimens.radiusTab),
                           ),
-                          labelColor: tabTextActive,
-                          unselectedLabelColor: tabTextInactive,
-                          labelStyle:
-                              Theme.of(context).textTheme.labelLarge,
-                          unselectedLabelStyle:
-                              Theme.of(context).textTheme.labelLarge,
+                          labelColor: AppColors.lighter,
+                          unselectedLabelColor: v.grayText,
+                          labelStyle: context.text.titleSmall,
+                          unselectedLabelStyle: context.text.bodyLarge,
                           tabs: const [
-                            Tab(text: 'Login'),
-                            Tab(text: 'Sign up'),
+                            Tab(height: AppDimens.buttonHeight, text: 'Login'),
+                            Tab(height: AppDimens.buttonHeight, text: 'Sign up'),
                           ],
                         ),
                       ),
@@ -162,7 +157,6 @@ class _LoginPageState extends State<LoginPage>
                   ],
                 ),
               ),
-            ),
           ),
         ),
         ),

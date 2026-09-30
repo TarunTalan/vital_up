@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
@@ -198,10 +199,8 @@ class _OtpScreenState extends State<OtpScreen>
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<AuthCubit>();
-    final colors = Theme.of(context).colorScheme;
-    final customColors =
-        Theme.of(context).extension<VitalUpColors>() ??
-            AppTheme.lightCustomColors;
+    final colors = context.colors;
+    final v = context.vColors;
 
     final headerTitle = 'Verify OTP';
     final description = widget.flow == 'signup'
@@ -253,9 +252,7 @@ class _OtpScreenState extends State<OtpScreen>
                          displayError.toLowerCase().contains('sent'));
                     final showErrorBorder = _hasError || (displayError != null && !isSuccessMessage);
 
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 500),
+                    return ResponsiveCenter(
                         child: Column(
                           children: [
                             AuthHeader(
@@ -263,54 +260,39 @@ class _OtpScreenState extends State<OtpScreen>
                               onBackClick: () => context.goNamed('login'),
                             ),
                             Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return SingleChildScrollView(
+                              child: SingleChildScrollView(
                                     physics: const ClampingScrollPhysics(),
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        minHeight: constraints.maxHeight,
-                                      ),
-                                      child: IntrinsicHeight(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: AppTheme.hPadding),
+                                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                                        padding: context.pagePadding,
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              const SizedBox(height: 20.0),
-                      
+                                              SizedBox(height: context.h(AppDimens.space32)),
+
                                               // ── Description + email hint ──
                                               Center(
                                                 child: RichText(
                                                   textAlign: TextAlign.center,
                                                   text: TextSpan(
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                          color: colors.onSurface
-                                                              .withValues(alpha: 0.7),
-                                                        ),
+                                                    style: context.text.bodyLarge?.copyWith(
+                                                      color: colors.onSurface,
+                                                    ),
                                                     children: [
                                                       TextSpan(text: '$description '),
                                                       TextSpan(
                                                         text: widget.email,
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodyMedium
-                                                            ?.copyWith(
-                                                              color: colors.primary,
-                                                              fontWeight: FontWeight.w600,
-                                                            ),
+                                                        style: context.text.bodyLarge?.copyWith(
+                                                          color: AppColors.primaryActive,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
                                                       ),
                                                     ],
                                                   ),
                                                 ),
                                               ),
-                      
-                                              const SizedBox(height: 20.0),
-                      
+
+                                              SizedBox(height: context.h(AppDimens.space32)),
+
                                               // ── OTP Boxes with shake ──
                                               AnimatedBuilder(
                                                 animation: _shakeAnimation,
@@ -333,32 +315,38 @@ class _OtpScreenState extends State<OtpScreen>
                                                               .text
                                                               .replaceAll('\u200B', '')
                                                               .isNotEmpty;
-                      
+
+                                                      // Figma num input: default / active / filled / error.
                                                       final borderColor = showErrorBorder
                                                           ? colors.error
                                                           : isFocused
                                                               ? colors.primary
-                                                              : (customColors.inputBorder ??
-                                                                  AppTheme.lightCustomColors
-                                                                      .inputBorder!);
-                      
+                                                              : v.glassBorder!;
+
                                                       final borderWidth =
                                                           showErrorBorder || isFocused
-                                                              ? AppTheme.borderWidthFocused
-                                                              : AppTheme.borderWidthDefault;
-                      
+                                                              ? AppDimens.borderThick
+                                                              : AppDimens.borderThin;
+
                                                       final boxColor = showErrorBorder
-                                                          ? colors.error
-                                                              .withValues(alpha: 0.08)
-                                                          : isFilled
-                                                              ? colors.surfaceBright
-                                                              : Colors.transparent;
-                      
-                                                      return AnimatedContainer(
-                                                        duration: const Duration(
-                                                            milliseconds: 150),
-                                                        width: AppTheme.inputHeight,
-                                                        height: AppTheme.inputHeight,
+                                                          ? v.errorFill
+                                                          : isFilled && !isFocused
+                                                              ? v.primaryFill
+                                                              : v.glassFill;
+
+                                                      return Flexible(
+                                                        child: Padding(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: AppDimens.space2,
+                                                          ),
+                                                          child: ConstrainedBox(
+                                                            constraints: const BoxConstraints(
+                                                              maxWidth: AppDimens.inputHeight,
+                                                            ),
+                                                            child: AspectRatio(
+                                                              aspectRatio: 1,
+                                                              child: AnimatedContainer(
+                                                        duration: AppDurations.fast,
                                                         decoration: BoxDecoration(
                                                           border: Border.all(
                                                             color: borderColor,
@@ -366,8 +354,11 @@ class _OtpScreenState extends State<OtpScreen>
                                                           ),
                                                           borderRadius:
                                                               BorderRadius.circular(
-                                                                  AppTheme.inputRadius),
+                                                                  AppDimens.radiusTab),
                                                           color: boxColor,
+                                                          boxShadow: isFocused && !showErrorBorder
+                                                              ? AppShadows.inputFocus
+                                                              : null,
                                                         ),
                                                         alignment: Alignment.center,
                                                         child: TextField(
@@ -381,15 +372,9 @@ class _OtpScreenState extends State<OtpScreen>
                                                           autofillHints: index == 0
                                                               ? const [AutofillHints.oneTimeCode]
                                                               : null,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .displayMedium
-                                                              ?.copyWith(
-                                                                color: showErrorBorder
-                                                                    ? colors.error
-                                                                    : colors.onSurface,
-                                                                fontWeight: FontWeight.w500,
-                                                              ),
+                                                          style: context.text.headlineMedium?.copyWith(
+                                                            color: colors.onSurface,
+                                                          ),
                                                           showCursor: true,
                                                           cursorColor: showErrorBorder
                                                               ? colors.error
@@ -397,7 +382,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                           onChanged: (val) {
                                                             final digitsOnly = val
                                                                 .replaceAll('\u200B', '');
-                      
+
                                                             // 1. Paste
                                                             if (digitsOnly.length > 1) {
                                                               _handlePaste(
@@ -405,7 +390,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                               _clearError();
                                                               return;
                                                             }
-                      
+
                                                             // 2. Backspace
                                                             if (val.isEmpty) {
                                                               _controllers[index].text =
@@ -413,7 +398,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                               _controllers[index]
                                                                   .selection = const TextSelection
                                                                   .collapsed(offset: 1);
-                      
+
                                                               if (_isBoxFilled[index]) {
                                                                 _isBoxFilled[index] = false;
                                                               } else if (index > 0) {
@@ -433,7 +418,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                               setState(() {});
                                                               return;
                                                             }
-                      
+
                                                             // 3. Normal typing
                                                             if (digitsOnly.isNotEmpty) {
                                                               final newChar =
@@ -446,7 +431,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                                   .selection = const TextSelection
                                                                   .collapsed(offset: 1);
                                                               _isBoxFilled[index] = true;
-                      
+
                                                               if (index < _otpLength - 1) {
                                                                 _focusNodes[index + 1]
                                                                     .requestFocus();
@@ -474,9 +459,17 @@ class _OtpScreenState extends State<OtpScreen>
                                                               const InputDecoration(
                                                             counterText: '',
                                                             border: InputBorder.none,
+                                                            enabledBorder: InputBorder.none,
+                                                            focusedBorder: InputBorder.none,
+                                                            disabledBorder: InputBorder.none,
+                                                            filled: false,
                                                             isDense: true,
                                                             contentPadding:
                                                                 EdgeInsets.zero,
+                                                          ),
+                                                        ),
+                                                              ),
+                                                            ),
                                                           ),
                                                         ),
                                                       );
@@ -484,19 +477,18 @@ class _OtpScreenState extends State<OtpScreen>
                                                   ),
                                                 ),
                                               ),
-                      
-                                              const SizedBox(height: 10),
-                      
-                                              // ── Inline Error Message Area (Fixed height to prevent shifting) ──
-                                              SizedBox(
-                                                height: 20.0,
+
+                                              const SizedBox(height: AppDimens.space4),
+
+                                              // ── Inline message area (min height to prevent shifting) ──
+                                              ConstrainedBox(
+                                                constraints: const BoxConstraints(
+                                                  minHeight: AppDimens.space24,
+                                                ),
                                                 child: displayError != null
                                                     ? Text(
                                                         displayError,
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
+                                                        style: context.text.bodyLarge?.copyWith(
                                                               color: (displayError.toLowerCase().contains('success') ||
                                                                       displayError.toLowerCase().contains('sent'))
                                                                   ? colors.primary
@@ -505,16 +497,16 @@ class _OtpScreenState extends State<OtpScreen>
                                                       )
                                                     : const SizedBox.shrink(),
                                               ),
-                                              const Spacer(),
+                                              SizedBox(height: context.h(AppDimens.space24)),
                                               // ── Verify Button ──
                                               PrimaryAuthButton(
                                                 label: buttonLabel,
                                                 isLoading: isLoading && !_isResending,
                                                 onTap: _isResending ? () {} : _verifyOtp,
                                               ),
-                      
-                                              const SizedBox(height: 20.0),
-                      
+
+                                              const SizedBox(height: AppDimens.buttonGap),
+
                                               // ── Resend Button with 30s cooldown ──
                                               StreamBuilder<int>(
                                                 stream: widget.flow == 'signup'
@@ -528,20 +520,17 @@ class _OtpScreenState extends State<OtpScreen>
                                                       timerSnapshot.data ?? 0;
                                                   final isResendEnabled =
                                                       secondsLeft <= 0 && !isLoading;
-                      
-                                                  return SizedBox(
-                                                    width: double.infinity,
-                                                    height: AppTheme.buttonHeight,
-                                                    child: SecondaryAuthButton(
+
+                                                  return SecondaryAuthButton(
                                                       enabled: isResendEnabled,
                                                       isLoading: _isResending,
                                                       disabledTextColor:
-                                                          const Color(0xFF0F7586),
+                                                          v.secondaryButtonText,
                                                       onTap: () {
                                                         _resetBoxes();
                                                         cubit.clearOtpError();
                                                         setState(() => _isResending = true);
-                      
+
                                                         if (widget.flow == 'signup') {
                                                            cubit.resendOTP(
                                                              token: _currentToken,
@@ -577,23 +566,16 @@ class _OtpScreenState extends State<OtpScreen>
                                                       label: isResendEnabled
                                                           ? 'Resend OTP'
                                                           : 'Resend OTP in ${secondsLeft}s',
-                                                    ),
                                                   );
                                                 },
                                               ),
-                                              const SizedBox(height: 20.0),
+                                              const SizedBox(height: AppDimens.space20),
                                             ],
                                           ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
                               ),
                             ),
                           ],
                         ),
-                      ),
                     );
                   },
                 );

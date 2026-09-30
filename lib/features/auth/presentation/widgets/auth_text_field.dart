@@ -91,7 +91,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
 
     _strikeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: AppDurations.medium,
     );
 
     // Initial state matching password visibility
@@ -157,28 +157,16 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
   }
 
   Widget _buildBullet(String text) {
+    final style = context.text.bodyMedium?.copyWith(
+      color: context.vColors.grayText,
+    );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.space2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '• ',
-            style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFF757575),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 11,
-                height: 1.25,
-                color: Color(0xFF757575),
-              ),
-            ),
-          ),
+          Text('•  ', style: style),
+          Expanded(child: Text(text, style: style)),
         ],
       ),
     );
@@ -186,24 +174,49 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    // Normal state: light gray fill (#F5F5F5), no border.
-    // Error state: light pink fill with red border.
-    // Focused state: white fill with cyan border.
-    final baseColor = const Color(0xFFD8D8D8);
-    // rgba(216, 216, 216, 0.3) to allow background blobs to blur through
-    final containerColor = baseColor.withValues(alpha: 0.3);
+    final colors = context.colors;
+    final v = context.vColors;
     final isAvailable = widget.isAvailable == true;
+    final hasFieldError = widget.error != null && !isAvailable;
+    final isFilled = widget.value.isNotEmpty;
 
-    // Border color: rgba(20, 156, 179, 1) when focused; green for success, red for error, else rgba(216, 216, 216, 1)
-    final borderColor = isAvailable
-        ? const Color(0xFF2E7D32)
-        : widget.error != null
-            ? colors.error
-            : _focused
-                ? const Color(0xFF149CB3) // Focused: rgba(20, 156, 179, 1)
-                : baseColor;
+    // Figma input/text states: default / active / filled / error.
+    final Color fillColor;
+    final Color borderColor;
+    final double borderWidth;
+    if (hasFieldError) {
+      fillColor = v.errorFill!;
+      borderColor = colors.error;
+      borderWidth = AppDimens.borderThick;
+    } else if (isAvailable) {
+      fillColor = v.primaryFill!;
+      borderColor = v.success!;
+      borderWidth = AppDimens.borderThick;
+    } else if (_focused) {
+      fillColor = v.glassFill!;
+      borderColor = colors.primary;
+      borderWidth = AppDimens.borderThick;
+    } else if (isFilled) {
+      fillColor = v.primaryFill!;
+      borderColor = v.glassBorder!;
+      borderWidth = AppDimens.borderThin;
+    } else {
+      fillColor = v.glassFill!;
+      borderColor = v.glassBorder!;
+      borderWidth = AppDimens.borderThin;
+    }
+
+    final textColor = hasFieldError
+        ? colors.error
+        : _focused
+            ? AppColors.primaryActive
+            : colors.onSurface;
+
+    final iconColor = hasFieldError
+        ? colors.error
+        : _focused
+            ? colors.primary
+            : colors.onSurface;
 
     final localPasswordError = widget.showValidation &&
             widget.isPassword &&
@@ -220,43 +233,72 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     final showForgotRow = widget.isPassword && widget.showForgot && widget.onForgotPassword != null;
 
     final inputHeight = AppTheme.responsiveInputHeight(context);
+    final radius = BorderRadius.circular(AppDimens.radiusInput);
+
+    final helperStyle = context.text.bodyLarge?.copyWith(
+      color: (isAvailable && !widget.isPassword) ? v.success : colors.error,
+    );
+    final forgotStyle = context.text.bodyMedium?.copyWith(
+      color: colors.onSurface,
+      decoration: TextDecoration.underline,
+    );
+
+    Widget helperText(String text) => Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: helperStyle,
+        );
+
+    Widget forgotLink() => GestureDetector(
+          onTap: widget.onForgotPassword,
+          child: Text('Forgot password?', style: forgotStyle),
+        );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: colors.onSurface,
-              ),
+          style: context.text.titleSmall?.copyWith(color: colors.onSurface),
         ),
-        const SizedBox(height: 6.0),
+        const SizedBox(height: AppDimens.inputLabelGap),
         Stack(
           clipBehavior: Clip.none,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 30.6, sigmaY: 30.6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: double.infinity,
-                  height: inputHeight,
-                  decoration: BoxDecoration(
-                    color: containerColor,
-                    borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-                    border: Border.all(
-                      color: borderColor,
-                      width: _focused ? 2.0 : 1.0, // 2dp when selected, 1dp otherwise
-                    ),
+            AnimatedContainer(
+              duration: AppDurations.medium,
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                boxShadow: _focused && !hasFieldError ? AppShadows.inputFocus : null,
+              ),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: AppDimens.glassBlur,
+                    sigmaY: AppDimens.glassBlur,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                  child: AnimatedContainer(
+                    duration: AppDurations.medium,
+                    width: double.infinity,
+                    constraints: BoxConstraints(minHeight: inputHeight),
+                    decoration: BoxDecoration(
+                      color: fillColor,
+                      borderRadius: radius,
+                      border: Border.all(color: borderColor, width: borderWidth),
+                    ),
+                    padding: const EdgeInsetsDirectional.only(
+                      start: AppDimens.space16,
+                      end: AppDimens.space4,
+                    ),
                     child: Row(
                       children: [
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                            padding: EdgeInsets.symmetric(
+                              vertical: widget.singleLine ? 0 : AppDimens.space16,
+                            ),
                             child: TextField(
                               controller: _controller,
                               focusNode: _focusNode,
@@ -268,15 +310,9 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                               onSubmitted: widget.onSubmitted,
                               autofillHints: widget.autofillHints,
                               maxLines: widget.singleLine ? 1 : null,
-                              enableInteractiveSelection: !widget.isPassword, // Disable copy/paste menu on password
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: widget.error != null && !isAvailable
-                                        ? colors.error
-                                        : _focused
-                                            ? const Color(0xFF149CB3) // Selected text color: rgba(20, 156, 179, 1)
-                                            : colors.onSurface,
-                                  ),
-                              cursorColor: colors.primary,
+                              enableInteractiveSelection: !widget.isPassword,
+                              style: context.text.bodyMedium?.copyWith(color: textColor),
+                              cursorColor: hasFieldError ? colors.error : colors.primary,
                               onChanged: (text) {
                                 setState(() {
                                   _showRequirements = false;
@@ -292,24 +328,28 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                               },
                               decoration: InputDecoration(
                                 hintText: widget.placeholder,
-                                hintStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: colors.onTertiary,
-                                    ),
+                                hintStyle: context.text.bodyMedium?.copyWith(
+                                  color: hasFieldError ? colors.error : v.grayText,
+                                ),
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                filled: false,
                                 isDense: true,
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
                           ),
                         ),
-                        // Trailing icons
                         if (widget.isPassword) ...[
                           if (widget.error != null && widget.showRequirementsInfo)
                             IconButton(
                               icon: Icon(
                                 Icons.info_outline,
                                 color: colors.error,
-                                size: 22,
+                                size: AppDimens.iconMd,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -321,11 +361,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                           IconButton(
                             icon: _SvgEyeIcon(
                               visible: _passwordVisible,
-                              color: widget.error != null
-                                  ? colors.error
-                                  : _focused
-                                      ? colors.primary
-                                      : colors.onSurface,
+                              color: iconColor,
                             ),
                             onPressed: () {
                               setState(() {
@@ -342,24 +378,25 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                           ),
                         ] else ...[
                           if (widget.isChecking)
-                            const Padding(
-                              padding: EdgeInsets.only(right: 8.0),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(end: AppDimens.space12),
+                              child: SizedBox.square(
+                                dimension: AppDimens.iconSm,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF149CB3)),
+                                  strokeWidth: AppDimens.borderThick,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(
+                                    AppColors.primaryActive,
+                                  ),
                                 ),
                               ),
                             )
                           else if (isAvailable)
-                            const Padding(
-                              padding: EdgeInsets.only(right: 8.0),
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(end: AppDimens.space12),
                               child: Icon(
                                 Icons.check_circle,
-                                color: Color(0xFF2E7D32),
-                                size: 20,
+                                color: v.success,
+                                size: AppDimens.iconMd,
                               ),
                             ),
                         ],
@@ -369,33 +406,34 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                 ),
               ),
             ),
-            // Floating requirements bubble above the textfield
             if (widget.isPassword && _showRequirements)
-              Positioned(
-                left: 16,
-                bottom: inputHeight + 8.0, // Floating exactly above the textfield
+              PositionedDirectional(
+                start: AppDimens.space16,
+                end: AppDimens.space16,
+                bottom: inputHeight + AppDimens.space8,
                 child: CustomPaint(
                   painter: SpeechBubblePainter(
-                    backgroundColor: Colors.white.withValues(alpha: 0.96),
-                    borderColor: const Color(0xFFD8D8D8),
+                    backgroundColor: v.surfaceElevated!.withValues(alpha: 0.96),
+                    borderColor: v.hairline!,
                   ),
-                  child: Container(
-                    width: 290,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20), // Bottom space for speech arrow
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppDimens.space16,
+                      AppDimens.space12,
+                      AppDimens.space16,
+                      AppDimens.space20,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
+                        Text(
                           'Password Requirements',
-                          style: TextStyle(
-                            fontFamily: 'SFProRounded',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: Color(0xFF1C1C1C),
+                          style: context.text.titleSmall?.copyWith(
+                            color: colors.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppDimens.space6),
                         _buildBullet('Password must be at least 8 characters'),
                       ],
                     ),
@@ -405,80 +443,38 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
           ],
         ),
         if (widget.reserveErrorSpace)
-          Column(
-            children: [
-              SizedBox(height: AppTheme.responsiveHeight(context, 5.0)),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      showErrText ?? ' ', // Reserve vertical space with a blank space
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: (isAvailable && !widget.isPassword)
-                                ? const Color(0xFF2E7D32)
-                                : colors.error,
-                            fontSize: 11.0,
-                          ),
-                    ),
-                  ),
-                  if (showForgotRow)
-                    GestureDetector(
-                      onTap: widget.onForgotPassword,
-                      child: Text(
-                        'Forgot password?',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: colors.onSurface,
-                              decoration: TextDecoration.underline,
-                              fontSize: 13.0,
-                            ),
-                      ),
-                    ),
+          Padding(
+            padding: const EdgeInsets.only(top: AppDimens.inputLabelGap),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: helperText(showErrText ?? ' ')),
+                if (showForgotRow) ...[
+                  const SizedBox(width: AppDimens.space8),
+                  forgotLink(),
                 ],
-              ),
-            ],
+              ],
+            ),
           )
         else
           AnimatedSize(
-            duration: const Duration(milliseconds: 250),
+            duration: AppDurations.medium,
             curve: Curves.easeOutCubic,
             alignment: Alignment.topCenter,
             child: (hasError || showForgotRow)
                 ? Padding(
-                    padding: EdgeInsets.only(top: AppTheme.responsiveHeight(context, 5.0)),
+                    padding: const EdgeInsets.only(top: AppDimens.inputLabelGap),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (hasError)
-                          Expanded(
-                            child: Text(
-                              showErrText ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: (isAvailable && !widget.isPassword)
-                                        ? const Color(0xFF2E7D32)
-                                        : colors.error,
-                                    fontSize: 11.0,
-                                  ),
-                            ),
-                          )
+                          Expanded(child: helperText(showErrText ?? ''))
                         else
                           const Spacer(),
-                        if (showForgotRow)
-                          GestureDetector(
-                            onTap: widget.onForgotPassword,
-                            child: Text(
-                              'Forgot password?',
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: colors.onSurface,
-                                    decoration: TextDecoration.underline,
-                                    fontSize: 13.0,
-                                  ),
-                            ),
-                          ),
+                        if (showForgotRow) ...[
+                          const SizedBox(width: AppDimens.space8),
+                          forgotLink(),
+                        ],
                       ],
                     ),
                   )
@@ -502,8 +498,8 @@ class _SvgEyeIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final svgWidget = SvgPicture.asset(
       'assets/icons/Eye.svg',
-      width: 22,
-      height: 22,
+      width: AppDimens.iconMd,
+      height: AppDimens.iconMd,
       colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
     );
 
@@ -527,13 +523,14 @@ class _SlashPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2.0
+      ..strokeWidth = AppDimens.borderThick
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
+    const inset = AppDimens.space2;
     canvas.drawLine(
-      Offset(2, size.height - 2),
-      Offset(size.width - 2, 2),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, inset),
       paint,
     );
   }
@@ -741,6 +738,9 @@ class AuthNumberField extends StatelessWidget {
   }
 }
 
+
+/// Rounded speech bubble with a downward arrow near its trailing edge
+/// (pointing at the requirements info icon inside the field).
 class SpeechBubblePainter extends CustomPainter {
   final Color backgroundColor;
   final Color borderColor;
@@ -758,27 +758,29 @@ class SpeechBubblePainter extends CustomPainter {
 
     final borderPaint = Paint()
       ..color = borderColor
-      ..strokeWidth = 1.0
+      ..strokeWidth = AppDimens.borderThin
       ..style = PaintingStyle.stroke;
 
-    final radius = 12.0;
-    final arrowHeight = 8.0;
-    final arrowWidth = 12.0;
-    final arrowX = size.width - 45.0;
+    const radius = AppDimens.radiusToast;
+    const arrowHeight = AppDimens.space8;
+    const arrowWidth = AppDimens.space12;
+    final arrowX = size.width - AppDimens.space48;
 
     final path = Path()
       ..moveTo(radius, 0)
       ..lineTo(size.width - radius, 0)
-      ..arcToPoint(Offset(size.width, radius), radius: Radius.circular(radius))
+      ..arcToPoint(Offset(size.width, radius), radius: const Radius.circular(radius))
       ..lineTo(size.width, size.height - radius - arrowHeight)
-      ..arcToPoint(Offset(size.width - radius, size.height - arrowHeight), radius: Radius.circular(radius))
+      ..arcToPoint(Offset(size.width - radius, size.height - arrowHeight),
+          radius: const Radius.circular(radius))
       ..lineTo(arrowX + arrowWidth / 2, size.height - arrowHeight)
       ..lineTo(arrowX, size.height)
       ..lineTo(arrowX - arrowWidth / 2, size.height - arrowHeight)
       ..lineTo(radius, size.height - arrowHeight)
-      ..arcToPoint(Offset(0, size.height - radius - arrowHeight), radius: Radius.circular(radius))
+      ..arcToPoint(Offset(0, size.height - radius - arrowHeight),
+          radius: const Radius.circular(radius))
       ..lineTo(0, radius)
-      ..arcToPoint(Offset(radius, 0), radius: Radius.circular(radius))
+      ..arcToPoint(const Offset(radius, 0), radius: const Radius.circular(radius))
       ..close();
 
     canvas.drawPath(path, paint);
