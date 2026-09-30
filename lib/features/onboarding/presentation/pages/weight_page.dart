@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
 class WeightPage extends StatefulWidget {
@@ -30,18 +32,18 @@ class _WeightPageState extends State<WeightPage> {
             _showErrors = true;
           });
         } else {
-          context.goNamed('health-bpm');
+          context.goNamed('health-dietary-preference');
         }
       },
       onSkip: () {
         setState(() => _showErrors = false);
-        context.goNamed('health-bpm');
+        context.goNamed('health-dietary-preference');
       },
       title: "How much do you weigh?",
       subtitle: "This helps us calculate your BMI accurately.",
       nextEnabled: true,
       fullBleedChild: true,
-      titleBottomSpace: 16.0,
+      titleBottomSpace: AppDimens.space16,
       child: _WeightContent(
         onValidityChange: (valid) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -105,7 +107,7 @@ class _WeightContentState extends State<_WeightContent> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
+          padding: context.pagePadding,
           child: Column(
             children: [
               // Controls
@@ -126,7 +128,7 @@ class _WeightContentState extends State<_WeightContent> {
                   ),
                 ],
               ),
-              const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
+              const SizedBox(height: AppDimens.space8),
               UnitDropdown(
                 selectedUnit: _selectedUnit,
                 units: const ["kg", "lb"],
@@ -146,7 +148,7 @@ class _WeightContentState extends State<_WeightContent> {
                   }
                 },
               ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: AppDimens.space16),
             ],
           ),
         ),
@@ -154,10 +156,10 @@ class _WeightContentState extends State<_WeightContent> {
         // Image
         Builder(
           builder: (context) {
-            final physicalHeight = MediaQuery.of(context).size.height + MediaQuery.of(context).viewInsets.bottom;
+            final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
             return SizedBox(
               width: double.infinity,
-              height: physicalHeight * 0.28, // Reduced from 35% to 28% to prevent scrolling
+              height: physicalHeight * 0.28,
               child: SvgPicture.asset(
                 'assets/icons/weight.svg',
                 fit: BoxFit.fitWidth,

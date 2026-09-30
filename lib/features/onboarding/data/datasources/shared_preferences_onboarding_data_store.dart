@@ -61,7 +61,7 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   Future<String> getBloodPressureBottom() async => _prefs.getString('onboarding_bp_bottom') ?? '';
 
   @override
-  Future<String> getBpm() async => _prefs.getString('onboarding_bpm') ?? '';
+  Future<String> getDietaryPreference() async => _prefs.getString('onboarding_dietary_preference') ?? '';
 
   @override
   Future<String> getActivity() async => _prefs.getString('onboarding_activity') ?? '';
@@ -105,10 +105,10 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   }
 
   @override
-  Future<void> saveHealthVitals(String bpTop, String bpBottom, String bpm, String activity, String sleep) async {
+  Future<void> saveHealthVitals(String bpTop, String bpBottom, String dietaryPreference, String activity, String sleep) async {
     await _prefs.setString('onboarding_bp_top', bpTop);
     await _prefs.setString('onboarding_bp_bottom', bpBottom);
-    await _prefs.setString('onboarding_bpm', bpm);
+    await _prefs.setString('onboarding_dietary_preference', dietaryPreference);
     await _prefs.setString('onboarding_activity', activity);
     await _prefs.setString('onboarding_sleep', sleep);
   }
