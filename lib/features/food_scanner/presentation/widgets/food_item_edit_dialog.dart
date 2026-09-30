@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 
 class FoodItemEditDialog extends StatefulWidget {
@@ -65,102 +67,61 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final colors = theme.extension<VitalUpColors>();
-    
-    // Theme-matching translucent glass background colors
-    final dialogBgColor = isDark 
-        ? const Color(0xE61C1C1C) 
-        : const Color(0xF2FEFEFE);
-    final borderColor = colors?.inputBorder ?? (isDark 
-        ? const Color(0xFF343434) 
-        : const Color(0xFFD8D8D8));
-    final fieldFillColor = isDark 
-        ? Colors.white.withValues(alpha: 0.05) 
-        : Colors.black.withValues(alpha: 0.03);
-    
-    final primaryColor = theme.primaryColor;
-    final primaryButtonTextColor = colors?.buttonText ?? const Color(0xFF0C0C0C);
+    final v = context.vColors;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(
+          sigmaX: AppDimens.glassBlur / 2,
+          sigmaY: AppDimens.glassBlur / 2,
+        ),
         child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
-            decoration: BoxDecoration(
-              color: dialogBgColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.gutter,
+            vertical: AppDimens.space24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimens.radiusDialog),
+            side: BorderSide(color: v.hairline!),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppDimens.maxContentWidth,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppDimens.space20,
+                    AppDimens.space20,
+                    AppDimens.space20,
+                    AppDimens.space12,
+                  ),
                   child: Text(
                     widget.item == null ? 'Add Food Item' : 'Edit Food Item',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 20,
-                      color: isDark ? Colors.white : const Color(0xFF1C1C1C),
-                    ),
+                    style: context.text.headlineSmall,
                   ),
                 ),
-                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
-                // Content
+                const Divider(),
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppDimens.space20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Food Name',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const _FieldLabel('Food Name'),
                         TextField(
                           controller: _nameController,
-                          style: theme.textTheme.bodyLarge,
-                          decoration: InputDecoration(
+                          style: context.text.bodyLarge,
+                          decoration: const InputDecoration(
                             hintText: 'e.g., Grilled Chicken',
-                            hintStyle: TextStyle(color: theme.hintColor),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: fieldFillColor,
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Quantity',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppDimens.space16),
+                        const _FieldLabel('Quantity'),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -168,56 +129,23 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                               child: TextField(
                                 controller: _quantityController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: theme.textTheme.bodyLarge,
-                                decoration: InputDecoration(
+                                style: context.text.bodyLarge,
+                                decoration: const InputDecoration(
                                   hintText: '1.0',
-                                  hintStyle: TextStyle(color: theme.hintColor),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: fieldFillColor,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppDimens.space12),
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: _selectedUnit,
+                                initialValue: _selectedUnit,
                                 isExpanded: true,
-                                style: theme.textTheme.bodyLarge,
-                                dropdownColor: dialogBgColor,
-                                borderRadius: BorderRadius.circular(16),
+                                style: context.text.bodyLarge,
+                                dropdownColor: v.surfaceElevated,
+                                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
                                 icon: Icon(
                                   Icons.keyboard_arrow_down_rounded,
-                                  color: isDark ? Colors.white70 : const Color(0xFF5F6368),
-                                ),
-                                decoration: InputDecoration(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: borderColor),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(color: colors?.inputBorderFocused ?? primaryColor, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: fieldFillColor,
+                                  color: v.grayText,
                                 ),
                                 items: _units.map((unit) {
                                   return DropdownMenuItem(
@@ -234,74 +162,30 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.info_outline_rounded,
-                                size: 20,
-                                color: primaryColor,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Nutrition data will be fetched from USDA database based on the food name.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: isDark ? const Color(0xFF9AA0A6) : const Color(0xFF5F6368),
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        const SizedBox(height: AppDimens.space20),
+                        const AppInfoNote(
+                          message: 'Nutrition data will be fetched from USDA database based on the food name.',
                         ),
                       ],
                     ),
                   ),
                 ),
-                Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
-                // Actions
+                const Divider(),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.all(AppDimens.space16),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: TextButton.styleFrom(
-                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF5F6368),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: AppSecondaryButton(
+                          label: 'Cancel',
+                          onTap: () => Navigator.of(context).pop(),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _handleSave,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: primaryButtonTextColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          widget.item == null ? 'Add' : 'Save',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                      const SizedBox(width: AppDimens.buttonGap),
+                      Expanded(
+                        child: AppPrimaryButton(
+                          label: widget.item == null ? 'Add' : 'Save',
+                          onTap: _handleSave,
                         ),
                       ),
                     ],
@@ -312,6 +196,21 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Field label — Figma input label (body 16 med), 6dp above the field.
+class _FieldLabel extends StatelessWidget {
+  final String text;
+
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimens.inputLabelGap),
+      child: Text(text, style: context.text.titleSmall),
     );
   }
 }
