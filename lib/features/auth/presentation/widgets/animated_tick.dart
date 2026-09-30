@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/theme/app_dimens.dart';
 
 class AnimatedTick extends StatefulWidget {
   final double totalSize;
@@ -12,8 +13,8 @@ class AnimatedTick extends StatefulWidget {
 
   const AnimatedTick({
     super.key,
-    this.totalSize = 115.0,
-    this.tickSize = 55.0,
+    this.totalSize = AppDimens.successBadge,
+    this.tickSize = AppDimens.successTick,
     this.play = true,
     this.completed = false,
     this.onFinished,

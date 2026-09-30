@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
@@ -51,23 +52,16 @@ class _SignupScreenState extends State<SignupScreen> {
     final cubit = context.read<AuthCubit>();
     final state = context.watch<AuthCubit>().state;
     final isLoading = state is AuthLoading;
-    final colors = Theme.of(context).colorScheme;
-    final vColors = Theme.of(context).extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
+    return SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight,
-            ),
-            child: IntrinsicHeight(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.symmetric(horizontal: context.gutter),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20.0),
+                    SizedBox(height: context.h(AppDimens.space20)),
                     // Username Input Block
                     StreamBuilder<String>(
                       stream: cubit.usernameSignupStream,
@@ -112,7 +106,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: AppDimens.space12),
                     // Email Input Block
                     StreamBuilder<String>(
                       stream: cubit.emailStream,
@@ -135,7 +129,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: AppDimens.space12),
                     // Password Input Block
                     StreamBuilder<String>(
                       stream: cubit.passwordStream,
@@ -160,13 +154,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 20.0),
+                    const SizedBox(height: AppDimens.space12),
                     // Terms and Conditions checkbox row
                     Row(
                       children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
+                        SizedBox.square(
+                          dimension: AppDimens.iconLg,
                           child: Checkbox(
                             value: _termsAccepted,
                             onChanged: isLoading
@@ -178,10 +171,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                     });
                                   },
                             activeColor: colors.primary,
-                            checkColor: Colors.white,
+                            checkColor: v.buttonText,
+                            side: BorderSide(
+                              color: _termsError != null ? colors.error : v.grayText!,
+                              width: AppDimens.borderThin,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppDimens.space8),
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
@@ -202,18 +199,17 @@ class _SignupScreenState extends State<SignupScreen> {
                             },
                             child: RichText(
                               text: TextSpan(
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: vColors?.grayText ?? AppTheme.lightCustomColors.grayText,
-                                      fontSize: 14.0,
-                                    ),
+                                style: context.text.bodyMedium?.copyWith(
+                                  color: v.grayText,
+                                ),
                                 children: [
                                   const TextSpan(text: 'I have read and agree with the '),
                                   TextSpan(
                                     text: 'terms and conditions',
-                                    style: TextStyle(
-                                      color: vColors?.termsLink ?? AppTheme.lightCustomColors.termsLink,
+                                    style: context.text.bodyMedium?.copyWith(
+                                      color: v.termsLink,
                                       decoration: TextDecoration.underline,
-                                      fontSize: 14.0,
+                                      decorationColor: v.termsLink,
                                     ),
                                   ),
                                 ],
@@ -227,17 +223,16 @@ class _SignupScreenState extends State<SignupScreen> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                          padding: const EdgeInsets.only(top: AppDimens.inputLabelGap),
                           child: Text(
                             _termsError!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: colors.error,
-                                  fontSize: 11.0,
-                                ),
+                            style: context.text.bodyLarge?.copyWith(
+                              color: colors.error,
+                            ),
                           ),
                         ),
                       ),
-                    const Spacer(),
+                    const SizedBox(height: AppDimens.space20),
                     BlocBuilder<AuthCubit, AuthState>(
                       builder: (context, state) {
                         final isLoading = state is AuthLoading;
@@ -249,14 +244,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 20.0),
+                    const SizedBox(height: AppDimens.space20),
                   ],
                 ),
-              ),
-            ),
-          ),
         );
-      },
-    );
   }
 }

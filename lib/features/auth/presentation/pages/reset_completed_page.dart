@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/widgets/animated_tick.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_header.dart';
@@ -32,7 +33,7 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.colors;
     final animationDuration = const Duration(milliseconds: 600);
 
     return PopScope(
@@ -45,9 +46,7 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
         backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+          child: ResponsiveCenter(
               child: Column(
                 children: [
                   AnimatedOpacity(
@@ -59,43 +58,32 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
                     ),
                   ),
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
+                    child: SingleChildScrollView(
                           physics: const ClampingScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight,
-                            ),
-                            child: IntrinsicHeight(
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppTheme.hPadding,
-                                ),
+                                padding: context.pagePadding,
                                 child: Column(
                                   children: [
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     AnimatedOpacity(
                                       opacity: _showContent ? 1.0 : 0.0,
                                       duration: animationDuration,
                                       child: Text(
                                         'Your password has been changed successfully.',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
+                                        style: context.text.bodyLarge?.copyWith(
                                               color: colors.onSurface,
                                             ),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     // The tick is always rendered in its final spot
                                     AnimatedTick(
                                       play: _playAnimation,
                                       completed: _showContent,
-                                      totalSize: 115,
-                                      tickSize: 55,
+                                      totalSize: AppDimens.successBadge,
+                                      tickSize: AppDimens.successTick,
                                       onFinished: () {
                                         if (mounted) {
                                           setState(() {
@@ -104,7 +92,7 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
                                         }
                                       },
                                     ),
-                                    const Spacer(),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     AnimatedOpacity(
                                       opacity: _showContent ? 1.0 : 0.0,
                                       duration: animationDuration,
@@ -116,19 +104,14 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
                                         },
                                       ),
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                   ],
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ],
               ),
-            ),
           ),
         ),
       ),

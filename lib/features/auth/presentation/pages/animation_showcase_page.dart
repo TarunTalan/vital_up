@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/theme/app_dimens.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/auth/presentation/widgets/animated_tick.dart';
 
@@ -31,7 +32,7 @@ class _AnimationShowcasePageState extends State<AnimationShowcasePage> {
               },
               child: const Text('Play Splash Screen'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppDimens.space16),
             ElevatedButton(
               onPressed: () {
                 setState(() {
@@ -41,7 +42,7 @@ class _AnimationShowcasePageState extends State<AnimationShowcasePage> {
               },
               child: Text(_showLoader ? 'Hide Loader' : 'Show Loader'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppDimens.space16),
             ElevatedButton(
               onPressed: () {
                 setState(() {
@@ -57,19 +58,19 @@ class _AnimationShowcasePageState extends State<AnimationShowcasePage> {
               },
               child: const Text('Play Animated Tick'),
             ),
-            const SizedBox(height: 64),
+            const SizedBox(height: AppDimens.space48),
             // Display area for the animations
             if (_showLoader)
               const SizedBox(
-                width: 100,
-                height: 100,
+                width: AppDimens.loaderSize,
+                height: AppDimens.loaderSize,
                 child: VitalUpLoader(),
               ),
             if (_showTick)
               const SizedBox(
-                width: 100,
-                height: 100,
-                child: AnimatedTick(totalSize: 100),
+                width: AppDimens.successBadge,
+                height: AppDimens.successBadge,
+                child: AnimatedTick(),
               ),
           ],
         ),

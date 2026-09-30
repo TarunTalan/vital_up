@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
@@ -38,7 +39,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     final cubit = context.read<AuthCubit>();
     final state = context.watch<AuthCubit>().state;
     final isLoading = state is AuthLoading;
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.colors;
 
     return PopScope(
       canPop: false,
@@ -56,9 +57,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           backgroundColor: Colors.transparent,
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+          child: ResponsiveCenter(
               child: Column(
                 children: [
                   AuthHeader(
@@ -66,28 +65,22 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     onBackClick: () => context.goNamed('login'),
                   ),
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
+                    child: SingleChildScrollView(
                           physics: const ClampingScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight,
-                            ),
-                            child: IntrinsicHeight(
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                               child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
+                                padding: context.pagePadding,
                                 child: Column(
                                   children: [
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     Text(
                                       'Enter your new password below.',
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      style: context.text.bodyLarge?.copyWith(
                                             color: colors.onSurface,
                                           ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     // New Password Block
                                     StreamBuilder<String>(
                                       stream: cubit.passwordStream,
@@ -118,7 +111,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                         );
                                       },
                                     ),
-                                    const Spacer(),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                     // Reset Button
                                     BlocListener<AuthCubit, AuthState>(
                                       listener: (context, state) {
@@ -144,19 +137,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                         },
                                       ),
                                     ),
-                                    const SizedBox(height: 20.0),
+                                    SizedBox(height: context.h(AppDimens.space32)),
                                   ],
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ],
               ),
-            ),
           ),
         ),
         ),

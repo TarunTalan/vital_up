@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 
-/// Login tab — NO scrolling, content fits in the available tab area.
-/// Uses Spacer to push the button to a comfortable position at bottom.
+/// Login tab (Figma login frame): inputs followed directly by the CTA.
+/// Scrolls when the keyboard or large text scale needs it.
 class LoginTab extends StatelessWidget {
   final VoidCallback onSignedIn;
 
@@ -20,22 +21,15 @@ class LoginTab extends StatelessWidget {
     final state = context.watch<AuthCubit>().state;
     final isLoading = state is AuthLoading;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
+    return SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: IntrinsicHeight(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.hPadding,
-                ),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.symmetric(horizontal: context.gutter),
                 child: AutofillGroup(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20.0),
+                      SizedBox(height: context.h(AppDimens.space32)),
                     // Username Input Block
                     StreamBuilder<String>(
                       stream: cubit.usernameLoginStream,
@@ -63,7 +57,7 @@ class LoginTab extends StatelessWidget {
                         );
                       },
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: AppDimens.space12),
                     // Password Input Block
                     StreamBuilder<String>(
                       stream: cubit.passwordStream,
@@ -90,7 +84,7 @@ class LoginTab extends StatelessWidget {
                         );
                       },
                     ),
-                    const Spacer(),
+                    const SizedBox(height: AppDimens.space20),
                     // Sign In Action Button
                     BlocBuilder<AuthCubit, AuthState>(
                       builder: (context, state) {
@@ -106,15 +100,10 @@ class LoginTab extends StatelessWidget {
                         );
                       },
                     ),
-                    const SizedBox(height: 20.0),
+                    const SizedBox(height: AppDimens.space20),
                   ],
                 ),
               ),
-            ),
-          ),
-          ),
         );
-      },
-    );
   }
 }
