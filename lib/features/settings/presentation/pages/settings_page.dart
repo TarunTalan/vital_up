@@ -1,14 +1,14 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
-import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
-import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
-
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -26,63 +26,33 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Widget _buildGlassCard({
-    required BuildContext context,
-    required List<Widget> children,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+  Widget _buildSection(String title, List<Widget> children) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
+      padding: const EdgeInsets.only(bottom: AppDimens.sectionGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCaption(title),
+          const SizedBox(height: AppDimens.space8),
+          AppCard(
             width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : Colors.white.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8))
-                    .withValues(alpha: 0.4),
-              ),
-            ),
+            padding: AppDimens.cardPaddingCompact,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(ThemeData theme, String title) {
-    final customColors = theme.extension<VitalUpColors>();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0, top: 12.0, left: 4.0),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.7,
-          color: customColors?.grayText ?? const Color(0xFF777777),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildDivider() {
     return Divider(
-      color: Colors.grey.withValues(alpha: 0.1),
-      height: 1,
-      thickness: 1,
-      indent: 48,
+      color: context.vColors.divider,
+      height: AppDimens.borderThin,
+      thickness: AppDimens.borderThin,
+      indent: AppDimens.iconBadge + AppDimens.space12,
     );
   }
 
@@ -92,270 +62,230 @@ class _SettingsPageState extends State<SettingsPage> {
     required String subtitle,
     Widget? trailing,
   }) {
-    final theme = Theme.of(context);
-    final vColors = theme.extension<VitalUpColors>();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-          ),
-          const SizedBox(width: 16),
+          AppIconBadge(icon: Icon(icon)),
+          const SizedBox(width: AppDimens.space12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
+                Text(title, style: context.text.titleSmall),
+                const SizedBox(height: AppDimens.space2),
                 Text(
                   subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: vColors?.grayText ?? Colors.grey,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.vColors.grayText,
                   ),
                 ),
               ],
             ),
           ),
-          if (trailing != null) trailing,
+          if (trailing != null) ...[
+            const SizedBox(width: AppDimens.space8),
+            trailing,
+          ],
         ],
       ),
     );
   }
 
+  Widget _buildUnitToggle({
+    required List<String> labels,
+    required List<bool> isSelected,
+    required ValueChanged<int> onPressed,
+  }) {
+    final colors = context.colors;
+    final v = context.vColors;
+    return ToggleButtons(
+      borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+      constraints: const BoxConstraints(
+        minHeight: AppDimens.space32,
+        minWidth: AppDimens.space40,
+      ),
+      textStyle: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+      color: v.grayText,
+      selectedColor: v.buttonText,
+      fillColor: colors.primary,
+      borderColor: v.glassBorder,
+      selectedBorderColor: colors.primary,
+      isSelected: isSelected,
+      onPressed: onPressed,
+      children: [
+        for (final label in labels)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.space12),
+            child: Text(label),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final vColors = theme.extension<VitalUpColors>();
+    final v = context.vColors;
 
-    return AuthBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          leading: Center(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: BackIcon(onClick: () => Navigator.of(context).pop()),
+    return AppScaffold(
+      header: const AppPageHeader(title: 'Settings'),
+      scrollable: false,
+      padBody: false,
+      body: BlocConsumer<SettingsCubit, SettingsState>(
+        listener: (context, state) {
+          if (state is SettingsError) {
+            showErrorSnackBar(context, state.message);
+          }
+        },
+        builder: (context, state) {
+          if (state is SettingsLoading || state is SettingsInitial) {
+            return const Center(child: VitalUpLoader());
+          }
+
+          if (state is SettingsLoaded) {
+            final settings = state.settings;
+
+            return ListView(
+              physics: const ClampingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                context.gutter,
+                AppDimens.sectionGap,
+                context.gutter,
+                AppDimens.sectionGap + context.safePadding.bottom,
+              ),
+              children: [
+                _buildSection('Preferences', [
+                  _buildSettingRow(
+                    icon: Icons.palette_rounded,
+                    title: 'Theme Mode',
+                    subtitle: 'System, Light, or Dark theme',
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space8,
+                        vertical: AppDimens.space4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: v.primaryFill,
+                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                        border: Border.all(color: v.primaryBorder!),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: settings.themeMode,
+                          isDense: true,
+                          borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: AppDimens.iconSm,
+                          ),
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.colors.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'system', child: Text('System')),
+                            DropdownMenuItem(value: 'light', child: Text('Light')),
+                            DropdownMenuItem(value: 'dark', child: Text('Dark')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              context.read<SettingsCubit>().updateSettings(
+                                    settings.copyWith(themeMode: val),
+                                  );
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildSettingRow(
+                    icon: Icons.straighten_rounded,
+                    title: 'Height Unit',
+                    subtitle: 'Centimeters or Inches',
+                    trailing: _buildUnitToggle(
+                      labels: const ['cm', 'in'],
+                      isSelected: [
+                        settings.heightUnit == 'cm',
+                        settings.heightUnit == 'in',
+                      ],
+                      onPressed: (index) {
+                        context.read<SettingsCubit>().updateSettings(
+                              settings.copyWith(
+                                heightUnit: index == 0 ? 'cm' : 'in',
+                              ),
+                            );
+                      },
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildSettingRow(
+                    icon: Icons.monitor_weight_rounded,
+                    title: 'Weight Unit',
+                    subtitle: 'Kilograms or Pounds',
+                    trailing: _buildUnitToggle(
+                      labels: const ['kg', 'lbs'],
+                      isSelected: [
+                        settings.weightUnit == 'kg',
+                        settings.weightUnit == 'lbs',
+                      ],
+                      onPressed: (index) {
+                        context.read<SettingsCubit>().updateSettings(
+                              settings.copyWith(
+                                weightUnit: index == 0 ? 'kg' : 'lbs',
+                              ),
+                            );
+                      },
+                    ),
+                  ),
+                ]),
+                _buildSection('Alerts & Integrations', [
+                  _buildSettingRow(
+                    icon: Icons.notifications_active_rounded,
+                    title: 'Notifications',
+                    subtitle: 'Daily check-in and log reminders',
+                    trailing: Switch(
+                      value: settings.notificationsEnabled,
+                      onChanged: (val) {
+                        context.read<SettingsCubit>().updateSettings(
+                              settings.copyWith(notificationsEnabled: val),
+                            );
+                      },
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildSettingRow(
+                    icon: Icons.sync_rounded,
+                    title: 'Health Sync',
+                    subtitle: 'Google Fit / Health Connect integration',
+                    trailing: Switch(
+                      value: settings.healthSyncEnabled,
+                      onChanged: (val) {
+                        context.read<SettingsCubit>().updateSettings(
+                              settings.copyWith(healthSyncEnabled: val),
+                            );
+                      },
+                    ),
+                  ),
+                ]),
+                _buildSection('Info', [
+                  _buildSettingRow(
+                    icon: Icons.info_outline_rounded,
+                    title: 'Version',
+                    subtitle: 'VitalUp v1.0.0 (Production)',
+                  ),
+                ]),
+              ],
+            );
+          }
+
+          return Center(
+            child: Text(
+              'Settings not found',
+              style: context.text.bodyMedium?.copyWith(color: v.grayText),
             ),
-          ),
-          leadingWidth: 56,
-          title: Text(
-            'Settings',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: BlocConsumer<SettingsCubit, SettingsState>(
-          listener: (context, state) {
-            if (state is SettingsError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: theme.colorScheme.error,
-                ),
-              );
-            }
-          },
-          builder: (context, state) {
-            if (state is SettingsLoading || state is SettingsInitial) {
-              return const Center(child: VitalUpLoader());
-            }
-
-            if (state is SettingsLoaded) {
-              final settings = state.settings;
-
-              return ListView(
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.hPadding,
-                  vertical: 10,
-                ),
-                children: [
-                          _buildSectionHeader(theme, 'Preferences'),
-                          _buildGlassCard(
-                            context: context,
-                            children: [
-                              _buildSettingRow(
-                                icon: Icons.palette_rounded,
-                                title: 'Theme Mode',
-                                subtitle: 'System, Light, or Dark theme',
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: settings.themeMode,
-                                      isDense: true,
-                                      borderRadius: BorderRadius.circular(12),
-                                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        fontSize: 12, 
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(value: 'system', child: Text('System')),
-                                        DropdownMenuItem(value: 'light', child: Text('Light')),
-                                        DropdownMenuItem(value: 'dark', child: Text('Dark')),
-                                      ],
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          context.read<SettingsCubit>().updateSettings(
-                                                settings.copyWith(themeMode: val),
-                                              );
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              _buildDivider(),
-                              _buildSettingRow(
-                                icon: Icons.straighten_rounded,
-                                title: 'Height Unit',
-                                subtitle: 'Centimeters or Inches',
-                                trailing: ToggleButtons(
-                                  borderRadius: BorderRadius.circular(8),
-                                  constraints: const BoxConstraints(
-                                    minHeight: 28,
-                                    minWidth: 46,
-                                  ),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  isSelected: [
-                                    settings.heightUnit == 'cm',
-                                    settings.heightUnit == 'in',
-                                  ],
-                                  onPressed: (index) {
-                                    context.read<SettingsCubit>().updateSettings(
-                                          settings.copyWith(
-                                            heightUnit: index == 0 ? 'cm' : 'in',
-                                          ),
-                                        );
-                                  },
-                                  children: const [
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text('cm'),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text('in'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              _buildDivider(),
-                              _buildSettingRow(
-                                icon: Icons.monitor_weight_rounded,
-                                title: 'Weight Unit',
-                                subtitle: 'Kilograms or Pounds',
-                                trailing: ToggleButtons(
-                                  borderRadius: BorderRadius.circular(8),
-                                  constraints: const BoxConstraints(
-                                    minHeight: 28,
-                                    minWidth: 46,
-                                  ),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  isSelected: [
-                                    settings.weightUnit == 'kg',
-                                    settings.weightUnit == 'lbs',
-                                  ],
-                                  onPressed: (index) {
-                                    context.read<SettingsCubit>().updateSettings(
-                                          settings.copyWith(
-                                            weightUnit: index == 0 ? 'kg' : 'lbs',
-                                          ),
-                                        );
-                                  },
-                                  children: const [
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text('kg'),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text('lbs'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          _buildSectionHeader(theme, 'Alerts & Integrations'),
-                          _buildGlassCard(
-                            context: context,
-                            children: [
-                              _buildSettingRow(
-                                icon: Icons.notifications_active_rounded,
-                                title: 'Notifications',
-                                subtitle: 'Daily check-in and log reminders',
-                                trailing: Transform.scale(
-                                  scale: 0.75,
-                                  child: Switch(
-                                    value: settings.notificationsEnabled,
-                                    onChanged: (val) {
-                                      context.read<SettingsCubit>().updateSettings(
-                                            settings.copyWith(notificationsEnabled: val),
-                                          );
-                                    },
-                                  ),
-                                ),
-                              ),
-                              _buildDivider(),
-                              _buildSettingRow(
-                                icon: Icons.sync_rounded,
-                                title: 'Health Sync',
-                                subtitle: 'Google Fit / Health Connect integration',
-                                trailing: Transform.scale(
-                                  scale: 0.75,
-                                  child: Switch(
-                                    value: settings.healthSyncEnabled,
-                                    onChanged: (val) {
-                                      context.read<SettingsCubit>().updateSettings(
-                                            settings.copyWith(healthSyncEnabled: val),
-                                          );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          _buildSectionHeader(theme, 'Info'),
-                          _buildGlassCard(
-                            context: context,
-                            children: [
-                              _buildSettingRow(
-                                icon: Icons.info_outline_rounded,
-                                title: 'Version',
-                                subtitle: 'VitalUp v1.0.0 (Production)',
-                              ),
-                            ],
-                          ),
-                ],
-              );
-            }
-
-            return const Center(child: Text('Settings not found'));
-          },
-        ),
+          );
+        },
       ),
     );
   }
