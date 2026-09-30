@@ -1,36 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
-/// Small circular icon button used for the back button and similar
-/// floating controls over the map.
+/// Floating circular control over the map — Figma `button/ ArrowLeft`
+/// (48dp circle, "shadow black y", 24dp icon) on an opaque surface so it
+/// stays legible over map tiles.
 class RoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
+  final String? tooltip;
 
   const RoundIconButton({
     super.key,
     required this.icon,
     required this.onPressed,
+    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      elevation: 4,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onPressed,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          child: Icon(icon, color: theme.colorScheme.onSurface, size: 18),
+    final button = Container(
+      width: AppDimens.backButtonSize,
+      height: AppDimens.backButtonSize,
+      decoration: BoxDecoration(
+        color: context.vColors.surfaceElevated,
+        shape: BoxShape.circle,
+        boxShadow: AppShadows.shadowY,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Icon(
+            icon,
+            color: context.colors.onSurface,
+            size: AppDimens.iconLg,
+          ),
         ),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -38,34 +48,13 @@ class RoundIconButton extends StatelessWidget {
 class ZoomResetButton extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const ZoomResetButton({
-    super.key,
-    required this.onPressed,
-  });
+  const ZoomResetButton({super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      elevation: 4,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onPressed,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.my_location_rounded,
-            color: theme.colorScheme.onSurface,
-            size: 18,
-          ),
-        ),
-      ),
+    return RoundIconButton(
+      icon: Icons.my_location_rounded,
+      onPressed: onPressed,
     );
   }
 }
@@ -88,29 +77,23 @@ class OfflineMapIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final customColors = theme.extension<VitalUpColors>();
-    IconData icon;
-    Color color;
+    final IconData icon;
+    final Color? color;
 
     if (isReady) {
       icon = Icons.offline_pin_rounded;
-      color = const Color(0xFF47B85A); // standard success green is fine
+      color = context.vColors.success;
     } else if (isDownloading) {
       icon = Icons.downloading_rounded;
-      color = theme.colorScheme.primary; // Brand primary cyan
+      color = context.colors.primary;
     } else {
       icon = Icons.download_for_offline_rounded;
-      color = customColors?.grayText ?? const Color(0xFF777777);
+      color = context.vColors.grayText;
     }
 
     return GestureDetector(
       onTap: onTap,
-      child: Icon(
-        icon,
-        color: color,
-        size: 24,
-      ),
+      child: Icon(icon, color: color, size: AppDimens.iconLg),
     );
   }
-}
+}

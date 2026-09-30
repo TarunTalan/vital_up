@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
-import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
 
 class CustomizeLayoutPage extends StatefulWidget {
   final WorkoutPrefsNotifier prefsNotifier;
@@ -20,7 +25,9 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
   void initState() {
     super.initState();
     _selected = List.from(widget.prefsNotifier.value.selectedMetrics);
-    _unselected = StatMetric.values.where((m) => !_selected.contains(m)).toList();
+    _unselected = StatMetric.values
+        .where((m) => !_selected.contains(m))
+        .toList();
   }
 
   void _save() {
@@ -32,18 +39,14 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
     setState(() {
       if (isSelected) {
         if (_selected.length >= 6) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Maximum of 6 metrics can be displayed')),
-          );
+          showErrorSnackBar(context, 'Maximum of 6 metrics can be displayed');
           return;
         }
         _unselected.remove(metric);
         _selected.add(metric);
       } else {
         if (_selected.length <= 1) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('At least 1 metric must be displayed')),
-          );
+          showErrorSnackBar(context, 'At least 1 metric must be displayed');
           return;
         }
         _selected.remove(metric);
@@ -54,342 +57,193 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
 
     // Generate layout preview rows
     final List<List<StatMetric>> previewRows = [];
     for (var i = 0; i < _selected.length; i += 3) {
-      previewRows.add(_selected.sublist(
-        i,
-        (i + 3) > _selected.length ? _selected.length : (i + 3),
-      ));
+      previewRows.add(
+        _selected.sublist(
+          i,
+          (i + 3) > _selected.length ? _selected.length : (i + 3),
+        ),
+      );
     }
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8.0),
-          child: Center(
-            child: BackIcon(
-              onClick: () => Navigator.of(context).pop(),
-            ),
-          ),
+    return AppScaffold(
+      header: AppPageHeader(
+        title: 'Customize Layout',
+        action: AppHeaderAction(
+          icon: const Icon(Icons.check_rounded),
+          tooltip: 'Save',
+          onTap: _save,
         ),
-        title: Text(
-          'CUSTOMIZE LAYOUT',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
-            color: colors.onSurface,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: Text(
-              'SAVE',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: colors.primary,
-                letterSpacing: 1,
+      ),
+      scrollable: false,
+      padBody: false,
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Preview panel
+            AppCard(
+              margin: EdgeInsets.fromLTRB(
+                context.gutter,
+                AppDimens.space16,
+                context.gutter,
+                AppDimens.space8,
+              ),
+              padding: AppDimens.cardPaddingCompact,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppCaption('Layout preview'),
+                  const SizedBox(height: AppDimens.space12),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '00:05:42',
+                      style: AppTextStyles.metric.copyWith(
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space2),
+                  Text(
+                    'Duration',
+                    style: context.text.labelSmall?.copyWith(
+                      color: v.grayText,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  ...previewRows.map((rowMetrics) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: AppDimens.space12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: rowMetrics.map((metric) {
+                          final (value, label) = _getMetricPreviewData(metric);
+                          return Expanded(
+                            child: StatColumn(value: value, label: label),
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/bg.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // ── Preview Panel ───────────────────────────────────────────────
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: theme.brightness == Brightness.light 
-                        ? Colors.white.withValues(alpha: 0.72) 
-                        : colors.surface.withValues(alpha: 0.72),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(
-                      color: (theme.brightness == Brightness.light 
-                          ? const Color(0xFFD8D8D8) 
-                          : colors.outline).withValues(alpha: 0.72),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: theme.brightness == Brightness.light ? 0.04 : 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'LAYOUT PREVIEW',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Duration preview
-                      Text(
-                        '00:05:42',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w600,
-                          height: 1.0,
-                          color: colors.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'DURATION',
-                        style: TextStyle(
-                          color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                          fontSize: 8.5,
-                          letterSpacing: 2.0,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Rows preview
-                      ...previewRows.map((rowMetrics) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: rowMetrics.map((metric) {
-                              final (value, label) = _getMetricPreviewData(metric);
-                              return Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        value,
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.0,
-                                          color: colors.onSurface,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      label,
-                                      maxLines: 2,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                                        fontSize: 8.0,
-                                        letterSpacing: 0.3,
-                                        fontWeight: FontWeight.w500,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                
-                // ── Active Metrics Header ─────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        'ACTIVE STATS (DRAG TO REORDER)',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                          color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${_selected.length}/6',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: colors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
-                // ── Active Metrics List ──────────────────────────────────────────
-                Expanded(
-                  child: Theme(
-                    data: theme.copyWith(
-                      canvasColor: Colors.transparent, // Prevents white background during drag
-                    ),
-                    child: ReorderableListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _selected.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (oldIndex < newIndex) {
-                            newIndex -= 1;
-                          }
-                          final item = _selected.removeAt(oldIndex);
-                          _selected.insert(newIndex, item);
-                        });
-                      },
-                      itemBuilder: (context, index) {
-                        final metric = _selected[index];
-                        return Card(
-                          key: ValueKey(metric),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          color: theme.brightness == Brightness.light
-                              ? Colors.white.withValues(alpha: 0.72)
-                              : colors.surface.withValues(alpha: 0.72),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(
-                              color: (theme.brightness == Brightness.light
-                                  ? const Color(0xFFD8D8D8)
-                                  : colors.outline).withValues(alpha: 0.72),
-                            ),
-                          ),
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.drag_handle_rounded,
-                              color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                            ),
-                            title: Text(
-                              metric.label,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: colors.onSurface,
-                              ),
-                            ),
-                            trailing: IconButton(
-                              icon: Icon(
-                                Icons.remove_circle_outline_rounded,
-                                color: colors.error,
-                              ),
-                              onPressed: () => _toggleMetric(metric, false),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+            // Active metrics header
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.gutter,
+                vertical: AppDimens.space8,
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: AppCaption('Active stats (drag to reorder)'),
                   ),
-                ),
-
-                // ── Available Metrics Section ────────────────────────────────────
-                if (_unselected.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'AVAILABLE STATS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                          color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 90,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _unselected.length,
-                      itemBuilder: (context, index) {
-                        final metric = _unselected[index];
-                        return Container(
-                          width: 140,
-                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                          child: InkWell(
-                            onTap: () => _toggleMetric(metric, true),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Ink(
-                              decoration: BoxDecoration(
-                                color: theme.brightness == Brightness.light
-                                    ? Colors.white.withValues(alpha: 0.72)
-                                    : colors.surface.withValues(alpha: 0.72),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: (theme.brightness == Brightness.light
-                                      ? const Color(0xFFD8D8D8)
-                                      : colors.outline).withValues(alpha: 0.72),
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      metric.label,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: colors.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Icon(
-                                      Icons.add_circle_outline_rounded,
-                                      color: colors.primary,
-                                      size: 20,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                  const SizedBox(width: AppDimens.space8),
+                  Text(
+                    '${_selected.length}/6',
+                    style: context.text.labelMedium?.copyWith(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+
+            // Active metrics list
+            Expanded(
+              child: Theme(
+                data: context.theme.copyWith(
+                  canvasColor: Colors
+                      .transparent, // Prevents white background during drag
+                ),
+                child: ReorderableListView.builder(
+                  padding: context.pagePadding,
+                  itemCount: _selected.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (oldIndex < newIndex) {
+                        newIndex -= 1;
+                      }
+                      final item = _selected.removeAt(oldIndex);
+                      _selected.insert(newIndex, item);
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final metric = _selected[index];
+                    return Padding(
+                      key: ValueKey(metric),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppDimens.space4,
+                      ),
+                      child: AppCard(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.drag_handle_rounded,
+                            color: v.grayText,
+                          ),
+                          title: Text(
+                            metric.label,
+                            style: context.text.bodyMedium?.copyWith(
+                              color: colors.onSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Remove',
+                            icon: Icon(
+                              Icons.remove_circle_outline_rounded,
+                              color: colors.error,
+                            ),
+                            onPressed: () => _toggleMetric(metric, false),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Available metrics
+            if (_unselected.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  context.gutter,
+                  AppDimens.space8,
+                  context.gutter,
+                  AppDimens.sectionGap,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AppCaption('Available stats'),
+                    const SizedBox(height: AppDimens.space8),
+                    Wrap(
+                      spacing: AppDimens.space8,
+                      runSpacing: AppDimens.space8,
+                      children: [
+                        for (final metric in _unselected)
+                          _AvailableMetricChip(
+                            label: metric.label,
+                            onTap: () => _toggleMetric(metric, true),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -407,4 +261,49 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
   }
 }
 
+class _AvailableMetricChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
 
+  const _AvailableMetricChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    return Material(
+      color: v.glassFill,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+        side: BorderSide(color: v.glassBorder!),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space12,
+            vertical: AppDimens.space8,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_circle_outline_rounded,
+                color: context.colors.primary,
+                size: AppDimens.iconSm,
+              ),
+              const SizedBox(width: AppDimens.space6),
+              Text(
+                label,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

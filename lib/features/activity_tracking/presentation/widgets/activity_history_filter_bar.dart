@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'dart:ui';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
@@ -20,23 +20,25 @@ class ActivityHistoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final v = context.vColors;
+    final chipHeight = MediaQuery.textScalerOf(
+      context,
+    ).scale(AppDimens.headerActionSize - AppDimens.space4);
 
     return Column(
       children: [
         SizedBox(
-          height: 40,
+          height: chipHeight,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: context.pagePadding,
             children: [
               _FilterChip(
                 label: 'All',
                 selected: selectedType == null,
                 onTap: () => onTypeSelected(null),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppDimens.space8),
               for (final type in ActivityType.values) ...[
                 _FilterChip(
                   label: type.label,
@@ -44,50 +46,29 @@ class ActivityHistoryFilterBar extends StatelessWidget {
                   selected: selectedType == type,
                   onTap: () => onTypeSelected(type),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppDimens.space8),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppDimens.space12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.hPadding),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.light
-                      ? Colors.white.withValues(alpha: 0.80)
-                      : colors.surface.withValues(alpha: 0.80),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: (theme.brightness == Brightness.light
-                            ? const Color(0xFFD8D8D8)
-                            : colors.outline)
-                        .withValues(alpha: 0.72),
-                  ),
-                ),
-                child: TextField(
-                  onChanged: onSearchChanged,
-                  style: TextStyle(color: colors.onSurface, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search by tag or note…',
-                    hintStyle: TextStyle(
-                        color: colors.onSurface.withValues(alpha: 0.4),
-                        fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        size: 20,
-                        color: colors.onSurface.withValues(alpha: 0.5)),
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 12),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                  ),
-                ),
+          padding: context.pagePadding,
+          child: TextField(
+            onChanged: onSearchChanged,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Search by tag or note…',
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: AppDimens.iconMd,
+                color: v.grayText,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: AppDimens.space12,
+                horizontal: AppDimens.space16,
               ),
             ),
           ),
@@ -112,42 +93,41 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final v = context.vColors;
+    final fg = selected ? v.buttonText! : context.colors.onSurface;
+    final radius = BorderRadius.circular(AppDimens.radiusPill);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? colors.primary : colors.surface,
-          border: Border.all(
-            color: selected ? colors.primary : colors.outline.withOpacity(0.5),
-          ),
-          borderRadius: BorderRadius.circular(20),
+    return Material(
+      color: selected ? context.colors.primary : v.glassFill,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: selected ? context.colors.primary : v.glassBorder!,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: selected ? (customColors?.buttonText ?? Colors.black) : colors.onSurface),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-                color: selected ? (customColors?.buttonText ?? Colors.black) : colors.onSurface,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppDimens.space12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: AppDimens.iconXs, color: fg),
+                const SizedBox(width: AppDimens.space6),
+              ],
+              Text(
+                label,
+                style: context.text.labelMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-}
+}
