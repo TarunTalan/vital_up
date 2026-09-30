@@ -29,7 +29,7 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final smokes = await _onboardingDataStore.getSmokes();
     final bpTop = await _onboardingDataStore.getBloodPressureTop();
     final bpBottom = await _onboardingDataStore.getBloodPressureBottom();
-    final bpm = await _onboardingDataStore.getBpm();
+    final dietaryPreference = await _onboardingDataStore.getDietaryPreference();
     final activity = await _onboardingDataStore.getActivity();
     final sleep = await _onboardingDataStore.getSleep();
 
@@ -51,7 +51,7 @@ class OnboardingCubit extends Cubit<OnboardingData> {
       smokes: smokes,
       bloodPressureTop: bpTop,
       bloodPressureBottom: bpBottom,
-      bpm: bpm,
+      dietaryPreference: dietaryPreference,
       activity: activity,
       sleep: sleep,
       currentStep: savedStep.isEmpty ? "personal_details" : savedStep,
@@ -142,24 +142,24 @@ class OnboardingCubit extends Cubit<OnboardingData> {
   Future<void> updateHealthVitals({
     String? bpTop,
     String? bpBottom,
-    String? bpm,
+    String? dietaryPreference,
     String? activity,
     String? sleep,
   }) async {
     final newTop = bpTop ?? state.bloodPressureTop;
     final newBottom = bpBottom ?? state.bloodPressureBottom;
-    final newBpm = bpm ?? state.bpm;
+    final newDietaryPreference = dietaryPreference ?? state.dietaryPreference;
     final newActivity = activity ?? state.activity;
     final newSleep = sleep ?? state.sleep;
     
     emit(state.copyWith(
       bloodPressureTop: newTop,
       bloodPressureBottom: newBottom,
-      bpm: newBpm,
+      dietaryPreference: newDietaryPreference,
       activity: newActivity,
       sleep: newSleep,
     ));
-    await _onboardingDataStore.saveHealthVitals(newTop, newBottom, newBpm, newActivity, newSleep);
+    await _onboardingDataStore.saveHealthVitals(newTop, newBottom, newDietaryPreference, newActivity, newSleep);
   }
 
   Future<void> setCurrentStep(String step) async {

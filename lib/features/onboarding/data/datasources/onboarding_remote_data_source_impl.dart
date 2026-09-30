@@ -40,7 +40,7 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
         'smokes': data.smokes,
         'blood_pressure_top': data.bloodPressureTop,
         'blood_pressure_bottom': data.bloodPressureBottom,
-        'bpm': data.bpm,
+        'dietary_preference': data.dietaryPreference,
         'activity': data.activity,
         'sleep': data.sleep,
         'onboarding_completed': true,

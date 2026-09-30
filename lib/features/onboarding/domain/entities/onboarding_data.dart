@@ -20,7 +20,7 @@ class OnboardingData extends Equatable {
   final String smokes;
   final String bloodPressureTop;
   final String bloodPressureBottom;
-  final String bpm;
+  final String dietaryPreference;
   final String activity;
   final String sleep;
   final String currentStep;
@@ -45,7 +45,7 @@ class OnboardingData extends Equatable {
     this.smokes = "",
     this.bloodPressureTop = "",
     this.bloodPressureBottom = "",
-    this.bpm = "",
+    this.dietaryPreference = "",
     this.activity = "",
     this.sleep = "",
     this.currentStep = "loading",
@@ -71,7 +71,7 @@ class OnboardingData extends Equatable {
     String? smokes,
     String? bloodPressureTop,
     String? bloodPressureBottom,
-    String? bpm,
+    String? dietaryPreference,
     String? activity,
     String? sleep,
     String? currentStep,
@@ -96,7 +96,7 @@ class OnboardingData extends Equatable {
       smokes: smokes ?? this.smokes,
       bloodPressureTop: bloodPressureTop ?? this.bloodPressureTop,
       bloodPressureBottom: bloodPressureBottom ?? this.bloodPressureBottom,
-      bpm: bpm ?? this.bpm,
+      dietaryPreference: dietaryPreference ?? this.dietaryPreference,
       activity: activity ?? this.activity,
       sleep: sleep ?? this.sleep,
       currentStep: currentStep ?? this.currentStep,
@@ -124,7 +124,7 @@ class OnboardingData extends Equatable {
         smokes,
         bloodPressureTop,
         bloodPressureBottom,
-        bpm,
+        dietaryPreference,
         activity,
         sleep,
         currentStep,

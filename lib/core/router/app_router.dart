@@ -15,7 +15,7 @@ import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_p
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/blood_pressure_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/bpm_page.dart';
+import 'package:vital_up/features/onboarding/presentation/pages/dietary_preference_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/extra_details_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/height_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/info_and_permission_page.dart';
@@ -209,17 +209,17 @@ class AppRouter {
           key: state.pageKey,
           child: BloodPressurePage(
             onNext: () => context.goNamed('health-goals'),
-            onBack: () => context.goNamed('health-bpm'),
+            onBack: () => context.goNamed('health-dietary-preference'),
             onSkip: () => context.goNamed('health-goals'),
           ),
         ),
       ),
       GoRoute(
-        path: '/health-onboarding/bpm',
-        name: 'health-bpm',
+        path: '/health-onboarding/dietary-preference',
+        name: 'health-dietary-preference',
         pageBuilder: (context, state) => FadeSlidePageRoute(
           key: state.pageKey,
-          child: BpmPage(
+          child: DietaryPreferencePage(
             onNext: () => context.goNamed('health-blood-pressure'),
             onBack: () => context.goNamed('health-weight'),
             onSkip: () => context.goNamed('health-blood-pressure'),

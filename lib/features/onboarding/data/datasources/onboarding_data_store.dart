@@ -17,7 +17,7 @@ abstract class OnboardingDataStore {
   Future<String> getSmokes();
   Future<String> getBloodPressureTop();
   Future<String> getBloodPressureBottom();
-  Future<String> getBpm();
+  Future<String> getDietaryPreference();
   Future<String> getActivity();
   Future<String> getSleep();
 
@@ -26,7 +26,7 @@ abstract class OnboardingDataStore {
   Future<void> saveHeight(String height, String unit);
   Future<void> saveGoals(String calorieGoal, String targetWeight, String targetWeightUnit, String goalDurationMonths);
   Future<void> saveExtraDetails(String conditions, String medicines, String allergies, String smokes);
-  Future<void> saveHealthVitals(String bpTop, String bpBottom, String bpm, String activity, String sleep);
+  Future<void> saveHealthVitals(String bpTop, String bpBottom, String dietaryPreference, String activity, String sleep);
   
   Future<void> setCurrentStep(String step);
   Future<void> setOnboardingCompleted(bool completed);
