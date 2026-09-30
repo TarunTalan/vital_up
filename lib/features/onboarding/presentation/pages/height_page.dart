@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
 class HeightPage extends StatefulWidget {
@@ -119,21 +121,18 @@ class _HeightContentState extends State<_HeightContent> {
           flex: 1,
           child: Builder(
             builder: (context) {
-              final physicalHeight = MediaQuery.of(context).size.height + MediaQuery.of(context).viewInsets.bottom;
+              final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
               final svgHeight = physicalHeight * 0.35;
               return SvgPicture.asset(
                 'assets/icons/height.svg',
                 height: svgHeight,
                 fit: BoxFit.contain,
-                placeholderBuilder: (context) => SizedBox(
-                  height: svgHeight, 
-                  child: Placeholder(fallbackHeight: svgHeight, fallbackWidth: 100),
-                ),
+                placeholderBuilder: (context) => SizedBox(height: svgHeight),
               );
             }
           ),
         ),
-        const SizedBox(width: OnboardingStyle.controlGap),
+        const SizedBox(width: AppDimens.space12),
         // Inputs
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -153,7 +152,7 @@ class _HeightContentState extends State<_HeightContent> {
                 suffixText: "ft",
                 isError: widget.showErrors && !valid,
               ),
-              const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
+              const SizedBox(height: AppDimens.space8),
               OnboardingNumberField<int>(
                 value: _inches,
                 onValueChange: (val) {
@@ -181,7 +180,7 @@ class _HeightContentState extends State<_HeightContent> {
                 isError: widget.showErrors && !valid,
               ),
             ],
-            const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
+            const SizedBox(height: AppDimens.space8),
             UnitDropdown(
               selectedUnit: _selectedUnit,
               units: const ["cm", "ft"],

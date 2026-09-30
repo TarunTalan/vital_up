@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
@@ -58,26 +59,16 @@ class _BpmPageState extends State<BpmPage> {
               });
             },
           ),
-          const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
-          Text(
-            "Beats per minute",
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: Colors.grey),
-          ),
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space6),
+          const OnboardingFieldCaption("Beats per minute"),
+          const SizedBox(height: AppDimens.space32),
 
-          SizedBox(
-            width:
-                OnboardingStyle.numberFieldWidth +
-                OnboardingStyle.numberFieldHeight,
-            height:
-                OnboardingStyle.numberFieldWidth +
-                OnboardingStyle.numberFieldHeight,
-            child: const HeartAnimation(),
+          const SizedBox.square(
+            dimension: AppDimens.onboardingIllustration,
+            child: HeartAnimation(),
           ),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space32),
 
           const NoteRow(
             text:
@@ -133,10 +124,7 @@ class _HeartAnimationState extends State<HeartAnimation>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final imagePath = isDark
-        ? 'assets/icons/heart.svg'
-        : 'assets/icons/heart.svg';
+    const imagePath = 'assets/icons/heart.svg';
 
     return AnimatedBuilder(
       animation: _controller,
@@ -161,8 +149,8 @@ class _HeartAnimationState extends State<HeartAnimation>
       child: SvgPicture.asset(
         imagePath,
         fit: BoxFit.contain,
-        width: 162,
-        height: 162,
+        width: AppDimens.onboardingIllustration,
+        height: AppDimens.onboardingIllustration,
       ),
     );
   }
@@ -188,11 +176,9 @@ class _GlowPainter extends CustomPainter {
       ..shader = RadialGradient(
         colors: [
           // Use the raw opacity value (hits 1.0 fully when enlarged)
-          const Color(0xFFFF3DBF).withValues(alpha: opacity),
-          const Color(
-            0xFFFF6FD8,
-          ).withValues(alpha: opacity * 0.3), // Lighter midway
-          const Color(0x00FFD6F1), // Fade to transparent
+          AppColors.heartGlow.withValues(alpha: opacity),
+          AppColors.heartGlowSoft.withValues(alpha: opacity * 0.3),
+          AppColors.heartGlowSoft.withValues(alpha: 0),
         ],
         stops: const [0.0, 0.35, 1.0], // Starts fading much earlier
       ).createShader(Rect.fromCircle(center: center, radius: drawRadius));

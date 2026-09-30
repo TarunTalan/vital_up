@@ -62,7 +62,6 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
       title: "Any extra details?",
       subtitle: "This helps us tailor your experience.",
       nextEnabled: true,
-      titleBottomSpace: 40.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -79,7 +78,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
               placeholder: "e.g. Diabetes, asthma, blood pressure",
               maxLength: 200,
             ),
-            const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+            const SizedBox(height: AppDimens.sectionGap),
             
             OnboardingTextField(
               label: "Any regular medicines?",
@@ -93,7 +92,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
               placeholder: "e.g. Metformin, insulin, inhaler",
               maxLength: 200,
             ),
-            const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+            const SizedBox(height: AppDimens.sectionGap),
             
             OnboardingTextField(
               label: "Any allergies?",
@@ -107,16 +106,10 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
               placeholder: "e.g. food or medicine allergy",
               maxLength: 200,
             ),
-            const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+            const SizedBox(height: AppDimens.sectionGap),
             
-            Text(
-              "Do you smoke?",
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontSize: OnboardingStyle.labelFontSize,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 6.0),
+            Text("Do you smoke?", style: context.text.titleSmall),
+            const SizedBox(height: AppDimens.inputLabelGap),
             
             Row(
               children: [
@@ -128,7 +121,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
                     _saveData();
                   },
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppDimens.space8),
                 _buildOptionButton(
                   text: "Sometimes",
                   isSelected: smoking == "Sometimes",
@@ -137,7 +130,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
                     _saveData();
                   },
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppDimens.space8),
                 _buildOptionButton(
                   text: "Often",
                   isSelected: smoking == "Often",
@@ -148,7 +141,7 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+            const SizedBox(height: AppDimens.sectionGap),
           ],
         ),
       );
@@ -159,46 +152,14 @@ class _ExtraDetailsPageState extends State<ExtraDetailsPage> {
     required bool isSelected,
     required VoidCallback onClick,
   }) {
-    const gradientStart = Color.fromRGBO(25, 195, 224, 0.08);
-    const gradientEnd = Color.fromRGBO(25, 195, 224, 0.7);
-    const selectedBorderColor = Color.fromRGBO(25, 195, 224, 0.27);
-    const bgColor = OnboardingColors.fieldBackground;
-    const borderColor = OnboardingColors.fieldBorder;
-
     return Expanded(
-      child: InkWell(
+      child: OnboardingOptionTile(
+        label: text,
+        isSelected: isSelected,
+        minHeight: AppDimens.inputHeight,
+        padding: const EdgeInsets.symmetric(horizontal: AppDimens.space8),
+        labelStyle: context.text.bodyMedium,
         onTap: onClick,
-        borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-        child: Container(
-          height: AppTheme.responsiveInputHeight(context),
-          decoration: BoxDecoration(
-            color: isSelected ? null : bgColor,
-            gradient: isSelected
-                ? const LinearGradient(
-                    colors: [gradientStart, gradientEnd],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-            border: Border.all(
-              color: isSelected ? selectedBorderColor : borderColor,
-              width: 1.0,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            text,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface, 
-              fontSize: 14.0,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        ),
       ),
     );
   }

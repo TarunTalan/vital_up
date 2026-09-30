@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -67,8 +66,6 @@ class _GoalsPageState extends State<GoalsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final note = _suggestionNote();
 
     return OnboardingLayout(
@@ -91,8 +88,8 @@ class _GoalsPageState extends State<GoalsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Calorie Goal ──────────────────────────────────
-          _SectionLabel('Daily Calorie Goal'),
-          const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
+          const _SectionLabel('Daily Calorie Goal'),
+          const SizedBox(height: AppDimens.inputLabelGap),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -104,19 +101,20 @@ class _GoalsPageState extends State<GoalsPage> {
                   max: 5000,
                   onValueChange: (v) => setState(() => calorieGoal = v),
                 ),
-                const SizedBox(width: 12),
-                Text('kcal / day',
-                    style: TextStyle(
-                        color: colors.onSurface.withValues(alpha: 0.6),
-                        fontSize: 14)),
+                const SizedBox(width: AppDimens.space12),
+                Text(
+                  'kcal / day',
+                  style: context.text.bodyMedium
+                      ?.copyWith(color: context.vColors.grayText),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+          const SizedBox(height: AppDimens.sectionGap),
 
           // ── Target Weight ─────────────────────────────────
-          _SectionLabel('Target Weight'),
-          const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
+          const _SectionLabel('Target Weight'),
+          const SizedBox(height: AppDimens.inputLabelGap),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -128,8 +126,7 @@ class _GoalsPageState extends State<GoalsPage> {
                   max: 250,
                   onValueChange: (v) => setState(() => targetWeight = v),
                 ),
-                const SizedBox(width: 12),
-                // Unit toggle
+                const SizedBox(width: AppDimens.space12),
                 _UnitToggle(
                   selected: targetWeightUnit,
                   options: const ['kg', 'lbs'],
@@ -138,59 +135,33 @@ class _GoalsPageState extends State<GoalsPage> {
               ],
             ),
           ),
-          const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+          const SizedBox(height: AppDimens.sectionGap),
 
           // ── Goal Duration ─────────────────────────────────
-          _SectionLabel('Achieve in'),
-          const SizedBox(height: OnboardingStyle.sectionSpacingSmall),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _durationOptions.map((months) {
-                final selected = months == goalDurationMonths;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => goalDurationMonths = months),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? colors.primary
-                            : OnboardingColors.fieldBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: selected
-                              ? colors.primary
-                              : OnboardingColors.fieldBorder,
-                        ),
-                      ),
-                      child: Text(
-                        months == 1 ? '1 month' : '$months months',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: selected
-                              ? theme.extension<VitalUpColors>()?.buttonText ??
-                                  Colors.black
-                              : colors.onSurface,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+          const _SectionLabel('Achieve in'),
+          const SizedBox(height: AppDimens.inputLabelGap),
+          Wrap(
+            spacing: AppDimens.space8,
+            runSpacing: AppDimens.space8,
+            children: _durationOptions.map((months) {
+              return OnboardingOptionTile(
+                label: months == 1 ? '1 month' : '$months months',
+                isSelected: months == goalDurationMonths,
+                minHeight: AppDimens.buttonHeight,
+                radius: AppDimens.radiusButton,
+                padding: AppDimens.buttonPadding,
+                labelStyle: context.text.bodyMedium,
+                expand: false,
+                onTap: () => setState(() => goalDurationMonths = months),
+              );
+            }).toList(),
           ),
 
           // ── Smart suggestion ──────────────────────────────
-          if (note.isNotEmpty) ...
-            [
-              const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
-              NoteRow(text: note),
-            ],
+          if (note.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.sectionGap),
+            NoteRow(text: note),
+          ],
         ],
       ),
     );
@@ -203,15 +174,7 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-        letterSpacing: 0.3,
-      ),
-    );
+    return Text(text, style: context.text.titleSmall);
   }
 }
 
@@ -228,44 +191,23 @@ class _UnitToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: options.map((opt) {
-        final isSelected = opt == selected;
-        return GestureDetector(
-          onTap: () => onChanged(opt),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: const EdgeInsets.only(right: 6),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? colors.primary
-                  : OnboardingColors.fieldBackground,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected ? colors.primary : OnboardingColors.fieldBorder,
-              ),
-            ),
-            child: Text(
-              opt,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? Theme.of(context)
-                            .extension<VitalUpColors>()
-                            ?.buttonText ??
-                        Colors.black
-                    : colors.onSurface,
-              ),
-            ),
+        return Padding(
+          padding: const EdgeInsets.only(right: AppDimens.space6),
+          child: OnboardingOptionTile(
+            label: opt,
+            isSelected: opt == selected,
+            minHeight: AppDimens.buttonHeight,
+            radius: AppDimens.radiusButton,
+            padding: AppDimens.buttonPadding,
+            labelStyle: context.text.bodyMedium,
+            expand: false,
+            onTap: () => onChanged(opt),
           ),
         );
       }).toList(),
     );
   }
 }
-
-

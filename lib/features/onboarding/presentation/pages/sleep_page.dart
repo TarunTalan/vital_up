@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
@@ -48,7 +50,7 @@ class _SleepPageState extends State<SleepPage> {
       subtitle: "This helps us suggest a healthy rest schedule for you.",
       nextEnabled: sleep != null,
       fullBleedChild: true,
-      titleBottomSpace: 20.0,
+      titleBottomSpace: AppDimens.sectionGap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -56,14 +58,14 @@ class _SleepPageState extends State<SleepPage> {
           // Image
           SvgPicture.asset(
             'assets/icons/sleep.svg',
-            width: MediaQuery.of(context).size.width,
+            width: context.screenWidth,
             fit: BoxFit.fitWidth,
           ),
           
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space32),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
+            padding: context.pagePadding,
             child: Column(
               children: [
 
@@ -78,15 +80,10 @@ class _SleepPageState extends State<SleepPage> {
             },
             showButtons: true,
           ),
-          const SizedBox(height: 6.0),
-          Text(
-            "Hours per night",
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.grey,
-            ),
-          ),
+          const SizedBox(height: AppDimens.space6),
+          const OnboardingFieldCaption("Hours per night"),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space32),
 
           // note row
           const NoteRow(
