@@ -1,0 +1,190 @@
+import 'package:flutter/material.dart';
+
+/// Raw colour palette — single source of truth, taken from the VitalUp Figma
+/// file (page "design" → section "light theme", node 206:4919).
+///
+/// Widgets should NOT reference these directly for surface/text colours —
+/// use `Theme.of(context).colorScheme` or the [VitalUpColors] extension
+/// (via `context.vColors`) so dark mode keeps working. Use these constants
+/// only inside the theme layer or for brand accents that never change.
+class AppColors {
+  AppColors._();
+
+  // ---------------------------------------------------------------------------
+  // Brand
+  // ---------------------------------------------------------------------------
+  /// Primary cyan — Figma button/pri background.
+  static const Color primary = Color(0xFF19C3E0);
+
+  /// Darker cyan used for active input text — Figma #149CB3.
+  static const Color primaryActive = Color(0xFF149CB3);
+
+  /// Teal — secondary button text, filled-input helper text. Figma #0F7586.
+  static const Color teal = Color(0xFF0F7586);
+
+  /// Light cyan highlight used inside glass gradients — Figma #B8ECF5.
+  static const Color highlight = Color(0xFFB8ECF5);
+  static const Color highlightDark = Color(0xFF0D515D);
+
+  // ---------------------------------------------------------------------------
+  // Neutrals (Figma variables: darker / lighter / grey text)
+  // ---------------------------------------------------------------------------
+  static const Color darker = Color(0xFF1C1C1C);
+  static const Color lighter = Color(0xFFFEFEFE);
+  static const Color greyText = Color(0xFF757575);
+  static const Color lightText = Color(0xFFE3E3E3);
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color black = Color(0xFF000000);
+
+  /// Text colour on the primary button — Figma #0C0C0C.
+  static const Color buttonText = Color(0xFF0C0C0C);
+
+  /// Secondary button outline — Figma #B9B9B9.
+  static const Color secondaryBorder = Color(0xFFB9B9B9);
+
+  /// Base grey used for glass fills/borders — Figma #BABABA.
+  static const Color glassBase = Color(0xFFBABABA);
+
+  /// Toast / hairline outline — Figma #D8D8D8.
+  static const Color outline = Color(0xFFD8D8D8);
+  static const Color outlineDark = Color(0xFF343434);
+
+  /// Dark surfaces.
+  static const Color surfaceDark = Color(0xFF1C1C1C);
+  static const Color surfaceDarkElevated = Color(0xFF2A2A2A);
+
+  // ---------------------------------------------------------------------------
+  // Glass (Figma card/*, input/text, header)
+  // ---------------------------------------------------------------------------
+  /// rgba(186,186,186,0.13) — card / input fill.
+  static const Color glassFill = Color(0x21BABABA);
+
+  /// rgba(186,186,186,0.27) — card / input border.
+  static const Color glassBorder = Color(0x45BABABA);
+
+  /// rgba(186,186,186,0.30) — divider.
+  static const Color divider = Color(0x4DBABABA);
+
+  /// rgba(186,186,186,0.20) — progress-bar track.
+  static const Color track = Color(0x33BABABA);
+
+  /// Dark-mode equivalents.
+  static const Color glassFillDark = Color(0x14FFFFFF);
+  static const Color glassBorderDark = Color(0x26FFFFFF);
+  static const Color dividerDark = Color(0x33FFFFFF);
+  static const Color trackDark = Color(0x26FFFFFF);
+
+  /// rgba(25,195,224,0.13) — filled input / header action fill.
+  static const Color primaryFill = Color(0x2119C3E0);
+
+  /// rgba(25,195,224,0.20) — icon badge background.
+  static const Color primaryTint = Color(0x3319C3E0);
+
+  /// rgba(25,195,224,0.27) — header action border.
+  static const Color primaryBorder = Color(0x4519C3E0);
+
+  /// Back-button fill — rgba(255,255,255,0.5).
+  static const Color backButtonFill = Color(0x80FFFFFF);
+  static const Color backButtonFillDark = Color(0x33FFFFFF);
+
+  // ---------------------------------------------------------------------------
+  // Status
+  // ---------------------------------------------------------------------------
+  /// Error — Figma input/text error #E24B4A.
+  static const Color error = Color(0xFFE24B4A);
+  static const Color errorDark = Color(0xFFCC4D47);
+
+  /// rgba(226,75,74,0.13) — error input fill.
+  static const Color errorFill = Color(0x21E24B4A);
+
+  /// Success green — Figma progress bar #4CAF50.
+  static const Color success = Color(0xFF4CAF50);
+
+  /// rgba(76,175,80,0.20) — success icon badge background.
+  static const Color successTint = Color(0x334CAF50);
+
+  static const Color warning = Color(0xFFFF9800);
+  static const Color warningTint = Color(0x33FF9800);
+  static const Color info = Color(0xFF2675ED);
+
+  // ---------------------------------------------------------------------------
+  // Decorative / misc
+  // ---------------------------------------------------------------------------
+  static const Color blobPurple = Color(0xFFE083FF);
+  static const Color blobMint = Color(0xFF67FFAB);
+  static const Color link = Color(0xFF2675ED);
+  static const Color termsLink = Color(0xFF1367E6);
+  static const Color indicatorInactive = Color(0xFFD8D8D8);
+  static const Color navSelected = Color(0xFF2DB6A3);
+  static const Color navUnselected = Color(0xFF9E9E9E);
+  static const Color snackBarBg = Color(0xFF1C1C1C);
+
+  /// Macro-nutrient accents — Figma macro bars (food scanner 1172:7901),
+  /// shared by dashboard, diet plan and scanner.
+  static const Color protein = Color(0xFF00BFA5);
+  static const Color carbs = Color(0xFFF5AE17);
+  static const Color fat = Color(0xFFB786F7);
+
+  /// Food scanner — Figma macro bars (1172:7901) and colour grades (1935:7668).
+  static const Color scanProtein = protein;
+  static const Color scanCarbs = carbs;
+  static const Color scanFat = fat;
+  static const Color gradeGood = Color(0xFF4CAF50);
+  static const Color gradeModerate = Color(0xFFF09F5C);
+  static const Color gradeBad = Color(0xFFF0685C);
+
+  /// Food scanner camera overlays (always drawn over a live preview).
+  static const Color cameraBackdrop = Color(0xFF101316);
+  static const Color cameraScrim = Color(0x66000000);
+  static const Color cameraControlFill = Color(0x80FFFFFF);
+  static const Color cameraCaptureRing = Color(0x33FFFFFF);
+
+  /// Water-intake accent (wave fill, quick-add chips).
+  static const Color water = Color(0xFF42A5F5);
+
+  // ---------------------------------------------------------------------------
+  // Gradients
+  // ---------------------------------------------------------------------------
+  /// Subtle cyan sheen used on Figma glass cards:
+  /// linear-gradient(~110deg, rgba(184,236,245,0) 53%, rgba(184,236,245,0.2) 97%)
+  static const LinearGradient glassSheen = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    stops: [0.53, 0.97],
+    colors: [Color(0x00B8ECF5), Color(0x33B8ECF5)],
+  );
+
+  /// Highlighted insight card — Figma card/insight on detail pages.
+  static const LinearGradient insightSheen = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    stops: [0.0, 0.6, 1.0],
+    colors: [Color(0xCC19C3E0), Color(0x0019C3E0), Color(0xCC19C3E0)],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Onboarding accents
+  // ---------------------------------------------------------------------------
+  /// Gender choice tiles — Figma onboarding/info/gender.
+  static const Color genderMale = Color(0xFF465EEB);
+  static const Color genderFemale = Color(0xFFF463BA);
+
+  /// BPM heart pulse glow.
+  static const Color heartGlow = Color(0xFFFF3DBF);
+  static const Color heartGlowSoft = Color(0xFFFF6FD8);
+}
+
+/// Fixed accents for activity tracking (map markers, soundtrack icons).
+class ActivityColors {
+  ActivityColors._();
+
+  /// Route start marker on the map.
+  static const Color mapStartPoint = Color(0xFFFF5722);
+
+  /// Outline around map markers (start point, location puck).
+  static const Color mapMarkerStroke = AppColors.white;
+
+  /// Soundtrack icon accents.
+  static const Color accentAmber = Color(0xFFFFC107);
+  static const Color accentPurple = Color(0xFF9C27B0);
+}

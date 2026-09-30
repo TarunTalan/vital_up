@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 
 /// Shows a dialog with a custom, premium scale and fade transition.
 ///
@@ -14,12 +15,12 @@ Future<T?> showSmoothDialog<T>({
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
-    barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.54),
+    barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.54),
     barrierLabel: barrierLabel ?? 'Dismiss',
     pageBuilder: (context, animation, secondaryAnimation) {
       return builder(context);
     },
-    transitionDuration: const Duration(milliseconds: 320),
+    transitionDuration: AppDurations.slow,
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final scale = Tween<double>(begin: 0.92, end: 1.0).animate(
         CurvedAnimation(
@@ -62,17 +63,23 @@ void showSmoothSnackBar(
   final controller = ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       duration: duration,
-      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppDimens.gutter,
+        vertical: AppDimens.space16,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space16,
+        vertical: AppDimens.space12,
+      ),
       action: action,
       content: Row(
         children: [
           Icon(
             icon,
             color: iconColor,
-            size: 20,
+            size: AppDimens.iconMd,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppDimens.space12),
           Expanded(
             child: Text(message),
           ),
@@ -95,7 +102,7 @@ void showSuccessSnackBar(BuildContext context, String message, {SnackBarAction? 
   showSmoothSnackBar(
     context,
     message: message,
-    iconColor: const Color(0xFF19C3E0),
+    iconColor: AppColors.primary,
     icon: Icons.check_circle_outline_rounded,
     action: action,
   );
@@ -106,7 +113,36 @@ void showErrorSnackBar(BuildContext context, String message) {
   showSmoothSnackBar(
     context,
     message: message,
-    iconColor: const Color(0xFFC33E36),
+    iconColor: AppColors.error,
     icon: Icons.error_outline_rounded,
+  );
+}
+
+/// Shows a modal bottom sheet with the app-standard look: elevated surface,
+/// 24dp top radius, drag handle, keyboard-aware padding, and content capped
+/// at 600dp wide on tablets.
+Future<T?> showAppBottomSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = true,
+  bool isDismissible = true,
+  bool enableDrag = true,
+  bool showDragHandle = true,
+  bool useSafeArea = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: isScrollControlled,
+    isDismissible: isDismissible,
+    enableDrag: enableDrag,
+    showDragHandle: showDragHandle,
+    useSafeArea: useSafeArea,
+    constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: builder(sheetContext),
+    ),
   );
 }
