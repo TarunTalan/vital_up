@@ -1,9 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'dart:math' as math;
@@ -116,7 +116,13 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final v = context.vColors;
+    final errorColor = context.colors.error;
+    final nameError = _showErrors && _nameError() != null;
+    final age = _calculateAge();
+    final dobError = _showErrors && (_dob.isEmpty || age == null || age < 13);
+    final genderError = _showErrors &&
+        (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female");
 
     return OnboardingLayout(
       step: 1,
@@ -144,35 +150,31 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-              OnboardingTextField(
-              label: "Full Name",
-              value: _nameController.text,
-              maxLength: 50,
-              onChange: (val) {
-                _nameController.text = val;
-                if (_showErrors) {
-                  setState(() => _showErrors = false);
-                }
-              },
-              placeholder: "Enter your full name",
-              isError: _showErrors && _nameError() != null,
-              showErrorText: false,
+          OnboardingTextField(
+            label: "Full Name",
+            value: _nameController.text,
+            maxLength: 50,
+            onChange: (val) {
+              _nameController.text = val;
+              if (_showErrors) {
+                setState(() => _showErrors = false);
+              }
+            },
+            placeholder: "Enter your full name",
+            isError: nameError,
+            showErrorText: false,
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: OnboardingStyle.sectionSpacingSmall),
-            child: Text(
-              _showErrors && _nameError() != null
-                  ? _nameError()!
-                  : "This will appear in your profile and reports.",
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _showErrors && _nameError() != null
-                    ? Theme.of(context).colorScheme.error
-                    : colors.onSurface.withValues(alpha: 0.7),
-              ),
+          const SizedBox(height: AppDimens.inputLabelGap),
+          Text(
+            nameError
+                ? _nameError()!
+                : "This will appear in your profile and reports.",
+            style: context.text.bodyLarge?.copyWith(
+              color: nameError ? errorColor : v.grayText,
             ),
           ),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+          const SizedBox(height: AppDimens.space32),
 
           OnboardingDateField(
             label: "Date of Birth",
@@ -182,75 +184,66 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
               setState(() => _showErrors = false);
               _selectDate(context);
             },
-            isError: _showErrors && (_dob.isEmpty || _calculateAge() == null || _calculateAge()! < 13),
+            isError: dobError,
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: OnboardingStyle.sectionSpacingSmall),
-            child: Text(
-              _showErrors && _dob.isEmpty
-                  ? "Date of Birth is required"
-                  : (_showErrors && _dob.isNotEmpty && (_calculateAge() == null || _calculateAge()! < 13)
-                      ? "You must be at least 13 years old"
-                      : (_calculateAge() != null
-                          ? "Age: ${_calculateAge()}"
-                          : "Enter your date of birth in DD/MM/YYYY format")),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _showErrors && (_dob.isEmpty || (_calculateAge() == null || _calculateAge()! < 13))
-                    ? Theme.of(context).colorScheme.error
-                    : (_calculateAge() != null
-                        ? const Color.fromRGBO(15, 117, 134, 1)
-                        : colors.onSurface.withValues(alpha: 0.7)),
-              ),
+          const SizedBox(height: AppDimens.inputLabelGap),
+          Text(
+            _showErrors && _dob.isEmpty
+                ? "Date of Birth is required"
+                : (_showErrors && _dob.isNotEmpty && (age == null || age < 13)
+                    ? "You must be at least 13 years old"
+                    : (age != null
+                        ? "Age: $age"
+                        : "Enter your date of birth in DD/MM/YYYY format")),
+            style: context.text.bodyLarge?.copyWith(
+              color: dobError
+                  ? errorColor
+                  : (age != null ? v.preText : v.grayText),
             ),
           ),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingMedium),
+          const SizedBox(height: AppDimens.space32),
 
-          Text(
-            "Gender",
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-          ),
-          SizedBox(height: AppTheme.responsiveHeight(context, 6.0)),
+          Text("Gender", style: context.text.titleSmall),
+          const SizedBox(height: AppDimens.inputLabelGap),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _GenderButton(
-                gender: "male",
-                isSelected: _gender.toLowerCase() == "male",
-                onClick: () {
-                  setState(() {
-                    _gender = "male";
-                    _showErrors = false;
-                  });
-                  context.read<OnboardingCubit>().updateGender("male");
-                },
+              Expanded(
+                child: _GenderButton(
+                  gender: "male",
+                  isSelected: _gender.toLowerCase() == "male",
+                  onClick: () {
+                    setState(() {
+                      _gender = "male";
+                      _showErrors = false;
+                    });
+                    context.read<OnboardingCubit>().updateGender("male");
+                  },
+                ),
               ),
-              _GenderButton(
-                gender: "female",
-                isSelected: _gender.toLowerCase() == "female",
-                onClick: () {
-                  setState(() {
-                    _gender = "female";
-                    _showErrors = false;
-                  });
-                  context.read<OnboardingCubit>().updateGender("female");
-                },
+              SizedBox(width: context.w(AppDimens.space32)),
+              Expanded(
+                child: _GenderButton(
+                  gender: "female",
+                  isSelected: _gender.toLowerCase() == "female",
+                  onClick: () {
+                    setState(() {
+                      _gender = "female";
+                      _showErrors = false;
+                    });
+                    context.read<OnboardingCubit>().updateGender("female");
+                  },
+                ),
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: OnboardingStyle.sectionSpacingSmall),
-            child: Text(
-              _showErrors && (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female")
-                  ? "Please select your gender"
-                  : "This helps us personalize insights.",
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _showErrors && (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female")
-                    ? Theme.of(context).colorScheme.error
-                    : colors.onSurface.withValues(alpha: 0.7),
-              ),
+          const SizedBox(height: AppDimens.inputLabelGap),
+          Text(
+            genderError
+                ? "Please select your gender"
+                : "This helps us personalize insights.",
+            style: context.text.bodyMedium?.copyWith(
+              color: genderError ? errorColor : v.grayText,
             ),
           ),
         ],
@@ -259,6 +252,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
   }
 }
 
+/// Figma gender tile: 100dp glass tile; selected tints with the gender accent.
 class _GenderButton extends StatelessWidget {
   final String gender;
   final bool isSelected;
@@ -272,56 +266,52 @@ class _GenderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.inputRadius));
+    final v = context.vColors;
+    final accent = gender == "male" ? AppColors.genderMale : AppColors.genderFemale;
+    final radius = BorderRadius.circular(AppDimens.radiusCard);
+    final iconSize = isSelected ? AppDimens.iconXl : AppDimens.space40;
 
-    final boxWidth = OnboardingStyle.numberFieldWidth + OnboardingStyle.sectionSpacingLarge;
-    final boxHeight = OnboardingStyle.numberFieldHeight + OnboardingStyle.sectionSpacingLarge;
-
-    return InkWell(
-      onTap: onClick,
-      customBorder: shape,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30.6, sigmaY: 30.6),
-          child: Container(
-            width: boxWidth,
-            height: boxHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-              color: isSelected 
-                  ? const Color.fromRGBO(70, 94, 235, 0.13) 
-                  : const Color.fromRGBO(186, 186, 186, 0.13),
-              border: Border.all(
-                color: isSelected 
-                    ? const Color.fromRGBO(70, 94, 235, 0.27) 
-                    : const Color.fromRGBO(186, 186, 186, 0.27),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-                gradient: isSelected
-                    ? const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color.fromRGBO(70, 94, 235, 0),
-                          Color.fromRGBO(70, 94, 235, 1),
-                        ],
-                      )
-                    : null,
-              ),
-              alignment: Alignment.center,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: gender,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        height: AppDimens.choiceTileHeight,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          color: isSelected ? null : v.glassFill,
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0.3, 1.0],
+                  colors: [
+                    accent.withValues(alpha: 0.13),
+                    accent.withValues(alpha: 0.45),
+                  ],
+                )
+              : null,
+          border: Border.all(
+            color: isSelected ? accent.withValues(alpha: 0.27) : v.glassBorder!,
+            width: AppDimens.borderThin,
+          ),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onClick,
+            child: Center(
               child: SvgPicture.asset(
                 gender == "male" ? 'assets/icons/gender_male.svg' : 'assets/icons/gender_female.svg',
-                width: OnboardingStyle.sectionSpacingLarge,
-                height: OnboardingStyle.sectionSpacingLarge,
+                width: iconSize,
+                height: iconSize,
                 placeholderBuilder: (BuildContext context) => Icon(
                   gender == "male" ? Icons.male : Icons.female,
-                  size: OnboardingStyle.sectionSpacingLarge,
-                  color: isSelected ? Colors.white : Colors.grey,
+                  size: iconSize,
+                  color: accent,
                 ),
               ),
             ),

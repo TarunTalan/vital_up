@@ -2,40 +2,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
-import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
 
-class OnboardingColors {
-  static const Color fieldBackground = Color.fromRGBO(186, 186, 186, 0.2);
-  static const Color fieldBorder = Color.fromRGBO(186, 186, 186, 0.3);
-}
-
-class OnboardingStyle {
-  static const double screenHorizontalPadding = AppTheme.hPadding;
-  static const double screenTopSpacing = 24.0;
-  static const double titleSubtitleSpacing = 8.0;
-  static const double sectionSpacingLarge = 32.0;
-  static const double sectionSpacingMedium = 16.0;
-  static const double sectionSpacingSmall = 8.0;
-
-  static const double controlButtonSizeWidth = 50.0;
-  static const double controlButtonSizeHeight = AppTheme.inputHeight;
-  static const double controlGap = 12.0;
-
-  static const double numberFieldWidth = 102.0;
-  static const double numberFieldHeight = AppTheme.inputHeight;
-  static const double numberFieldCornerRadius = AppTheme.inputRadius;
-
-  static const double bottomBarHeight = AppTheme.buttonHeight;
-  static const double bottomBarPaddingBottom = 32.0;
-
-  static const double labelFontSize = 16.0;
-  static const double stepCounterFontSize = 20.0;
-
-  static const double imageHorizontalPadding = screenHorizontalPadding;
-}
-
+/// Shared scaffold for every onboarding step — Figma `onboarding/<step>`:
+/// back button + step counter, centred Large Title (+ body 16 med subtitle),
+/// scrollable content and a pinned Skip / Next bar.
 class OnboardingLayout extends StatelessWidget {
   final int step;
   final VoidCallback onBack;
@@ -45,9 +20,11 @@ class OnboardingLayout extends StatelessWidget {
   final String? subtitle;
   final bool nextEnabled;
   final bool showSkip;
+  final String nextLabel;
   final bool fullBleedChild;
-  final double titleTopSpace;
-  final double titleBottomSpace;
+  final bool handleSystemBack;
+  final double? titleTopSpace;
+  final double? titleBottomSpace;
   final Widget child;
 
   const OnboardingLayout({
@@ -60,127 +37,151 @@ class OnboardingLayout extends StatelessWidget {
     this.subtitle,
     this.nextEnabled = true,
     this.showSkip = true,
+    this.nextLabel = "Next",
     this.fullBleedChild = false,
-    this.titleTopSpace = 24.0,
-    this.titleBottomSpace = 40.0,
+    this.handleSystemBack = true,
+    this.titleTopSpace,
+    this.titleBottomSpace,
     required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (MediaQuery.of(context).viewInsets.bottom > 0.0) {
-          FocusScope.of(context).unfocus();
-        } else {
-          onBack();
-        }
-      },
-      child: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final gutter = context.gutter;
+
+    Widget padded(Widget w) => Padding(
+      padding: EdgeInsets.symmetric(horizontal: gutter),
+      child: w,
+    );
+
+    final scaffold = GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         extendBodyBehindAppBar: true,
-        bottomNavigationBar: Padding(
-          padding: const EdgeInsets.only(
-            top: 16.0,
-            bottom: OnboardingStyle.bottomBarPaddingBottom,
-          ),
-          child: OnboardingBottomBar(
-            onNext: onNext,
-            onSkip: onSkip,
-            nextEnabled: nextEnabled,
-            showSkip: showSkip,
+        bottomNavigationBar: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: AppDimens.space16),
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: AppDimens.space16,
+              bottom: isKeyboardOpen ? 0 : context.h(AppDimens.space16),
+            ),
+            child: Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppDimens.maxContentWidth,
+                ),
+                child: OnboardingBottomBar(
+                  onNext: onNext,
+                  onSkip: onSkip,
+                  nextEnabled: nextEnabled,
+                  showSkip: showSkip,
+                  nextLabel: nextLabel,
+                ),
+              ),
+            ),
           ),
         ),
         body: Stack(
           children: [
-            // Background Image
             Positioned.fill(
               child: Image.asset(
-                'assets/images/bg.png', // Fallback to generic name if it doesn't exist yet
+                'assets/images/bg.png',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => const SizedBox(),
               ),
             ),
-            // Blur effect
             Positioned.fill(
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                child: Container(color: Colors.transparent),
+                filter: ImageFilter.blur(
+                  sigmaX: AppDimens.glassBlur / 2,
+                  sigmaY: AppDimens.glassBlur / 2,
+                ),
+                child: const ColoredBox(color: Colors.transparent),
               ),
             ),
-            // Content
             SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 16.0), // Top margin above the bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
-                    child: OnboardingTopBar(onBack: onBack, step: step),
-                  ),
-                  const SizedBox(height: 16.0), // Padding below top bar to prevent hard clipping on scroll
-                  Expanded(
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Column(
-                            children: [
-                              SizedBox(height: titleTopSpace),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
-                                child: Text(
-                                  title,
-                                  style: Theme.of(context).textTheme.displayMedium,
-                                  textAlign: TextAlign.center,
+              bottom: false,
+              child: ResponsiveCenter(
+                child: Column(
+                  children: [
+                    const SizedBox(height: AppDimens.space16),
+                    padded(OnboardingTopBar(onBack: onBack, step: step)),
+                    Expanded(
+                      child: CustomScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  height:
+                                      titleTopSpace ??
+                                      (isKeyboardOpen
+                                          ? AppDimens.space16
+                                          : context.h(AppDimens.space48)),
                                 ),
-                              ),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: OnboardingStyle.titleSubtitleSpacing),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
-                                  child: Text(
-                                    subtitle!,
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                    ),
+                                padded(
+                                  Text(
+                                    title,
+                                    style: context.text.displayLarge,
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
-                              ],
-                              Builder(
-                                builder: (context) {
-                                  final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-                                  return SizedBox(height: isKeyboardOpen ? 16.0 : titleBottomSpace);
-                                }
-                              ),
-                              fullBleedChild 
-                                ? child 
-                                : Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
-                                    child: child,
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: AppDimens.space12),
+                                  padded(
+                                    Text(
+                                      subtitle!,
+                                      style: context.text.titleSmall,
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
-                              Builder(
-                                builder: (context) {
-                                  final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-                                  return SizedBox(height: isKeyboardOpen ? 16.0 : 40.0);
-                                }
-                              ),
-                            ],
+                                ],
+                                SizedBox(
+                                  height: isKeyboardOpen
+                                      ? AppDimens.space16
+                                      : (titleBottomSpace ??
+                                            context.h(AppDimens.space48)),
+                                ),
+                                fullBleedChild ? child : padded(child),
+                                SizedBox(
+                                  height: isKeyboardOpen
+                                      ? AppDimens.space16
+                                      : AppDimens.space40,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
-      ),
+    );
+
+    if (!handleSystemBack) return scaffold;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (MediaQuery.viewInsetsOf(context).bottom > 0.0) {
+          FocusScope.of(context).unfocus();
+        } else {
+          onBack();
+        }
+      },
+      child: scaffold,
     );
   }
 }
@@ -189,30 +190,22 @@ class OnboardingTopBar extends StatelessWidget {
   final VoidCallback onBack;
   final int step;
 
-  const OnboardingTopBar({
-    super.key,
-    required this.onBack,
-    required this.step,
-  });
+  const OnboardingTopBar({super.key, required this.onBack, required this.step});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         BackIcon(onClick: onBack),
-          const Spacer(),
-          Text(
-            "$step/10",
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontSize: OnboardingStyle.stepCounterFontSize,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      );
+        const Spacer(),
+        Text("$step/10", style: context.text.headlineSmall),
+      ],
+    );
   }
 }
 
+/// Skip (Figma `button/ sec`, #D8D8D8 hairline) + Next (`button/ pri`).
+/// Buttons keep the Figma 108dp width as a minimum and grow with the label.
 class OnboardingBottomBar extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onSkip;
@@ -231,39 +224,37 @@ class OnboardingBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: OnboardingStyle.bottomBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: OnboardingStyle.screenHorizontalPadding),
+    const minWidth = BoxConstraints(minWidth: AppDimens.actionButtonMinWidth);
+
+    return Padding(
+      padding: context.pagePadding,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (showSkip)
-            SizedBox(
-              width: 108,
-              child: SecondaryAuthButton(
+            ConstrainedBox(
+              constraints: minWidth,
+              child: AppSecondaryButton(
                 label: "Skip",
+                expand: false,
+                borderColor: context.vColors.hairline,
                 onTap: () {
                   HapticFeedback.lightImpact();
                   onSkip();
                 },
-                containerColor: Colors.transparent,
-                borderColor: const Color.fromRGBO(216, 216, 216, 1),
-                contentColor: Theme.of(context).colorScheme.onSurface,
               ),
-            )
-          else
-            const SizedBox(width: 108), // Keep spacing consistent
-          SizedBox(
-            width: 108,
-            child: PrimaryAuthButton(
+            ),
+          const Spacer(),
+          ConstrainedBox(
+            constraints: minWidth,
+            child: AppPrimaryButton(
               label: nextLabel,
+              expand: false,
+              enabled: nextEnabled,
+              showRightArrow: true,
               onTap: () {
                 HapticFeedback.lightImpact();
                 onNext();
               },
-              enabled: nextEnabled,
-              isLoading: false,
-              showRightArrow: true,
             ),
           ),
         ],
@@ -335,7 +326,9 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
       onChange: widget.onChange,
       placeholder: widget.placeholder,
       keyboardType: widget.keyboardType,
-      error: widget.showErrorText ? (widget.isError ? "Required" : widget.error) : null,
+      error: widget.showErrorText
+          ? (widget.isError ? "Required" : widget.error)
+          : null,
       showValidation: widget.showErrorText,
       maxLength: widget.maxLength > 0 ? widget.maxLength : 1000,
       enabled: !widget.readOnly,
@@ -346,6 +339,8 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
   }
 }
 
+/// Figma `num input`: glass +/- steppers around a value box. The value box
+/// gets a 2dp primary border + glow while focused and turns red on error.
 class OnboardingNumberField<T extends num> extends StatefulWidget {
   final T? value;
   final ValueChanged<T?> onValueChange;
@@ -371,16 +366,24 @@ class OnboardingNumberField<T extends num> extends StatefulWidget {
   });
 
   @override
-  State<OnboardingNumberField<T>> createState() => _OnboardingNumberFieldState<T>();
+  State<OnboardingNumberField<T>> createState() =>
+      _OnboardingNumberFieldState<T>();
 }
 
-class _OnboardingNumberFieldState<T extends num> extends State<OnboardingNumberField<T>> {
+class _OnboardingNumberFieldState<T extends num>
+    extends State<OnboardingNumberField<T>> {
   late TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _focused = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.value?.toString() ?? '');
+    _focusNode = FocusNode()
+      ..addListener(() {
+        if (mounted) setState(() => _focused = _focusNode.hasFocus);
+      });
   }
 
   @override
@@ -391,7 +394,7 @@ class _OnboardingNumberFieldState<T extends num> extends State<OnboardingNumberF
     // (e.g. don't override "5." with "5.0")
     final currentParsed = double.tryParse(_controller.text);
     final newParsed = double.tryParse(newVal);
-    
+
     if (newParsed != null && currentParsed == newParsed) {
       return;
     }
@@ -411,62 +414,145 @@ class _OnboardingNumberFieldState<T extends num> extends State<OnboardingNumberF
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _decrement() {
+    if (widget.value == null) {
+      HapticFeedback.lightImpact();
+      widget.onValueChange(widget.min);
+    } else if (widget.value! > widget.min) {
+      HapticFeedback.lightImpact();
+      final newValue = widget.value! - widget.step;
+      if (T == int) {
+        widget.onValueChange(
+          newValue.toInt().clamp(widget.min, widget.max) as T,
+        );
+      } else {
+        final rounded = double.parse(newValue.toStringAsFixed(1));
+        widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
+      }
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+  }
+
+  void _increment() {
+    if (widget.value == null) {
+      HapticFeedback.lightImpact();
+      final startVal = widget.min + widget.step;
+      if (T == int) {
+        widget.onValueChange(
+          startVal.toInt().clamp(widget.min, widget.max) as T,
+        );
+      } else {
+        final rounded = double.parse(startVal.toStringAsFixed(1));
+        widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
+      }
+    } else if (widget.value! < widget.max) {
+      HapticFeedback.lightImpact();
+      final newValue = widget.value! + widget.step;
+      if (T == int) {
+        widget.onValueChange(
+          newValue.toInt().clamp(widget.min, widget.max) as T,
+        );
+      } else {
+        final rounded = double.parse(newValue.toStringAsFixed(1));
+        widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
+      }
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+  }
+
+  void _onChanged(String text) {
+    if (text.isEmpty) {
+      widget.onValueChange(widget.min);
+      return;
+    }
+
+    if (T == int && text.length > 1 && text.startsWith('0')) {
+      final cleanText = int.tryParse(text)?.toString() ?? text;
+      if (cleanText != text) {
+        _controller.text = cleanText;
+        _controller.selection = TextSelection.collapsed(
+          offset: cleanText.length,
+        );
+        text = cleanText;
+      }
+    }
+
+    final parsed = double.tryParse(text);
+    if (parsed != null) {
+      if (T == int) {
+        final intValue = parsed.toInt();
+        if (intValue > widget.max) {
+          HapticFeedback.heavyImpact();
+          widget.onValueChange(widget.max);
+          _controller.text = widget.max.toString();
+          _controller.selection = TextSelection.collapsed(
+            offset: _controller.text.length,
+          );
+        } else {
+          widget.onValueChange(intValue as T);
+        }
+      } else {
+        if (parsed > widget.max) {
+          HapticFeedback.heavyImpact();
+          widget.onValueChange(widget.max);
+          _controller.text = widget.max.toString();
+          _controller.selection = TextSelection.collapsed(
+            offset: _controller.text.length,
+          );
+        } else {
+          widget.onValueChange(parsed as T);
+        }
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fieldShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
-    );
-    final colors = Theme.of(context).colorScheme;
-    final bgColor = widget.isError ? colors.error.withValues(alpha: 0.12) : OnboardingColors.fieldBackground;
-    final borderColor = widget.isError ? colors.error : OnboardingColors.fieldBorder;
+    final colors = context.colors;
+    final v = context.vColors;
+    final Color bgColor;
+    final Color borderColor;
+    final double borderWidth;
+    if (widget.isError) {
+      bgColor = v.errorFill!;
+      borderColor = colors.error;
+      borderWidth = AppDimens.borderThick;
+    } else if (_focused) {
+      bgColor = v.glassFill!;
+      borderColor = colors.primary;
+      borderWidth = AppDimens.borderThick;
+    } else {
+      bgColor = v.glassFill!;
+      borderColor = v.glassBorder!;
+      borderWidth = AppDimens.borderThin;
+    }
+    final valueColor = widget.isError ? colors.error : v.preText;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.showButtons) ...[
-          InkWell(
-            onTap: () {
-              if (widget.value == null) {
-                HapticFeedback.lightImpact();
-                widget.onValueChange(widget.min);
-              } else if (widget.value! > widget.min) {
-                HapticFeedback.lightImpact();
-                final newValue = widget.value! - widget.step;
-                if (T == int) {
-                  widget.onValueChange(newValue.toInt().clamp(widget.min, widget.max) as T);
-                } else {
-                  final rounded = double.parse(newValue.toStringAsFixed(1));
-                  widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
-                }
-              } else {
-                HapticFeedback.heavyImpact();
-              }
-            },
-            customBorder: fieldShape,
-            child: Container(
-              width: OnboardingStyle.controlButtonSizeWidth,
-              height: OnboardingStyle.controlButtonSizeHeight,
-              decoration: BoxDecoration(
-                color: OnboardingColors.fieldBackground,
-                borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
-                border: Border.all(color: OnboardingColors.fieldBorder),
-              ),
-              alignment: Alignment.center,
-              child: const Text("−", style: TextStyle(fontSize: 24)),
-            ),
-          ),
-          const SizedBox(width: OnboardingStyle.controlGap),
+          _StepperButton(icon: Icons.remove_rounded, onTap: _decrement),
+          const SizedBox(width: AppDimens.space8),
         ],
-        Container(
-          width: OnboardingStyle.numberFieldWidth,
-          height: OnboardingStyle.numberFieldHeight,
+        AnimatedContainer(
+          duration: AppDurations.fast,
+          width: AppDimens.numberFieldWidth,
+          height: AppDimens.numberFieldHeight,
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
-            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(AppDimens.radiusButton),
+            border: Border.all(color: borderColor, width: borderWidth),
+            boxShadow: _focused && !widget.isError
+                ? AppShadows.inputFocus
+                : null,
           ),
           alignment: Alignment.center,
           child: Stack(
@@ -474,110 +560,99 @@ class _OnboardingNumberFieldState<T extends num> extends State<OnboardingNumberF
             children: [
               TextField(
                 controller: _controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                focusNode: _focusNode,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 textAlign: TextAlign.center,
                 autofocus: widget.autofocus,
-                style: Theme.of(context).textTheme.headlineLarge,
-                decoration: const InputDecoration(
+                cursorColor: colors.primary,
+                style: context.text.headlineLarge?.copyWith(color: valueColor),
+                decoration: InputDecoration(
+                  filled: false,
+                  isCollapsed: true,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
+                  hintText: '_ _',
+                  hintStyle: context.text.headlineLarge?.copyWith(
+                    color: v.preText,
+                  ),
                 ),
-                onChanged: (text) {
-                  if (text.isEmpty) {
-                    widget.onValueChange(widget.min);
-                    return;
-                  }
-                  
-                  if (T == int && text.length > 1 && text.startsWith('0')) {
-                    final cleanText = int.tryParse(text)?.toString() ?? text;
-                    if (cleanText != text) {
-                      _controller.text = cleanText;
-                      _controller.selection = TextSelection.collapsed(offset: cleanText.length);
-                      text = cleanText;
-                    }
-                  }
-
-                  final parsed = double.tryParse(text);
-                  if (parsed != null) {
-                    if (T == int) {
-                      final intValue = parsed.toInt();
-                      if (intValue > widget.max) {
-                        HapticFeedback.heavyImpact();
-                        widget.onValueChange(widget.max);
-                        _controller.text = widget.max.toString();
-                        _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
-                      } else {
-                        widget.onValueChange(intValue as T);
-                      }
-                    } else {
-                      if (parsed > widget.max) {
-                        HapticFeedback.heavyImpact();
-                        widget.onValueChange(widget.max);
-                        _controller.text = widget.max.toString();
-                        _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
-                      } else {
-                        widget.onValueChange(parsed as T);
-                      }
-                    }
-                  }
-                },
+                onChanged: _onChanged,
               ),
               if (widget.suffixText != null)
                 Positioned(
-                  right: OnboardingStyle.sectionSpacingSmall,
+                  right: AppDimens.space8,
                   child: Text(
                     widget.suffixText!,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: context.text.bodyMedium?.copyWith(color: v.grayText),
                   ),
                 ),
             ],
           ),
         ),
         if (widget.showButtons) ...[
-          const SizedBox(width: OnboardingStyle.controlGap),
-          InkWell(
-            onTap: () {
-              if (widget.value == null) {
-                HapticFeedback.lightImpact();
-                final startVal = widget.min + widget.step;
-                if (T == int) {
-                  widget.onValueChange(startVal.toInt().clamp(widget.min, widget.max) as T);
-                } else {
-                  final rounded = double.parse(startVal.toStringAsFixed(1));
-                  widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
-                }
-              } else if (widget.value! < widget.max) {
-                HapticFeedback.lightImpact();
-                final newValue = widget.value! + widget.step;
-                if (T == int) {
-                  widget.onValueChange(newValue.toInt().clamp(widget.min, widget.max) as T);
-                } else {
-                  final rounded = double.parse(newValue.toStringAsFixed(1));
-                  widget.onValueChange(rounded.clamp(widget.min, widget.max) as T);
-                }
-              } else {
-                HapticFeedback.heavyImpact();
-              }
-            },
-            customBorder: fieldShape,
-            child: Container(
-              width: OnboardingStyle.controlButtonSizeWidth,
-              height: OnboardingStyle.controlButtonSizeHeight,
-              decoration: BoxDecoration(
-                color: OnboardingColors.fieldBackground,
-                borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
-                border: Border.all(color: OnboardingColors.fieldBorder),
-              ),
-              alignment: Alignment.center,
-              child: const Text("+", style: TextStyle(fontSize: 24)),
-            ),
-          ),
+          const SizedBox(width: AppDimens.space8),
+          _StepperButton(icon: Icons.add_rounded, onTap: _increment),
         ],
       ],
     );
   }
 }
 
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _StepperButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final radius = BorderRadius.circular(AppDimens.radiusCard);
+    return Material(
+      color: v.glassFill,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: v.glassBorder!, width: AppDimens.borderThin),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox.square(
+          dimension: AppDimens.numberStepperSize,
+          child: Icon(
+            icon,
+            size: AppDimens.iconLg,
+            color: context.colors.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small grey caption under a number field (e.g. "Beats per minute").
+class OnboardingFieldCaption extends StatelessWidget {
+  final String text;
+
+  const OnboardingFieldCaption(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: context.text.bodySmall?.copyWith(color: context.vColors.grayText),
+    );
+  }
+}
+
+/// Tappable field styled like Figma `input/text` (used for the date picker).
 class OnboardingDateField extends StatelessWidget {
   final String label;
   final String value;
@@ -596,42 +671,44 @@ class OnboardingDateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vColors = Theme.of(context).extension<VitalUpColors>();
-    final bgColor = vColors?.inputBorder?.withValues(alpha: 0.1) ?? OnboardingColors.fieldBackground;
-    final bdColor = isError ? AppTheme.errorLightColor : (vColors?.inputBorder ?? OnboardingColors.fieldBorder);
+    final v = context.vColors;
+    final colors = context.colors;
+    final isEmpty = value.isEmpty;
+    final radius = BorderRadius.circular(AppDimens.radiusInput);
+
+    final Color bgColor = isError
+        ? v.errorFill!
+        : (isEmpty ? v.glassFill! : v.primaryFill!);
+    final BorderSide border = isError
+        ? BorderSide(color: colors.error, width: AppDimens.borderThick)
+        : BorderSide(color: v.glassBorder!, width: AppDimens.borderThin);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 6.0),
-        InkWell(
-          onTap: onClick,
-          borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 30.6, sigmaY: 30.6),
-              child: Container(
-                height: AppTheme.inputHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-                  border: Border.all(color: bdColor),
-                ),
-                child: Text(
-                  value.isEmpty ? placeholder : value,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: value.isEmpty ? (vColors?.grayText ?? Colors.grey) : Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
+        Text(label, style: context.text.titleSmall),
+        const SizedBox(height: AppDimens.inputLabelGap),
+        Material(
+          color: bgColor,
+          shape: RoundedRectangleBorder(borderRadius: radius, side: border),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onClick,
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: AppDimens.inputHeight,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space16,
+              ),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                isEmpty ? placeholder : value,
+                style: isEmpty
+                    ? context.text.bodyMedium?.copyWith(color: v.grayText)
+                    : context.text.bodyLarge?.copyWith(
+                        color: isError ? colors.error : colors.onSurface,
+                      ),
               ),
             ),
           ),
@@ -641,6 +718,8 @@ class OnboardingDateField extends StatelessWidget {
   }
 }
 
+/// Unit picker — Figma glass `button/ sec` with grey label + caret, same
+/// height as the inputs.
 class UnitDropdown extends StatelessWidget {
   final String selectedUnit;
   final List<String> units;
@@ -655,24 +734,36 @@ class UnitDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v = context.vColors;
     return Container(
-      height: 60,
-      width: 85,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
+      height: AppDimens.inputHeight,
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.space16),
       decoration: BoxDecoration(
-        color: OnboardingColors.fieldBackground,
-        borderRadius: BorderRadius.circular(OnboardingStyle.numberFieldCornerRadius),
-        border: Border.all(color: OnboardingColors.fieldBorder),
+        color: v.glassFill,
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        border: Border.all(color: v.glassBorder!, width: AppDimens.borderThin),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: selectedUnit,
-          icon: const Icon(Icons.arrow_drop_down, size: 20),
-          isExpanded: true,
+          icon: Padding(
+            padding: const EdgeInsets.only(left: AppDimens.space8),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: AppDimens.iconXs,
+              color: v.grayText,
+            ),
+          ),
+          dropdownColor: v.surfaceElevated,
+          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+          style: context.text.bodyMedium?.copyWith(color: v.grayText),
           items: units.map((String unit) {
             return DropdownMenuItem<String>(
               value: unit,
-              child: Text(unit, style: Theme.of(context).textTheme.titleMedium),
+              child: Text(
+                unit,
+                style: context.text.bodyMedium?.copyWith(color: v.grayText),
+              ),
             );
           }).toList(),
           onChanged: (val) {
@@ -686,48 +777,118 @@ class UnitDropdown extends StatelessWidget {
   }
 }
 
-class NoteRow extends StatelessWidget {
-  final IconData iconRes;
-  final String text;
-  final Color borderColor;
-  final Color textColor;
+/// Selectable option tile — Figma onboarding/act & extra: glass tile that
+/// turns into a cyan sheen with a cyan border when selected.
+class OnboardingOptionTile extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Widget? leading;
+  final double minHeight;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final TextStyle? labelStyle;
+  final bool expand;
 
-  const NoteRow({
+  const OnboardingOptionTile({
     super.key,
-    this.iconRes = Icons.info_outline,
-    required this.text,
-    this.borderColor = const Color.fromRGBO(52, 52, 52, 1),
-    this.textColor = const Color.fromRGBO(117, 117, 117, 1),
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.leading,
+    this.minHeight = AppDimens.optionTileHeight,
+    this.padding = const EdgeInsets.all(AppDimens.space16),
+    this.radius = AppDimens.radiusCard,
+    this.labelStyle,
+    this.expand = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor, width: 1.0),
-        borderRadius: BorderRadius.circular(16.0),
-      ),
-      padding: const EdgeInsets.only(top: 6.0, bottom: 6.0, right: 6.0, left: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2.0),
-            child: Icon(iconRes, size: 20, color: textColor),
+    final v = context.vColors;
+    final borderRadius = BorderRadius.circular(radius);
+    final style = (labelStyle ?? context.text.titleSmall)?.copyWith(
+      color: context.colors.onSurface,
+    );
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        constraints: BoxConstraints(minHeight: minHeight),
+        decoration: BoxDecoration(
+          color: isSelected ? null : v.glassFill,
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0.3, 1.0],
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.08),
+                    AppColors.primary.withValues(alpha: 0.35),
+                  ],
+                )
+              : null,
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: isSelected ? v.primaryBorder! : v.glassBorder!,
+            width: AppDimens.borderThin,
           ),
-          const SizedBox(width: 8.0),
-          Expanded(
-            child: Text(
-              text,
-              textAlign: TextAlign.start,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w300,
-                color: textColor,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: borderRadius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
+            child: Padding(
+              padding: padding,
+              child: Center(
+                widthFactor: expand ? null : 1.0,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (leading != null) ...[
+                      leading!,
+                      const SizedBox(width: AppDimens.space16),
+                    ],
+                    Flexible(
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: style,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+}
+
+/// Inline info note — Figma `toast/info`. Thin wrapper over [AppInfoNote].
+class NoteRow extends StatelessWidget {
+  final IconData iconRes;
+  final String text;
+
+  const NoteRow({
+    super.key,
+    this.iconRes = Icons.info_outline_rounded,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppInfoNote(message: text, icon: iconRes);
   }
 }

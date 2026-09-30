@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
@@ -57,7 +58,7 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
           // Blood Pressure Inputs (reusable fields)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Column(
                 children: [
@@ -72,17 +73,12 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
                     },
                     showButtons: false,
                   ),
-                  const SizedBox(height: 6.0),
-                  Text(
-                    "Top number",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.grey),
-                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  const OnboardingFieldCaption("Top number"),
                 ],
               ),
 
-              const SizedBox(width: OnboardingStyle.sectionSpacingMedium),
+              const SizedBox(width: AppDimens.space16),
 
               Column(
                 children: [
@@ -97,25 +93,19 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
                     },
                     showButtons: false,
                   ),
-                  const SizedBox(height: 6.0),
-                  Text(
-                    "Bottom number",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  const OnboardingFieldCaption("Bottom number"),
                 ],
               ),
             ],
           ),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space32),
 
           // Heart Icon - switch to dark SVG in dark mode
           _buildHeartIcon(context),
 
-          const SizedBox(height: OnboardingStyle.sectionSpacingLarge),
+          const SizedBox(height: AppDimens.space32),
 
           // note
           const NoteRow(
@@ -131,8 +121,8 @@ class _BloodPressurePageState extends State<BloodPressurePage> {
     // Both light and dark modes use the same SVG for now, unless you have a specific dark SVG
     return SvgPicture.asset(
       'assets/icons/heart_icon.svg',
-      width: 162,
-      height: 162,
+      width: AppDimens.onboardingIllustration,
+      height: AppDimens.onboardingIllustration,
       fit: BoxFit.contain,
     );
   }
