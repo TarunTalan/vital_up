@@ -36,11 +36,15 @@ class AuthHeader extends StatelessWidget {
               child: BackIcon(onClick: onBackClick),
             ),
             SizedBox(height: context.h(AppDimens.space32)),
-            Text(
-              headerText,
-              textAlign: TextAlign.center,
-              style: context.text.displayLarge?.copyWith(
-                color: context.colors.onSurface,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                headerText,
+                textAlign: TextAlign.center,
+                style: context.text.displayLarge?.copyWith(
+                  color: context.colors.onSurface,
+                ),
               ),
             ),
           ],

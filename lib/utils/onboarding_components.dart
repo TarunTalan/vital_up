@@ -25,6 +25,7 @@ class OnboardingLayout extends StatelessWidget {
   final bool handleSystemBack;
   final double? titleTopSpace;
   final double? titleBottomSpace;
+  final bool showBack;
   final Widget child;
 
   const OnboardingLayout({
@@ -37,6 +38,7 @@ class OnboardingLayout extends StatelessWidget {
     this.subtitle,
     this.nextEnabled = true,
     this.showSkip = true,
+    this.showBack = true,
     this.nextLabel = "Next",
     this.fullBleedChild = false,
     this.handleSystemBack = true,
@@ -109,11 +111,11 @@ class OnboardingLayout extends StatelessWidget {
                 child: Column(
                   children: [
                     const SizedBox(height: AppDimens.space16),
-                    padded(OnboardingTopBar(onBack: onBack, step: step)),
+                    padded(OnboardingTopBar(onBack: onBack, step: step, showBack: showBack)),
                     Expanded(
                       child: CustomScrollView(
                         keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
+                            ScrollViewKeyboardDismissBehavior.manual,
                         slivers: [
                           SliverToBoxAdapter(
                             child: Column(
@@ -169,7 +171,7 @@ class OnboardingLayout extends StatelessWidget {
       ),
     );
 
-    if (!handleSystemBack) return scaffold;
+    if (!handleSystemBack || !showBack) return scaffold;
 
     return PopScope(
       canPop: false,
@@ -189,16 +191,22 @@ class OnboardingLayout extends StatelessWidget {
 class OnboardingTopBar extends StatelessWidget {
   final VoidCallback onBack;
   final int step;
+  final bool showBack;
 
-  const OnboardingTopBar({super.key, required this.onBack, required this.step});
+  const OnboardingTopBar({
+    super.key, 
+    required this.onBack, 
+    required this.step,
+    this.showBack = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        BackIcon(onClick: onBack),
+        if (showBack) BackIcon(onClick: onBack) else const SizedBox(width: AppDimens.space48),
         const Spacer(),
-        Text("$step/10", style: context.text.headlineSmall),
+        Text("$step/7", style: context.text.headlineSmall),
       ],
     );
   }
@@ -326,9 +334,9 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
       onChange: widget.onChange,
       placeholder: widget.placeholder,
       keyboardType: widget.keyboardType,
-      error: widget.showErrorText
-          ? (widget.isError ? "Required" : widget.error)
-          : null,
+      error: widget.isError
+          ? (widget.showErrorText ? (widget.error ?? "Required") : "")
+          : (widget.showErrorText ? widget.error : null),
       showValidation: widget.showErrorText,
       maxLength: widget.maxLength > 0 ? widget.maxLength : 1000,
       enabled: !widget.readOnly,
@@ -561,10 +569,17 @@ class _OnboardingNumberFieldState<T extends num>
               TextField(
                 controller: _controller,
                 focusNode: _focusNode,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                keyboardType: TextInputType.numberWithOptions(
+                  decimal: T != int,
                 ),
+                inputFormatters: [
+                  if (T == int)
+                    FilteringTextInputFormatter.digitsOnly
+                  else
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
                 textAlign: TextAlign.center,
+                onTapOutside: (event) {},
                 autofocus: widget.autofocus,
                 cursorColor: colors.primary,
                 style: context.text.headlineLarge?.copyWith(color: valueColor),
