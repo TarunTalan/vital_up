@@ -2,9 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 
 /// UUID for the standard Bluetooth Heart Rate Service.
 const _kHeartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
+
 /// UUID for the Heart Rate Measurement characteristic.
 const _kHrmCharacteristicUuid = '00002a37-0000-1000-8000-00805f9b34fb';
 
@@ -23,7 +27,10 @@ class HeartRateManager {
   Future<void> connect(BluetoothDevice device) async {
     await disconnect();
     _device = device;
-    await device.connect(autoConnect: false, timeout: const Duration(seconds: 10));
+    await device.connect(
+      autoConnect: false,
+      timeout: const Duration(seconds: 10),
+    );
 
     _stateSubscription = device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
@@ -40,7 +47,9 @@ class HeartRateManager {
             _valueSubscription = char.lastValueStream.listen((data) {
               if (data.isNotEmpty) {
                 // Parse HRM per Bluetooth spec — first byte flags, BPM follows.
-                final bpm = (data[0] & 0x01) == 0 ? data[1] : data[1] | (data[2] << 8);
+                final bpm = (data[0] & 0x01) == 0
+                    ? data[1]
+                    : data[1] | (data[2] << 8);
                 _bpmController.add(bpm);
               }
             });
@@ -78,15 +87,11 @@ class HrDeviceSheet extends StatefulWidget {
   const HrDeviceSheet({super.key, required this.manager});
 
   static Future<void> show(
-      BuildContext context, HeartRateManager manager) async {
-    final theme = Theme.of(context);
-    await showModalBottomSheet(
+    BuildContext context,
+    HeartRateManager manager,
+  ) async {
+    await showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (_) => HrDeviceSheet(manager: manager),
     );
   }
@@ -145,9 +150,7 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
     } catch (e) {
       if (mounted) {
         setState(() => _connectingId = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connection failed: $e')),
-        );
+        showErrorSnackBar(context, 'Connection failed: $e');
       }
     }
   }
@@ -161,9 +164,11 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
+    final titleStyle = context.text.titleSmall?.copyWith(
+      color: colors.onSurface,
+    );
 
     return DraggableScrollableSheet(
       expand: false,
@@ -171,24 +176,15 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
       maxChildSize: 0.85,
       builder: (_, scrollCtrl) {
         return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+          padding: EdgeInsets.fromLTRB(
+            context.gutter,
+            0,
+            context.gutter,
+            AppDimens.space16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.outline.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Header row
               Row(
                 children: [
                   Expanded(
@@ -196,18 +192,15 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'HEART RATE MONITOR',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 2,
-                              color: colors.onSurface),
+                          'Heart Rate Monitor',
+                          style: context.text.headlineSmall,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppDimens.space4),
                         Text(
                           'Pair a BLE heart rate device',
-                          style: TextStyle(
-                              fontSize: 13, color: customColors?.grayText ?? const Color(0xFF888888)),
+                          style: context.text.bodyMedium?.copyWith(
+                            color: v.grayText,
+                          ),
                         ),
                       ],
                     ),
@@ -218,50 +211,54 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                         await widget.manager.disconnect();
                         if (mounted) setState(() {});
                       },
-                      icon: Icon(Icons.link_off_rounded, size: 16,
-                          color: colors.error),
-                      label: Text('Disconnect',
-                          style: TextStyle(color: colors.error, fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.error,
+                        textStyle: context.text.bodySmall,
+                      ),
+                      icon: const Icon(
+                        Icons.link_off_rounded,
+                        size: AppDimens.iconXs,
+                      ),
+                      label: const Text('Disconnect'),
                     ),
                   if (_isScanning)
-                    SizedBox(
-                      width: 18,
-                      height: 18,
+                    const SizedBox.square(
+                      dimension: AppDimens.iconSm,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colors.primary,
+                        strokeWidth: AppDimens.borderThick,
                       ),
                     )
                   else
                     IconButton(
                       onPressed: _startScan,
-                      icon: Icon(Icons.refresh_rounded, color: colors.onSurface),
+                      icon: const Icon(Icons.refresh_rounded),
                       tooltip: 'Rescan',
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Divider(color: colors.outline.withOpacity(0.2)),
+              const SizedBox(height: AppDimens.space12),
+              const Divider(),
 
               // Connected device
               if (widget.manager.connectedDevice != null) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: colors.primary.withOpacity(0.12),
-                    child: Icon(Icons.favorite_rounded,
-                        color: colors.error, size: 20),
+                  leading: AppIconBadge(
+                    icon: const Icon(Icons.favorite_rounded),
+                    color: colors.error,
                   ),
                   title: Text(
                     widget.manager.connectedDevice!.platformName.isEmpty
                         ? 'HR Monitor'
                         : widget.manager.connectedDevice!.platformName,
-                    style: TextStyle(fontWeight: FontWeight.w700, color: colors.onSurface),
+                    style: titleStyle,
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Connected',
-                    style: TextStyle(
-                        color: Colors.green, fontWeight: FontWeight.w600),
+                    style: context.text.bodyMedium?.copyWith(
+                      color: v.success,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   trailing: StreamBuilder<int?>(
                     stream: widget.manager.bpmStream,
@@ -269,16 +266,15 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                       final bpm = snap.data;
                       return Text(
                         bpm != null ? '$bpm BPM' : '--',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                        style: context.text.titleSmall?.copyWith(
                           color: colors.error,
+                          fontWeight: FontWeight.w600,
                         ),
                       );
                     },
                   ),
                 ),
-                Divider(color: colors.outline.withOpacity(0.2)),
+                const Divider(),
               ],
 
               // Scanned devices list
@@ -290,8 +286,9 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                               ? 'Scanning for heart rate monitors…'
                               : 'No devices found.\nMake sure your device is in pairing mode.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: customColors?.grayText ?? const Color(0xFF888888), height: 1.6),
+                          style: context.text.bodyMedium?.copyWith(
+                            color: v.grayText,
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -306,29 +303,31 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                           final isConnecting = _connectingId == id;
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundColor: colors.outline.withOpacity(0.12),
-                              child: Icon(Icons.favorite_border_rounded,
-                                  color: colors.error, size: 20),
+                            leading: AppIconBadge(
+                              icon: const Icon(Icons.favorite_border_rounded),
+                              color: colors.error,
                             ),
-                            title: Text(name,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700, color: colors.onSurface)),
-                            subtitle:
-                                Text('RSSI: ${r.rssi} dBm',
-                                    style: TextStyle(fontSize: 12, color: customColors?.grayText)),
+                            title: Text(name, style: titleStyle),
+                            subtitle: Text(
+                              'RSSI: ${r.rssi} dBm',
+                              style: context.text.bodySmall?.copyWith(
+                                color: v.grayText,
+                              ),
+                            ),
                             trailing: isConnecting
-                                ? SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                ? const SizedBox.square(
+                                    dimension: AppDimens.iconMd,
                                     child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: colors.primary,
+                                      strokeWidth: AppDimens.borderThick,
                                     ),
                                   )
-                                : Icon(Icons.chevron_right_rounded, color: colors.outline),
-                            onTap:
-                                _connectingId != null ? null : () => _connect(r),
+                                : Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: v.grayText,
+                                  ),
+                            onTap: _connectingId != null
+                                ? null
+                                : () => _connect(r),
                           );
                         },
                       ),
@@ -340,4 +339,3 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
     );
   }
 }
-

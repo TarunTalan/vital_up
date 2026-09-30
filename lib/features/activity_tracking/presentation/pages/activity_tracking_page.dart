@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
 import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 
@@ -112,7 +114,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   Future<void> _checkIfCurrentTrackFavorited() async {
     final track = _prefsNotifier.value.backgroundAudioTrack;
     final isar = sl<IsarService>().isar;
-    final existing = await isar.favoriteAudios.filter().trackIdEqualTo(track).findFirst();
+    final existing = await isar.favoriteAudios
+        .filter()
+        .trackIdEqualTo(track)
+        .findFirst();
     if (mounted) {
       setState(() {
         _isCurrentTrackFavorited = existing != null;
@@ -120,29 +125,35 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  static const _audioChannel = MethodChannel('com.example.vital_up/audio_intent');
+  static const _audioChannel = MethodChannel(
+    'com.example.vital_up/audio_intent',
+  );
 
   void _playWorkoutAudio({bool play = true}) {
     final prefs = _prefsNotifier.value;
     if (prefs.preferredPlayerPackage != 'builtIn') {
-      _audioChannel.invokeMethod('launchAudioApp', {'packageName': prefs.preferredPlayerPackage});
+      _audioChannel.invokeMethod('launchAudioApp', {
+        'packageName': prefs.preferredPlayerPackage,
+      });
     } else {
       sl<IsarService>().isar.downloadedTracks
           .filter()
           .trackIdEqualTo(prefs.backgroundAudioTrack)
           .findFirst()
           .then((downloaded) {
-        final localPath = downloaded?.localFilePath;
-        final source = downloaded != null
-            ? 'download'
-            : (prefs.backgroundAudioTrack.startsWith('Local:') ? 'local' : 'preset');
-        sl<WorkoutAudioService>().playTrack(
-          prefs.backgroundAudioTrack,
-          source: source,
-          localPath: localPath,
-          play: play,
-        );
-      });
+            final localPath = downloaded?.localFilePath;
+            final source = downloaded != null
+                ? 'download'
+                : (prefs.backgroundAudioTrack.startsWith('Local:')
+                      ? 'local'
+                      : 'preset');
+            sl<WorkoutAudioService>().playTrack(
+              prefs.backgroundAudioTrack,
+              source: source,
+              localPath: localPath,
+              play: play,
+            );
+          });
     }
   }
 
@@ -157,7 +168,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _resumeWorkoutAudio() {
     final prefs = _prefsNotifier.value;
     if (prefs.preferredPlayerPackage != 'builtIn') {
-      _audioChannel.invokeMethod('launchAudioApp', {'packageName': prefs.preferredPlayerPackage});
+      _audioChannel.invokeMethod('launchAudioApp', {
+        'packageName': prefs.preferredPlayerPackage,
+      });
     } else {
       sl<WorkoutAudioService>().resume();
     }
@@ -186,7 +199,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         'Story: Best Speeches',
       ];
     } else if (queueType == 'favorite') {
-      final favs = await sl<IsarService>().isar.favoriteAudios.where().findAll();
+      final favs = await sl<IsarService>().isar.favoriteAudios
+          .where()
+          .findAll();
       queue = favs.map((f) => f.trackId).toList();
     } else if (queueType == 'local') {
       final songs = await sl<LocalAudioQueryService>().getLocalSongs();
@@ -217,7 +232,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
 
     final targetTrack = queue[targetIndex];
-    await _prefsNotifier.setBackgroundAudioTrack(targetTrack, queueType: queueType);
+    await _prefsNotifier.setBackgroundAudioTrack(
+      targetTrack,
+      queueType: queueType,
+    );
 
     _voiceCoach.stop();
 
@@ -265,28 +283,29 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       return;
     }
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen((position) {
-      if (mounted) {
-        final point = TrackPoint(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: position.timestamp,
-          accuracy: position.accuracy,
-          speed: position.speed.isFinite ? position.speed : 0,
-          altitude: position.altitude.isFinite ? position.altitude : 0,
-        );
-        setState(() {
-          _currentPosition = point;
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((position) {
+          if (mounted) {
+            final point = TrackPoint(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              timestamp: position.timestamp,
+              accuracy: position.accuracy,
+              speed: position.speed.isFinite ? position.speed : 0,
+              altitude: position.altitude.isFinite ? position.altitude : 0,
+            );
+            setState(() {
+              _currentPosition = point;
+            });
+            _updatePuck(point);
+            _initialCenterCamera(position.latitude, position.longitude);
+          }
         });
-        _updatePuck(point);
-        _initialCenterCamera(position.latitude, position.longitude);
-      }
-    });
   }
 
   Future<void> _downloadOfflineMap() async {
@@ -317,7 +336,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       // 2. Start Mapbox tile download (10km radius)
@@ -348,7 +369,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         setState(() {
           _isDownloadingMap = false;
         });
-        showErrorSnackBar(context, 'Failed to download offline tiles: ${e.toString()}');
+        showErrorSnackBar(
+          context,
+          'Failed to download offline tiles: ${e.toString()}',
+        );
       }
     }
   }
@@ -380,30 +404,40 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
     // Move compass to top right, at roughly 60% height of screen
     final screenHeight = MediaQuery.sizeOf(context).height;
-    await map.compass.updateSettings(mbx.CompassSettings(
-      position: mbx.OrnamentPosition.TOP_RIGHT,
-      marginTop: screenHeight * 0.6,
-      marginRight: 12,
-    ));
+    await map.compass.updateSettings(
+      mbx.CompassSettings(
+        position: mbx.OrnamentPosition.TOP_RIGHT,
+        marginTop: screenHeight * 0.6,
+        marginRight: AppDimens.gutter,
+      ),
+    );
 
     // Hide scale bar
     await map.scaleBar.updateSettings(mbx.ScaleBarSettings(enabled: false));
 
     // Create annotation managers
-    _polylineAnnotationManager = await map.annotations.createPolylineAnnotationManager();
-    _circleAnnotationManager = await map.annotations.createCircleAnnotationManager();
-    _startPointAnnotationManager = await map.annotations.createCircleAnnotationManager();
+    _polylineAnnotationManager = await map.annotations
+        .createPolylineAnnotationManager();
+    _circleAnnotationManager = await map.annotations
+        .createCircleAnnotationManager();
+    _startPointAnnotationManager = await map.annotations
+        .createCircleAnnotationManager();
 
     // Center camera immediately if we already have a position from the stream
     if (_currentPosition != null) {
-      _initialCenterCamera(_currentPosition!.latitude, _currentPosition!.longitude);
+      _initialCenterCamera(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
       _updatePuck(_currentPosition);
     }
 
     // Center camera on user's current location initially with appropriate zoom
     try {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       _initialCenterCamera(position.latitude, position.longitude);
 
@@ -424,54 +458,72 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   void _updateRoute(List<TrackPoint> points) {
-    if (_polylineAnnotationManager == null || points.length < 2 || !mounted) return;
+    if (_polylineAnnotationManager == null || points.length < 2 || !mounted)
+      return;
 
     _polylineAnnotationManager!.deleteAll();
 
     final coordinates = points.map((p) => [p.longitude, p.latitude]).toList();
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = context.colors.primary;
 
-    _polylineAnnotationManager!.create(mbx.PolylineAnnotationOptions(
-      geometry: mbx.LineString(coordinates: coordinates.map((c) => mbx.Position(c[0], c[1])).toList()),
-      lineColor: primaryColor.toARGB32(),
-      lineWidth: 5.0,
-    ));
+    _polylineAnnotationManager!.create(
+      mbx.PolylineAnnotationOptions(
+        geometry: mbx.LineString(
+          coordinates: coordinates
+              .map((c) => mbx.Position(c[0], c[1]))
+              .toList(),
+        ),
+        lineColor: primaryColor.toARGB32(),
+        lineWidth: ActivityMapDimens.routeWidth,
+      ),
+    );
   }
 
   void _updateStartPoint(TrackPoint? point) {
-    if (_startPointAnnotationManager == null || point == null || !mounted) return;
+    if (_startPointAnnotationManager == null || point == null || !mounted)
+      return;
 
     _startPointAnnotationManager!.deleteAll();
 
-    _startPointAnnotationManager!.create(mbx.CircleAnnotationOptions(
-      geometry: mbx.Point(coordinates: mbx.Position(point.longitude, point.latitude)),
-      circleRadius: 10.0,
-      circleColor: const Color(0xFFFF5722).toARGB32(),
-      circleStrokeWidth: 3.0,
-      circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
-    ));
+    _startPointAnnotationManager!.create(
+      mbx.CircleAnnotationOptions(
+        geometry: mbx.Point(
+          coordinates: mbx.Position(point.longitude, point.latitude),
+        ),
+        circleRadius: ActivityMapDimens.startRadius,
+        circleColor: ActivityColors.mapStartPoint.toARGB32(),
+        circleStrokeWidth: ActivityMapDimens.startStroke,
+        circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
+      ),
+    );
   }
 
   void _updatePuck(TrackPoint? point) {
     if (_circleAnnotationManager == null || point == null || !mounted) return;
 
     _circleAnnotationManager!.deleteAll();
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = context.colors.primary;
 
-    _circleAnnotationManager!.create(mbx.CircleAnnotationOptions(
-      geometry: mbx.Point(coordinates: mbx.Position(point.longitude, point.latitude)),
-      circleRadius: 8.0,
-      circleColor: primaryColor.toARGB32(),
-      circleStrokeWidth: 2.0,
-      circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
-    ));
+    _circleAnnotationManager!.create(
+      mbx.CircleAnnotationOptions(
+        geometry: mbx.Point(
+          coordinates: mbx.Position(point.longitude, point.latitude),
+        ),
+        circleRadius: ActivityMapDimens.puckRadius,
+        circleColor: primaryColor.toARGB32(),
+        circleStrokeWidth: ActivityMapDimens.puckStroke,
+        circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
+      ),
+    );
   }
 
   void _centerCamera(double lat, double lng, {double? zoom}) {
-    _mapboxMap?.setCamera(mbx.CameraOptions(
-      center: mbx.Point(coordinates: mbx.Position(lng, lat)),
-      zoom: zoom,
-    ));
+    _mapboxMap?.setCamera(
+      mbx.CameraOptions(
+        center: mbx.Point(coordinates: mbx.Position(lng, lat)),
+        zoom: zoom,
+      ),
+    );
   }
 
   void _clearMapAnnotations() {
@@ -485,8 +537,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return BlocConsumer<ActivityTrackingBloc, ActivityTrackingState>(
       listener: (context, state) {
         if (state is TrackingPermissionDenied) {
@@ -522,7 +572,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingPaused) {
-          if (_prefsNotifier.value.voiceCoachEnabled) _voiceCoach.announcePause();
+          if (_prefsNotifier.value.voiceCoachEnabled)
+            _voiceCoach.announcePause();
           // Stay unlocked or locked as per user preference
           _updateRoute(state.routePoints);
           if (state.routePoints.isNotEmpty) {
@@ -581,7 +632,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             currentSpeed = state.routePoints.last.speed;
             double cumulativeElevation = 0.0;
             for (int i = 1; i < state.routePoints.length; i++) {
-              final diff = state.routePoints[i].altitude - state.routePoints[i - 1].altitude;
+              final diff =
+                  state.routePoints[i].altitude -
+                  state.routePoints[i - 1].altitude;
               if (diff > 0) cumulativeElevation += diff;
             }
             elevationGain = cumulativeElevation;
@@ -596,7 +649,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             currentSpeed = 0.0;
             double cumulativeElevation = 0.0;
             for (int i = 1; i < state.routePoints.length; i++) {
-              final diff = state.routePoints[i].altitude - state.routePoints[i - 1].altitude;
+              final diff =
+                  state.routePoints[i].altitude -
+                  state.routePoints[i - 1].altitude;
               if (diff > 0) cumulativeElevation += diff;
             }
             elevationGain = cumulativeElevation;
@@ -611,7 +666,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             currentSpeed = 0.0;
             double cumulativeElevation = 0.0;
             for (int i = 1; i < state.session.points.length; i++) {
-              final diff = state.session.points[i].altitude - state.session.points[i - 1].altitude;
+              final diff =
+                  state.session.points[i].altitude -
+                  state.session.points[i - 1].altitude;
               if (diff > 0) cumulativeElevation += diff;
             }
             elevationGain = cumulativeElevation;
@@ -626,7 +683,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             }
           },
           child: Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
+            backgroundColor: context.colors.surface,
             body: Stack(
               children: [
                 // Map fills the background
@@ -651,9 +708,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                     left: 0,
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(context.gutter),
                         child: RoundIconButton(
                           icon: Icons.arrow_back_rounded,
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).backButtonTooltip,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
@@ -667,10 +727,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                     right: 0,
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(context.gutter),
                         child: RoundIconButton(
                           icon: Icons.history_rounded,
-                          onPressed: () => context.pushNamed('activity-history'),
+                          tooltip: 'History',
+                          onPressed: () =>
+                              context.pushNamed('activity-history'),
                         ),
                       ),
                     ),
@@ -685,7 +747,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                     bottom: false,
                     child: Padding(
                       padding: EdgeInsets.only(
-                        top: state is TrackingIdle ? 56 : 12,
+                        top: state is TrackingIdle
+                            ? AppDimens.backButtonSize + context.gutter * 2
+                            : AppDimens.space12,
                       ),
                       child: ValueListenableBuilder<DistanceUnit>(
                         valueListenable: _unitNotifier,
@@ -724,12 +788,17 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         AnimatedOpacity(
-                          opacity: (_isUiVisible && !_isCountingDown) ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
+                          opacity: (_isUiVisible && !_isCountingDown)
+                              ? 1.0
+                              : 0.0,
+                          duration: AppDurations.medium,
                           child: IgnorePointer(
                             ignoring: !(_isUiVisible && !_isCountingDown),
                             child: Padding(
-                              padding: const EdgeInsets.only(right: 12, bottom: 12),
+                              padding: EdgeInsets.only(
+                                right: context.gutter,
+                                bottom: AppDimens.space12,
+                              ),
                               child: ZoomResetButton(
                                 onPressed: () {
                                   if (_currentPosition != null) {
@@ -745,188 +814,288 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                           ),
                         ),
                         AnimatedOpacity(
-                          opacity: (_isUiVisible && !_isCountingDown) ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
+                          opacity: (_isUiVisible && !_isCountingDown)
+                              ? 1.0
+                              : 0.0,
+                          duration: AppDurations.medium,
                           child: IgnorePointer(
                             ignoring: !(_isUiVisible && !_isCountingDown),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                            child: ResponsiveCenter(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  context.gutter,
+                                  AppDimens.space8,
+                                  context.gutter,
+                                  AppDimens.space12,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ValueListenableBuilder<WorkoutPrefs>(
+                                      valueListenable: _prefsNotifier,
+                                      builder: (context, prefs, __) {
+                                        final isExternal =
+                                            prefs.preferredPlayerPackage !=
+                                            'builtIn';
+                                        final displayTrack = isExternal
+                                            ? 'Player: ${prefs.preferredPlayerPackage.split('.').last.toUpperCase()}'
+                                            : prefs.backgroundAudioTrack;
 
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ValueListenableBuilder<WorkoutPrefs>(
-                                    valueListenable: _prefsNotifier,
-                                    builder: (context, prefs, __) {
-                                      final isExternal = prefs.preferredPlayerPackage != 'builtIn';
-                                      final displayTrack = isExternal
-                                          ? 'Player: ${prefs.preferredPlayerPackage.split('.').last.toUpperCase()}'
-                                          : prefs.backgroundAudioTrack;
-
-                                      return StreamBuilder<bool>(
-                                        stream: sl<WorkoutAudioService>().playingStream,
-                                        initialData: sl<WorkoutAudioService>().isPlaying,
-                                        builder: (context, playingSnapshot) {
-                                          final isPlaying = playingSnapshot.data ?? false;
-                                           return WorkoutMusicPlayer(
-                                             trackName: displayTrack,
-                                             isPlaying: isExternal ? false : isPlaying,
-                                             isFavorited: isExternal ? false : _isCurrentTrackFavorited,
-                                             isMinimized: _isPlayerMinimized,
-                                             onMinimizeToggle: () {
-                                               setState(() {
-                                                 _isPlayerMinimized = !_isPlayerMinimized;
-                                               });
-                                             },
-                                             onTap: () {
-                                               Navigator.of(context).push(
-                                                 MaterialPageRoute(
-                                                   builder: (_) => WorkoutAudioPage(
-                                                     current: prefs,
-                                                     notifier: _prefsNotifier,
-                                                   ),
-                                                 ),
-                                               ).then((_) {
-                                                 _checkIfCurrentTrackFavorited();
-                                               });
-                                             },
-                                             onDiscard: () {
-                                               _prefsNotifier.setBackgroundAudioTrack('None');
-                                               _stopWorkoutAudio();
-                                               _voiceCoach.stop();
-                                             },
-                                             onPlayPause: () {
-                                               if (isExternal) {
+                                        return StreamBuilder<bool>(
+                                          stream: sl<WorkoutAudioService>()
+                                              .playingStream,
+                                          initialData: sl<WorkoutAudioService>()
+                                              .isPlaying,
+                                          builder: (context, playingSnapshot) {
+                                            final isPlaying =
+                                                playingSnapshot.data ?? false;
+                                            return WorkoutMusicPlayer(
+                                              trackName: displayTrack,
+                                              isPlaying: isExternal
+                                                  ? false
+                                                  : isPlaying,
+                                              isFavorited: isExternal
+                                                  ? false
+                                                  : _isCurrentTrackFavorited,
+                                              isMinimized: _isPlayerMinimized,
+                                              onMinimizeToggle: () {
+                                                setState(() {
+                                                  _isPlayerMinimized =
+                                                      !_isPlayerMinimized;
+                                                });
+                                              },
+                                              onTap: () {
+                                                Navigator.of(context)
+                                                    .push(
+                                                      MaterialPageRoute(
+                                                        builder: (_) =>
+                                                            WorkoutAudioPage(
+                                                              current: prefs,
+                                                              notifier:
+                                                                  _prefsNotifier,
+                                                            ),
+                                                      ),
+                                                    )
+                                                    .then((_) {
+                                                      _checkIfCurrentTrackFavorited();
+                                                    });
+                                              },
+                                              onDiscard: () {
+                                                _prefsNotifier
+                                                    .setBackgroundAudioTrack(
+                                                      'None',
+                                                    );
+                                                _stopWorkoutAudio();
+                                                _voiceCoach.stop();
+                                              },
+                                              onPlayPause: () {
+                                                if (isExternal) {
                                                   _playWorkoutAudio();
-                                               } else {
-                                                 final audioService = sl<WorkoutAudioService>();
-                                                 if (audioService.isPlaying) {
-                                                   _pauseWorkoutAudio();
-                                                   sl<VoiceCoachService>().stop();
-                                                 } else {
-                                                   _playWorkoutAudio();
-                                                 }
-                                               }
-                                             },
-                                             onNext: isExternal ? () {} : () => _cycleTrack(next: true),
-                                             onPrevious: isExternal ? () {} : () => _cycleTrack(next: false),
-                                             onFavoriteToggle: isExternal ? () {} : () async {
-                                               final track = prefs.backgroundAudioTrack;
-                                               final isar = sl<IsarService>().isar;
-                                               final existing = await isar.favoriteAudios.filter().trackIdEqualTo(track).findFirst();
-                                               await isar.writeTxn(() async {
-                                                 if (existing != null) {
-                                                   await isar.favoriteAudios.delete(existing.id);
-                                                 } else {
-                                                   final title = track.replaceFirst('Story: ', '').replaceFirst('Music: ', '');
-                                                   final source = track.startsWith('Local:') ? 'local' : 'preset';
-                                                   final fav = FavoriteAudio()
-                                                     ..trackId = track
-                                                     ..title = title
-                                                     ..subtitle = source == 'local' ? 'Local Track' : 'Curated Audio'
-                                                     ..audioSource = source
-                                                     ..favoritedAt = DateTime.now();
-                                                   await isar.favoriteAudios.put(fav);
-                                                 }
-                                               });
-                                               _checkIfCurrentTrackFavorited();
-                                             },
-                                           );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                  if (state is TrackingIdle) ...[
-                                    ActivitySelector(
-                                      selected: state.activityType,
-                                      enabled: true,
-                                      onSelected: (type) => bloc.add(SelectActivityType(type)),
+                                                } else {
+                                                  final audioService =
+                                                      sl<WorkoutAudioService>();
+                                                  if (audioService.isPlaying) {
+                                                    _pauseWorkoutAudio();
+                                                    sl<VoiceCoachService>()
+                                                        .stop();
+                                                  } else {
+                                                    _playWorkoutAudio();
+                                                  }
+                                                }
+                                              },
+                                              onNext: isExternal
+                                                  ? () {}
+                                                  : () =>
+                                                        _cycleTrack(next: true),
+                                              onPrevious: isExternal
+                                                  ? () {}
+                                                  : () => _cycleTrack(
+                                                      next: false,
+                                                    ),
+                                              onFavoriteToggle: isExternal
+                                                  ? () {}
+                                                  : () async {
+                                                      final track = prefs
+                                                          .backgroundAudioTrack;
+                                                      final isar =
+                                                          sl<IsarService>()
+                                                              .isar;
+                                                      final existing =
+                                                          await isar
+                                                              .favoriteAudios
+                                                              .filter()
+                                                              .trackIdEqualTo(
+                                                                track,
+                                                              )
+                                                              .findFirst();
+                                                      await isar.writeTxn(() async {
+                                                        if (existing != null) {
+                                                          await isar
+                                                              .favoriteAudios
+                                                              .delete(
+                                                                existing.id,
+                                                              );
+                                                        } else {
+                                                          final title = track
+                                                              .replaceFirst(
+                                                                'Story: ',
+                                                                '',
+                                                              )
+                                                              .replaceFirst(
+                                                                'Music: ',
+                                                                '',
+                                                              );
+                                                          final source =
+                                                              track.startsWith(
+                                                                'Local:',
+                                                              )
+                                                              ? 'local'
+                                                              : 'preset';
+                                                          final fav = FavoriteAudio()
+                                                            ..trackId = track
+                                                            ..title = title
+                                                            ..subtitle =
+                                                                source ==
+                                                                    'local'
+                                                                ? 'Local Track'
+                                                                : 'Curated Audio'
+                                                            ..audioSource =
+                                                                source
+                                                            ..favoritedAt =
+                                                                DateTime.now();
+                                                          await isar
+                                                              .favoriteAudios
+                                                              .put(fav);
+                                                        }
+                                                      });
+                                                      _checkIfCurrentTrackFavorited();
+                                                    },
+                                            );
+                                          },
+                                        );
+                                      },
                                     ),
-                                    const SizedBox(height: 10),
-                                  ],
-                                  StartPauseControl(
-                                    state: state,
-                                    isLocked: _isLocked,
-                                    onMusicTap: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => WorkoutAudioPage(
-                                            current: _prefsNotifier.value,
-                                            notifier: _prefsNotifier,
-                                          ),
-                                        ),
-                                      ).then((_) {
-                                        _checkIfCurrentTrackFavorited();
-                                      });
-                                    },
-                                    onLockToggle: (locked) {
-                                      setState(() {
-                                        _isLocked = locked;
-                                      });
-                                    },
-                                    onStart: () async {
-                                      final duration = _prefsNotifier.value.countdownDurationSeconds;
-                                      if (duration > 0) {
+                                    if (state is TrackingIdle) ...[
+                                      ActivitySelector(
+                                        selected: state.activityType,
+                                        enabled: true,
+                                        onSelected: (type) =>
+                                            bloc.add(SelectActivityType(type)),
+                                      ),
+                                      const SizedBox(height: AppDimens.space8),
+                                    ],
+                                    StartPauseControl(
+                                      state: state,
+                                      isLocked: _isLocked,
+                                      onMusicTap: () {
+                                        Navigator.of(context)
+                                            .push(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    WorkoutAudioPage(
+                                                      current:
+                                                          _prefsNotifier.value,
+                                                      notifier: _prefsNotifier,
+                                                    ),
+                                              ),
+                                            )
+                                            .then((_) {
+                                              _checkIfCurrentTrackFavorited();
+                                            });
+                                      },
+                                      onLockToggle: (locked) {
                                         setState(() {
-                                          _isCountingDown = true;
+                                          _isLocked = locked;
                                         });
-                                      } else {
-                                        _prefsNotifier.applyDailyTargetIfEnabled();
-                                        bloc.add(StartTracking());
-                                        if (_prefsNotifier.value.voiceCoachEnabled) {
-                                          _voiceCoach.announceStart();
+                                      },
+                                      onStart: () async {
+                                        final duration = _prefsNotifier
+                                            .value
+                                            .countdownDurationSeconds;
+                                        if (duration > 0) {
+                                          setState(() {
+                                            _isCountingDown = true;
+                                          });
+                                        } else {
+                                          _prefsNotifier
+                                              .applyDailyTargetIfEnabled();
+                                          bloc.add(StartTracking());
+                                          if (_prefsNotifier
+                                              .value
+                                              .voiceCoachEnabled) {
+                                            _voiceCoach.announceStart();
+                                          }
+                                          _playWorkoutAudio();
                                         }
-                                        _playWorkoutAudio();
-                                      }
-                                    },
-                                     onPause: () {
-                                       bloc.add(PauseTracking());
-                                       _pauseWorkoutAudio();
-                                     },
-                                     onResume: () {
-                                       bloc.add(ResumeTracking());
+                                      },
+                                      onPause: () {
+                                        bloc.add(PauseTracking());
+                                        _pauseWorkoutAudio();
+                                      },
+                                      onResume: () {
+                                        bloc.add(ResumeTracking());
 
-                                       if (_prefsNotifier.value.voiceCoachEnabled) {
-                                         _voiceCoach.announceResume();
-                                       }
-                                       _resumeWorkoutAudio();
-                                     },
-                                    onStop: () {
-                                      final prefs = _prefsNotifier.value;
-                                      String? tType;
-                                      double? tValue;
-                                      bool tAchieved = false;
-                                      if (prefs.targetType != WorkoutTargetType.none && prefs.targetValue > 0) {
-                                        tType = prefs.targetType.name;
-                                        tValue = prefs.targetValue;
-                                        // Compute achievement from current bloc state
-                                        final s = context.read<ActivityTrackingBloc>().state;
-                                        if (prefs.targetType == WorkoutTargetType.distance) {
-                                          final targetMeters = prefs.targetValue * 1000;
-                                          if (s is TrackingInProgress) {
-                                            tAchieved = s.distanceMeters >= targetMeters;
-                                          } else if (s is TrackingPaused) {
-                                            tAchieved = s.distanceMeters >= targetMeters;
-                                          }
-                                        } else if (prefs.targetType == WorkoutTargetType.calories) {
-                                          if (s is TrackingInProgress) {
-                                            tAchieved = s.calories >= prefs.targetValue;
-                                          } else if (s is TrackingPaused) {
-                                            tAchieved = s.calories >= prefs.targetValue;
+                                        if (_prefsNotifier
+                                            .value
+                                            .voiceCoachEnabled) {
+                                          _voiceCoach.announceResume();
+                                        }
+                                        _resumeWorkoutAudio();
+                                      },
+                                      onStop: () {
+                                        final prefs = _prefsNotifier.value;
+                                        String? tType;
+                                        double? tValue;
+                                        bool tAchieved = false;
+                                        if (prefs.targetType !=
+                                                WorkoutTargetType.none &&
+                                            prefs.targetValue > 0) {
+                                          tType = prefs.targetType.name;
+                                          tValue = prefs.targetValue;
+                                          // Compute achievement from current bloc state
+                                          final s = context
+                                              .read<ActivityTrackingBloc>()
+                                              .state;
+                                          if (prefs.targetType ==
+                                              WorkoutTargetType.distance) {
+                                            final targetMeters =
+                                                prefs.targetValue * 1000;
+                                            if (s is TrackingInProgress) {
+                                              tAchieved =
+                                                  s.distanceMeters >=
+                                                  targetMeters;
+                                            } else if (s is TrackingPaused) {
+                                              tAchieved =
+                                                  s.distanceMeters >=
+                                                  targetMeters;
+                                            }
+                                          } else if (prefs.targetType ==
+                                              WorkoutTargetType.calories) {
+                                            if (s is TrackingInProgress) {
+                                              tAchieved =
+                                                  s.calories >=
+                                                  prefs.targetValue;
+                                            } else if (s is TrackingPaused) {
+                                              tAchieved =
+                                                  s.calories >=
+                                                  prefs.targetValue;
+                                            }
                                           }
                                         }
-                                      }
-                                      bloc.add(StopAndSaveTracking(
-                                        targetType: tType,
-                                        targetValue: tValue,
-                                        targetAchieved: tAchieved,
-                                      ));
-                                      _prefsNotifier.clearSessionTarget();
-                                      _stopWorkoutAudio();
-                                    },
-                                    onSettingsTap: () => _openSettings(),
-                                  ),
-                                ],
+                                        bloc.add(
+                                          StopAndSaveTracking(
+                                            targetType: tType,
+                                            targetValue: tValue,
+                                            targetAchieved: tAchieved,
+                                          ),
+                                        );
+                                        _prefsNotifier.clearSessionTarget();
+                                        _stopWorkoutAudio();
+                                      },
+                                      onSettingsTap: () => _openSettings(),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -938,7 +1107,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                 if (_isCountingDown)
                   Positioned.fill(
                     child: CountdownOverlay(
-                      durationSeconds: _prefsNotifier.value.countdownDurationSeconds,
+                      durationSeconds:
+                          _prefsNotifier.value.countdownDurationSeconds,
                       voiceCoachEnabled: _prefsNotifier.value.voiceCoachEnabled,
                       onFinished: () {
                         setState(() {

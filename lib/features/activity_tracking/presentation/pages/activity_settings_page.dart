@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
@@ -9,6 +12,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/presentation/pages/customize_layout_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/target_picker_sheet.dart';
 
@@ -33,230 +37,174 @@ class ActivitySettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final chevron = Icon(
+      Icons.chevron_right_rounded,
+      color: context.vColors.grayText,
+    );
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8.0),
-          child: Center(
-            child: BackIcon(
-              onClick: () => Navigator.of(context).pop(),
-            ),
-          ),
-        ),
-        title: Text(
-          'ACTIVITY SETTINGS',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
-            color: colors.onSurface,
-          ),
-        ),
-        centerTitle: false,
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/bg.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          SafeArea(
-            child: ValueListenableBuilder<WorkoutPrefs>(
-              valueListenable: prefsNotifier,
-              builder: (_, prefs, __) {
-                return ValueListenableBuilder<DistanceUnit>(
-                  valueListenable: unitNotifier,
-                  builder: (_, unit, __) {
-                    final connectedDevice = hrManager.connectedDevice;
+    return AppScaffold(
+      header: const AppPageHeader(title: 'Activity Settings'),
+      scrollable: false,
+      padBody: false,
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<WorkoutPrefs>(
+          valueListenable: prefsNotifier,
+          builder: (_, prefs, _) {
+            return ValueListenableBuilder<DistanceUnit>(
+              valueListenable: unitNotifier,
+              builder: (_, unit, _) {
+                final connectedDevice = hrManager.connectedDevice;
 
-                    String targetSubtitle = 'No target set';
-                    if (prefs.targetType == WorkoutTargetType.distance) {
-                      final val = unit == DistanceUnit.miles
-                          ? prefs.targetValue / 1.60934
-                          : prefs.targetValue;
-                      targetSubtitle =
-                          '${val.toStringAsFixed(1)} ${unit.label}';
-                    } else if (prefs.targetType == WorkoutTargetType.calories) {
-                      targetSubtitle =
-                          '${prefs.targetValue.toStringAsFixed(0)} kcal';
-                    }
+                String targetSubtitle = 'No target set';
+                if (prefs.targetType == WorkoutTargetType.distance) {
+                  final val = unit == DistanceUnit.miles
+                      ? prefs.targetValue / 1.60934
+                      : prefs.targetValue;
+                  targetSubtitle = '${val.toStringAsFixed(1)} ${unit.label}';
+                } else if (prefs.targetType == WorkoutTargetType.calories) {
+                  targetSubtitle =
+                      '${prefs.targetValue.toStringAsFixed(0)} kcal';
+                }
 
-                    final hrSubtitle = connectedDevice != null
-                        ? '${connectedDevice.platformName.isEmpty ? "Device" : connectedDevice.platformName}'
-                            ' — ${liveHeartRate != null ? "$liveHeartRate BPM" : "connected"}'
-                        : 'Tap to scan for BLE devices';
+                final hrSubtitle = connectedDevice != null
+                    ? '${connectedDevice.platformName.isEmpty ? "Device" : connectedDevice.platformName}'
+                          ' — ${liveHeartRate != null ? "$liveHeartRate BPM" : "connected"}'
+                    : 'Tap to scan for BLE devices';
 
-                    return ListView(
-                      children: [
-                        // ── Session ─────────────────────────────────────────────
-                        const _SectionHeader('SESSION'),
+                return ListView(
+                  padding: const EdgeInsets.only(bottom: AppDimens.space32),
+                  children: [
+                    // ── Session ─────────────────────────────────────────────
+                    const _SectionHeader('Session'),
 
-                        _SettingsTile(
-                          icon: Icons.mic_rounded,
-                          title: 'Voice coach',
-                          subtitle: 'Audio cues at each km/mi milestone',
-                          trailing: Transform.scale(
-                            scale: 0.8,
-                            child: Switch(
-                              value: prefs.voiceCoachEnabled,
-                              activeColor: colors.primary,
-                              onChanged: (v) => prefsNotifier.setVoiceCoach(v),
-                            ),
-                          ),
-                        ),
+                    _SettingsTile(
+                      icon: Icons.mic_rounded,
+                      title: 'Voice coach',
+                      subtitle: 'Audio cues at each km/mi milestone',
+                      trailing: Switch(
+                        value: prefs.voiceCoachEnabled,
+                        onChanged: (v) => prefsNotifier.setVoiceCoach(v),
+                      ),
+                    ),
 
-                        _SettingsTile(
-                          icon: Icons.timer_3_rounded,
-                          title: 'Countdown duration',
-                          subtitle: prefs.countdownDurationSeconds == 0
-                              ? 'Disabled'
-                              : '${prefs.countdownDurationSeconds} seconds',
-                          trailing: Icon(Icons.chevron_right_rounded,
-                              color: colors.outline),
-                          onTap: () {
-                            showSmoothDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                title: Text(
-                                  'COUNTDOWN DURATION',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 1.5,
-                                    color: colors.onSurface,
-                                  ),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [0, 3, 5, 10].map((sec) {
-                                    final isSel = prefs.countdownDurationSeconds == sec;
-                                    return ListTile(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      title: Text(
-                                        sec == 0 ? 'Off' : '$sec seconds',
-                                        style: TextStyle(
-                                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                          color: isSel ? colors.primary : colors.onSurface,
-                                        ),
-                                      ),
-                                      trailing: isSel
-                                          ? Icon(Icons.check_rounded, color: colors.primary)
-                                          : null,
-                                      onTap: () {
-                                        Navigator.of(context).pop();
-                                        prefsNotifier.setCountdownDuration(sec);
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        _SettingsTile(
-                          icon: Icons.flag_rounded,
-                          title: 'Activity target',
-                          subtitle: targetSubtitle,
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (prefs.targetType != WorkoutTargetType.none)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colors.outline.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    prefs.dailyTargetEnabled ? 'DAILY' : 'SESSION',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w600,
-                                      color: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
-                                      letterSpacing: 0.5,
+                    _SettingsTile(
+                      icon: Icons.timer_3_rounded,
+                      title: 'Countdown duration',
+                      subtitle: prefs.countdownDurationSeconds == 0
+                          ? 'Disabled'
+                          : '${prefs.countdownDurationSeconds} seconds',
+                      trailing: chevron,
+                      onTap: () {
+                        showSmoothDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Countdown duration'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [0, 3, 5, 10].map((sec) {
+                                final isSel =
+                                    prefs.countdownDurationSeconds == sec;
+                                return ListTile(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppDimens.radiusSm,
                                     ),
                                   ),
-                                ),
-                              if (prefs.targetType != WorkoutTargetType.none)
-                                GestureDetector(
-                                  onTap: () => prefsNotifier.clearTarget(),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 4, left: 4),
-                                    child: Icon(Icons.cancel_outlined,
-                                        color: colors.outline, size: 20),
+                                  title: Text(
+                                    sec == 0 ? 'Off' : '$sec seconds',
+                                    style: context.text.bodyLarge?.copyWith(
+                                      fontWeight: isSel
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isSel
+                                          ? colors.primary
+                                          : colors.onSurface,
+                                    ),
                                   ),
-                                ),
-                              Icon(Icons.chevron_right_rounded,
-                                  color: colors.outline),
-                            ],
+                                  trailing: isSel
+                                      ? Icon(
+                                          Icons.check_rounded,
+                                          color: colors.primary,
+                                        )
+                                      : null,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    prefsNotifier.setCountdownDuration(sec);
+                                  },
+                                );
+                              }).toList(),
+                            ),
                           ),
-                          onTap: () async {
-                            await TargetPickerSheet.show(
-                              context,
-                              current: prefs,
-                              distanceUnit: unit,
-                              notifier: prefsNotifier,
-                            );
-                          },
-                        ),
+                        );
+                      },
+                    ),
 
-                        _SettingsTile(
-                          icon: Icons.calendar_today_rounded,
-                          title: 'Daily target',
-                          subtitle: prefs.dailyTargetEnabled
-                              ? (() {
-                                  if (prefs.dailyTargetType == WorkoutTargetType.distance) {
-                                    final val = unit == DistanceUnit.miles
-                                        ? prefs.dailyTargetValue / 1.60934
-                                        : prefs.dailyTargetValue;
-                                    return '${val.toStringAsFixed(1)} ${unit.label} every session';
-                                  } else if (prefs.dailyTargetType == WorkoutTargetType.calories) {
-                                    return '${prefs.dailyTargetValue.toStringAsFixed(0)} kcal every session';
-                                  }
-                                  return 'Enabled';
-                                })()
-                              : 'Disabled — targets are per-session only',
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (prefs.dailyTargetEnabled)
-                                GestureDetector(
-                                  onTap: () => prefsNotifier.clearDailyTarget(),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Icon(Icons.cancel_outlined,
-                                        color: colors.outline, size: 20),
-                                  ),
-                                ),
-                              Icon(Icons.chevron_right_rounded,
-                                  color: colors.outline),
-                            ],
-                          ),
-                          onTap: () async {
-                            final result = await showModalBottomSheet(
+                    _SettingsTile(
+                      icon: Icons.flag_rounded,
+                      title: 'Activity target',
+                      subtitle: targetSubtitle,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (prefs.targetType != WorkoutTargetType.none)
+                            ActivityTagChip(
+                              label: prefs.dailyTargetEnabled
+                                  ? 'Daily'
+                                  : 'Session',
+                            ),
+                          if (prefs.targetType != WorkoutTargetType.none)
+                            _ClearButton(
+                              onTap: () => prefsNotifier.clearTarget(),
+                            ),
+                          chevron,
+                        ],
+                      ),
+                      onTap: () async {
+                        await TargetPickerSheet.show(
+                          context,
+                          current: prefs,
+                          distanceUnit: unit,
+                          notifier: prefsNotifier,
+                        );
+                      },
+                    ),
+
+                    _SettingsTile(
+                      icon: Icons.calendar_today_rounded,
+                      title: 'Daily target',
+                      subtitle: prefs.dailyTargetEnabled
+                          ? (() {
+                              if (prefs.dailyTargetType ==
+                                  WorkoutTargetType.distance) {
+                                final val = unit == DistanceUnit.miles
+                                    ? prefs.dailyTargetValue / 1.60934
+                                    : prefs.dailyTargetValue;
+                                return '${val.toStringAsFixed(1)} ${unit.label} every session';
+                              } else if (prefs.dailyTargetType ==
+                                  WorkoutTargetType.calories) {
+                                return '${prefs.dailyTargetValue.toStringAsFixed(0)} kcal every session';
+                              }
+                              return 'Enabled';
+                            })()
+                          : 'Disabled — targets are per-session only',
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (prefs.dailyTargetEnabled)
+                            _ClearButton(
+                              onTap: () => prefsNotifier.clearDailyTarget(),
+                            ),
+                          chevron,
+                        ],
+                      ),
+                      onTap: () async {
+                        final result =
+                            await showAppBottomSheet<
+                              (WorkoutTargetType, double)?
+                            >(
                               context: context,
-                              isScrollControlled: true,
-                              backgroundColor: colors.surface,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                              ),
                               builder: (_) => TargetPickerSheet(
                                 current: prefs.dailyTargetEnabled
                                     ? prefs.copyWith(
@@ -270,163 +218,162 @@ class ActivitySettingsPage extends StatelessWidget {
                                 distanceUnit: unit,
                               ),
                             );
-                            if (result != null) {
-                              final (WorkoutTargetType type, double val) = result;
-                              await prefsNotifier.setDailyTarget(type, val);
-                            }
-                          },
-                        ),
+                        if (result != null) {
+                          final (WorkoutTargetType type, double val) = result;
+                          await prefsNotifier.setDailyTarget(type, val);
+                        }
+                      },
+                    ),
 
-                        _SettingsTile(
-                          icon: Icons.run_circle_outlined,
-                          title: 'Default activity type',
-                          subtitle: prefs.defaultActivityType.label,
-                          trailing: Icon(Icons.chevron_right_rounded,
-                              color: colors.outline),
-                          onTap: () {
-                            showSmoothDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                title: Text(
-                                  'DEFAULT ACTIVITY TYPE',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 1.5,
-                                    color: colors.onSurface,
-                                  ),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: ActivityType.values.map((type) {
-                                    final isSel = prefs.defaultActivityType == type;
-                                    return ListTile(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
+                    _SettingsTile(
+                      icon: Icons.run_circle_outlined,
+                      title: 'Default activity type',
+                      subtitle: prefs.defaultActivityType.label,
+                      trailing: chevron,
+                      onTap: () {
+                        showSmoothDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Default activity type'),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: ActivityType.values.map((type) {
+                                  final isSel =
+                                      prefs.defaultActivityType == type;
+                                  return ListTile(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppDimens.radiusSm,
                                       ),
-                                      leading: Icon(
-                                        activityTypeIcon(type),
-                                        color: isSel ? colors.primary : colors.outline,
+                                    ),
+                                    leading: Icon(
+                                      activityTypeIcon(type),
+                                      color: isSel
+                                          ? colors.primary
+                                          : context.vColors.grayText,
+                                    ),
+                                    title: Text(
+                                      type.label,
+                                      style: context.text.bodyLarge?.copyWith(
+                                        fontWeight: isSel
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                        color: isSel
+                                            ? colors.primary
+                                            : colors.onSurface,
                                       ),
-                                      title: Text(
-                                        type.label,
-                                        style: TextStyle(
-                                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                          color: isSel ? colors.primary : colors.onSurface,
-                                        ),
-                                      ),
-                                      trailing: isSel
-                                          ? Icon(Icons.check_rounded, color: colors.primary)
-                                          : null,
-                                      onTap: () {
-                                        Navigator.of(context).pop();
-                                        prefsNotifier.setDefaultActivityType(type);
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        // ── Devices ──────────────────────────────────────────────
-                        const _SectionHeader('DEVICES'),
-
-                        _SettingsTile(
-                          icon: connectedDevice != null
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          iconColor:
-                              connectedDevice != null ? colors.error : null,
-                          title: 'Heart rate monitor',
-                          subtitle: hrSubtitle,
-                          trailing: connectedDevice != null
-                              ? TextButton(
-                                  onPressed: () async {
-                                    await hrManager.disconnect();
-                                  },
-                                  child: Text(
-                                    'Disconnect',
-                                    style: TextStyle(
-                                        color: colors.error, fontSize: 12),
-                                  ),
-                                )
-                              : Icon(Icons.chevron_right_rounded,
-                                  color: colors.outline),
-                          onTap: connectedDevice != null
-                              ? null
-                              : () => HrDeviceSheet.show(context, hrManager),
-                        ),
-
-                        // ── Music & Stories ──────────────────────────────────────
-                        const _SectionHeader('MUSIC & STORIES'),
-
-                        _SettingsTile(
-                          icon: Icons.music_note_rounded,
-                          title: 'Background soundtrack',
-                          subtitle: prefs.backgroundAudioTrack == 'None'
-                              ? 'No background soundtrack'
-                              : prefs.backgroundAudioTrack,
-                          trailing: Icon(Icons.chevron_right_rounded,
-                              color: colors.outline),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => WorkoutAudioPage(
-                                current: prefs,
-                                notifier: prefsNotifier,
+                                    ),
+                                    trailing: isSel
+                                        ? Icon(
+                                            Icons.check_rounded,
+                                            color: colors.primary,
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      Navigator.of(context).pop();
+                                      prefsNotifier.setDefaultActivityType(
+                                        type,
+                                      );
+                                    },
+                                  );
+                                }).toList(),
                               ),
                             ),
                           ),
-                        ),
+                        );
+                      },
+                    ),
 
-                        // ── Display ──────────────────────────────────────────────
-                        const _SectionHeader('DISPLAY'),
+                    // ── Devices ──────────────────────────────────────────────
+                    const _SectionHeader('Devices'),
 
-                        _SettingsTile(
-                          icon: Icons.straighten_rounded,
-                          title: 'Distance unit',
-                          subtitle: 'Affects distance, pace and speed display',
-                          trailing: _UnitPill(
-                            selected: unit,
-                            onTap: (u) => unitNotifier.setUnit(u),
+                    _SettingsTile(
+                      icon: connectedDevice != null
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      iconColor: connectedDevice != null ? colors.error : null,
+                      title: 'Heart rate monitor',
+                      subtitle: hrSubtitle,
+                      trailing: connectedDevice != null
+                          ? TextButton(
+                              onPressed: () async {
+                                await hrManager.disconnect();
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: colors.error,
+                                textStyle: context.text.bodySmall,
+                              ),
+                              child: const Text('Disconnect'),
+                            )
+                          : chevron,
+                      onTap: connectedDevice != null
+                          ? null
+                          : () => HrDeviceSheet.show(context, hrManager),
+                    ),
+
+                    // ── Music & Stories ──────────────────────────────────────
+                    const _SectionHeader('Music & stories'),
+
+                    _SettingsTile(
+                      icon: Icons.music_note_rounded,
+                      title: 'Background soundtrack',
+                      subtitle: prefs.backgroundAudioTrack == 'None'
+                          ? 'No background soundtrack'
+                          : prefs.backgroundAudioTrack,
+                      trailing: chevron,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => WorkoutAudioPage(
+                            current: prefs,
+                            notifier: prefsNotifier,
                           ),
                         ),
+                      ),
+                    ),
 
-                        _SettingsTile(
-                          icon: Icons.dashboard_customize_rounded,
-                          title: 'Customize metrics layout',
-                          subtitle: 'Choose and reorder stats on tracking page',
-                          trailing: Icon(Icons.chevron_right_rounded,
-                              color: colors.outline),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => CustomizeLayoutPage(
-                                  prefsNotifier: prefsNotifier,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                    // ── Display ──────────────────────────────────────────────
+                    const _SectionHeader('Display'),
 
-                        // ── Map ─────────────────────────────────────────────────
-                        const _SectionHeader('MAP'),
+                    _SettingsTile(
+                      icon: Icons.straighten_rounded,
+                      title: 'Distance unit',
+                      subtitle: 'Affects distance, pace and speed display',
+                      trailing: _UnitPill(
+                        selected: unit,
+                        onTap: (u) => unitNotifier.setUnit(u),
+                      ),
+                    ),
 
-                        _OfflineMapTile(unitNotifier: unitNotifier, prefsNotifier: prefsNotifier),
+                    _SettingsTile(
+                      icon: Icons.dashboard_customize_rounded,
+                      title: 'Customize metrics layout',
+                      subtitle: 'Choose and reorder stats on tracking page',
+                      trailing: chevron,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CustomizeLayoutPage(
+                              prefsNotifier: prefsNotifier,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
 
-                        const SizedBox(height: 32),
-                      ],
-                    );
-                  },
+                    // ── Map ─────────────────────────────────────────────────
+                    const _SectionHeader('Map'),
+
+                    _OfflineMapTile(
+                      unitNotifier: unitNotifier,
+                      prefsNotifier: prefsNotifier,
+                    ),
+                  ],
                 );
               },
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -440,19 +387,32 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final customColors = theme.extension<VitalUpColors>();
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1.8,
-          color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-        ),
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        AppDimens.sectionGap,
+        context.gutter,
+        AppDimens.space8,
+      ),
+      child: AppCaption(title),
+    );
+  }
+}
+
+class _ClearButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ClearButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: 'Clear',
+      visualDensity: VisualDensity.compact,
+      icon: Icon(
+        Icons.cancel_outlined,
+        color: context.vColors.grayText,
+        size: AppDimens.iconMd,
       ),
     );
   }
@@ -477,41 +437,20 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      decoration: BoxDecoration(
-        color: theme.brightness == Brightness.light 
-            ? Colors.white.withValues(alpha: 0.72) 
-            : colors.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: (theme.brightness == Brightness.light 
-              ? const Color(0xFFD8D8D8) 
-              : colors.outline).withValues(alpha: 0.72),
-        ),
+    return AppCard(
+      margin: EdgeInsets.symmetric(
+        horizontal: context.gutter,
+        vertical: AppDimens.space4,
       ),
+      padding: EdgeInsets.zero,
       child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: colors.outline.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 20, color: iconColor ?? colors.onSurface),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+          vertical: AppDimens.space4,
         ),
-        title: Text(title,
-            style: TextStyle(
-                fontWeight: FontWeight.w600, fontSize: 14, color: colors.onSurface)),
-        subtitle: Text(subtitle,
-            style:
-                TextStyle(fontSize: 12, color: customColors?.grayText ?? const Color(0xFF9A9A9A))),
+        leading: AppIconBadge(icon: Icon(icon), color: iconColor),
+        title: Text(title),
+        subtitle: Text(subtitle),
         trailing: trailing,
         onTap: onTap,
       ),
@@ -527,16 +466,16 @@ class _UnitPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
 
     return Container(
       decoration: BoxDecoration(
-        color: customColors?.tabBarBg ?? colors.outline.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        color: v.glassFill,
+        borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+        border: Border.all(color: v.glassBorder!),
       ),
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(AppDimens.space2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: DistanceUnit.values.map((u) {
@@ -544,19 +483,20 @@ class _UnitPill extends StatelessWidget {
           return GestureDetector(
             onTap: () => onTap(u),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+              duration: AppDurations.fast,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space12,
+                vertical: AppDimens.space4,
+              ),
               decoration: BoxDecoration(
                 color: isSel ? colors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(17),
+                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
               ),
               child: Text(
                 u.label.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 12,
+                style: context.text.labelSmall?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: isSel ? (customColors?.buttonText ?? Colors.black) : (customColors?.grayText ?? const Color(0xFF888888)),
+                  color: isSel ? v.buttonText : v.grayText,
                 ),
               ),
             ),
@@ -566,8 +506,6 @@ class _UnitPill extends StatelessWidget {
     );
   }
 }
-
-
 
 class _OfflineMapTile extends StatefulWidget {
   final DistanceUnitNotifier unitNotifier;
@@ -587,14 +525,15 @@ class _OfflineMapTileState extends State<_OfflineMapTile> {
   // is informational here — it directs the user back to the tracking page.
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return _SettingsTile(
       icon: Icons.download_for_offline_rounded,
       title: 'Download offline map',
       subtitle: 'Available on the tracking screen via the ⚙ button',
-      trailing: Icon(Icons.info_outline_rounded,
-          color: theme.colorScheme.outline, size: 18),
+      trailing: Icon(
+        Icons.info_outline_rounded,
+        color: context.vColors.grayText,
+        size: AppDimens.iconSm,
+      ),
     );
   }
 }
-

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
@@ -64,14 +66,14 @@ class TopStats extends StatelessWidget {
       case StatMetric.distance:
         return (
           formatDistance(distanceMeters, unit: distanceUnit),
-          distanceUnit.distanceLabel.toUpperCase()
+          distanceUnit.distanceLabel.toUpperCase(),
         );
       case StatMetric.calories:
         return (calories.toString(), 'CALORIES');
       case StatMetric.avgPace:
         return (
           formatPace(avgPace, unit: distanceUnit),
-          'AVG. PACE (${distanceUnit.paceLabel})'.toUpperCase()
+          'AVG. PACE (${distanceUnit.paceLabel})'.toUpperCase(),
         );
       case StatMetric.currentSpeed:
         final factor = distanceUnit == DistanceUnit.miles ? 2.23694 : 3.6;
@@ -92,9 +94,8 @@ class TopStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
     final progress = _targetProgress;
     final hasBpm = heartRateBpm != null;
 
@@ -105,144 +106,117 @@ class TopStats extends StatelessWidget {
     // Chunk metrics into rows of up to 3 columns.
     final List<List<StatMetric>> rows = [];
     for (var i = 0; i < metrics.length; i += 3) {
-      rows.add(metrics.sublist(
-        i,
-        (i + 3) > metrics.length ? metrics.length : i + 3,
-      ));
+      rows.add(
+        metrics.sublist(i, (i + 3) > metrics.length ? metrics.length : i + 3),
+      );
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: (theme.brightness == Brightness.light 
-            ? Colors.white 
-            : colors.surface).withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: (theme.brightness == Brightness.light 
-              ? const Color(0xFFD8D8D8) 
-              : colors.outline).withValues(alpha: 0.72),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: theme.brightness == Brightness.light ? 0.06 : 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Duration + optional BPM
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                formatDuration(elapsed),
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
-                  color: colors.onSurface,
-                ),
-              ),
-              if (hasBpm) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colors.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+    return ResponsiveCenter(
+      child: AppCard(
+        margin: context.pagePadding,
+        padding: AppDimens.cardPaddingCompact,
+        tint: v.surfaceElevated!.withValues(alpha: 0.9),
+        blur: true,
+        shadow: AppShadows.elevated,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Duration + optional BPM
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    formatDuration(elapsed),
+                    style: AppTextStyles.metricLarge.copyWith(
+                      color: colors.onSurface,
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.favorite_rounded,
-                          color: colors.error, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$heartRateBpm',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: colors.error,
+                  if (hasBpm) ...[
+                    const SizedBox(width: AppDimens.space12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space8,
+                        vertical: AppDimens.space4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: v.errorFill,
+                        borderRadius: BorderRadius.circular(
+                          AppDimens.radiusPill,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'DURATION',
-            style: TextStyle(
-              color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-              fontSize: 10,
-              letterSpacing: 2.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-
-          // Dynamic metric rows
-          ...rows.map((rowMetrics) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: rowMetrics.map((metric) {
-                  final (value, label) = _getMetricData(metric);
-                  return Expanded(
-                    child: StatColumn(
-                      value: value,
-                      label: label,
-                    ),
-                  );
-                }).toList(),
-              ),
-            );
-          }),
-
-          // Target progress bar
-          if (progress >= 0) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.flag_rounded, size: 12, color: customColors?.grayText ?? const Color(0xFF9A9A9A)),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: colors.outline.withValues(alpha: 0.2),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        progress >= 1.0 ? Colors.green : colors.primary,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.favorite_rounded,
+                            color: colors.error,
+                            size: AppDimens.iconXs,
+                          ),
+                          const SizedBox(width: AppDimens.space4),
+                          Text(
+                            '$heartRateBpm',
+                            style: context.text.titleSmall?.copyWith(
+                              color: colors.error,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _targetLabel,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: customColors?.grayText ?? const Color(0xFF666666),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ),
+            const SizedBox(height: AppDimens.space4),
+            const AppCaption('Duration'),
+
+            // Dynamic metric rows
+            ...rows.map((rowMetrics) {
+              return Padding(
+                padding: const EdgeInsets.only(top: AppDimens.space12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: rowMetrics.map((metric) {
+                    final (value, label) = _getMetricData(metric);
+                    return Expanded(
+                      child: StatColumn(value: value, label: label),
+                    );
+                  }).toList(),
+                ),
+              );
+            }),
+
+            // Target progress bar
+            if (progress >= 0) ...[
+              const SizedBox(height: AppDimens.space12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.flag_rounded,
+                    size: AppDimens.iconXs,
+                    color: v.grayText,
+                  ),
+                  const SizedBox(width: AppDimens.space4),
+                  Expanded(
+                    child: AppProgressBar(
+                      value: progress,
+                      color: progress >= 1.0 ? v.success : colors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.space8),
+                  Text(
+                    _targetLabel,
+                    style: context.text.labelSmall?.copyWith(
+                      color: v.grayText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -253,48 +227,38 @@ class StatColumn extends StatelessWidget {
   final String value;
   final String label;
 
-  const StatColumn({
-    super.key,
-    required this.value,
-    required this.label,
-  });
+  const StatColumn({super.key, required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              height: 1.0,
-              color: colors.onSurface,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.space2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: context.text.headlineSmall?.copyWith(
+                color: context.colors.onSurface,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          maxLines: 2,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: customColors?.grayText ?? const Color(0xFF9A9A9A),
-            fontSize: 8.5,
-            letterSpacing: 0.4,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: context.text.labelSmall?.copyWith(
+              color: context.vColors.grayText,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

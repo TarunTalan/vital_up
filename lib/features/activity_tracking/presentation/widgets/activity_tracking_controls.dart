@@ -5,6 +5,104 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
+/// Opaque control tile used for every button in the map overlay so they stay
+/// legible over map tiles. [accent] switches to the selected / tinted style.
+class _ControlTile extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final Color? accent;
+  final bool filled;
+  final double? width;
+
+  const _ControlTile({
+    required this.child,
+    required this.onTap,
+    this.accent,
+    this.filled = false,
+    this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final radius = BorderRadius.circular(AppDimens.radiusButton);
+    final Color background;
+    if (filled) {
+      background = accent ?? context.colors.primary;
+    } else if (accent != null) {
+      background = Color.alphaBlend(
+        accent!.withValues(alpha: 0.13),
+        v.surfaceElevated!,
+      );
+    } else {
+      background = v.surfaceElevated!;
+    }
+
+    return SizedBox(
+      width: width,
+      height: AppDimens.buttonHeight,
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: filled
+              ? BorderSide.none
+              : BorderSide(
+                  color: accent ?? v.glassBorder!,
+                  width: accent != null
+                      ? AppDimens.borderThick
+                      : AppDimens.borderThin,
+                ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// Icon + uppercase label content used inside the tracking control tiles.
+class _ControlLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool iconTrailing;
+
+  const _ControlLabel({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.iconTrailing = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = Icon(icon, color: color, size: AppDimens.iconMd);
+    final text = Text(
+      label,
+      maxLines: 1,
+      style: context.text.labelMedium?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.space8),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: iconTrailing
+              ? [text, const SizedBox(width: AppDimens.space4), iconWidget]
+              : [iconWidget, const SizedBox(width: AppDimens.space4), text],
+        ),
+      ),
+    );
+  }
+}
 
 /// Row of activity type buttons (walk/run/cycle/more) shown while idle.
 class ActivitySelector extends StatelessWidget {
@@ -29,21 +127,21 @@ class ActivitySelector extends StatelessWidget {
           enabled: enabled,
           onTap: () => onSelected(ActivityType.walk),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppDimens.space8),
         ActivityButton(
           icon: Icons.directions_run_rounded,
           selected: selected == ActivityType.run,
           enabled: enabled,
           onTap: () => onSelected(ActivityType.run),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppDimens.space8),
         ActivityButton(
           icon: Icons.directions_bike_rounded,
           selected: selected == ActivityType.cycle,
           enabled: enabled,
           onTap: () => onSelected(ActivityType.cycle),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppDimens.space8),
         MoreActivitiesButton(
           enabled: enabled,
           selected: selected,
@@ -70,36 +168,15 @@ class ActivityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
+    final primary = context.colors.primary;
     return Expanded(
-      child: InkWell(
+      child: _ControlTile(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: selected
-                ? colors.primary.withValues(alpha: 0.12)
-                : (theme.brightness == Brightness.light
-                    ? Colors.white.withValues(alpha: 0.72)
-                    : colors.surface.withValues(alpha: 0.72)),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: selected
-                  ? colors.primary
-                  : (theme.brightness == Brightness.light
-                      ? const Color(0xFFD8D8D8)
-                      : colors.outline).withValues(alpha: 0.72),
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: 22,
-            color: selected ? colors.primary : colors.onSurface,
-          ),
+        accent: selected ? primary : null,
+        child: Icon(
+          icon,
+          size: AppDimens.iconLg,
+          color: selected ? primary : context.colors.onSurface,
         ),
       ),
     );
@@ -118,122 +195,63 @@ class MoreActivitiesButton extends StatelessWidget {
     required this.onSelected,
   });
 
+  void _showOptions(BuildContext context) {
+    final colors = context.colors;
+    showSmoothDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('More Activities'),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space8,
+          vertical: AppDimens.space16,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final type in ActivityType.values)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                  ),
+                  leading: Icon(
+                    activityTypeIcon(type),
+                    color: colors.onSurface,
+                  ),
+                  title: Text(type.label),
+                  trailing: selected == type
+                      ? Icon(Icons.check_rounded, color: colors.primary)
+                      : null,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onSelected(type);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final isCustomSelected = selected != ActivityType.walk &&
+    final colors = context.colors;
+    final isCustomSelected =
+        selected != ActivityType.walk &&
         selected != ActivityType.run &&
         selected != ActivityType.cycle;
 
     return Expanded(
-      child: InkWell(
-        onTap: enabled
-            ? () {
-          // Show dialog with additional activity options
-          showSmoothDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text(
-                'More Activities',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    leading: Icon(activityTypeIcon(ActivityType.walk), color: colors.onSurface),
-                    title: const Text('Walking'),
-                    trailing: selected == ActivityType.walk
-                        ? Icon(Icons.check_rounded, color: colors.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelected(ActivityType.walk);
-                    },
-                  ),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    leading: Icon(activityTypeIcon(ActivityType.run), color: colors.onSurface),
-                    title: const Text('Running'),
-                    trailing: selected == ActivityType.run
-                        ? Icon(Icons.check_rounded, color: colors.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelected(ActivityType.run);
-                    },
-                  ),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    leading: Icon(activityTypeIcon(ActivityType.cycle), color: colors.onSurface),
-                    title: const Text('Cycling'),
-                    trailing: selected == ActivityType.cycle
-                        ? Icon(Icons.check_rounded, color: colors.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelected(ActivityType.cycle);
-                    },
-                  ),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    leading: Icon(activityTypeIcon(ActivityType.trekking), color: colors.onSurface),
-                    title: const Text('Trekking'),
-                    trailing: selected == ActivityType.trekking
-                        ? Icon(Icons.check_rounded, color: colors.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelected(ActivityType.trekking);
-                    },
-                  ),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    leading: Icon(activityTypeIcon(ActivityType.climbing), color: colors.onSurface),
-                    title: const Text('Climbing'),
-                    trailing: selected == ActivityType.climbing
-                        ? Icon(Icons.check_rounded, color: colors.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelected(ActivityType.climbing);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-            : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: isCustomSelected
-                ? colors.primary.withValues(alpha: 0.12)
-                : (theme.brightness == Brightness.light
-                    ? Colors.white.withValues(alpha: 0.72)
-                    : colors.surface.withValues(alpha: 0.72)),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: isCustomSelected
-                  ? colors.primary
-                  : (theme.brightness == Brightness.light
-                      ? const Color(0xFFD8D8D8)
-                      : colors.outline).withValues(alpha: 0.72),
-              width: isCustomSelected ? 2 : 1,
-            ),
-          ),
-          child: Center(
-            child: Icon(
-              isCustomSelected ? activityTypeIcon(selected) : Icons.more_horiz_rounded,
-              size: 22,
-              color: isCustomSelected ? colors.primary : colors.onSurface,
-            ),
-          ),
+      child: _ControlTile(
+        onTap: enabled ? () => _showOptions(context) : null,
+        accent: isCustomSelected ? colors.primary : null,
+        child: Icon(
+          isCustomSelected
+              ? activityTypeIcon(selected)
+              : Icons.more_horiz_rounded,
+          size: AppDimens.iconLg,
+          color: isCustomSelected ? colors.primary : colors.onSurface,
         ),
       ),
     );
@@ -268,89 +286,69 @@ class StartPauseControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final buttonText = context.vColors.buttonText!;
     final isIdle = state is TrackingIdle || state is TrackingCompleted;
     final isInProgress = state is TrackingInProgress;
 
     if (isIdle) {
       return Row(
         children: [
-          SizedBox(
-            width: 52,
-            height: 52,
-            child: OutlinedButton(
-              onPressed: onMusicTap ?? () {
-                showErrorSnackBar(context, 'Music integration is currently unavailable');
-              },
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: colors.surface,
-                padding: EdgeInsets.zero,
-              ),
-              child: Icon(Icons.music_note_rounded, color: colors.onSurface, size: 20),
+          _ControlTile(
+            width: AppDimens.buttonHeight,
+            onTap:
+                onMusicTap ??
+                () {
+                  showErrorSnackBar(
+                    context,
+                    'Music integration is currently unavailable',
+                  );
+                },
+            child: Icon(
+              Icons.music_note_rounded,
+              color: colors.onSurface,
+              size: AppDimens.iconMd,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppDimens.space8),
           Expanded(
-            child: SizedBox(
-              height: 52,
-              child: FilledButton(
-                onPressed: onStart,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: customColors?.buttonText ?? Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _ControlTile(
+              filled: true,
+              onTap: onStart,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.space16,
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'START',
-                          style: TextStyle(
-                            fontSize: 12,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
+                    Expanded(
+                      child: Text(
+                        'Start ${state.activityType.label}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.labelLarge?.copyWith(
+                          color: buttonText,
                         ),
-                        Text(
-                          state.activityType.label.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    Icon(Icons.arrow_forward_rounded, color: customColors?.buttonText ?? Colors.black, size: 22),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: buttonText,
+                      size: AppDimens.iconLg,
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 52,
-            height: 52,
-            child: OutlinedButton(
-              onPressed: onSettingsTap,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: colors.surface,
-                padding: EdgeInsets.zero,
-              ),
-              child: Icon(Icons.settings_rounded, color: colors.onSurface, size: 20),
+          const SizedBox(width: AppDimens.space8),
+          _ControlTile(
+            width: AppDimens.buttonHeight,
+            onTap: onSettingsTap,
+            child: Icon(
+              Icons.settings_rounded,
+              color: colors.onSurface,
+              size: AppDimens.iconMd,
             ),
           ),
         ],
@@ -367,105 +365,48 @@ class StartPauseControl extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: SizedBox(
-            height: 52,
-            child: OutlinedButton(
-              onPressed: onStop,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.error, width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: colors.surface,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.stop_rounded, color: colors.error, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    'FINISH',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.error,
-                    ),
-                  ),
-                ],
-              ),
+          child: _ControlTile(
+            onTap: onStop,
+            accent: colors.error,
+            child: _ControlLabel(
+              icon: Icons.stop_rounded,
+              label: 'FINISH',
+              color: colors.error,
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 48,
-          height: 52,
-          child: OutlinedButton(
-            onPressed: () => onLockToggle(true),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: colors.outline.withOpacity(0.5), width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              backgroundColor: colors.surface,
-              padding: EdgeInsets.zero,
-            ),
-            child: Icon(Icons.lock_rounded, color: colors.onSurface, size: 18),
+        const SizedBox(width: AppDimens.space8),
+        _ControlTile(
+          width: AppDimens.buttonHeight,
+          onTap: () => onLockToggle(true),
+          child: Icon(
+            Icons.lock_rounded,
+            color: colors.onSurface,
+            size: AppDimens.iconMd,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppDimens.space8),
         Expanded(
-          child: SizedBox(
-            height: 52,
-            child: isInProgress
-                ? OutlinedButton(
-              onPressed: onPause,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.primary, width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: colors.surface,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.pause_rounded, color: colors.primary, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    'PAUSE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.primary,
-                    ),
+          child: isInProgress
+              ? _ControlTile(
+                  onTap: onPause,
+                  accent: colors.primary,
+                  child: _ControlLabel(
+                    icon: Icons.pause_rounded,
+                    label: 'PAUSE',
+                    color: colors.primary,
                   ),
-                ],
-              ),
-            )
-                : FilledButton(
-              onPressed: onResume,
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: customColors?.buttonText ?? Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'RESUME',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+                )
+              : _ControlTile(
+                  filled: true,
+                  onTap: onResume,
+                  child: _ControlLabel(
+                    icon: Icons.arrow_forward_rounded,
+                    label: 'RESUME',
+                    color: buttonText,
+                    iconTrailing: true,
                   ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, color: customColors?.buttonText ?? Colors.black, size: 18),
-                ],
-              ),
-            ),
-          ),
+                ),
         ),
       ],
     );
@@ -492,35 +433,41 @@ class _SlidingButtonState extends State<SlidingButton> {
   double _position = 0.0;
   bool _triggered = false;
 
+  static const double _knobSize = AppDimens.headerActionSize - AppDimens.space4;
+  static const double _inset = AppDimens.space4;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double maxDistance = constraints.maxWidth - 44 - 8;
+        final double maxDistance =
+            constraints.maxWidth - _knobSize - _inset * 2;
 
         return Container(
-          height: 52,
+          height: AppDimens.buttonHeight,
           decoration: BoxDecoration(
-            color: theme.brightness == Brightness.light ? const Color(0xFFF2F2F2) : colors.outline.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: colors.outline.withValues(alpha: 0.3)),
+            color: v.surfaceElevated,
+            borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+            border: Border.all(color: v.glassBorder!),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: _inset),
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
-              Center(
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: colors.onSurface.withValues(alpha: 0.7),
-                    fontSize: 12,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w600,
+              Padding(
+                padding: const EdgeInsets.only(left: _knobSize),
+                child: Center(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.labelMedium?.copyWith(
+                      color: colors.onSurface.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -530,7 +477,10 @@ class _SlidingButtonState extends State<SlidingButton> {
                   onHorizontalDragUpdate: (details) {
                     if (_triggered) return;
                     setState(() {
-                      _position = (_position + details.delta.dx).clamp(0.0, maxDistance);
+                      _position = (_position + details.delta.dx).clamp(
+                        0.0,
+                        maxDistance,
+                      );
                     });
                   },
                   onHorizontalDragEnd: (details) {
@@ -556,23 +506,17 @@ class _SlidingButtonState extends State<SlidingButton> {
                     }
                   },
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: _knobSize,
+                    height: _knobSize,
                     decoration: BoxDecoration(
                       color: colors.primary,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: colors.primary.withValues(alpha: 0.3),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        )
-                      ],
+                      boxShadow: AppShadows.shadowY,
                     ),
                     child: Icon(
                       Icons.arrow_forward_rounded,
-                      color: customColors?.buttonText ?? Colors.black,
-                      size: 22,
+                      color: v.buttonText,
+                      size: AppDimens.iconLg,
                     ),
                   ),
                 ),
@@ -583,4 +527,4 @@ class _SlidingButtonState extends State<SlidingButton> {
       },
     );
   }
-}
+}

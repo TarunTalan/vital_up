@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 
@@ -22,18 +24,10 @@ class TargetPickerSheet extends StatefulWidget {
     required DistanceUnit distanceUnit,
     required WorkoutPrefsNotifier notifier,
   }) async {
-    final theme = Theme.of(context);
-    await showModalBottomSheet(
+    await showAppBottomSheet<(WorkoutTargetType, double)?>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => TargetPickerSheet(
-        current: current,
-        distanceUnit: distanceUnit,
-      ),
+      builder: (_) =>
+          TargetPickerSheet(current: current, distanceUnit: distanceUnit),
     ).then((result) {
       if (result == null) return;
       final (WorkoutTargetType type, double val) = result;
@@ -94,119 +88,114 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
+    final colors = context.colors;
+    final v = context.vColors;
     final distUnitLabel = widget.distanceUnit.label.toUpperCase();
+    final fieldHeight =
+        MediaQuery.textScalerOf(context).scale(AppDimens.inputHeight) +
+        AppDimens.space16;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.outline.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'ACTIVITY TARGET',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 2,
-                  color: colors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 16),
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          context.gutter,
+          0,
+          context.gutter,
+          AppDimens.sectionGap,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Activity Target', style: context.text.headlineSmall),
+            const SizedBox(height: AppDimens.space16),
 
-              // Tab bar
-              Container(
-                decoration: BoxDecoration(
-                  color: customColors?.tabBarBg ?? colors.outline.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TabBar(
-                  controller: _tabs,
-                  indicator: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  labelColor: customColors?.buttonText ?? Colors.black,
-                  unselectedLabelColor: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
-                  labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13),
-                  dividerColor: Colors.transparent,
-                  tabs: [
-                    Tab(text: 'DISTANCE ($distUnitLabel)'),
-                    const Tab(text: 'CALORIES (KCAL)'),
-                  ],
-                ),
+            // Segmented tabs — Figma Move/Rest/Fuel/Vitals style.
+            Container(
+              padding: const EdgeInsets.all(AppDimens.space4),
+              decoration: BoxDecoration(
+                color: v.glassFill,
+                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+                border: Border.all(color: v.glassBorder!),
               ),
-              const SizedBox(height: 20),
-
-              // Tab content
-              SizedBox(
-                height: 70,
-                child: TabBarView(
-                  controller: _tabs,
-                  children: [
-                    _NumberField(
-                      controller: _distCtrl,
-                      hint: 'e.g. 5.0',
-                      suffix: distUnitLabel,
-                    ),
-                    _NumberField(
-                      controller: _calCtrl,
-                      hint: 'e.g. 500',
-                      suffix: 'kcal',
-                    ),
-                  ],
+              child: TabBar(
+                controller: _tabs,
+                indicator: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                  boxShadow: AppShadows.segment,
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Confirm / Clear buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: SecondaryAuthButton(
-                      label: 'CLEAR',
-                      onTap: () => Navigator.of(context).pop(null),
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: v.buttonText,
+                unselectedLabelColor: v.grayText,
+                labelStyle: context.text.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(
+                    height: AppDimens.segmentHeight,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Distance ($distUnitLabel)'),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: PrimaryAuthButton(
-                      label: 'SET TARGET',
-                      isLoading: false,
-                      onTap: () {
-                        final type = _tabs.index == 0
-                            ? WorkoutTargetType.distance
-                            : WorkoutTargetType.calories;
-                        _confirm(type);
-                      },
+                  const Tab(
+                    height: AppDimens.segmentHeight,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Calories (kcal)'),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppDimens.space20),
+
+            SizedBox(
+              height: fieldHeight,
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  _NumberField(
+                    controller: _distCtrl,
+                    hint: 'e.g. 5.0',
+                    suffix: distUnitLabel,
+                  ),
+                  _NumberField(
+                    controller: _calCtrl,
+                    hint: 'e.g. 500',
+                    suffix: 'kcal',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimens.space8),
+
+            Row(
+              children: [
+                Expanded(
+                  child: AppSecondaryButton(
+                    label: 'Clear',
+                    onTap: () => Navigator.of(context).pop(null),
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space12),
+                Expanded(
+                  child: AppPrimaryButton(
+                    label: 'Set Target',
+                    onTap: () {
+                      final type = _tabs.index == 0
+                          ? WorkoutTargetType.distance
+                          : WorkoutTargetType.calories;
+                      _confirm(type);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -226,38 +215,26 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final customColors = theme.extension<VitalUpColors>();
-
-    return TextField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-      ],
-      style: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.w600,
-        color: colors.onSurface,
-      ),
-      decoration: InputDecoration(
-        border: InputBorder.none,
-        hintText: hint,
-        hintStyle: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          color: colors.outline.withValues(alpha: 0.5),
-        ),
-        suffixText: suffix,
-        suffixStyle: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: customColors?.grayText ?? colors.onSurface.withValues(alpha: 0.6),
+    final valueStyle = context.text.headlineSmall;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: TextField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+        ],
+        style: valueStyle?.copyWith(color: context.colors.onSurface),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: valueStyle?.copyWith(color: context.vColors.grayText),
+          suffixText: suffix,
+          suffixStyle: context.text.bodyMedium?.copyWith(
+            color: context.vColors.grayText,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
   }
 }
-
-
