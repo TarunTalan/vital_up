@@ -311,6 +311,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
                               autofillHints: widget.autofillHints,
                               maxLines: widget.singleLine ? 1 : null,
                               enableInteractiveSelection: !widget.isPassword,
+                              onTapOutside: (event) {},
                               style: context.text.bodyMedium?.copyWith(color: textColor),
                               cursorColor: hasFieldError ? colors.error : colors.primary,
                               onChanged: (text) {

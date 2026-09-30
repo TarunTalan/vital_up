@@ -153,16 +153,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   SizedBox(height: context.h(AppDimens.space24)),
 
                   // Description — Figma heading 2, centred.
-                  Padding(
-                    padding: context.pagePadding,
-                    child: Text(
-                      OnboardingItem.values[_currentPage].description,
-                      style: context.text.headlineMedium?.copyWith(
-                        color: colors.onSurface,
+                  SizedBox(
+                    height: context.h(120),
+                    child: Padding(
+                      padding: context.pagePadding,
+                      child: Text(
+                        OnboardingItem.values[_currentPage].description,
+                        style: context.text.headlineMedium?.copyWith(
+                          color: colors.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
 
