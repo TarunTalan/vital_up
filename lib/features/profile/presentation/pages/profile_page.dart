@@ -4,7 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
@@ -154,10 +160,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.primary,
-              onPrimary: Colors.white,
-              onSurface: Theme.of(context).colorScheme.onSurface,
+            colorScheme: context.colors.copyWith(
+              onPrimary: context.vColors.buttonText,
             ),
           ),
           child: child!,
@@ -201,9 +205,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final vColors = theme.extension<VitalUpColors>();
-
     return BlocConsumer<ProfileCubit, ProfileState>(
       listener: (context, state) {
         if (state is ProfileLoaded) {
@@ -211,27 +212,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         } else if (state is ProfileSaveSuccess) {
           _populateFields(state.updatedProfile);
           setState(() => _isEditing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Profile updated successfully!'),
-              backgroundColor: theme.colorScheme.primary,
-            ),
-          );
+          showSuccessSnackBar(context, 'Profile updated successfully!');
         } else if (state is ProfileError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          showErrorSnackBar(context, state.message);
         }
       },
       builder: (context, state) {
         if (state is ProfileLoading || state is ProfileInitial) {
           return const Scaffold(
-            body: Center(
-              child: VitalUpLoader(),
-            ),
+            backgroundColor: Colors.transparent,
+            body: AuthBackground(child: Center(child: VitalUpLoader())),
           );
         }
 
@@ -243,374 +233,88 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         } else if (state is ProfileSaving) {
           profile = state.currentProfile;
         } else if (state is ProfileError) {
-          // If we have an error but loaded state was present before, fallback to current values
-          // otherwise show full error fallback view
+          return _buildErrorView();
+        }
+
+        if (profile == null) {
           return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      size: 64,
-                      color: theme.colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Failed to load profile',
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Please check your connection and try again.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => context.read<ProfileCubit>().loadProfile(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
+            backgroundColor: Colors.transparent,
+            body: AuthBackground(
+              child: Center(
+                child: Text(
+                  'Profile not initialized.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
                 ),
               ),
             ),
           );
         }
 
-        if (profile == null) {
-          return const Scaffold(
-            body: Center(
-              child: Text('Profile not initialized.'),
-            ),
-          );
-        }
-
         final isSaving = state is ProfileSaving;
-
-        final isDark = theme.brightness == Brightness.dark;
+        final loadedProfile = profile;
+        // Segment + container/outer padding + container border + indicator weight.
+        final tabBarHeight = AppDimens.segmentHeight +
+            AppDimens.space8 * 4 +
+            AppDimens.borderThin * 2 +
+            AppDimens.borderThick;
+        final headerHeight = context.h(AppDimens.profileHeaderHeight);
 
         return Scaffold(
           backgroundColor: Colors.transparent,
-          body: Form(
-            key: _formKey,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/images/bg.png',
-                    fit: BoxFit.cover,
-                  ),
+          body: AuthBackground(
+            child: Form(
+              key: _formKey,
+              child: NestedScrollView(
+                headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+                  return <Widget>[
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                      sliver: SliverAppBar(
+                        expandedHeight: headerHeight + tabBarHeight,
+                        floating: false,
+                        pinned: true,
+                        forceElevated: innerBoxIsScrolled,
+                        backgroundColor: Colors.transparent,
+                        surfaceTintColor: Colors.transparent,
+                        elevation: 0,
+                        automaticallyImplyLeading: false,
+                        flexibleSpace: LayoutBuilder(
+                          builder: (BuildContext context, BoxConstraints constraints) {
+                            final topPadding = context.safePadding.top;
+                            final collapsedHeight =
+                                kToolbarHeight + tabBarHeight + topPadding;
+                            final isCollapsed =
+                                constraints.maxHeight <= collapsedHeight + AppDimens.space20;
+                            return _buildHeaderBackground(
+                              loadedProfile,
+                              topPadding: topPadding,
+                              tabBarHeight: tabBarHeight,
+                              isCollapsed: isCollapsed,
+                            );
+                          },
+                        ),
+                        actions: [
+                          ..._buildHeaderActions(loadedProfile, isSaving),
+                          SizedBox(width: context.gutter),
+                        ],
+                        bottom: PreferredSize(
+                          preferredSize: Size.fromHeight(tabBarHeight),
+                          child: _buildTabBar(),
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildTabScroll(_buildAccountTab(loadedProfile)),
+                    _buildTabScroll(_buildHealthTab(loadedProfile)),
+                  ],
                 ),
-                NestedScrollView(
-                  headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-                    return <Widget>[
-                      // 1. Premium Glassmorphic Header Sliver
-                      SliverOverlapAbsorber(
-                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                        sliver: SliverAppBar(
-                          expandedHeight: 328.0, // 260 + 68 for the TabBar
-                          floating: false,
-                          pinned: true,
-                          forceElevated: innerBoxIsScrolled,
-                          backgroundColor: Colors.transparent,
-                          elevation: 0,
-                          flexibleSpace: LayoutBuilder(
-                            builder: (BuildContext context, BoxConstraints constraints) {
-                              final topPadding = MediaQuery.paddingOf(context).top;
-                              final collapsedHeight = 56.0 + 68.0 + topPadding;
-                              final isCollapsed = constraints.maxHeight <= collapsedHeight + 20;
-
-                              return Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ClipRect(
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(sigmaX: 12.0, sigmaY: 12.0),
-                                      child: Container(
-                                        color: theme.scaffoldBackgroundColor.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ),
-                                  FlexibleSpaceBar(
-                                    background: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            theme.colorScheme.primary.withValues(alpha: 0.15),
-                                            vColors?.blobPurple?.withValues(alpha: 0.05) ??
-                                                Colors.purple.withValues(alpha: 0.05),
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                      child: SafeArea(
-                                        bottom: false,
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            const SizedBox(height: 20),
-                                            // Profile Avatar Container
-                                            Stack(
-                                              alignment: Alignment.center,
-                                              children: [
-                                                Container(
-                                                  width: 100,
-                                                  height: 100,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: theme.colorScheme.primary,
-                                                      width: 3.0,
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                                                        blurRadius: 16,
-                                                        offset: const Offset(0, 4),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: CircleAvatar(
-                                                    radius: 47,
-                                                    backgroundColor: theme.colorScheme.primaryContainer,
-                                                    backgroundImage: profile!.photoUrl != null
-                                                        ? NetworkImage(profile.photoUrl!)
-                                                        : null,
-                                                    child: profile.photoUrl == null
-                                                        ? Text(
-                                                            profile.fullName.isNotEmpty
-                                                                ? profile.fullName.substring(0, 1).toUpperCase()
-                                                                : profile.username.isNotEmpty
-                                                                    ? profile.username.substring(0, 1).toUpperCase()
-                                                                    : 'U',
-                                                            style: theme.textTheme.headlineMedium?.copyWith(
-                                                              color: theme.colorScheme.onPrimaryContainer,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          )
-                                                        : null,
-                                                  ),
-                                                ),
-                                                if (_isEditing)
-                                                  Positioned(
-                                                    bottom: 0,
-                                                    right: 0,
-                                                    child: GestureDetector(
-                                                      onTap: () {
-                                                        ScaffoldMessenger.of(context).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text('Avatar image upload is handled via Google OAuth or future updates.'),
-                                                          ),
-                                                        );
-                                                      },
-                                                      child: Container(
-                                                        padding: const EdgeInsets.all(6),
-                                                        decoration: BoxDecoration(
-                                                          color: theme.colorScheme.primary,
-                                                          shape: BoxShape.circle,
-                                                        ),
-                                                        child: const Icon(
-                                                          Icons.camera_alt_rounded,
-                                                          size: 16,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              profile.fullName.isNotEmpty ? profile.fullName : 'VitalUp User',
-                                              style: theme.textTheme.titleLarge?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '@${profile.username}',
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                color: vColors?.grayText,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 68), // Spacer for TabBar
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 200),
-                                    opacity: isCollapsed ? 1.0 : 0.0,
-                                    child: Align(
-                                      alignment: Alignment.topLeft,
-                                      child: Padding(
-                                        padding: EdgeInsets.only(
-                                          top: topPadding + 12.0,
-                                          left: AppTheme.hPadding,
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: theme.colorScheme.primaryContainer,
-                                              backgroundImage: profile!.photoUrl != null
-                                                  ? NetworkImage(profile.photoUrl!)
-                                                  : null,
-                                              child: profile.photoUrl == null
-                                                  ? Text(
-                                                      profile.fullName.isNotEmpty
-                                                          ? profile.fullName.substring(0, 1).toUpperCase()
-                                                          : profile.username.isNotEmpty
-                                                              ? profile.username.substring(0, 1).toUpperCase()
-                                                              : 'U',
-                                                      style: theme.textTheme.labelSmall?.copyWith(
-                                                        color: theme.colorScheme.onPrimaryContainer,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    )
-                                                  : null,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              profile.fullName.isNotEmpty ? profile.fullName : 'Profile',
-                                              style: theme.textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          actions: [
-                            if (!_isEditing) ...[
-                              IconButton(
-                                icon: const Icon(Icons.settings_rounded),
-                                onPressed: () => context.pushNamed('settings'),
-                                tooltip: 'Settings',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit_rounded),
-                                onPressed: () => setState(() => _isEditing = true),
-                                tooltip: 'Edit Profile',
-                              ),
-                            ]
-                            else ...[
-                              if (isSaving)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                )
-                              else ...[
-                                IconButton(
-                                  icon: const Icon(Icons.close_rounded),
-                                  onPressed: () {
-                                    _populateFields(profile!);
-                                    setState(() => _isEditing = false);
-                                  },
-                                  tooltip: 'Cancel',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.check_rounded),
-                                  onPressed: () => _saveProfile(profile!),
-                                  tooltip: 'Save Details',
-                                ),
-                              ]
-                            ]
-                          ],
-                          bottom: PreferredSize(
-                            preferredSize: const Size.fromHeight(68.0),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppTheme.hPadding,
-                                vertical: 10,
-                              ),
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: theme.brightness == Brightness.dark
-                                      ? Colors.black.withValues(alpha: 0.25)
-                                      : Colors.white.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: (theme.brightness == Brightness.dark
-                                            ? const Color(0xFF343434)
-                                            : const Color(0xFFD8D8D8))
-                                        .withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                child: TabBar(
-                                  controller: _tabController,
-                                  dividerColor: Colors.transparent,
-                                  indicatorSize: TabBarIndicatorSize.tab,
-                                  indicator: BoxDecoration(
-                                    color: theme.colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  labelColor: Colors.white,
-                                  unselectedLabelColor: vColors?.grayText,
-                                  labelStyle: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  tabs: const [
-                                    Tab(text: 'Account Details'),
-                                    Tab(text: 'Health Metrics'),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ];
-                  },
-                  body: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // TAB 1: Account details
-                      Builder(
-                        builder: (context) => CustomScrollView(
-                          slivers: [
-                            SliverOverlapInjector(
-                              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                            ),
-                            SliverToBoxAdapter(
-                              child: _buildAccountTab(theme, vColors, profile!),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // TAB 2: Health metrics
-                      Builder(
-                        builder: (context) => CustomScrollView(
-                          slivers: [
-                            SliverOverlapInjector(
-                              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                            ),
-                            SliverToBoxAdapter(
-                              child: _buildHealthTab(theme, vColors, profile!),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -618,477 +322,741 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
-  // --- TAB 1: ACCOUNT DETAILS VIEW ---
-  Widget _buildAccountTab(ThemeData theme, VitalUpColors? vColors, ProfileEntity profile) {
-    return ListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(AppTheme.hPadding, 10, AppTheme.hPadding, 100),
-      children: [
-        _buildSectionHeader(theme, 'Identity'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.badge_rounded,
-                label: 'Full Name',
-                value: profile.fullName,
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.alternate_email_rounded,
-                label: 'Username',
-                value: '@${profile.username}',
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.email_rounded,
-                label: 'Email Address',
-                value: profile.email,
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildTextField(
-                controller: _fullNameController,
-                label: 'Full Name',
-                icon: Icons.badge_rounded,
-                enabled: _isEditing,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Full name is required';
-                  if (val.trim().length < 2) return 'Must be at least 2 characters';
-                  return null;
-                },
-              ),
-              _buildTextField(
-                controller: _usernameController,
-                label: 'Username',
-                icon: Icons.alternate_email_rounded,
-                enabled: _isEditing,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Username is required';
-                  if (val.trim().length < 3) return 'Must be at least 3 characters';
-                  return null;
-                },
-              ),
-              _buildReadOnlyField(
-                label: 'Email Address',
-                value: profile.email,
-                icon: Icons.email_rounded,
-              ),
-            ],
-          ),
-        const SizedBox(height: 8),
-        _buildSectionHeader(theme, 'Personal Demographics'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.calendar_month_rounded,
-                label: 'Date of Birth',
-                value: _formatDobDisplay(profile.dob),
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.wc_rounded,
-                label: 'Gender',
-                value: profile.gender,
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.smoking_rooms_rounded,
-                label: 'Smoker Status',
-                value: profile.smokes,
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildDatePickerField(
-                context: context,
-                controller: _dobController,
-                label: 'Date of Birth',
-                icon: Icons.calendar_month_rounded,
-                enabled: _isEditing,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Date of birth is required';
-                  return null;
-                },
-              ),
-              _buildDropdownField(
-                label: 'Gender',
-                value: _gender,
-                icon: Icons.wc_rounded,
-                enabled: _isEditing,
-                items: const ['Male', 'Female', 'Other'],
-                onChanged: (val) => setState(() => _gender = val ?? ''),
-              ),
-              _buildDropdownField(
-                label: 'Smoker Status',
-                value: _smokes,
-                icon: Icons.smoking_rooms_rounded,
-                enabled: _isEditing,
-                items: const ['No', 'Yes', 'Occasionally'],
-                onChanged: (val) => setState(() => _smokes = val ?? ''),
-              ),
-            ],
-          ),
-        const SizedBox(height: 30),
-        // Logout Button
-        if (!_isEditing)
-          SizedBox(
-            width: double.infinity,
-            height: AppTheme.buttonHeight,
-            child: OutlinedButton.icon(
-              onPressed: widget.onLogout,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
-                foregroundColor: theme.colorScheme.error,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+  Widget _buildErrorView() {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AuthBackground(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(context.gutter),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIconBadge(
+                  icon: const Icon(Icons.error_outline_rounded),
+                  color: context.colors.error,
+                  size: AppDimens.iconXxl,
                 ),
-              ),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Logout Account'),
+                const SizedBox(height: AppDimens.space16),
+                Text(
+                  'Failed to load profile',
+                  textAlign: TextAlign.center,
+                  style: context.text.headlineSmall,
+                ),
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  'Please check your connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
+                ),
+                const SizedBox(height: AppDimens.sectionGap),
+                AppPrimaryButton(
+                  label: 'Retry',
+                  expand: false,
+                  onTap: () => context.read<ProfileCubit>().loadProfile(),
+                ),
+              ],
             ),
           ),
-      ],
+        ),
+      ),
+    );
+  }
+
+  String _initial(ProfileEntity profile) {
+    if (profile.fullName.isNotEmpty) return profile.fullName.substring(0, 1).toUpperCase();
+    if (profile.username.isNotEmpty) return profile.username.substring(0, 1).toUpperCase();
+    return 'U';
+  }
+
+  Widget _buildAvatar(ProfileEntity profile, double size, TextStyle? initialStyle) {
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: context.vColors.primaryTint,
+      backgroundImage: profile.photoUrl != null ? NetworkImage(profile.photoUrl!) : null,
+      child: profile.photoUrl == null
+          ? Text(
+              _initial(profile),
+              style: initialStyle?.copyWith(color: context.colors.primary),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildHeaderBackground(
+    ProfileEntity profile, {
+    required double topPadding,
+    required double tabBarHeight,
+    required bool isCollapsed,
+  }) {
+    final v = context.vColors;
+    final avatarSize = context.w(AppDimens.avatarLarge);
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppDimens.headerBlur / 2,
+          sigmaY: AppDimens.headerBlur / 2,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: v.glassFill,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [v.primaryFill!, Colors.transparent],
+            ),
+            border: Border(bottom: BorderSide(color: v.glassBorder!)),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              FlexibleSpaceBar(
+                background: Padding(
+                  padding: EdgeInsets.only(
+                    top: topPadding + kToolbarHeight / 2,
+                    bottom: tabBarHeight,
+                    left: context.gutter,
+                    right: context.gutter,
+                  ),
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: avatarSize,
+                                height: avatarSize,
+                                padding: const EdgeInsets.all(AppDimens.borderThick),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: context.colors.primary,
+                                    width: AppDimens.borderThick,
+                                  ),
+                                  boxShadow: AppShadows.inputFocus,
+                                ),
+                                child: _buildAvatar(
+                                  profile,
+                                  avatarSize,
+                                  context.text.headlineMedium,
+                                ),
+                              ),
+                              if (_isEditing)
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      showSmoothSnackBar(
+                                        context,
+                                        message:
+                                            'Avatar image upload is handled via Google OAuth or future updates.',
+                                        iconColor: AppColors.info,
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(AppDimens.space6),
+                                      decoration: BoxDecoration(
+                                        color: context.colors.primary,
+                                        shape: BoxShape.circle,
+                                        boxShadow: AppShadows.shadowY,
+                                      ),
+                                      child: Icon(
+                                        Icons.camera_alt_rounded,
+                                        size: AppDimens.iconXs,
+                                        color: v.buttonText,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: AppDimens.space12),
+                          Text(
+                            profile.fullName.isNotEmpty ? profile.fullName : 'VitalUp User',
+                            textAlign: TextAlign.center,
+                            style: context.text.headlineMedium,
+                          ),
+                          const SizedBox(height: AppDimens.space4),
+                          Text(
+                            '@${profile.username}',
+                            style: context.text.bodyMedium?.copyWith(color: v.grayText),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              AnimatedOpacity(
+                duration: AppDurations.medium,
+                opacity: isCollapsed ? 1.0 : 0.0,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: topPadding + AppDimens.space12,
+                      left: context.gutter,
+                      right: context.gutter +
+                          AppDimens.headerActionSize * 2 +
+                          AppDimens.space8 * 2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildAvatar(
+                          profile,
+                          AppDimens.avatarSmall,
+                          context.text.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        Flexible(
+                          child: Text(
+                            profile.fullName.isNotEmpty ? profile.fullName : 'Profile',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildHeaderActions(ProfileEntity profile, bool isSaving) {
+    const gap = SizedBox(width: AppDimens.space8);
+    if (!_isEditing) {
+      return [
+        AppHeaderAction(
+          icon: const Icon(Icons.settings_rounded),
+          onTap: () => context.pushNamed('settings'),
+          tooltip: 'Settings',
+        ),
+        gap,
+        AppHeaderAction(
+          icon: const Icon(Icons.edit_rounded),
+          onTap: () => setState(() => _isEditing = true),
+          tooltip: 'Edit Profile',
+        ),
+      ];
+    }
+    if (isSaving) {
+      return [
+        SizedBox.square(
+          dimension: AppDimens.headerActionSize,
+          child: Center(
+            child: SizedBox.square(
+              dimension: AppDimens.iconLg,
+              child: CircularProgressIndicator(
+                strokeWidth: AppDimens.borderThick,
+                color: context.colors.primary,
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      AppHeaderAction(
+        icon: const Icon(Icons.close_rounded),
+        onTap: () {
+          _populateFields(profile);
+          setState(() => _isEditing = false);
+        },
+        tooltip: 'Cancel',
+      ),
+      gap,
+      AppHeaderAction(
+        icon: const Icon(Icons.check_rounded),
+        onTap: () => _saveProfile(profile),
+        tooltip: 'Save Details',
+      ),
+    ];
+  }
+
+  /// Figma segmented tabs: glass container, primary selected segment.
+  Widget _buildTabBar() {
+    final v = context.vColors;
+    final labelStyle = context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w500);
+    Widget tab(String text) => Tab(
+          height: AppDimens.segmentHeight,
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1)),
+        );
+
+    return ResponsiveCenter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.gutter,
+          vertical: AppDimens.space8,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(AppDimens.space8),
+          decoration: BoxDecoration(
+            color: v.glassFill,
+            borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+            border: Border.all(color: v.glassBorder!),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            dividerColor: Colors.transparent,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicatorWeight: AppDimens.borderThick,
+            indicator: BoxDecoration(
+              color: context.colors.primary,
+              borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+              boxShadow: AppShadows.segment,
+            ),
+            labelPadding: EdgeInsets.zero,
+            labelColor: v.buttonText,
+            unselectedLabelColor: v.grayText,
+            labelStyle: labelStyle,
+            unselectedLabelStyle: labelStyle,
+            tabs: [
+              tab('Account Details'),
+              tab('Health Metrics'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabScroll(Widget content) {
+    return Builder(
+      builder: (context) => CustomScrollView(
+        slivers: [
+          SliverOverlapInjector(
+            handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+          ),
+          SliverToBoxAdapter(child: ResponsiveCenter(child: content)),
+        ],
+      ),
+    );
+  }
+
+  /// Leaves room for the floating dashboard nav bar.
+  EdgeInsets get _tabPadding => EdgeInsets.fromLTRB(
+        context.gutter,
+        AppDimens.sectionGap,
+        context.gutter,
+        AppDimens.navBarItemHeight +
+            AppDimens.navBarPadding.vertical +
+            AppDimens.navBarBottomOffset +
+            AppDimens.sectionGap +
+            context.safePadding.bottom,
+      );
+
+  // --- TAB 1: ACCOUNT DETAILS VIEW ---
+  Widget _buildAccountTab(ProfileEntity profile) {
+    return Padding(
+      padding: _tabPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSection(
+            'Identity',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
+                      icon: Icons.badge_rounded,
+                      label: 'Full Name',
+                      value: profile.fullName,
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.alternate_email_rounded,
+                      label: 'Username',
+                      value: '@${profile.username}',
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.email_rounded,
+                      label: 'Email Address',
+                      value: profile.email,
+                    ),
+                  ]
+                : [
+                    _buildTextField(
+                      controller: _fullNameController,
+                      label: 'Full Name',
+                      icon: Icons.badge_rounded,
+                      enabled: _isEditing,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Full name is required';
+                        if (val.trim().length < 2) return 'Must be at least 2 characters';
+                        return null;
+                      },
+                    ),
+                    _buildTextField(
+                      controller: _usernameController,
+                      label: 'Username',
+                      icon: Icons.alternate_email_rounded,
+                      enabled: _isEditing,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Username is required';
+                        if (val.trim().length < 3) return 'Must be at least 3 characters';
+                        return null;
+                      },
+                    ),
+                    _buildReadOnlyField(
+                      label: 'Email Address',
+                      value: profile.email,
+                      icon: Icons.email_rounded,
+                    ),
+                  ],
+          ),
+          _buildSection(
+            'Personal Demographics',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
+                      icon: Icons.calendar_month_rounded,
+                      label: 'Date of Birth',
+                      value: _formatDobDisplay(profile.dob),
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.wc_rounded,
+                      label: 'Gender',
+                      value: profile.gender,
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.smoking_rooms_rounded,
+                      label: 'Smoker Status',
+                      value: profile.smokes,
+                    ),
+                  ]
+                : [
+                    _buildDatePickerField(
+                      context: context,
+                      controller: _dobController,
+                      label: 'Date of Birth',
+                      icon: Icons.calendar_month_rounded,
+                      enabled: _isEditing,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Date of birth is required';
+                        return null;
+                      },
+                    ),
+                    _buildDropdownField(
+                      label: 'Gender',
+                      value: _gender,
+                      icon: Icons.wc_rounded,
+                      enabled: _isEditing,
+                      items: const ['Male', 'Female', 'Other'],
+                      onChanged: (val) => setState(() => _gender = val ?? ''),
+                    ),
+                    _buildDropdownField(
+                      label: 'Smoker Status',
+                      value: _smokes,
+                      icon: Icons.smoking_rooms_rounded,
+                      enabled: _isEditing,
+                      items: const ['No', 'Yes', 'Occasionally'],
+                      onChanged: (val) => setState(() => _smokes = val ?? ''),
+                    ),
+                  ],
+          ),
+          if (!_isEditing)
+            AppSecondaryButton(
+              label: 'Logout Account',
+              onTap: widget.onLogout,
+              leadingIcon: const Icon(Icons.logout_rounded),
+              contentColor: context.colors.error,
+              borderColor: context.colors.error.withValues(alpha: 0.5),
+            ),
+        ],
+      ),
     );
   }
 
   // --- TAB 2: HEALTH METRICS VIEW ---
-  Widget _buildHealthTab(ThemeData theme, VitalUpColors? vColors, ProfileEntity profile) {
-    return ListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(AppTheme.hPadding, 10, AppTheme.hPadding, 100),
-      children: [
-        _buildSectionHeader(theme, 'Physical Metrics'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.straighten_rounded,
-                label: 'Height',
-                value: profile.height.isNotEmpty ? '${profile.height} ${profile.heightUnit}' : '',
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.monitor_weight_rounded,
-                label: 'Weight',
-                value: profile.weight.isNotEmpty ? '${profile.weight} ${profile.weightUnit}' : '',
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _heightController,
-                      label: 'Height',
+  Widget _buildHealthTab(ProfileEntity profile) {
+    final suffixStyle = context.text.bodySmall?.copyWith(color: context.vColors.grayText);
+    return Padding(
+      padding: _tabPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSection(
+            'Physical Metrics',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
                       icon: Icons.straighten_rounded,
-                      enabled: _isEditing,
-                      keyboardType: TextInputType.number,
-                      suffix: Text(_heightUnit, style: theme.textTheme.bodySmall),
-                      validator: (val) {
-                        if (val != null && val.isNotEmpty && double.tryParse(val) == null) {
-                          return 'Invalid height';
-                        }
-                        return null;
-                      },
+                      label: 'Height',
+                      value: profile.height.isNotEmpty ? '${profile.height} ${profile.heightUnit}' : '',
                     ),
-                  ),
-                  if (_isEditing) ...[
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 80,
-                      child: _buildDropdownFieldWithoutIcon(
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.monitor_weight_rounded,
+                      label: 'Weight',
+                      value: profile.weight.isNotEmpty ? '${profile.weight} ${profile.weightUnit}' : '',
+                    ),
+                  ]
+                : [
+                    _buildValueWithUnit(
+                      field: _buildTextField(
+                        controller: _heightController,
+                        label: 'Height',
+                        icon: Icons.straighten_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        suffix: Text(_heightUnit, style: suffixStyle),
+                        validator: (val) {
+                          if (val != null && val.isNotEmpty && double.tryParse(val) == null) {
+                            return 'Invalid height';
+                          }
+                          return null;
+                        },
+                      ),
+                      unit: _buildDropdownFieldWithoutIcon(
                         value: _heightUnit,
                         items: const ['cm', 'in'],
                         onChanged: (val) => setState(() => _heightUnit = val ?? 'cm'),
                       ),
                     ),
-                  ]
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _weightController,
-                      label: 'Weight',
-                      icon: Icons.monitor_weight_rounded,
-                      enabled: _isEditing,
-                      keyboardType: TextInputType.number,
-                      suffix: Text(_weightUnit, style: theme.textTheme.bodySmall),
-                      validator: (val) {
-                        if (val != null && val.isNotEmpty && double.tryParse(val) == null) {
-                          return 'Invalid weight';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  if (_isEditing) ...[
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 80,
-                      child: _buildDropdownFieldWithoutIcon(
+                    _buildValueWithUnit(
+                      field: _buildTextField(
+                        controller: _weightController,
+                        label: 'Weight',
+                        icon: Icons.monitor_weight_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        suffix: Text(_weightUnit, style: suffixStyle),
+                        validator: (val) {
+                          if (val != null && val.isNotEmpty && double.tryParse(val) == null) {
+                            return 'Invalid weight';
+                          }
+                          return null;
+                        },
+                      ),
+                      unit: _buildDropdownFieldWithoutIcon(
                         value: _weightUnit,
                         items: const ['kg', 'lbs'],
                         onChanged: (val) => setState(() => _weightUnit = val ?? 'kg'),
                       ),
                     ),
-                  ]
-                ],
-              ),
-            ],
+                  ],
           ),
-        const SizedBox(height: 8),
-        _buildSectionHeader(theme, 'Cardiovascular & Vitals'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.favorite_rounded,
-                label: 'Blood Pressure',
-                value: (profile.bloodPressureTop.isNotEmpty && profile.bloodPressureBottom.isNotEmpty)
-                    ? '${profile.bloodPressureTop}/${profile.bloodPressureBottom} mmHg'
-                    : '',
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.favorite_rounded,
-                label: 'Resting Heart Rate',
-                value: profile.bpm.isNotEmpty ? '${profile.bpm} bpm' : '',
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.opacity_rounded,
-                label: 'Blood Oxygen (SpO2)',
-                value: profile.oxygenLevel.isNotEmpty ? '${profile.oxygenLevel}%' : '',
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _bpTopController,
-                      label: 'BP Systolic (Top)',
+          _buildSection(
+            'Cardiovascular & Vitals',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
                       icon: Icons.favorite_rounded,
-                      enabled: _isEditing,
-                      keyboardType: TextInputType.number,
-                      placeholder: 'e.g. 120',
+                      label: 'Blood Pressure',
+                      value: (profile.bloodPressureTop.isNotEmpty && profile.bloodPressureBottom.isNotEmpty)
+                          ? '${profile.bloodPressureTop}/${profile.bloodPressureBottom} mmHg'
+                          : '',
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _bpBottomController,
-                      label: 'BP Diastolic (Bottom)',
-                      icon: Icons.heart_broken_rounded,
-                      enabled: _isEditing,
-                      keyboardType: TextInputType.number,
-                      placeholder: 'e.g. 80',
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _bpmController,
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.favorite_rounded,
                       label: 'Resting Heart Rate',
-                      icon: Icons.favorite_rounded,
-                      enabled: _isEditing,
-                      keyboardType: TextInputType.number,
-                      placeholder: 'e.g. 72',
-                      suffix: Text('bpm', style: theme.textTheme.bodySmall),
+                      value: profile.bpm.isNotEmpty ? '${profile.bpm} bpm' : '',
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _oxygenController,
-                      label: 'Blood Oxygen (SpO2)',
+                    _buildDivider(),
+                    _buildProfileRow(
                       icon: Icons.opacity_rounded,
+                      label: 'Blood Oxygen (SpO2)',
+                      value: profile.oxygenLevel.isNotEmpty ? '${profile.oxygenLevel}%' : '',
+                    ),
+                  ]
+                : [
+                    _buildFieldPair(
+                      _buildTextField(
+                        controller: _bpTopController,
+                        label: 'BP Systolic (Top)',
+                        icon: Icons.favorite_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        placeholder: 'e.g. 120',
+                      ),
+                      _buildTextField(
+                        controller: _bpBottomController,
+                        label: 'BP Diastolic (Bottom)',
+                        icon: Icons.heart_broken_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        placeholder: 'e.g. 80',
+                      ),
+                    ),
+                    _buildFieldPair(
+                      _buildTextField(
+                        controller: _bpmController,
+                        label: 'Resting Heart Rate',
+                        icon: Icons.favorite_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        placeholder: 'e.g. 72',
+                        suffix: Text('bpm', style: suffixStyle),
+                      ),
+                      _buildTextField(
+                        controller: _oxygenController,
+                        label: 'Blood Oxygen (SpO2)',
+                        icon: Icons.opacity_rounded,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.number,
+                        placeholder: 'e.g. 98',
+                        suffix: Text('%', style: suffixStyle),
+                      ),
+                    ),
+                  ],
+          ),
+          _buildSection(
+            'Habits & Routine Targets',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
+                      icon: Icons.directions_run_rounded,
+                      label: 'Activity Level',
+                      value: profile.activity,
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.bedtime_rounded,
+                      label: 'Daily Sleep Target',
+                      value: profile.sleep.isNotEmpty ? '${profile.sleep} hrs' : '',
+                    ),
+                  ]
+                : [
+                    _buildDropdownField(
+                      label: 'Activity Level',
+                      value: _activity,
+                      icon: Icons.directions_run_rounded,
+                      enabled: _isEditing,
+                      items: const ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active'],
+                      onChanged: (val) => setState(() => _activity = val ?? ''),
+                    ),
+                    _buildTextField(
+                      controller: _sleepController,
+                      label: 'Daily Sleep Target',
+                      icon: Icons.bedtime_rounded,
                       enabled: _isEditing,
                       keyboardType: TextInputType.number,
-                      placeholder: 'e.g. 98',
-                      suffix: Text('%', style: theme.textTheme.bodySmall),
+                      placeholder: 'e.g. 8',
+                      suffix: Text('hrs', style: suffixStyle),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
           ),
-        const SizedBox(height: 8),
-        _buildSectionHeader(theme, 'Habits & Routine Targets'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.directions_run_rounded,
-                label: 'Activity Level',
-                value: profile.activity,
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.bedtime_rounded,
-                label: 'Daily Sleep Target',
-                value: profile.sleep.isNotEmpty ? '${profile.sleep} hrs' : '',
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildDropdownField(
-                label: 'Activity Level',
-                value: _activity,
-                icon: Icons.directions_run_rounded,
-                enabled: _isEditing,
-                items: const ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active'],
-                onChanged: (val) => setState(() => _activity = val ?? ''),
-              ),
-              _buildTextField(
-                controller: _sleepController,
-                label: 'Daily Sleep Target',
-                icon: Icons.bedtime_rounded,
-                enabled: _isEditing,
-                keyboardType: TextInputType.number,
-                placeholder: 'e.g. 8',
-                suffix: Text('hrs', style: theme.textTheme.bodySmall),
-              ),
-            ],
+          _buildSection(
+            'Medical History',
+            !_isEditing
+                ? [
+                    _buildProfileRow(
+                      icon: Icons.medical_services_rounded,
+                      label: 'Health Conditions',
+                      value: profile.healthConditions,
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.warning_amber_rounded,
+                      label: 'Allergies',
+                      value: profile.allergies,
+                    ),
+                    _buildDivider(),
+                    _buildProfileRow(
+                      icon: Icons.medication_rounded,
+                      label: 'Current Medications',
+                      value: profile.medicines,
+                    ),
+                  ]
+                : [
+                    _buildTextField(
+                      controller: _conditionsController,
+                      label: 'Health Conditions',
+                      icon: Icons.medical_services_rounded,
+                      enabled: _isEditing,
+                      placeholder: 'None or list them...',
+                    ),
+                    _buildTextField(
+                      controller: _allergiesController,
+                      label: 'Allergies',
+                      icon: Icons.warning_amber_rounded,
+                      enabled: _isEditing,
+                      placeholder: 'None or list them...',
+                    ),
+                    _buildTextField(
+                      controller: _medicinesController,
+                      label: 'Current Medications',
+                      icon: Icons.medication_rounded,
+                      enabled: _isEditing,
+                      placeholder: 'None or list them...',
+                    ),
+                  ],
           ),
-        const SizedBox(height: 8),
-        _buildSectionHeader(theme, 'Medical History'),
-        if (!_isEditing)
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildProfileRow(
-                icon: Icons.medical_services_rounded,
-                label: 'Health Conditions',
-                value: profile.healthConditions,
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.warning_amber_rounded,
-                label: 'Allergies',
-                value: profile.allergies,
-              ),
-              _buildDivider(),
-              _buildProfileRow(
-                icon: Icons.medication_rounded,
-                label: 'Current Medications',
-                value: profile.medicines,
-              ),
-            ],
-          )
-        else
-          _buildGlassCard(
-            context: context,
-            children: [
-              _buildTextField(
-                controller: _conditionsController,
-                label: 'Health Conditions',
-                icon: Icons.medical_services_rounded,
-                enabled: _isEditing,
-                placeholder: 'None or list them...',
-              ),
-              _buildTextField(
-                controller: _allergiesController,
-                label: 'Allergies',
-                icon: Icons.warning_amber_rounded,
-                enabled: _isEditing,
-                placeholder: 'None or list them...',
-              ),
-              _buildTextField(
-                controller: _medicinesController,
-                label: 'Current Medications',
-                icon: Icons.medication_rounded,
-                enabled: _isEditing,
-                placeholder: 'None or list them...',
-              ),
-            ],
-          ),
-      ],
+        ],
+      ),
     );
   }
 
   // --- REUSABLE UI BUILDER METHODS ---
 
-  Widget _buildGlassCard({
-    required BuildContext context,
-    required List<Widget> children,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+  Widget _buildSection(String title, List<Widget> children) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
+      padding: const EdgeInsets.only(bottom: AppDimens.sectionGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCaption(title),
+          const SizedBox(height: AppDimens.space8),
+          AppCard(
             width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : Colors.white.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8))
-                    .withValues(alpha: 0.4),
-              ),
-            ),
+            padding: AppDimens.cardPaddingCompact,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(ThemeData theme, String title) {
-    final customColors = theme.extension<VitalUpColors>();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0, top: 12.0, left: 4.0),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.7,
-          color: customColors?.grayText ?? const Color(0xFF777777),
-        ),
-      ),
+  /// Two fields side by side, stacked on narrow cards.
+  Widget _buildFieldPair(Widget first, Widget second) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < AppDimens.smallPhoneBreakpoint) {
+          return Column(children: [first, second]);
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(child: second),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildValueWithUnit({required Widget field, required Widget unit}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(child: field),
+        if (_isEditing) ...[
+          const SizedBox(width: AppDimens.space8),
+          SizedBox(width: context.w(AppDimens.unitFieldWidth), child: unit),
+        ],
+      ],
     );
   }
 
@@ -1096,46 +1064,32 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required IconData icon,
     required String label,
     required String value,
-    Widget? trailing,
   }) {
-    final theme = Theme.of(context);
-    final vColors = theme.extension<VitalUpColors>();
+    final v = context.vColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-          ),
-          const SizedBox(width: 16),
+          AppIconBadge(icon: Icon(icon)),
+          const SizedBox(width: AppDimens.space12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: vColors?.grayText ?? Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: context.text.bodySmall?.copyWith(color: v.grayText),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppDimens.space2),
                 Text(
                   value.isNotEmpty ? value : 'Not provided',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: value.isNotEmpty ? null : theme.disabledColor,
+                  style: context.text.titleSmall?.copyWith(
+                    color: value.isNotEmpty ? null : v.grayText,
                   ),
                 ),
               ],
             ),
           ),
-          if (trailing != null) trailing,
         ],
       ),
     );
@@ -1143,12 +1097,32 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   Widget _buildDivider() {
     return Divider(
-      color: Colors.grey.withValues(alpha: 0.1),
-      height: 1,
-      thickness: 1,
-      indent: 48,
+      color: context.vColors.divider,
+      height: AppDimens.borderThin,
+      thickness: AppDimens.borderThin,
+      indent: AppDimens.iconBadge + AppDimens.space12,
     );
   }
+
+  /// Figma `input/text`: label (body 16 med) 6dp above the field.
+  Widget _labeled(String? label, Widget field) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimens.space16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null) ...[
+            Text(label, style: context.text.titleSmall),
+            const SizedBox(height: AppDimens.inputLabelGap),
+          ],
+          field,
+        ],
+      ),
+    );
+  }
+
+  Icon _prefixIcon(IconData icon) =>
+      Icon(icon, color: context.colors.primary, size: AppDimens.iconMd);
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -1160,45 +1134,23 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     String placeholder = '',
     String? Function(String?)? validator,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextFormField(
+    return _labeled(
+      label,
+      TextFormField(
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
         validator: validator,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: enabled ? null : theme.disabledColor,
+        style: context.text.bodyLarge?.copyWith(
+          color: enabled ? null : context.vColors.grayText,
         ),
         decoration: InputDecoration(
-          labelText: label,
           hintText: placeholder,
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
-          suffixIcon: suffix,
-          filled: true,
-          fillColor: enabled 
-              ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03))
-              : theme.disabledColor.withValues(alpha: 0.05),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2.0),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.25),
-            ),
+          prefixIcon: _prefixIcon(icon),
+          suffixIcon: suffix == null ? null : Center(widthFactor: 1, child: suffix),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: AppDimens.space40,
+            minHeight: AppDimens.space40,
           ),
         ),
       ),
@@ -1210,29 +1162,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required String value,
     required IconData icon,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: InputDecorator(
+    final grey = context.vColors.grayText;
+    return _labeled(
+      label,
+      InputDecorator(
         decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
-          filled: true,
-          fillColor: theme.disabledColor.withValues(alpha: 0.05),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.25),
-            ),
-          ),
+          prefixIcon: Icon(icon, color: grey, size: AppDimens.iconMd),
         ),
         child: Text(
           value.isNotEmpty ? value : 'N/A',
-          style: theme.textTheme.bodyLarge?.copyWith(color: theme.disabledColor),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.bodyLarge?.copyWith(color: grey),
         ),
       ),
     );
@@ -1246,46 +1187,20 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     bool enabled = true,
     String? Function(String?)? validator,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextFormField(
+    return _labeled(
+      label,
+      TextFormField(
         controller: controller,
         enabled: enabled,
         readOnly: true,
         validator: validator,
         onTap: enabled ? () => _selectDate(context) : null,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: enabled ? null : theme.disabledColor,
+        style: context.text.bodyLarge?.copyWith(
+          color: enabled ? null : context.vColors.grayText,
         ),
         decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+          prefixIcon: _prefixIcon(icon),
           suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
-          filled: true,
-          fillColor: enabled 
-              ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03))
-              : theme.disabledColor.withValues(alpha: 0.05),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2.0),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.25),
-            ),
-          ),
         ),
       ),
     );
@@ -1299,46 +1214,21 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required ValueChanged<String?> onChanged,
     bool enabled = true,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final displayValue = items.contains(value) ? value : (items.isNotEmpty ? items.first : '');
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: DropdownButtonFormField<String>(
-        value: displayValue.isEmpty ? null : displayValue,
+
+    return _labeled(
+      label,
+      DropdownButtonFormField<String>(
+        initialValue: displayValue.isEmpty ? null : displayValue,
         onChanged: enabled ? onChanged : null,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
-          filled: true,
-          fillColor: enabled 
-              ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03))
-              : theme.disabledColor.withValues(alpha: 0.05),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2.0),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.25),
-            ),
-          ),
-        ),
+        isExpanded: true,
+        style: context.text.bodyLarge?.copyWith(color: context.colors.onSurface),
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        decoration: InputDecoration(prefixIcon: _prefixIcon(icon)),
         items: items.map<DropdownMenuItem<String>>((String val) {
           return DropdownMenuItem<String>(
             value: val,
-            child: Text(val),
+            child: Text(val, overflow: TextOverflow.ellipsis),
           );
         }).toList(),
       ),
@@ -1350,32 +1240,20 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final displayValue = items.contains(value) ? value : (items.isNotEmpty ? items.first : '');
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: DropdownButtonFormField<String>(
-        value: displayValue.isEmpty ? null : displayValue,
+
+    return _labeled(
+      null,
+      DropdownButtonFormField<String>(
+        initialValue: displayValue.isEmpty ? null : displayValue,
         onChanged: onChanged,
         isExpanded: true, // This prevents RenderFlex overflow in narrow spaces
-        decoration: InputDecoration(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-          filled: true,
-          fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(
-              color: (isDark ? const Color(0xFF343434) : const Color(0xFFD8D8D8)).withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2.0),
+        style: context.text.bodyLarge?.copyWith(color: context.colors.onSurface),
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        decoration: const InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: AppDimens.space12,
+            vertical: AppDimens.space16,
           ),
         ),
         items: items.map<DropdownMenuItem<String>>((String val) {
