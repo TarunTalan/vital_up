@@ -58,9 +58,7 @@ class _ActivityTrackingView extends StatefulWidget {
 }
 
 class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
-  bool _isOfflineMapReady = false;
-  bool _isDownloadingMap = false;
-  double _mapDownloadProgress = 0.0;
+  bool _offlineMapChecked = false;
   bool _isUiVisible = true;
   bool _isLocked = true;
   bool _isCountingDown = false;
@@ -82,7 +80,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   TrackPoint? _currentPosition;
   TrackPoint? _startPoint;
+
+  /// Map-preview position feed while no workout is running. It must be
+  /// cancelled before a workout starts: geolocator shares one native stream
+  /// and would hand the workout this low-precision, foreground-only feed.
   StreamSubscription<Position>? _positionSubscription;
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
@@ -96,8 +99,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
-    _checkOfflineMap();
     _startLocationUpdates();
+    // Checkpoint the workout whenever the app leaves the foreground — the
+    // OS may kill a backgrounded app without further notice.
+    _lifecycleListener = AppLifecycleListener(
+      onHide: () {
+        if (mounted) context.read<ActivityTrackingBloc>().add(PersistProgress());
+      },
+    );
   }
 
   void _onPrefsChanged() {
@@ -242,16 +251,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _playWorkoutAudio();
   }
 
-  Future<void> _checkOfflineMap() async {
-    final mapRepo = sl<MapTileRepository>();
-    final exists = await mapRepo.checkRegionDownloaded(kOfflineRegionId);
-    if (mounted) {
-      setState(() {
-        _isOfflineMapReady = exists;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _prefsNotifier.removeListener(_onPrefsChanged);
@@ -261,6 +260,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _stopWorkoutAudio();
     _voiceCoach.stop();
 
+    _lifecycleListener.dispose();
     _positionSubscription?.cancel();
     _hrSubscription?.cancel();
     _hrManager.dispose();
@@ -271,6 +271,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   Future<void> _startLocationUpdates() async {
+    if (_positionSubscription != null) return;
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
 
@@ -280,6 +281,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
     if (permission != LocationPermission.always &&
         permission != LocationPermission.whileInUse) {
+      return;
+    }
+    // A workout may have started while we were awaiting permission.
+    if (!mounted ||
+        _positionSubscription != null ||
+        context.read<ActivityTrackingBloc>().state is! TrackingIdle) {
       return;
     }
 
@@ -304,76 +311,45 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             });
             _updatePuck(point);
             _initialCenterCamera(position.latitude, position.longitude);
+            _ensureOfflineMap(position.latitude, position.longitude);
           }
-        });
+        }, onError: (Object e) => debugPrint('Map preview location error: $e'));
   }
 
-  Future<void> _downloadOfflineMap() async {
-    setState(() {
-      _isDownloadingMap = true;
-      _mapDownloadProgress = 0.0;
-    });
+  void _stopLocationUpdates() {
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+  }
 
+  /// Starts the workout. Shared by the instant start and the countdown.
+  void _beginTracking() {
+    _stopLocationUpdates();
+    _prefsNotifier.applyDailyTargetIfEnabled();
+    context.read<ActivityTrackingBloc>().add(StartTracking());
+    if (_prefsNotifier.value.voiceCoachEnabled) {
+      _voiceCoach.announceStart();
+    }
+    _playWorkoutAudio();
+  }
+
+  /// Keeps a 10 km offline map around the user so the tracking map still
+  /// renders with no connection. Runs once per visit, silently: offline the
+  /// download simply fails and is retried on the next visit.
+  Future<void> _ensureOfflineMap(double latitude, double longitude) async {
+    if (_offlineMapChecked) return;
+    _offlineMapChecked = true;
+    if (!SupabaseConfig.mapboxAccessToken.startsWith('pk.')) return;
+
+    final mapRepo = sl<MapTileRepository>();
     try {
-      if (!SupabaseConfig.mapboxAccessToken.startsWith('pk.')) {
-        throw Exception(
-          'A valid Mapbox public access token is required before offline maps can be downloaded.',
-        );
+      if (await mapRepo.regionCovers(kOfflineRegionId, latitude, longitude)) {
+        return;
       }
-
-      // 1. Fetch current GPS position
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('Location services are disabled.');
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Location permissions are denied.');
-        }
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-
-      // 2. Start Mapbox tile download (10km radius)
-      final mapRepo = sl<MapTileRepository>();
-      final downloadStream = mapRepo.downloadRegion(
-        kOfflineRegionId,
-        position.latitude,
-        position.longitude,
-        10.0,
-      );
-
-      await for (final progress in downloadStream) {
-        if (mounted) {
-          setState(() {
-            _mapDownloadProgress = progress;
-          });
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _isOfflineMapReady = true;
-          _isDownloadingMap = false;
-        });
-      }
+      await mapRepo
+          .downloadRegion(kOfflineRegionId, latitude, longitude, 10.0)
+          .drain<void>();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isDownloadingMap = false;
-        });
-        showErrorSnackBar(
-          context,
-          'Failed to download offline tiles: ${e.toString()}',
-        );
-      }
+      debugPrint('Offline map download skipped: $e');
     }
   }
 
@@ -399,8 +375,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _onMapCreated(mbx.MapboxMap map) async {
     _mapboxMap = map;
 
-    // Set map style
-    await map.loadStyleURI(mbx.MapboxStyles.MAPBOX_STREETS);
+    // Set map style. Offline without a downloaded style pack this fails;
+    // carry on so the route and position markers are still created.
+    try {
+      await map.loadStyleURI(mbx.MapboxStyles.MAPBOX_STREETS);
+    } catch (e) {
+      debugPrint('Map style failed to load: $e');
+    }
+    if (!mounted) return;
 
     // Move compass to top right, at roughly 60% height of screen
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -450,6 +432,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         speed: position.speed.isFinite ? position.speed : 0,
         altitude: position.altitude.isFinite ? position.altitude : 0,
       );
+      if (!mounted) return;
       setState(() {
         _currentPosition = point;
       });
@@ -533,6 +516,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     setState(() {
       _startPoint = null;
     });
+    _updatePuck(_currentPosition);
   }
 
   @override
@@ -568,7 +552,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _updateStartPoint(state.routePoints.first);
           }
           _updateRoute(state.routePoints);
-          if (state.routePoints.isNotEmpty) {
+          if (state.routePoints.isNotEmpty &&
+              !identical(_currentPosition, state.routePoints.last)) {
+            _currentPosition = state.routePoints.last;
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingPaused) {
@@ -580,6 +566,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _updatePuck(state.routePoints.last);
           }
         } else if (state is TrackingCompleted) {
+          if (!state.saved) {
+            showErrorSnackBar(
+              context,
+              "Couldn't save this activity to your device.",
+            );
+          }
           if (_prefsNotifier.value.voiceCoachEnabled) {
             _voiceCoach.announceStop(
               distanceMeters: state.session.totalDistanceMeters,
@@ -609,6 +601,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         } else if (state is TrackingIdle) {
           // Clear map annotations when reset
           _clearMapAnnotations();
+          _startLocationUpdates();
         }
       },
       builder: (context, state) {
@@ -628,51 +621,22 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
           steps = state.steps;
-          if (state.routePoints.isNotEmpty) {
-            currentSpeed = state.routePoints.last.speed;
-            double cumulativeElevation = 0.0;
-            for (int i = 1; i < state.routePoints.length; i++) {
-              final diff =
-                  state.routePoints[i].altitude -
-                  state.routePoints[i - 1].altitude;
-              if (diff > 0) cumulativeElevation += diff;
-            }
-            elevationGain = cumulativeElevation;
-          }
+          currentSpeed = state.currentSpeedMps;
+          elevationGain = state.elevationGainMeters;
         } else if (state is TrackingPaused) {
           elapsed = state.elapsed;
           distanceMeters = state.distanceMeters;
           calories = state.calories;
           avgPace = state.avgPaceSecondsPerKm;
           steps = state.steps;
-          if (state.routePoints.isNotEmpty) {
-            currentSpeed = 0.0;
-            double cumulativeElevation = 0.0;
-            for (int i = 1; i < state.routePoints.length; i++) {
-              final diff =
-                  state.routePoints[i].altitude -
-                  state.routePoints[i - 1].altitude;
-              if (diff > 0) cumulativeElevation += diff;
-            }
-            elevationGain = cumulativeElevation;
-          }
+          elevationGain = state.elevationGainMeters;
         } else if (state is TrackingCompleted) {
           elapsed = Duration(seconds: state.session.totalDurationSeconds);
           distanceMeters = state.session.totalDistanceMeters;
           calories = state.session.calories;
           avgPace = state.session.avgPaceSecondsPerKm;
           steps = state.session.steps;
-          if (state.session.points.isNotEmpty) {
-            currentSpeed = 0.0;
-            double cumulativeElevation = 0.0;
-            for (int i = 1; i < state.session.points.length; i++) {
-              final diff =
-                  state.session.points[i].altitude -
-                  state.session.points[i - 1].altitude;
-              if (diff > 0) cumulativeElevation += diff;
-            }
-            elevationGain = cumulativeElevation;
-          }
+          elevationGain = state.elevationGainMeters;
         }
 
         return PopScope(
@@ -1017,15 +981,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                             _isCountingDown = true;
                                           });
                                         } else {
-                                          _prefsNotifier
-                                              .applyDailyTargetIfEnabled();
-                                          bloc.add(StartTracking());
-                                          if (_prefsNotifier
-                                              .value
-                                              .voiceCoachEnabled) {
-                                            _voiceCoach.announceStart();
-                                          }
-                                          _playWorkoutAudio();
+                                          _beginTracking();
                                         }
                                       },
                                       onPause: () {
@@ -1114,12 +1070,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                         setState(() {
                           _isCountingDown = false;
                         });
-                        bloc.add(StartTracking());
-                        _prefsNotifier.applyDailyTargetIfEnabled();
-                        if (_prefsNotifier.value.voiceCoachEnabled) {
-                          _voiceCoach.announceStart();
-                        }
-                        _playWorkoutAudio();
+                        _beginTracking();
                       },
                     ),
                   ),

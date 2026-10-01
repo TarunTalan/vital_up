@@ -5,4 +5,8 @@ abstract class ActivityRepository {
   Future<List<ActivitySession>> getSessions();
   Future<ActivitySession?> getSessionById(String id);
   Future<void> deleteSession(String id);
+
+  /// Closes sessions left open by an app kill or crash mid-workout, keeping
+  /// everything recorded up to their last checkpoint. Call at startup only.
+  Future<void> finalizeInterruptedSessions();
 }

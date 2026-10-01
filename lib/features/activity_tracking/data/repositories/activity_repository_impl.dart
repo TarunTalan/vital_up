@@ -27,7 +27,6 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetValue: Value(session.targetValue),
       targetAchieved: Value(session.targetAchieved),
     );
-    await database.saveSessionCompanion(dbSession);
 
     final dbPoints = session.points.map((p) => DriftTrackPointsCompanion.insert(
       sessionId: session.id,
@@ -36,46 +35,20 @@ class ActivityRepositoryImpl implements ActivityRepository {
       timestamp: p.timestamp,
       accuracy: p.accuracy,
       speed: p.speed,
+      altitude: Value(p.altitude),
     )).toList();
 
-    await database.replaceTrackPointsForSession(session.id, dbPoints);
+    await database.saveSessionWithPoints(dbSession, dbPoints);
   }
 
   @override
   Future<List<ActivitySession>> getSessions() async {
     final dbSessions = await database.getAllSessions();
-    final List<ActivitySession> sessions = [];
+    final pointsBySession = await database.getAllTrackPointsBySession();
 
-    for (final s in dbSessions) {
-      final dbPoints = await database.getTrackPointsForSession(s.id);
-      final points = dbPoints.map((p) => TrackPoint(
-        latitude: p.latitude,
-        longitude: p.longitude,
-        timestamp: p.timestamp,
-        accuracy: p.accuracy,
-        speed: p.speed,
-        altitude: 0.0,
-      )).toList();
-
-      sessions.add(ActivitySession(
-        id: s.id,
-        activityType: ActivityType.values.firstWhere((e) => e.name == s.activityType, orElse: () => ActivityType.walk),
-        startTime: s.startTime,
-        endTime: s.endTime,
-        totalDistanceMeters: s.totalDistanceMeters,
-        totalDurationSeconds: s.totalDurationSeconds,
-        avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
-        calories: s.calories,
-        steps: s.steps,
-        stepCountReliable: s.stepCountReliable,
-        points: points,
-        targetType: s.targetType,
-        targetValue: s.targetValue,
-        targetAchieved: s.targetAchieved ?? false,
-      ));
-    }
-
-    return sessions;
+    return dbSessions
+        .map((s) => _toEntity(s, pointsBySession[s.id] ?? const []))
+        .toList();
   }
 
   @override
@@ -84,13 +57,30 @@ class ActivityRepositoryImpl implements ActivityRepository {
     if (s == null) return null;
 
     final dbPoints = await database.getTrackPointsForSession(s.id);
+    return _toEntity(s, dbPoints);
+  }
+
+  @override
+  Future<void> deleteSession(String id) async {
+    await database.deleteSession(id);
+  }
+
+  @override
+  Future<void> finalizeInterruptedSessions() {
+    return database.finalizeInterruptedSessions();
+  }
+
+  ActivitySession _toEntity(
+    DriftActivitySession s,
+    List<DriftTrackPoint> dbPoints,
+  ) {
     final points = dbPoints.map((p) => TrackPoint(
       latitude: p.latitude,
       longitude: p.longitude,
       timestamp: p.timestamp,
       accuracy: p.accuracy,
       speed: p.speed,
-      altitude: 0.0,
+      altitude: p.altitude,
     )).toList();
 
     return ActivitySession(
@@ -109,10 +99,5 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetValue: s.targetValue,
       targetAchieved: s.targetAchieved ?? false,
     );
-  }
-
-  @override
-  Future<void> deleteSession(String id) async {
-    await database.deleteSession(id);
   }
 }

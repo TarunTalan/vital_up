@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
-import 'package:vital_up/features/activity_tracking/data/repositories/location_tracking_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/geo_math.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_save_session.dart';
@@ -20,25 +21,56 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   final StopAndSaveSession stopAndSaveSession;
   final AuthRepository authRepository;
 
+  /// How often a running workout is checkpointed to the local database.
+  static const Duration _checkpointInterval = Duration(seconds: 30);
+
+  /// Wait before re-subscribing after the GPS stream errors or closes
+  /// (location toggled off, provider restart…).
+  static const Duration _gpsRetryDelay = Duration(seconds: 3);
+
+  /// No fix for this long means we can't claim the user is still moving.
+  static const Duration _speedStaleAfter = Duration(seconds: 5);
+
+  /// Climb only counts once altitude moves this far from the last
+  /// reference, so GPS altitude jitter isn't summed into fake gain.
+  static const double _elevationThresholdMeters = 3.0;
+
+  /// Below this distance avg pace is dominated by noise (e.g. 200:00 /km).
+  static const double _minDistanceForPaceMeters = 20.0;
+
   StreamSubscription<TrackPoint>? _locationSubscription;
   StreamSubscription<int>? _stepSubscription;
   Timer? _timer;
+  Timer? _gpsRetryTimer;
+
+  /// Monotonic active-time clock: unaffected by wall-clock changes (NTP,
+  /// timezone, manual edits) and naturally excludes paused time.
+  final Stopwatch _activeClock = Stopwatch();
+
+  /// Monotonic clock for "when did the last fix arrive", independent of
+  /// the GPS timestamps (which follow the satellite clock).
+  final Stopwatch _sessionClock = Stopwatch();
+  Duration? _lastFixAt;
 
   String? _currentSessionId;
   DateTime? _startedAt;
-  DateTime? _pauseStartedAt;
-  Duration _pausedDuration = Duration.zero;
   int _currentSteps = 0;
   int _lastRawSteps = 0;
   int _rawStepsAtPause = 0;
   int _ignoredPausedSteps = 0;
   bool _stepCountReliable = true;
   bool _skipDistanceForNextPoint = false;
+  bool _isStarting = false;
+  bool _isStopping = false;
+
+  double _elevationGain = 0.0;
+  double? _elevationReference;
 
   /// User weight cached at session start to avoid hitting the DB on every tick.
   double _cachedWeightKg = 70.0;
 
-  DateTime? _lastSavedAt;
+  Duration _lastCheckpointAt = Duration.zero;
+  Future<void> _pendingSave = Future.value();
   DateTime? _stationarySince;
 
   ActivityTrackingBloc({
@@ -56,108 +88,176 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     on<UpdateSteps>(_onUpdateSteps);
     on<TickTimer>(_onTickTimer);
     on<ResetTracking>(_onResetTracking);
+    on<PersistProgress>(_onPersistProgress);
   }
 
+  bool get _isTracking =>
+      state is TrackingInProgress || state is TrackingPaused;
+
   void _onSelectActivityType(SelectActivityType event, Emitter<ActivityTrackingState> emit) {
-    if (state is! TrackingIdle) return;
+    if (state is! TrackingIdle || _isStarting) return;
     emit(TrackingIdle(activityType: event.activityType));
   }
 
   Future<void> _onStartTracking(StartTracking event, Emitter<ActivityTrackingState> emit) async {
-    if (state is! TrackingIdle) return;
+    // Handlers run concurrently, and the awaits below leave the state Idle
+    // for a while — without this a double tap starts two sessions.
+    if (state is! TrackingIdle || _isStarting) return;
+    _isStarting = true;
 
-    final hasPermission = await getLiveLocationStream.ensurePermission();
-    if (!hasPermission) {
-      emit(const TrackingPermissionDenied('Location permission is required for tracking.'));
-      return;
+    try {
+      final activityType = state.activityType;
+
+      final hasPermission = await getLiveLocationStream.ensurePermission();
+      if (!hasPermission) {
+        emit(TrackingPermissionDenied(
+          'Location permission is required for tracking.',
+          activityType: activityType,
+        ));
+        // Back to Idle straight away so the user can retry or leave the
+        // screen (the page only allows popping while Idle).
+        emit(TrackingIdle(activityType: activityType));
+        return;
+      }
+
+      final hasStepPermission = await getLiveStepsStream.ensurePermission();
+
+      // Cache user weight once per session — avoids async DB hit on every tick.
+      final userResult = await authRepository.getCurrentUser();
+      _cachedWeightKg = userResult.fold(
+        (failure) => 70.0,
+        (user) {
+          final weight = user?.weightKg;
+          return weight != null && weight > 0 ? weight : 70.0;
+        },
+      );
+
+      // Start the foreground service (and its permission prompts) before
+      // the clock starts, so time spent in system dialogs isn't counted.
+      try {
+        await ForegroundServiceManager.start(activityName: activityType.label);
+      } catch (e) {
+        debugPrint('Foreground service failed to start: $e');
+      }
+
+      _currentSessionId = const Uuid().v4();
+      _startedAt = DateTime.now();
+      _activeClock
+        ..reset()
+        ..start();
+      _sessionClock
+        ..reset()
+        ..start();
+      _lastFixAt = null;
+      _currentSteps = 0;
+      _lastRawSteps = 0;
+      _rawStepsAtPause = 0;
+      _ignoredPausedSteps = 0;
+      _stepCountReliable = hasStepPermission;
+      _skipDistanceForNextPoint = false;
+      _stationarySince = null;
+      _elevationGain = 0.0;
+      _elevationReference = null;
+      _lastCheckpointAt = Duration.zero;
+
+      emit(TrackingInProgress(
+        activityType: activityType,
+        elapsed: Duration.zero,
+        distanceMeters: 0.0,
+        avgPaceSecondsPerKm: 0,
+        calories: 0,
+        steps: 0,
+        stepCountReliable: _stepCountReliable,
+        routePoints: const [],
+      ));
+
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
+
+      _subscribeToLocation(activityType);
+
+      await _stepSubscription?.cancel();
+      _stepSubscription = null;
+      if (hasStepPermission) {
+        _stepSubscription = getLiveStepsStream().listen(
+          (steps) => add(UpdateSteps(steps)),
+          onError: (Object e) {
+            // Sensor missing or revoked: keep the workout going, but don't
+            // present a frozen count as accurate.
+            debugPrint('Step counter error: $e');
+            _stepCountReliable = false;
+          },
+        );
+      }
+    } finally {
+      _isStarting = false;
     }
+  }
 
-    _currentSessionId = const Uuid().v4();
-    _startedAt = DateTime.now();
-    _pauseStartedAt = null;
-    _pausedDuration = Duration.zero;
-    _currentSteps = 0;
-    _lastRawSteps = 0;
-    _rawStepsAtPause = 0;
-    _ignoredPausedSteps = 0;
-    _stepCountReliable = true;
-    _skipDistanceForNextPoint = false;
-    _stationarySince = null;
-    _lastSavedAt = DateTime.now();
-
-    // Cache user weight once per session — avoids async DB hit on every tick.
-    final userResult = await authRepository.getCurrentUser();
-    _cachedWeightKg = userResult.fold(
-      (failure) => 70.0,
-      (user) => user?.weightKg ?? 70.0,
-    );
-
-    final activityType = state.activityType;
-
-    emit(TrackingInProgress(
-      activityType: activityType,
-      elapsed: Duration.zero,
-      distanceMeters: 0.0,
-      avgPaceSecondsPerKm: 0,
-      calories: 0,
-      steps: 0,
-      stepCountReliable: true,
-      routePoints: const [],
-    ));
-
-    // Start Foreground Service
-    await ForegroundServiceManager.start(activityName: activityType.label);
-
-    // Subscriptions
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
-
-    await _locationSubscription?.cancel();
+  void _subscribeToLocation(ActivityType activityType) {
+    _gpsRetryTimer?.cancel();
+    _locationSubscription?.cancel();
     _locationSubscription = getLiveLocationStream(activityType).listen(
       (point) => add(UpdateTrackPoint(point)),
+      onError: (Object e) {
+        debugPrint('GPS stream error: $e');
+        _scheduleLocationRetry(activityType);
+      },
+      onDone: () => _scheduleLocationRetry(activityType),
+      cancelOnError: true,
     );
+  }
 
-    await _stepSubscription?.cancel();
-    _stepSubscription = getLiveStepsStream().listen(
-      (steps) => add(UpdateSteps(steps)),
-    );
+  /// Keeps recording through GPS hiccups instead of silently freezing the
+  /// distance for the rest of the workout.
+  void _scheduleLocationRetry(ActivityType activityType) {
+    _locationSubscription = null;
+    _gpsRetryTimer?.cancel();
+    _gpsRetryTimer = Timer(_gpsRetryDelay, () {
+      if (isClosed || !_isTracking || _isStopping) return;
+      _subscribeToLocation(activityType);
+    });
   }
 
   void _onPauseTracking(PauseTracking event, Emitter<ActivityTrackingState> emit) {
     final s = state;
-    if (s is! TrackingInProgress) return;
+    if (s is! TrackingInProgress || _isStopping) return;
 
-    _pauseStartedAt = DateTime.now();
+    _activeClock.stop();
     _rawStepsAtPause = _lastRawSteps;
     _timer?.cancel();
 
-    emit(TrackingPaused(
+    final elapsed = _activeClock.elapsed;
+    final paused = TrackingPaused(
       activityType: s.activityType,
-      elapsed: s.elapsed,
+      elapsed: elapsed,
       distanceMeters: s.distanceMeters,
       avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
-      calories: s.calories,
+      calories: _calculateCalories(s.activityType, elapsed, s.distanceMeters),
       steps: s.steps,
       stepCountReliable: s.stepCountReliable,
       routePoints: s.routePoints,
-    ));
+      elevationGainMeters: s.elevationGainMeters,
+      currentSpeedMps: 0.0,
+    );
+    emit(paused);
 
     ForegroundServiceManager.update(
-      'Paused\nDistance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km | Duration: ${_formatDuration(s.elapsed)}',
+      'Paused\nDistance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km | Duration: ${_formatDuration(elapsed)}',
     );
+    _checkpoint(paused);
   }
 
   void _onResumeTracking(ResumeTracking event, Emitter<ActivityTrackingState> emit) {
     final s = state;
-    if (s is! TrackingPaused) return;
+    if (s is! TrackingPaused || _isStopping) return;
 
-    final pausedAt = _pauseStartedAt;
-    if (pausedAt != null) {
-      _pausedDuration += DateTime.now().difference(pausedAt);
-    }
+    _activeClock.start();
     _ignoredPausedSteps += _lastRawSteps - _rawStepsAtPause;
-    _pauseStartedAt = null;
+    // Distance walked while paused must not count, so the first fix after
+    // resuming only re-anchors the route.
     _skipDistanceForNextPoint = true;
+    _stationarySince = null;
 
     emit(TrackingInProgress(
       activityType: s.activityType,
@@ -168,149 +268,168 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       steps: s.steps,
       stepCountReliable: s.stepCountReliable,
       routePoints: s.routePoints,
+      elevationGainMeters: s.elevationGainMeters,
     ));
 
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
   }
 
   Future<void> _onStopAndSaveTracking(StopAndSaveTracking event, Emitter<ActivityTrackingState> emit) async {
     final s = state;
-    if (s is! TrackingInProgress && s is! TrackingPaused) return;
+    if ((s is! TrackingInProgress && s is! TrackingPaused) || _isStopping) return;
+    _isStopping = true;
 
-    _timer?.cancel();
-    _locationSubscription?.cancel();
-    _stepSubscription?.cancel();
+    try {
+      _activeClock.stop();
+      _sessionClock.stop();
+      _timer?.cancel();
+      _gpsRetryTimer?.cancel();
+      await _locationSubscription?.cancel();
+      _locationSubscription = null;
+      await _stepSubscription?.cancel();
+      _stepSubscription = null;
 
-    await ForegroundServiceManager.stop();
+      final session = _buildSession(
+        endTime: DateTime.now(),
+        targetType: event.targetType,
+        targetValue: event.targetValue,
+        targetAchieved: event.targetAchieved,
+      );
 
-    Duration elapsed = Duration.zero;
-    double distance = 0.0;
-    int pace = 0;
-    int calories = 0;
-    int steps = 0;
-    List<TrackPoint> points = const [];
+      try {
+        await ForegroundServiceManager.stop();
+      } catch (e) {
+        debugPrint('Foreground service failed to stop: $e');
+      }
 
-    if (s is TrackingInProgress) {
-      elapsed = s.elapsed;
-      distance = s.distanceMeters;
-      pace = s.avgPaceSecondsPerKm;
-      calories = s.calories;
-      steps = s.steps;
-      _stepCountReliable = s.stepCountReliable;
-      points = s.routePoints;
-    } else if (s is TrackingPaused) {
-      elapsed = s.elapsed;
-      distance = s.distanceMeters;
-      pace = s.avgPaceSecondsPerKm;
-      calories = s.calories;
-      steps = s.steps;
-      _stepCountReliable = s.stepCountReliable;
-      points = s.routePoints;
+      // A checkpoint may still be writing; let it land first so it can't
+      // overwrite the final session with endTime = null.
+      await _pendingSave;
+
+      var saved = true;
+      try {
+        await stopAndSaveSession(session);
+      } catch (e) {
+        saved = false;
+        debugPrint('Saving activity session failed: $e');
+      }
+
+      emit(TrackingCompleted(
+        activityType: s.activityType,
+        session: session,
+        elevationGainMeters: _elevationGain,
+        saved: saved,
+      ));
+    } finally {
+      _isStopping = false;
     }
-
-    final session = ActivitySession(
-      id: _currentSessionId ?? const Uuid().v4(),
-      activityType: s.activityType,
-      startTime: _startedAt ?? DateTime.now(),
-      endTime: DateTime.now(),
-      totalDistanceMeters: distance,
-      totalDurationSeconds: elapsed.inSeconds,
-      avgPaceSecondsPerKm: pace,
-      calories: calories,
-      steps: steps,
-      stepCountReliable: _stepCountReliable,
-      points: points,
-      targetType: event.targetType,
-      targetValue: event.targetValue,
-      targetAchieved: event.targetAchieved,
-    );
-
-    await stopAndSaveSession(session);
-
-    emit(TrackingCompleted(
-      activityType: s.activityType,
-      session: session,
-    ));
   }
 
-  Future<void> _onTickTimer(TickTimer event, Emitter<ActivityTrackingState> emit) async {
+  void _onTickTimer(TickTimer event, Emitter<ActivityTrackingState> emit) {
     final s = state;
-    if (s is! TrackingInProgress) return;
+    if (s is! TrackingInProgress || _isStopping) return;
 
-    final start = _startedAt;
-    if (start == null) return;
-
-    final elapsed = DateTime.now().difference(start) - _pausedDuration;
+    final elapsed = _activeClock.elapsed;
     final calories = _calculateCalories(s.activityType, elapsed, s.distanceMeters);
-    
-    emit(TrackingInProgress(
+    final pace = _calculateOverallPace(elapsed, s.distanceMeters);
+
+    final lastFixAt = _lastFixAt;
+    final fixIsStale = lastFixAt == null ||
+        _sessionClock.elapsed - lastFixAt > _speedStaleAfter;
+
+    final next = TrackingInProgress(
       activityType: s.activityType,
       elapsed: elapsed,
       distanceMeters: s.distanceMeters,
-      avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
+      avgPaceSecondsPerKm: pace,
       calories: calories,
       steps: s.steps,
-      stepCountReliable: s.stepCountReliable,
+      stepCountReliable: s.stepCountReliable && _stepCountReliable,
       routePoints: s.routePoints,
-    ));
+      elevationGainMeters: s.elevationGainMeters,
+      currentSpeedMps: fixIsStale ? 0.0 : s.currentSpeedMps,
+    );
+    emit(next);
 
     ForegroundServiceManager.update(
       'Distance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(elapsed)}',
     );
 
-    final lastSaved = _lastSavedAt;
-    if (lastSaved != null && DateTime.now().difference(lastSaved).inSeconds >= 30) {
-      _lastSavedAt = DateTime.now();
-      _saveProgressPeriodically(s, elapsed, calories);
+    if (_sessionClock.elapsed - _lastCheckpointAt >= _checkpointInterval) {
+      _checkpoint(next);
     }
   }
 
-  Future<void> _onUpdateTrackPoint(UpdateTrackPoint event, Emitter<ActivityTrackingState> emit) async {
+  void _onUpdateTrackPoint(UpdateTrackPoint event, Emitter<ActivityTrackingState> emit) {
     final s = state;
-    if (s is! TrackingInProgress) return;
+    if (s is! TrackingInProgress || _isStopping) return;
 
+    final point = event.point;
     final points = [...s.routePoints];
+    final previous = points.isNotEmpty ? points.last : null;
     double distance = s.distanceMeters;
 
-    final segmentDistance = points.isNotEmpty
-        ? haversineMeters(points.last, event.point)
-        : 0.0;
-    if (points.isNotEmpty && !_skipDistanceForNextPoint) {
+    // Fixes can arrive out of order after a GPS stream restart.
+    if (previous != null && !point.timestamp.isAfter(previous.timestamp)) {
+      return;
+    }
+
+    final segmentDistance =
+        previous != null ? haversineMeters(previous, point) : 0.0;
+    if (previous != null &&
+        !_skipDistanceForNextPoint &&
+        _isPlausibleSegment(s.activityType, previous, point, segmentDistance)) {
       distance += segmentDistance;
     }
     _skipDistanceForNextPoint = false;
-    points.add(event.point);
-    _updateStationaryState(event.point, segmentDistance);
+    points.add(point);
+    _lastFixAt = _sessionClock.elapsed;
+    _updateStationaryState(point, segmentDistance);
+    _updateElevation(point);
 
-    final pace = _calculateOverallPace(s.elapsed, distance);
-    final calories = _calculateCalories(s.activityType, s.elapsed, distance);
+    final elapsed = _activeClock.elapsed;
+    final pace = _calculateOverallPace(elapsed, distance);
+    final calories = _calculateCalories(s.activityType, elapsed, distance);
 
     emit(TrackingInProgress(
       activityType: s.activityType,
-      elapsed: s.elapsed,
+      elapsed: elapsed,
       distanceMeters: distance,
       avgPaceSecondsPerKm: pace,
       calories: calories,
       steps: s.steps,
       stepCountReliable: s.stepCountReliable,
       routePoints: points,
+      elevationGainMeters: _elevationGain,
+      currentSpeedMps: point.speed,
     ));
 
     ForegroundServiceManager.update(
-      'Distance: ${(distance / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(s.elapsed)}',
+      'Distance: ${(distance / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(elapsed)}',
     );
+  }
+
+  /// Final guard on the distance itself. The repository's filter covers
+  /// one continuous stream, but after a GPS restart or a long gap the first
+  /// new fix is compared against nothing — a cold-start fix hundreds of
+  /// meters off must not be added as distance.
+  bool _isPlausibleSegment(
+    ActivityType type,
+    TrackPoint from,
+    TrackPoint to,
+    double meters,
+  ) {
+    final seconds = to.timestamp.difference(from.timestamp).inMilliseconds / 1000.0;
+    if (seconds <= 0) return false;
+    return meters / seconds <= type.maxReasonableSpeedMetersPerSecond * 2;
   }
 
   void _onUpdateSteps(UpdateSteps event, Emitter<ActivityTrackingState> emit) {
     _lastRawSteps = event.steps;
 
-    final paused = state is TrackingPaused;
-    if (paused) {
-      return;
-    }
-
     final s = state;
-    if (s is! TrackingInProgress) return;
+    if (s is! TrackingInProgress || _isStopping) return;
 
     final previousSteps = _currentSteps;
     _currentSteps = (event.steps - _ignoredPausedSteps).clamp(0, 1 << 31).toInt();
@@ -330,7 +449,14 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       steps: _currentSteps,
       stepCountReliable: _stepCountReliable,
       routePoints: s.routePoints,
+      elevationGainMeters: s.elevationGainMeters,
+      currentSpeedMps: s.currentSpeedMps,
     ));
+  }
+
+  void _onPersistProgress(PersistProgress event, Emitter<ActivityTrackingState> emit) {
+    final s = state;
+    if (s is TrackingInProgress || s is TrackingPaused) _checkpoint(s);
   }
 
   bool _isStepCountStillReliable({
@@ -338,8 +464,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     required int previousSteps,
     required int currentSteps,
   }) {
-    final elapsedSeconds = state.elapsed.inSeconds;
-    if (elapsedSeconds <= 0) return true;
+    final elapsedSeconds = _activeClock.elapsed.inSeconds;
+    // Too early to judge cadence: a handful of steps in the first seconds
+    // reads as an absurd steps-per-minute figure.
+    if (elapsedSeconds < 30) return true;
 
     final cadence = currentSteps / (elapsedSeconds / 60.0);
     if (cadence > 220) return false;
@@ -358,9 +486,29 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   void _updateStationaryState(TrackPoint point, double segmentDistance) {
     final isStationary = point.speed < 0.4 && segmentDistance < 1.5;
     if (isStationary) {
-      _stationarySince ??= point.timestamp;
+      _stationarySince ??= DateTime.now();
     } else {
       _stationarySince = null;
+    }
+  }
+
+  /// Hysteresis climb counter: altitude must rise [_elevationThresholdMeters]
+  /// above the reference to count, and the reference only follows descents
+  /// of the same size, so ±2 m jitter around a flat road adds nothing.
+  void _updateElevation(TrackPoint point) {
+    final altitude = point.altitude;
+    if (!altitude.isFinite || altitude == 0.0) return; // 0 = no altitude fix
+    final reference = _elevationReference;
+    if (reference == null) {
+      _elevationReference = altitude;
+      return;
+    }
+    final delta = altitude - reference;
+    if (delta >= _elevationThresholdMeters) {
+      _elevationGain += delta;
+      _elevationReference = altitude;
+    } else if (delta <= -_elevationThresholdMeters) {
+      _elevationReference = altitude;
     }
   }
 
@@ -392,27 +540,72 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   }
 
   int _calculateOverallPace(Duration elapsed, double distanceMeters) {
-    if (elapsed.inSeconds <= 0 || distanceMeters < 1.0) return 0;
-    
+    if (elapsed.inSeconds <= 0 || distanceMeters < _minDistanceForPaceMeters) return 0;
+
     final distanceKm = distanceMeters / 1000.0;
     return (elapsed.inSeconds / distanceKm).round();
   }
 
-  Future<void> _saveProgressPeriodically(TrackingInProgress s, Duration elapsed, int calories) async {
-    final session = ActivitySession(
-      id: _currentSessionId ?? const Uuid().v4(),
+  ActivitySession _buildSession({
+    required DateTime? endTime,
+    String? targetType,
+    double? targetValue,
+    bool targetAchieved = false,
+  }) {
+    final s = state;
+    final elapsed = _activeClock.elapsed;
+    final distance = switch (s) {
+      TrackingInProgress() => s.distanceMeters,
+      TrackingPaused() => s.distanceMeters,
+      _ => 0.0,
+    };
+    final steps = switch (s) {
+      TrackingInProgress() => s.steps,
+      TrackingPaused() => s.steps,
+      _ => 0,
+    };
+    final reliable = switch (s) {
+      TrackingInProgress() => s.stepCountReliable,
+      TrackingPaused() => s.stepCountReliable,
+      _ => false,
+    };
+    final points = switch (s) {
+      TrackingInProgress() => s.routePoints,
+      TrackingPaused() => s.routePoints,
+      _ => const <TrackPoint>[],
+    };
+
+    return ActivitySession(
+      id: _currentSessionId ??= const Uuid().v4(),
       activityType: s.activityType,
       startTime: _startedAt ?? DateTime.now(),
-      endTime: null,
-      totalDistanceMeters: s.distanceMeters,
+      endTime: endTime,
+      totalDistanceMeters: distance,
       totalDurationSeconds: elapsed.inSeconds,
-      avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
-      calories: calories,
-      steps: s.steps,
-      stepCountReliable: s.stepCountReliable,
-      points: s.routePoints,
+      avgPaceSecondsPerKm: _calculateOverallPace(elapsed, distance),
+      calories: _calculateCalories(s.activityType, elapsed, distance),
+      steps: steps,
+      stepCountReliable: reliable && _stepCountReliable,
+      points: points,
+      targetType: targetType,
+      targetValue: targetValue,
+      targetAchieved: targetAchieved,
     );
-    await stopAndSaveSession(session);
+  }
+
+  /// Saves the running workout with no end time. Writes are chained so
+  /// they land in order and the final save can wait for them.
+  void _checkpoint(ActivityTrackingState s) {
+    if (_isStopping || _currentSessionId == null) return;
+    _lastCheckpointAt = _sessionClock.elapsed;
+    final session = _buildSession(endTime: null);
+    _pendingSave = _pendingSave.then((_) async {
+      try {
+        await stopAndSaveSession(session);
+      } catch (e) {
+        debugPrint('Activity checkpoint failed: $e');
+      }
+    });
   }
 
   String _formatDuration(Duration duration) {
@@ -423,10 +616,17 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   }
 
   void _onResetTracking(ResetTracking event, Emitter<ActivityTrackingState> emit) {
+    if (_isTracking || _isStopping) return;
+    final activityType = state.activityType;
     _currentSessionId = null;
     _startedAt = null;
-    _pauseStartedAt = null;
-    _pausedDuration = Duration.zero;
+    _activeClock
+      ..stop()
+      ..reset();
+    _sessionClock
+      ..stop()
+      ..reset();
+    _lastFixAt = null;
     _currentSteps = 0;
     _lastRawSteps = 0;
     _rawStepsAtPause = 0;
@@ -434,15 +634,25 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _stepCountReliable = true;
     _skipDistanceForNextPoint = false;
     _stationarySince = null;
-    _lastSavedAt = null;
-    emit(const TrackingIdle());
+    _elevationGain = 0.0;
+    _elevationReference = null;
+    _lastCheckpointAt = Duration.zero;
+    emit(TrackingIdle(activityType: activityType));
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     _timer?.cancel();
-    _locationSubscription?.cancel();
-    _stepSubscription?.cancel();
+    _gpsRetryTimer?.cancel();
+    await _locationSubscription?.cancel();
+    await _stepSubscription?.cancel();
+    if (_isTracking) {
+      // Leaving mid-workout (e.g. the route is torn down): keep what was
+      // recorded and release the foreground service.
+      _checkpoint(state);
+      await ForegroundServiceManager.stop();
+    }
+    await _pendingSave;
     return super.close();
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -339,6 +340,13 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<ActivityRepository>(
         () => ActivityRepositoryImpl(sl<AppDatabase>()),
   );
+  // A workout still open from a previous run means the app was killed
+  // mid-recording; close it so its checkpointed progress shows in history.
+  try {
+    await sl<ActivityRepository>().finalizeInterruptedSessions();
+  } catch (e) {
+    debugPrint('Could not finalize interrupted activity sessions: $e');
+  }
   sl.registerLazySingleton<ActivityHistoryRepository>(
         () => ActivityHistoryRepositoryImpl(
       activityRepository: sl<ActivityRepository>(),

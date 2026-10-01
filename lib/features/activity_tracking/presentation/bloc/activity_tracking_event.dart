@@ -65,3 +65,7 @@ class UpdateSteps extends ActivityTrackingEvent {
 class TickTimer extends ActivityTrackingEvent {}
 
 class ResetTracking extends ActivityTrackingEvent {}
+
+/// Writes a checkpoint of the running workout now (e.g. when the app is
+/// backgrounded), so an OS kill loses as little as possible.
+class PersistProgress extends ActivityTrackingEvent {}
