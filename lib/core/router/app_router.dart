@@ -34,10 +34,8 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_edit_pa
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
-import 'package:vital_up/features/help_support/presentation/pages/help_support_page.dart';
-import 'package:vital_up/features/help_support/presentation/pages/support_chat_page.dart';
-import 'package:vital_up/features/about/presentation/pages/about_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
