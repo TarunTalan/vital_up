@@ -44,9 +44,14 @@ class ActivityRepositoryImpl implements ActivityRepository {
 
     await database.saveSessionWithPoints(dbSession, dbPoints);
     // Checkpoints of a workout still recording aren't uploaded.
-    if (session.endTime != null) {
+    final end = session.endTime;
+    if (end != null) {
       sync?.schedule();
-      events?.logged(const HabitLogged(Habit.activity));
+      final now = DateTime.now();
+      // Imported older workouts don't count as today's.
+      if (end.year == now.year && end.month == now.month && end.day == now.day) {
+        events?.logged(const HabitLogged(Habit.activity));
+      }
     }
   }
 

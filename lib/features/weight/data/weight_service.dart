@@ -86,7 +86,12 @@ class WeightService {
       ..source = source;
     await _isar.writeTxn(() => _isar.weightLogCaches.put(log));
     _sync?.schedule();
-    _events?.logged(const HabitLogged(Habit.weight));
+    final now = DateTime.now();
+    if (log.timestamp.year == now.year &&
+        log.timestamp.month == now.month &&
+        log.timestamp.day == now.day) {
+      _events?.logged(const HabitLogged(Habit.weight));
+    }
     final latest = await this.latest();
     if (latest?.id == log.id) unawaited(_updateProfileWeight(kg));
     return null;
