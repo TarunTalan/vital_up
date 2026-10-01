@@ -9,6 +9,7 @@ extension ReminderKindStyle on ReminderKind {
     ReminderKind.water => Icons.water_drop_rounded,
     ReminderKind.sleep => Icons.bedtime_rounded,
     ReminderKind.mood => Icons.self_improvement_rounded,
+    ReminderKind.weight => Icons.monitor_weight_rounded,
     ReminderKind.custom => Icons.alarm_rounded,
   };
 
@@ -19,6 +20,7 @@ extension ReminderKindStyle on ReminderKind {
     ReminderKind.water => AppColors.water,
     ReminderKind.sleep => AppColors.sleep,
     ReminderKind.mood => AppColors.blobPurple,
+    ReminderKind.weight => AppColors.teal,
     ReminderKind.custom => null,
   };
 }
@@ -32,6 +34,7 @@ const reminderTargets = <(String, String?)>[
   ('Mood check-in', 'stress-trends'),
   ('Start an activity', 'activity-tracking'),
   ('Activity goals', 'activity-goals'),
+  ('Weigh in', 'weight-trends'),
 ];
 
 const _dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];

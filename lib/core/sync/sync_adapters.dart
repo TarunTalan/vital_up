@@ -237,57 +237,55 @@ class MealSyncAdapter implements SyncAdapter {
       });
 
   @override
-  Future<void> apply(String userId, List<Map<String, dynamic>> rows) =>
-      _isar.writeTxn(() async {
-        for (final row in rows) {
-          final id = row['id'] as String;
-          final existing = await _isar.mealLogCaches
-              .where()
-              .mealLogIdEqualTo(id)
-              .findAll();
-          if (_deleted(row)) {
-            await _isar.mealLogCaches.deleteAll([
-              for (final e in existing) e.id,
-            ]);
-            continue;
-          }
-          // A local edit not uploaded yet wins.
-          if (existing.any((e) => !e.isSynced)) continue;
-          final d = Map<String, dynamic>.from(row['data'] as Map);
-          List<String> strings(String k) => [
-            for (final v in (d[k] as List? ?? const [])) '$v',
-          ];
-          List<double> numbers(String k) => [
-            for (final v in (d[k] as List? ?? const [])) (v as num).toDouble(),
-          ];
-          final meal = (existing.isEmpty ? MealLogCache() : existing.first)
-            ..mealLogId = id
-            ..capturedAt = _time(row['captured_at'])
-            // Photos stay on the phone that took them.
-            ..imagePath = existing.isEmpty ? '' : existing.first.imagePath
-            ..itemIds = strings('item_ids')
-            ..itemNames = strings('item_names')
-            ..itemConfidences = numbers('item_confidences')
-            ..itemServingDescriptions = strings('item_serving_descriptions')
-            ..itemQuantities = numbers('item_quantities')
-            ..itemUnits = strings('item_units')
-            ..nutritionCalories = numbers('calories')
-            ..nutritionProteinG = numbers('protein_g')
-            ..nutritionCarbsG = numbers('carbs_g')
-            ..nutritionFatG = numbers('fat_g')
-            ..nutritionFiberG = numbers('fiber_g')
-            ..nutritionSugarG = numbers('sugar_g')
-            ..nutritionSodiumMg = numbers('sodium_mg')
-            ..totalCalories = (row['total_calories'] as num).toDouble()
-            ..mealType = (row['meal_type'] as num).toInt()
-            ..userConfirmed = d['user_confirmed'] as bool? ?? true
-            ..createdAt = d['created_at'] == null
-                ? null
-                : _time(d['created_at'])
-            ..isSynced = true;
-          await _isar.mealLogCaches.put(meal);
-        }
-      });
+  Future<void> apply(
+    String userId,
+    List<Map<String, dynamic>> rows,
+  ) => _isar.writeTxn(() async {
+    for (final row in rows) {
+      final id = row['id'] as String;
+      final existing = await _isar.mealLogCaches
+          .where()
+          .mealLogIdEqualTo(id)
+          .findAll();
+      if (_deleted(row)) {
+        await _isar.mealLogCaches.deleteAll([for (final e in existing) e.id]);
+        continue;
+      }
+      // A local edit not uploaded yet wins.
+      if (existing.any((e) => !e.isSynced)) continue;
+      final d = Map<String, dynamic>.from(row['data'] as Map);
+      List<String> strings(String k) => [
+        for (final v in (d[k] as List? ?? const [])) '$v',
+      ];
+      List<double> numbers(String k) => [
+        for (final v in (d[k] as List? ?? const [])) (v as num).toDouble(),
+      ];
+      final meal = (existing.isEmpty ? MealLogCache() : existing.first)
+        ..mealLogId = id
+        ..capturedAt = _time(row['captured_at'])
+        // Photos stay on the phone that took them.
+        ..imagePath = existing.isEmpty ? '' : existing.first.imagePath
+        ..itemIds = strings('item_ids')
+        ..itemNames = strings('item_names')
+        ..itemConfidences = numbers('item_confidences')
+        ..itemServingDescriptions = strings('item_serving_descriptions')
+        ..itemQuantities = numbers('item_quantities')
+        ..itemUnits = strings('item_units')
+        ..nutritionCalories = numbers('calories')
+        ..nutritionProteinG = numbers('protein_g')
+        ..nutritionCarbsG = numbers('carbs_g')
+        ..nutritionFatG = numbers('fat_g')
+        ..nutritionFiberG = numbers('fiber_g')
+        ..nutritionSugarG = numbers('sugar_g')
+        ..nutritionSodiumMg = numbers('sodium_mg')
+        ..totalCalories = (row['total_calories'] as num).toDouble()
+        ..mealType = (row['meal_type'] as num).toInt()
+        ..userConfirmed = d['user_confirmed'] as bool? ?? true
+        ..createdAt = d['created_at'] == null ? null : _time(d['created_at'])
+        ..isSynced = true;
+      await _isar.mealLogCaches.put(meal);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
+import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -482,6 +483,11 @@ class _HomeTabState extends State<_HomeTab> {
                           const WaterIntakeCard(),
                           const SizedBox(height: AppDimens.cardGap),
                           const SleepCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          WeightCard(
+                            onOpenTrends: () =>
+                                context.pushNamed('weight-trends'),
+                          ),
                           const SizedBox(height: AppDimens.cardGap),
                           const ScreenTimeCard(),
                         ],

@@ -7,6 +7,7 @@ enum ReminderKind {
   water('water', 'water-trends'),
   sleep('sleep', 'sleep-trends'),
   mood('mood', 'stress-trends'),
+  weight('weight', 'weight-trends'),
   custom('custom', null);
 
   final String code;
