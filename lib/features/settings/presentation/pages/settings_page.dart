@@ -9,7 +9,9 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
@@ -276,13 +278,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingRow(
                     icon: Icons.sync_rounded,
                     title: 'Health Sync',
-                    subtitle: 'Google Fit / Health Connect integration',
+                    subtitle: 'Import weight and workouts from Health Connect / Apple Health',
                     trailing: Switch(
                       value: settings.healthSyncEnabled,
-                      onChanged: (val) {
-                        context.read<SettingsCubit>().updateSettings(
-                              settings.copyWith(healthSyncEnabled: val),
+                      onChanged: (val) async {
+                        final cubit = context.read<SettingsCubit>();
+                        if (val && !await sl<HealthImportService>().connect()) {
+                          if (context.mounted) {
+                            showErrorSnackBar(
+                              context,
+                              'Allow VitalUp to read weight and workouts in '
+                              'Health Connect / Apple Health to turn this on.',
                             );
+                          }
+                          return;
+                        }
+                        cubit.updateSettings(
+                          settings.copyWith(healthSyncEnabled: val),
+                        );
                       },
                     ),
                   ),

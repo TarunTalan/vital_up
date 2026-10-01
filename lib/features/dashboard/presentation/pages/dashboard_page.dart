@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -76,6 +77,8 @@ class _DashboardPageState extends State<DashboardPage> {
     // Syncs the profile (incl. calorie goal) into the local cache that the
     // nutrition card reads.
     _profileCubit = sl<ProfileCubit>()..loadProfile();
+
+    sl<HealthImportService>().start();
 
     final push = sl<PushService>();
     push.requestPermissionAndRegister();
