@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
@@ -26,6 +27,9 @@ import 'package:vital_up/features/reminders/data/reminders_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Uncaught errors go to Crashlytics (release builds, once configured).
+  await CrashReporter.init();
   
   // Initialize communication port for foreground task manager
   ForegroundServiceManager.init();
@@ -56,13 +60,14 @@ void main() async {
     // Re-apply reminders (app update, time-zone change).
     await sl<RemindersService>().resync();
 
+    CrashReporter.watchUser(sl<SupabaseClient>());
+
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();
     final supabase = sl<SupabaseClient>();
     isarService.syncOfflineFoodsBackground(supabase);
   } catch (e, stackTrace) {
-    debugPrint('INITIALIZATION ERROR: $e');
-    debugPrint(stackTrace.toString());
+    CrashReporter.report(e, stackTrace, reason: 'Initialization failed');
   }
   
   runApp(

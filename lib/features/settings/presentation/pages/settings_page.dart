@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -19,6 +20,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final _packageInfo = PackageInfo.fromPlatform();
+
   @override
   void initState() {
     super.initState();
@@ -283,10 +286,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ]),
                 _buildSection('Info', [
-                  _buildSettingRow(
-                    icon: Icons.info_outline_rounded,
-                    title: 'Version',
-                    subtitle: 'VitalUp v1.0.0 (Production)',
+                  FutureBuilder<PackageInfo>(
+                    future: _packageInfo,
+                    builder: (context, snap) => _buildSettingRow(
+                      icon: Icons.info_outline_rounded,
+                      title: 'Version',
+                      subtitle: snap.hasData
+                          ? 'VitalUp ${snap.data!.version} '
+                                '(${snap.data!.buildNumber})'
+                          : 'VitalUp',
+                    ),
                   ),
                 ]),
               ],

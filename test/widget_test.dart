@@ -1,30 +1,43 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vital_up/core/router/app_router.dart';
+import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
+import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
+import 'package:vital_up/features/reminders/domain/reminder_presets.dart';
+import 'package:vital_up/features/reminders/presentation/widgets/reminder_style.dart';
 
-import 'package:vital_up/main.dart';
-
+/// Smoke test: every route a notification or reminder can open exists, so
+/// a tap never lands on go_router's error page.
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  final router = AppRouter.router;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  bool exists(String name) {
+    try {
+      router.namedLocation(name);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('notification links point at real routes', () {
+    for (final name in notificationLinkableRoutes) {
+      expect(exists(name), isTrue, reason: 'missing route "$name"');
+    }
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('reminder targets are real, linkable routes', () {
+    final routes = {
+      for (final kind in ReminderKind.values) ?kind.defaultRoute,
+      for (final preset in reminderPresets) ?preset.route,
+      for (final target in reminderTargets) ?target.$2,
+    };
+    for (final name in routes) {
+      expect(exists(name), isTrue, reason: 'missing route "$name"');
+      expect(
+        notificationLinkableRoutes,
+        contains(name),
+        reason: 'a tapped reminder could not open "$name"',
+      );
+    }
   });
 }
