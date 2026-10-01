@@ -38,6 +38,7 @@ import 'package:vital_up/features/settings/presentation/pages/settings_page.dart
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
+import 'package:vital_up/features/weekly_summary/weekly_summary_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_diet_plan_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
@@ -150,6 +151,14 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const WaterTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/weekly-summary',
+        name: 'weekly-summary',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const WeeklySummaryPage(),
         ),
       ),
       GoRoute(

@@ -32,6 +32,7 @@ const notificationLinkableRoutes = {
   'activity-tracking',
   'reminders',
   'weight-trends',
+  'weekly-summary',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.

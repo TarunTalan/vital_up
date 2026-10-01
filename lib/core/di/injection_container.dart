@@ -132,6 +132,7 @@ import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
+import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -631,6 +632,18 @@ Future<void> initDependencies() async {
       sl<WeightService>(),
       sl<ActivityRepository>(),
       sl<SharedPreferences>(),
+    ),
+  );
+
+  // 23. Weekly summary (in-app recap + time zone for the Sunday push)
+  sl.registerLazySingleton(
+    () => WeeklySummaryService(
+      sl<SupabaseClient>(),
+      sl<ActivityRepository>(),
+      sl<WaterIntakeService>(),
+      sl<SleepService>(),
+      sl<GetMealLogHistory>(),
+      sl<WeightService>(),
     ),
   );
 }
