@@ -10,6 +10,7 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/account/data/data_export_service.dart';
 import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
@@ -301,6 +302,25 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ]),
                 _buildSection('Account', [
+                  InkWell(
+                    onTap: () async {
+                      final error =
+                          await sl<DataExportService>().exportAndShare();
+                      if (error != null && context.mounted) {
+                        showErrorSnackBar(context, error);
+                      }
+                    },
+                    child: _buildSettingRow(
+                      icon: Icons.download_rounded,
+                      title: 'Export my data',
+                      subtitle: 'Logs, workouts and profile as CSV / JSON',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
                   InkWell(
                     onTap: () => showDeleteAccountSheet(context),
                     child: _buildSettingRow(
