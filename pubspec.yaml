@@ -101,6 +101,7 @@ dependencies:
   flutter_timezone: ^5.1.0
   package_info_plus: ^10.2.2
   firebase_crashlytics: ^5.4.0
+  home_widget: ^0.10.0
 
 
 dev_dependencies:
