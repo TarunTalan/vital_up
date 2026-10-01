@@ -11,10 +11,14 @@ class GenerateMealPlan {
   Future<ApiResult<MealPlan>> call({
     required NutritionTarget target,
     required Map<String, dynamic> preferences,
+    String? instructions,
+    MealPlan? basePlan,
   }) async {
     return repository.generateMealPlan(
       target: target,
       preferences: preferences,
+      instructions: instructions,
+      basePlan: basePlan,
     );
   }
 }

@@ -8,6 +8,7 @@ import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/calculate_target_from_goal.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/calculate_target_from_onboarding.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
@@ -19,6 +20,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 
 class DietPlanResultPage extends StatefulWidget {
   final Map<String, dynamic> params;
@@ -34,6 +36,10 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   NutritionTarget? _target;
   late Map<String, dynamic> _preferences;
   String _mode = 'cached';
+
+  /// Last tweak request, so "Try Again" after a failure retries the tweak.
+  String? _instructions;
+  MealPlan? _basePlan;
 
   @override
   void initState() {
@@ -51,6 +57,26 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
 
   Future<void> _calculateAndGenerate() async {
     try {
+      if (_mode == 'tweak') {
+        // Opened from Vita: tweak the active plan with its saved preferences.
+        final getActive = sl<GetActiveMealPlan>();
+        final base = await getActive();
+        if (base == null) {
+          _cubit.showError(
+            'Create a diet plan first, then ask Vita to tweak it.',
+          );
+          return;
+        }
+        _preferences = await getActive.preferences();
+        _target = NutritionTarget(
+          calories: base.totalCalories,
+          protein: base.totalProtein,
+          carbs: base.totalCarbs,
+          fat: base.totalFat,
+        );
+        _tweak(widget.params['instructions'] as String, base);
+        return;
+      }
       if (_mode == 'manual') {
         _target = widget.params['target'] as NutritionTarget;
       } else {
@@ -101,7 +127,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         _cubit.generatePlan(target: _target!, preferences: _preferences);
       }
     } catch (e) {
-      _cubit.emit(DietPlanError('Failed to calculate target: $e'));
+      _cubit.showError('Failed to calculate target: $e');
     }
   }
 
@@ -119,9 +145,45 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     }
     _lastRegenerateTime = now;
 
+    _instructions = null;
+    _basePlan = null;
     if (_target != null) {
       _cubit.generatePlan(target: _target!, preferences: _preferences);
     }
+  }
+
+  void _tweak(String instructions, MealPlan base) {
+    _instructions = instructions;
+    _basePlan = base;
+    _cubit.generatePlan(
+      target: _target!,
+      preferences: _preferences,
+      instructions: instructions,
+      basePlan: base,
+    );
+  }
+
+  /// Retries whatever failed: the last tweak, or a fresh plan.
+  void _retry() {
+    final instructions = _instructions;
+    final base = _basePlan;
+    if (instructions != null && base != null) {
+      _tweak(instructions, base);
+    } else {
+      _regenerate();
+    }
+  }
+
+  Future<void> _tweakWithVita(MealPlan plan) async {
+    final instructions = await context.pushNamed<String>(
+      'vita-chat',
+      extra: VitaChatArgs(
+        initialPrompt: "I'd like to make some changes to this diet plan.",
+        draftPlan: plan,
+      ),
+    );
+    if (!mounted || instructions == null || _target == null) return;
+    _tweak(instructions, plan);
   }
 
   @override
@@ -187,7 +249,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                           if (_target != null)
                             AppPrimaryButton(
                               label: 'Try Again',
-                              onTap: _regenerate,
+                              onTap: _retry,
                               expand: false,
                             ),
                         ],
@@ -212,27 +274,36 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   }
 
   Widget _buildBottomActions(BuildContext context, MealPlan plan) {
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: AppSecondaryButton(
-            label: 'Regenerate',
-            onTap: _regenerate,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: AppSecondaryButton(
+                label: 'Regenerate',
+                onTap: _regenerate,
+              ),
+            ),
+            const SizedBox(width: AppDimens.cardGap),
+            Expanded(
+              child: AppSecondaryButton(
+                label: 'Tweak with Vita',
+                onTap: () => _tweakWithVita(plan),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppDimens.cardGap),
-        Expanded(
-          flex: 2,
-          child: AppPrimaryButton(
-            label: 'Set as Active Plan',
-            onTap: () async {
-              await _cubit.saveActivePlan(plan);
-              if (context.mounted) {
-                showSuccessSnackBar(context, 'Active plan saved successfully!');
-                context.goNamed('dashboard');
-              }
-            },
-          ),
+        const SizedBox(height: AppDimens.space12),
+        AppPrimaryButton(
+          label: 'Set as Active Plan',
+          onTap: () async {
+            await _cubit.saveActivePlan(plan, preferences: _preferences);
+            if (context.mounted) {
+              showSuccessSnackBar(context, 'Active plan saved successfully!');
+              context.goNamed('dashboard');
+            }
+          },
         ),
       ],
     );
@@ -262,18 +333,14 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   Widget _buildMacroRing(BuildContext context, MealPlan plan) {
     final hole = context.w(AppDimens.donutHole);
     final thickness = context.w(AppDimens.donutThickness);
-    final sectionStyle = context.text.labelSmall?.copyWith(
-      color: AppColors.white,
-      fontWeight: FontWeight.w600,
-    );
-
-    PieChartSectionData section(Color color, int value, String label) {
+    // Values live in the legend below — the ring is too thin to hold
+    // "120g Protein" without clipping, especially on small slices.
+    PieChartSectionData section(Color color, int value) {
       return PieChartSectionData(
         color: color,
         value: value.toDouble(),
-        title: '${value}g\n$label',
         radius: thickness,
-        titleStyle: sectionStyle,
+        showTitle: false,
       );
     }
 
@@ -294,9 +361,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                     sectionsSpace: AppDimens.space4,
                     centerSpaceRadius: hole,
                     sections: [
-                      section(AppColors.protein, plan.totalProtein, 'Pro'),
-                      section(AppColors.carbs, plan.totalCarbs, 'Carb'),
-                      section(AppColors.fat, plan.totalFat, 'Fat'),
+                      section(AppColors.protein, plan.totalProtein),
+                      section(AppColors.carbs, plan.totalCarbs),
+                      section(AppColors.fat, plan.totalFat),
                     ],
                   ),
                 ),
@@ -323,8 +390,75 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
               ],
             ),
           ),
+          const SizedBox(height: AppDimens.space12),
+          Center(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: AppDimens.space16,
+              runSpacing: AppDimens.space8,
+              children: [
+                _MacroLegend(
+                  color: AppColors.protein,
+                  label: 'Protein',
+                  grams: plan.totalProtein,
+                ),
+                _MacroLegend(
+                  color: AppColors.carbs,
+                  label: 'Carbs',
+                  grams: plan.totalCarbs,
+                ),
+                _MacroLegend(
+                  color: AppColors.fat,
+                  label: 'Fat',
+                  grams: plan.totalFat,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Colour dot + "Protein 120g" key for the daily-target ring.
+class _MacroLegend extends StatelessWidget {
+  final Color color;
+  final String label;
+  final int grams;
+
+  const _MacroLegend({
+    required this.color,
+    required this.label,
+    required this.grams,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: AppDimens.space8,
+          height: AppDimens.space8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: AppDimens.space6),
+        Text(
+          label,
+          style: context.text.bodySmall?.copyWith(
+            color: context.vColors.grayText,
+          ),
+        ),
+        const SizedBox(width: AppDimens.space4),
+        Text(
+          '${grams}g',
+          style: context.text.bodySmall?.copyWith(
+            color: context.colors.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

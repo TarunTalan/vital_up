@@ -6,9 +6,19 @@ abstract class DietPlanRepository {
   Future<ApiResult<MealPlan>> generateMealPlan({
     required NutritionTarget target,
     required Map<String, dynamic> preferences,
+    String? instructions,
+    MealPlan? basePlan,
   });
 
   Future<MealPlan?> getActiveMealPlan();
 
-  Future<void> setActiveMealPlan(MealPlan plan);
+  /// [preferences] are kept so the active plan can be tweaked later
+  /// (e.g. from Vita) with the same dietary constraints.
+  Future<void> setActiveMealPlan(
+    MealPlan plan, {
+    Map<String, dynamic> preferences = const {},
+  });
+
+  /// Preferences the active plan was generated with ({} if unknown).
+  Future<Map<String, dynamic>> getActivePlanPreferences();
 }

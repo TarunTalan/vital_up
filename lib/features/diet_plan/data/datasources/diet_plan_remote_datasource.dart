@@ -1,131 +1,99 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:vital_up/core/network/api_result.dart';
 import 'package:vital_up/core/network/dio_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
 import 'package:vital_up/features/diet_plan/data/models/meal_plan_model.dart';
 import 'package:vital_up/features/diet_plan/data/models/nutrition_target_model.dart';
+import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
-import 'package:vital_up/core/config/supabase_config.dart';
-import 'package:dio/dio.dart';
 
 abstract class DietPlanRemoteDataSource {
+  /// With [instructions], the function tweaks [basePlan] instead of
+  /// generating a fresh plan.
   Future<ApiResult<MealPlanModel>> generateDietPlan({
     required NutritionTarget target,
     required Map<String, dynamic> preferences,
+    String? instructions,
+    MealPlan? basePlan,
   });
 }
 
 class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
+  // ignore: unused_field
   final DioClient _dioClient; // Kept for DI compatibility
 
   DietPlanRemoteDataSourceImpl(this._dioClient);
+
+  /// The edge function retries internally (two attempts, each with a
+  /// provider fallback), so allow for the worst case before giving up.
+  static const Duration _timeout = Duration(seconds: 75);
 
   @override
   Future<ApiResult<MealPlanModel>> generateDietPlan({
     required NutritionTarget target,
     required Map<String, dynamic> preferences,
+    String? instructions,
+    MealPlan? basePlan,
   }) async {
     try {
-      final targetModel = NutritionTargetModel.fromEntity(target);
-      final token = Supabase.instance.client.auth.currentSession?.accessToken;
-      if (token == null) {
-        throw Exception('No active session — cannot call generate-diet-plan');
+      if (Supabase.instance.client.auth.currentSession == null) {
+        return const ApiError(message: 'Please sign in to generate a diet plan.', code: 401);
       }
-      
-      print('\n\n--- DEBUG INFO START ---');
-      final anonKey = SupabaseConfig.publishableKey;
-      final baseUrl = SupabaseConfig.url;
-      print('CURL COMMAND TO TEST:');
-      print('''
-curl -i -X POST '$baseUrl/functions/v1/generate-diet-plan' \\
-  -H "Authorization: Bearer $token" \\
-  -H "Content-Type: application/json" \\
-  -H "apikey: $anonKey" \\
-  -d '{"target":{"calories":2000,"protein":150,"carbs":200,"fat":60},"preferences":{"dietaryType":"Veg","mealsPerDay":4}}'
-      ''');
-      
-      try {
-         final dioResponse = await _dioClient.dio.post(
-            '$baseUrl/functions/v1/generate-diet-plan',
-            data: {
-              'target': targetModel.toJson(),
-              'preferences': preferences,
-            },
-            options: Options(
-              headers: {
-                 'Authorization': 'Bearer $token',
-                 'apikey': anonKey,
-              },
-              validateStatus: (status) => true,
-            ),
-         );
-         print('RAW STATUS: ${dioResponse.statusCode}');
-         print('RAW BODY: ${dioResponse.data}');
-      } catch (e) {
-         print('DIO ERROR: $e');
+      // An access token that expired while the app sat in the background is
+      // rejected by the function; refresh it first.
+      if (Supabase.instance.client.auth.currentSession?.isExpired ?? false) {
+        await Supabase.instance.client.auth.refreshSession();
       }
-      print('--- DEBUG INFO END ---\n\n');
 
-      print('\n\n--- JWT PAYLOAD DEBUG ---');
-      try {
-        final parts = token.split('.');
-        if (parts.length == 3) {
-          final payloadStr = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
-          final payload = jsonDecode(payloadStr);
-          print('JWT Payload iss: ${payload['iss']}');
-          print('JWT Payload exp: ${payload['exp']}');
-          final expDate = DateTime.fromMillisecondsSinceEpoch((payload['exp'] as int) * 1000);
-          print('JWT exp date: $expDate');
-        }
-      } catch (e) {
-        print('Error decoding JWT: $e');
-      }
-      print('--- JWT PAYLOAD DEBUG END ---\n\n');
-      
+      final targetModel = NutritionTargetModel.fromEntity(target);
+      // functions.invoke attaches the signed-in user's access token itself.
       final response = await Supabase.instance.client.functions.invoke(
         'generate-diet-plan',
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
         body: {
           'target': targetModel.toJson(),
           'preferences': preferences,
+          'instructions': ?instructions,
+          if (instructions != null && basePlan != null)
+            'basePlan': {
+              'meals': [
+                for (final m in basePlan.meals)
+                  {'name': m.name, 'items': m.items, 'calories': m.calories},
+              ],
+            },
         },
-      );
+      ).timeout(_timeout);
 
-      if (response.status == 200) {
-        final dateKey = DateTime.now().toIso8601String().split('T')[0];
-        final model = MealPlanModel.fromJson(response.data as Map<String, dynamic>, dateKey);
-        return ApiSuccess(model);
-      } else {
-        final errorMsg = response.data?['error']?.toString() ?? 'Server error';
-        final details = response.data?['details']?.toString();
-        
-        // Log the detailed error to the terminal
-        print('API Error [generateDietPlan]: $errorMsg');
-        if (details != null) {
-          print('Details: $details');
-        }
-        
-        return ApiError(
-          message: 'Unable to generate diet plan. Please try again later.', 
-          code: response.status ?? 500
-        );
-      }
+      final data = response.data is String ? jsonDecode(response.data as String) : response.data;
+      final dateKey = DateTime.now().toIso8601String().split('T')[0];
+      return ApiSuccess(MealPlanModel.fromJson(data as Map<String, dynamic>, dateKey));
     } on FunctionException catch (e) {
-      final rawError = e.details != null ? e.details.toString() : (e.reasonPhrase ?? 'No reason phrase');
-      
-      // Log the detailed error to the terminal
-      print('FunctionException [generateDietPlan]: $rawError');
-      
+      debugPrint('generate-diet-plan failed: status=${e.status} details=${e.details}');
+      return ApiError(message: _messageForStatus(e.status), code: e.status);
+    } on TimeoutException {
       return const ApiError(
-        message: 'Unable to connect to the server. Please try again later.', 
-        code: 500
+        message: 'Generating your plan is taking too long. Please try again.',
+        code: 408,
       );
     } catch (e) {
-      print('Unexpected error [generateDietPlan]: $e');
+      debugPrint('Unexpected error [generateDietPlan]: $e');
       final err = ResponseHandler.fromException(e) as ApiError;
       return ApiError(message: err.message, code: err.code);
+    }
+  }
+
+  String _messageForStatus(int status) {
+    switch (status) {
+      case 401:
+        return 'Your session has expired. Please sign in again.';
+      case 429:
+        return "You've reached today's diet plan limit. Please try again tomorrow.";
+      case 422:
+        return 'We couldn\'t build a plan that fits your preferences. Please try again.';
+      default:
+        return 'Unable to generate diet plan. Please try again later.';
     }
   }
 }
