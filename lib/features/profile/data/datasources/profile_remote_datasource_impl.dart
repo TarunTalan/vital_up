@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/error/exceptions.dart';
@@ -7,6 +9,18 @@ import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   final SupabaseClient supabaseClient;
   final Logger logger;
+
+  /// Public Supabase Storage bucket for profile photos; each user may only
+  /// write inside their own `<userId>/` folder (see the avatars migration).
+  static const _avatarBucket = 'avatars';
+
+  static const _imageTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+    'heic': 'image/heic',
+  };
 
   ProfileRemoteDataSourceImpl({
     required this.supabaseClient,
@@ -134,6 +148,91 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } catch (e) {
       logger.e('Error updating profile in Supabase: $e');
       throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<String> uploadProfilePhoto(String userId, File imageFile) async {
+    try {
+      _requireCurrentUser(userId);
+
+      final dot = imageFile.path.lastIndexOf('.');
+      final ext = dot == -1 ? '' : imageFile.path.substring(dot + 1).toLowerCase();
+      final contentType = _imageTypes[ext];
+      if (contentType == null) {
+        throw const ServerException(
+          message: 'Please choose a JPG, PNG, WEBP or HEIC image.',
+        );
+      }
+
+      // A new file name per upload busts image caches holding the old URL.
+      final path = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final bucket = supabaseClient.storage.from(_avatarBucket);
+      await bucket.upload(
+        path,
+        imageFile,
+        fileOptions: FileOptions(contentType: contentType, cacheControl: '3600'),
+      );
+      final url = bucket.getPublicUrl(path);
+
+      await supabaseClient.auth.updateUser(
+        UserAttributes(data: {'avatar_url': url}),
+      );
+      await _deleteAvatarFiles(userId, keep: path);
+
+      logger.i('Uploaded profile photo for user: $userId');
+      return url;
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      logger.e('Error uploading profile photo: $e');
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<void> removeProfilePhoto(String userId) async {
+    try {
+      _requireCurrentUser(userId);
+      await _deleteAvatarFiles(userId);
+
+      // getProfile falls back to the OAuth `picture`, so clear both or a
+      // Google user's original photo would reappear.
+      await supabaseClient.auth.updateUser(
+        UserAttributes(data: {'avatar_url': null, 'picture': null}),
+      );
+      logger.i('Removed profile photo for user: $userId');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      logger.e('Error removing profile photo: $e');
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  void _requireCurrentUser(String userId) {
+    final user = supabaseClient.auth.currentUser;
+    if (user == null) {
+      throw const ServerException(message: 'User is not authenticated');
+    }
+    if (user.id != userId) {
+      throw const ServerException(message: "Can't change another user's photo");
+    }
+  }
+
+  /// Deletes the user's stored avatars except [keep]. Best effort: a failed
+  /// cleanup only leaves an orphaned file, so it never fails the request.
+  Future<void> _deleteAvatarFiles(String userId, {String? keep}) async {
+    try {
+      final bucket = supabaseClient.storage.from(_avatarBucket);
+      final files = await bucket.list(path: userId);
+      final stale = files
+          .map((f) => '$userId/${f.name}')
+          .where((path) => path != keep)
+          .toList();
+      if (stale.isNotEmpty) await bucket.remove(stale);
+    } catch (e) {
+      logger.w('Could not clean up old profile photos: $e');
     }
   }
 }

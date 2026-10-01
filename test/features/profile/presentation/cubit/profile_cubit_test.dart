@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:vital_up/core/error/failures.dart';
@@ -27,6 +29,17 @@ class FakeProfileRepository implements ProfileRepository {
     lastUpdatedProfile = profile;
     return updateProfileResult ?? const Right(null);
   }
+
+  Either<Failure, String>? uploadPhotoResult;
+  Either<Failure, void>? removePhotoResult;
+
+  @override
+  Future<Either<Failure, String>> uploadProfilePhoto(String userId, File imageFile) async =>
+      uploadPhotoResult ?? const Right('https://example.com/avatar.jpg');
+
+  @override
+  Future<Either<Failure, void>> removeProfilePhoto(String userId) async =>
+      removePhotoResult ?? const Right(null);
 }
 
 void main() {
@@ -131,6 +144,54 @@ void main() {
       expectLater(cubit.stream, emitsInOrder(expectedStates));
 
       await cubit.updateProfile(updatedProfile);
+    });
+  });
+
+  group('profile photo', () {
+    const profile = ProfileEntity(
+      id: 'user-1',
+      username: 'vita',
+      email: 'vita@example.com',
+      fullName: 'Vita User',
+      photoUrl: 'https://example.com/old.jpg',
+    );
+
+    setUp(() => fakeRepository.getProfileResult = const Right(profile));
+
+    test('upload emits updating then updated with the new URL', () async {
+      await cubit.loadProfile();
+      final states = <ProfileState>[];
+      final sub = cubit.stream.listen(states.add);
+
+      await cubit.uploadPhoto(File('avatar.jpg'));
+      await Future<void>.delayed(Duration.zero); // let stream events deliver
+      await sub.cancel();
+
+      expect(states.first, isA<ProfilePhotoUpdating>());
+      final updated = states.last as ProfilePhotoUpdated;
+      expect(updated.profile.photoUrl, 'https://example.com/avatar.jpg');
+      expect(updated.removed, isFalse);
+    });
+
+    test('failed upload keeps the profile and reports the error', () async {
+      fakeRepository.uploadPhotoResult = const Left(ServerFailure('Upload failed'));
+      await cubit.loadProfile();
+
+      await cubit.uploadPhoto(File('avatar.jpg'));
+
+      final failed = cubit.state as ProfilePhotoFailed;
+      expect(failed.message, 'Upload failed');
+      expect(failed.profile.photoUrl, profile.photoUrl);
+    });
+
+    test('remove clears the photo URL', () async {
+      await cubit.loadProfile();
+
+      await cubit.removePhoto();
+
+      final updated = cubit.state as ProfilePhotoUpdated;
+      expect(updated.profile.photoUrl, isNull);
+      expect(updated.removed, isTrue);
     });
   });
 }

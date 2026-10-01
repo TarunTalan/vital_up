@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartz/dartz.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/database/isar_service.dart';
@@ -98,6 +100,52 @@ class ProfileRepositoryImpl implements ProfileRepository {
       return Left(ServerFailure(_mapExceptionMessage(e.message)));
     } catch (e) {
       return Left(ServerFailure(_mapExceptionMessage(e.toString())));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadProfilePhoto(
+    String userId,
+    File imageFile,
+  ) async {
+    try {
+      final url = await remoteDataSource.uploadProfilePhoto(userId, imageFile);
+      await _cachePhotoUrl(userId, url);
+      return Right(url);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(_mapExceptionMessage(e.message)));
+    } catch (e) {
+      return Left(ServerFailure(_mapExceptionMessage(e.toString())));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> removeProfilePhoto(String userId) async {
+    try {
+      await remoteDataSource.removeProfilePhoto(userId);
+      await _cachePhotoUrl(userId, null);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(_mapExceptionMessage(e.message)));
+    } catch (e) {
+      return Left(ServerFailure(_mapExceptionMessage(e.toString())));
+    }
+  }
+
+  /// Keeps the offline profile cache's photo in sync.
+  Future<void> _cachePhotoUrl(String userId, String? url) async {
+    try {
+      final isar = isarService.isar;
+      await isar.writeTxn(() async {
+        final cache = await isar.userProfileCaches.getBySupabaseId(userId);
+        if (cache == null) return;
+        cache
+          ..photoUrl = url
+          ..lastSyncedAt = DateTime.now();
+        await isar.userProfileCaches.putBySupabaseId(cache);
+      });
+    } catch (e) {
+      logger.e('Failed to update cached profile photo: $e');
     }
   }
 

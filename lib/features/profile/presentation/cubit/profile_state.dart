@@ -39,6 +39,39 @@ class ProfileSaveSuccess extends ProfileState {
   List<Object?> get props => [updatedProfile];
 }
 
+/// A profile photo upload / removal is in progress.
+class ProfilePhotoUpdating extends ProfileState {
+  final ProfileEntity profile;
+
+  const ProfilePhotoUpdating(this.profile);
+
+  @override
+  List<Object?> get props => [profile];
+}
+
+/// The photo changed; [profile] carries the new (or cleared) photo URL.
+class ProfilePhotoUpdated extends ProfileState {
+  final ProfileEntity profile;
+  final bool removed;
+
+  const ProfilePhotoUpdated(this.profile, {this.removed = false});
+
+  @override
+  List<Object?> get props => [profile, removed];
+}
+
+/// The photo change failed; the rest of the profile is unaffected, so the
+/// page keeps showing [profile] and only surfaces [message].
+class ProfilePhotoFailed extends ProfileState {
+  final ProfileEntity profile;
+  final String message;
+
+  const ProfilePhotoFailed(this.profile, this.message);
+
+  @override
+  List<Object?> get props => [profile, message];
+}
+
 class ProfileError extends ProfileState {
   final String message;
 
