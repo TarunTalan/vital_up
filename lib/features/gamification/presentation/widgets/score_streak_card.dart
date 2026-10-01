@@ -74,6 +74,10 @@ class ScoreStreakCard extends StatelessWidget {
                     color: context.colors.primary,
                     text: '+${_points.format(state.todayTotal)} today',
                   ),
+                  CardLink(
+                    label: 'Your week',
+                    onTap: () => _push(context, 'weekly-summary'),
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.space12),
