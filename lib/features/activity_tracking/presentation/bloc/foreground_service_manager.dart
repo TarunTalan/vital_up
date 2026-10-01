@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:vital_up/core/monitoring/crash_reporter.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
+  CrashReporter.hookCurrentIsolate();
   FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
 }
 
