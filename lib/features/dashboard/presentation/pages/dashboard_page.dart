@@ -10,6 +10,9 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
+import 'package:home_widget/home_widget.dart';
+import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -68,6 +71,7 @@ class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
   late final ProfileCubit _profileCubit;
   StreamSubscription<PushOpen>? _pushOpens;
+  StreamSubscription<Uri?>? _widgetClicks;
   int _selectedIndex = 0;
   final List<int> _navigationQueue = [0];
 
@@ -85,9 +89,14 @@ class _DashboardPageState extends State<DashboardPage> {
     final push = sl<PushService>();
     push.requestPermissionAndRegister();
     _pushOpens = push.opens.listen(_openPush);
+
+    sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
+    _widgetClicks = HomeWidget.widgetClicked.listen(_openWidgetRoute);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final launch = push.takePendingOpen();
       if (launch != null) _openPush(launch);
+      HomeWidget.initiallyLaunchedFromHomeWidget().then(_openWidgetRoute);
       _askForUsernameIfNeeded();
     });
   }
@@ -112,6 +121,13 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// A tapped push opens the screen its notification links to.
+  /// The home screen widget was tapped (it links to the water screen).
+  void _openWidgetRoute(Uri? uri) {
+    final route = HomeWidgetService.routeOf(uri);
+    if (!mounted || route == null) return;
+    if (notificationLinkableRoutes.contains(route)) context.pushNamed(route);
+  }
+
   void _openPush(PushOpen open) {
     if (!mounted) return;
     final route = notificationRoute(open.type, open.route);
@@ -121,6 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _pushOpens?.cancel();
+    _widgetClicks?.cancel();
     _dietPlanCubit.close();
     _profileCubit.close();
     super.dispose();

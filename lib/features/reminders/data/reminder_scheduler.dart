@@ -115,7 +115,7 @@ class ReminderScheduler {
           payload: jsonEncode({
             'type': 'reminder',
             'route': r.route,
-            if (userId != null) 'user': userId,
+            'user': ?userId,
           }),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           matchDateTimeComponents: !repeat

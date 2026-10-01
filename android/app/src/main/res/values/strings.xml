@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_title">VitalUp today</string>
+    <string name="widget_description">Today\'s water, streak and points, with a quick +250 ml button.</string>
+    <string name="widget_add_water">+250 ml</string>
+</resources>

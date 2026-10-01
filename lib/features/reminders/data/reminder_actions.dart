@@ -18,14 +18,19 @@ String? reminderUserId(NotificationResponse response) {
   }
 }
 
-/// "+250 ml" tapped on a water reminder while the app was closed. Runs in a
-/// background isolate, so it writes straight to Isar; the entry is backed up
-/// the next time the app syncs.
+/// "+250 ml" tapped on a water reminder while the app was closed.
 @pragma('vm:entry-point')
 Future<void> reminderActionBackground(NotificationResponse response) async {
   if (response.actionId != ReminderScheduler.logWaterAction) return;
   final userId = reminderUserId(response);
   if (userId == null) return;
+  await addWaterInBackground(userId, ReminderScheduler.logWaterMl);
+}
+
+/// Logs water from a background isolate (notification action, home screen
+/// widget) by writing straight to Isar; the entry is backed up the next
+/// time the app syncs. Returns today's total in ml.
+Future<int> addWaterInBackground(String userId, int ml) async {
   DartPluginRegistrant.ensureInitialized();
   final isar =
       Isar.getInstance() ??
@@ -33,13 +38,20 @@ Future<void> reminderActionBackground(NotificationResponse response) async {
         IsarService.schemas,
         directory: (await getApplicationDocumentsDirectory()).path,
       );
+  final now = DateTime.now();
   await isar.writeTxn(
     () => isar.waterLogCaches.put(
       WaterLogCache()
         ..userId = userId
-        ..amountMl = ReminderScheduler.logWaterMl
-        ..timestamp = DateTime.now()
+        ..amountMl = ml
+        ..timestamp = now
         ..isSynced = false,
     ),
   );
+  final today = await isar.waterLogCaches
+      .filter()
+      .userIdEqualTo(userId)
+      .timestampGreaterThan(DateTime(now.year, now.month, now.day))
+      .findAll();
+  return today.fold<int>(0, (sum, l) => sum + l.amountMl);
 }

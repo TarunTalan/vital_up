@@ -646,4 +646,13 @@ Future<void> initDependencies() async {
       sl<WeightService>(),
     ),
   );
+
+  // 24. Android home screen widget
+  sl.registerLazySingleton(
+    () => HomeWidgetService(
+      sl<SupabaseClient>(),
+      sl<WaterIntakeService>(),
+      sl<GamificationRepository>(),
+    ),
+  );
 }

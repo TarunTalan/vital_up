@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#000000</color>
+
+    <!-- Home screen widget; mirrors AppColors in lib/core/theme/app_colors.dart -->
+    <color name="widget_background">#FFFFFFFF</color>
+    <color name="widget_text">#FF1C1C1C</color>
+    <color name="widget_secondary_text">#FF757575</color>
+    <color name="widget_track">#1F757575</color>
+    <color name="widget_primary">#FF19C3E0</color>
+    <color name="widget_water">#FF42A5F5</color>
+    <color name="widget_streak">#FFFF7A3D</color>
 </resources>
