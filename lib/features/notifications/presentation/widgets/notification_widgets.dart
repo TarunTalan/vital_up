@@ -31,6 +31,7 @@ const notificationLinkableRoutes = {
   'food-scan',
   'activity-tracking',
   'reminders',
+  'weight-trends',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.

@@ -60,6 +60,16 @@ const reminderPresets = <Reminder>[
     route: 'stress-trends',
   ),
   Reminder(
+    id: 'preset_weight',
+    kind: ReminderKind.weight,
+    title: 'Weekly weigh-in',
+    body: 'Step on the scale and log it to see your trend.',
+    times: [ReminderTime(7, 15)],
+    weekdays: {DateTime.monday},
+    isPreset: true,
+    route: 'weight-trends',
+  ),
+  Reminder(
     id: 'preset_sleep',
     kind: ReminderKind.sleep,
     title: 'Time to wind down',

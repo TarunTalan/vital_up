@@ -76,7 +76,7 @@ class RemindersPage extends StatelessWidget {
                   onAction: () => openAppSettings(),
                 ),
               _Section(
-                title: 'Daily habits',
+                title: 'Healthy habits',
                 children: [
                   for (final r in state.presets)
                     _ReminderRow(

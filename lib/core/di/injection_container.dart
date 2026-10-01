@@ -129,6 +129,7 @@ import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/account/data/account_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -565,6 +566,17 @@ Future<void> initDependencies() async {
       WeightSyncAdapter(sl<IsarService>()),
       ActivitySyncAdapter(sl<AppDatabase>()),
     ]),
+  );
+
+  // 21. Weight log
+  sl.registerLazySingleton(
+    () => WeightService(
+      sl<IsarService>(),
+      sl<SupabaseClient>(),
+      sl<SettingsRepository>(),
+      sl<SharedPreferences>(),
+      sl<SyncService>(),
+    ),
   );
 
   // 20. Account deletion

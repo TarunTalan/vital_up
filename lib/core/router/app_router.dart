@@ -37,6 +37,7 @@ import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_pag
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
+import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_diet_plan_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
@@ -149,6 +150,14 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const WaterTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/weight',
+        name: 'weight-trends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const WeightTrendsPage(),
         ),
       ),
       GoRoute(

@@ -87,7 +87,8 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
   /// Uploads and downloads everything. Safe to call often: concurrent
   /// calls share one run. Never throws.
-  Future<void> sync() => _running ??= _run().whenComplete(() => _running = null);
+  Future<void> sync() =>
+      _running ??= _run().whenComplete(() => _running = null);
 
   /// Entries recorded here but not backed up yet.
   Future<int> pendingCount() async {
@@ -131,9 +132,9 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     final pending = await adapter.pending(userId);
     for (var i = 0; i < pending.length; i += _uploadBatch) {
       final batch = pending.skip(i).take(_uploadBatch).toList();
-      await _client
-          .from(adapter.table)
-          .upsert([for (final p in batch) p.row], onConflict: 'id');
+      await _client.from(adapter.table).upsert([
+        for (final p in batch) p.row,
+      ], onConflict: 'id');
       await adapter.markSynced(userId, [for (final p in batch) p.localKey]);
     }
   }
@@ -143,7 +144,9 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     final saved = _prefs.getString(cursorKey);
     var cursor = saved == null
         ? null
-        : DateTime.parse(saved).subtract(_pullOverlap).toUtc().toIso8601String();
+        : DateTime.parse(
+            saved,
+          ).subtract(_pullOverlap).toUtc().toIso8601String();
 
     while (true) {
       var query = _client.from(adapter.table).select().eq('user_id', userId);
