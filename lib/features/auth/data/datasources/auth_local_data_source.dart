@@ -15,6 +15,7 @@ abstract class AuthLocalDataSource {
   Future<void> saveUser(String userJson);
   Future<String?> getUser();
   Future<void> clearUser();
-  Future<void> setOnboardingCompleted(bool completed);
-  Future<bool> hasCompletedOnboarding();
+  /// Cached health-onboarding status for [userId]; null if never checked.
+  Future<void> setOnboardingCompleted(String userId, bool completed);
+  Future<bool?> hasCompletedOnboarding(String userId);
 }

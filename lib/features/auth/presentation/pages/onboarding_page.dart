@@ -201,7 +201,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             ),
                           ),
                           onTap: () => context.read<AuthCubit>().signInWithGoogle(
-                                onSuccess: widget.onGoogleSignInSuccess,
+                                // The AuthAuthenticated listener above
+                                // navigates; calling it here too would run
+                                // the post-sign-in navigation twice.
+                                onSuccess: () {},
                               ),
                         ),
                         const SizedBox(height: AppDimens.buttonGap),

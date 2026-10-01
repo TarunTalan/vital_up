@@ -354,4 +354,26 @@ class AuthRepositoryImpl implements AuthRepository {
       return const Right(false);
     }
   }
+
+  @override
+  Future<bool> hasCompletedOnboarding() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    try {
+      final row = await Supabase.instance.client
+          .from('user_health_data')
+          .select('onboarding_completed')
+          .eq('id', userId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      final completed = row?['onboarding_completed'] == true;
+      await _localDataSource.setOnboardingCompleted(userId, completed);
+      return completed;
+    } catch (_) {
+      // Offline / server hiccup: don't push a returning user back through
+      // onboarding just because the check failed.
+      return await _localDataSource.hasCompletedOnboarding(userId) ?? true;
+    }
+  }
 }

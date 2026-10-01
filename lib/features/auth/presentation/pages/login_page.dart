@@ -137,10 +137,14 @@ class _LoginPageState extends State<LoginPage>
                                   child: VitalUpLoader(),
                                 ),
                               );
-                              await Future.delayed(const Duration(seconds: 2));
+                              final completed = await context
+                                  .read<AuthCubit>()
+                                  .hasCompletedOnboarding();
                               if (context.mounted) {
                                 Navigator.of(context).pop(); // Close loader
-                                context.goNamed('dashboard');
+                                context.goNamed(
+                                  completed ? 'dashboard' : 'health-onboarding',
+                                );
                               }
                             },
                           ),
