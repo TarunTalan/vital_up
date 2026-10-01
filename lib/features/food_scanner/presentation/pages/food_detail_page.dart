@@ -482,6 +482,20 @@ List<String> _tagsToSuggestions(List<String> tags) {
         'It is getting late; try to finish eating a couple of hours before bed.',
     'post_workout_window':
         'Great post-workout timing for recovery and muscle repair.',
+    'high_sodium':
+        'High in salt; go easy on pickle, papad and added salt today.',
+    'high_sugar':
+        'High in sugar; keep your next snack or drink unsweetened.',
+    'high_saturated_fat':
+        'Much of the fat is saturated (ghee, butter, cream, frying); try a lighter tadka next time.',
+    'low_protein':
+        'Add dal, curd, paneer, eggs or sprouts to raise the protein.',
+    'low_fiber':
+        'Add a salad, sabzi or fruit, or choose whole-wheat roti, for more fibre.',
+    'high_fiber':
+        'Good fibre content helps digestion and keeps you full longer.',
+    'large_meal':
+        'This is a large meal; keep the next one light.',
   };
   return [
     for (final tag in tags)

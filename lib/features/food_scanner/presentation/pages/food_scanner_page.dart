@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -375,7 +376,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   Future<void> _pickFromGallery() async {
     await _stopImageStream();
-    final image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    // Let the platform downscale large gallery photos natively; the upload
+    // encoder shrinks further, but decoding a 12+ MP image in Dart is slow.
+    final image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 92,
+    );
     if (image == null || !mounted) return;
 
     setState(() {
@@ -1099,23 +1107,31 @@ class _CaptureButton extends StatelessWidget {
             shape: BoxShape.circle,
             color: AppColors.cameraCaptureRing,
           ),
-          child: isLoading
-              ? const SizedBox.square(
-                  dimension: AppDimens.iconLg,
-                  child: CircularProgressIndicator(
-                    color: AppColors.white,
-                    strokeWidth: AppDimens.borderThick,
+          padding: const EdgeInsets.all(10.0),
+          child: Container(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.cameraControlFill,
+            ),
+            alignment: Alignment.center,
+            child: isLoading
+                ? const SizedBox.square(
+                    dimension: AppDimens.iconLg,
+                    child: CircularProgressIndicator(
+                      color: AppColors.darker,
+                      strokeWidth: AppDimens.borderThick,
+                    ),
+                  )
+                : SvgPicture.asset(
+                    'assets/icons/camera.svg',
+                    width: AppDimens.iconLg,
+                    height: AppDimens.iconLg,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.darker,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                )
-              : SvgPicture.asset(
-                  'assets/icons/camera.svg',
-                  width: AppDimens.iconLg,
-                  height: AppDimens.iconLg,
-                  colorFilter: const ColorFilter.mode(
-                    AppColors.white,
-                    BlendMode.srcIn,
-                  ),
-                ),
+          ),
         ),
       ),
     );
@@ -1208,7 +1224,7 @@ class ScannerOverlayPainter extends CustomPainter {
 
   ScannerOverlayPainter({
     this.barrierColor = AppColors.cameraScrim,
-    this.borderRadius = AppDimens.scanFrameRadius,
+    this.borderRadius = 72.0,
     this.strokeWidth = AppDimens.borderThick,
     this.strokeColor = AppColors.white,
   });
@@ -1234,14 +1250,7 @@ class ScannerOverlayPainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, maskPaint);
 
-    // 2. Draw the viewport outline with low opacity
-    final Paint outlinePaint = Paint()
-      ..color = strokeColor.withValues(alpha: 0.18)
-      ..strokeWidth = AppDimens.borderThin
-      ..style = PaintingStyle.stroke;
-    canvas.drawRRect(rrect, outlinePaint);
-
-    // 3. Draw the corner brackets
+    // 2. Draw the corner brackets
     final Paint linePaint = Paint()
       ..color = strokeColor
       ..strokeWidth = strokeWidth
@@ -1302,48 +1311,57 @@ Future<File> cropCapturedImage({
 }) async {
   try {
     final bytes = await File(imagePath).readAsBytes();
-    final originalImage = img.decodeImage(bytes);
-    if (originalImage == null) return File(imagePath);
-
-    final double imgW = originalImage.width.toDouble();
-    final double imgH = originalImage.height.toDouble();
-
-    final double sw = screenWidth;
-    final double sh = screenHeight;
-
-    // Viewport coordinates matching the custom painter overlay
-    final double boxWidth = sw - 2 * _scanFrameInset;
-    final double boxHeight = sh * _scanFrameHeightFraction;
-    final double boxLeft = (sw - boxWidth) / 2;
-    final double boxTop = (sh - boxHeight) / 2 - _scanFrameLift;
-
-    // Camera preview uses BoxFit.cover, so we calculate the scale and offsets
-    final double scale = math.max(sw / imgW, sh / imgH);
-    final double previewScaledW = imgW * scale;
-    final double previewScaledH = imgH * scale;
-    final double dx = (sw - previewScaledW) / 2;
-    final double dy = (sh - previewScaledH) / 2;
-
-    // Map screen coordinates of the viewport to original image pixels
-    final double cropLeft = (boxLeft - dx) / scale;
-    final double cropTop = (boxTop - dy) / scale;
-    final double cropWidth = boxWidth / scale;
-    final double cropHeight = boxHeight / scale;
-
-    final croppedImage = img.copyCrop(
-      originalImage,
-      x: cropLeft.round().clamp(0, originalImage.width - 1),
-      y: cropTop.round().clamp(0, originalImage.height - 1),
-      width: cropWidth.round().clamp(1, originalImage.width),
-      height: cropHeight.round().clamp(1, originalImage.height),
+    // Decoding a full-resolution JPEG takes hundreds of ms; keep it off the
+    // UI isolate so the capture animation doesn't freeze.
+    final croppedBytes = await Isolate.run(
+      () => _cropToScanFrame(bytes, screenWidth, screenHeight),
     );
-
-    final croppedBytes = img.encodeJpg(croppedImage);
-    final croppedFile = File(imagePath)..writeAsBytesSync(croppedBytes);
-    return croppedFile;
+    if (croppedBytes == null) return File(imagePath);
+    return File(imagePath)..writeAsBytesSync(croppedBytes);
   } catch (_) {
     return File(imagePath);
   }
+}
+
+Uint8List? _cropToScanFrame(Uint8List bytes, double sw, double sh) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return null;
+  // Camera JPEGs are often stored sensor-rotated with an EXIF orientation
+  // tag. The crop math below is in upright screen space, so apply the
+  // rotation first or the crop lands on the wrong part of the frame.
+  final originalImage = img.bakeOrientation(decoded);
+
+  final double imgW = originalImage.width.toDouble();
+  final double imgH = originalImage.height.toDouble();
+
+  // Viewport coordinates matching the custom painter overlay
+  final double boxWidth = sw - 2 * _scanFrameInset;
+  final double boxHeight = sh * _scanFrameHeightFraction;
+  final double boxLeft = (sw - boxWidth) / 2;
+  final double boxTop = (sh - boxHeight) / 2 - _scanFrameLift;
+
+  // Camera preview uses BoxFit.cover, so we calculate the scale and offsets
+  final double scale = math.max(sw / imgW, sh / imgH);
+  final double previewScaledW = imgW * scale;
+  final double previewScaledH = imgH * scale;
+  final double dx = (sw - previewScaledW) / 2;
+  final double dy = (sh - previewScaledH) / 2;
+
+  // Map screen coordinates of the viewport to original image pixels
+  final double cropLeft = (boxLeft - dx) / scale;
+  final double cropTop = (boxTop - dy) / scale;
+  final double cropWidth = boxWidth / scale;
+  final double cropHeight = boxHeight / scale;
+
+  final croppedImage = img.copyCrop(
+    originalImage,
+    x: cropLeft.round().clamp(0, originalImage.width - 1),
+    y: cropTop.round().clamp(0, originalImage.height - 1),
+    width: cropWidth.round().clamp(1, originalImage.width),
+    height: cropHeight.round().clamp(1, originalImage.height),
+  );
+
+  return img.encodeJpg(croppedImage, quality: 90);
 }
 
 class QrOutlinePainter extends CustomPainter {
