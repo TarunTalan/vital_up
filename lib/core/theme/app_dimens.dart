@@ -32,6 +32,7 @@ class AppDimens {
   static const double space4 = 4.0;
   static const double space6 = 6.0;
   static const double space8 = 8.0;
+  static const double space10 = 10.0;
   static const double space12 = 12.0;
   static const double space16 = 16.0;
   static const double space20 = 20.0;
@@ -90,11 +91,10 @@ class AppDimens {
   static const double iconBadge = 40.0;
   static const double iconBadgeLarge = 48.0;
 
-  /// Figma quick-action tile (Steps / Water / Workout …).
-  static const double quickActionWidth = 80.0;
+  static const double quickActionWidth = 100.0;
 
   /// Figma bottom nav bar (bars & panels/tab).
-  static const double navBarItemHeight = 51.0;
+  static const double navBarItemHeight = 42.0;
   static const EdgeInsets navBarPadding =
       EdgeInsets.symmetric(horizontal: 32.0, vertical: 8.0);
   static const double navBarBottomOffset = 16.0;
@@ -169,7 +169,30 @@ class AppDimens {
 
   /// Dashboard: calorie ring and water-wave panel.
   static const double calorieRing = 80.0;
+  static const double calorieRingStroke = 8.0;
   static const double waterWaveHeight = 120.0;
+
+  /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
+  /// detail pages.
+  static const double miniChartHeight = 64.0;
+  static const double trendChartHeight = 200.0;
+  static const double chartBarWidth = 14.0;
+  static const double chartBarWidthMini = 10.0;
+  static const double chartBarWidthDense = 6.0;
+  static const double chartAxisReserved = 36.0;
+  static const double chartLabelReserved = 20.0;
+  static const int chartGoalDash = 4;
+
+  /// Opacity of past-day bars (today's bar is fully opaque).
+  static const double chartInactiveAlpha = 0.4;
+
+  /// Stress check-in: emoji faces, mood strip dots, confetti.
+  static const double moodFaceSize = 30.0;
+  static const double moodFaceBox = 52.0;
+  static const double moodFaceSelectedScale = 1.25;
+  static const double moodStripDot = 14.0;
+  static const double confettiParticle = 6.0;
+  static const double confettiSpread = 90.0;
 
   // ---------------------------------------------------------------------------
   // Auth
@@ -259,6 +282,53 @@ class AppDurations {
   static const Duration fast = Duration(milliseconds: 150);
   static const Duration medium = Duration(milliseconds: 250);
   static const Duration slow = Duration(milliseconds: 400);
+
+  /// Page push / pop (see `AppPageTransitionsBuilder`).
+  static const Duration page = Duration(milliseconds: 400);
+  static const Duration pageReverse = Duration(milliseconds: 320);
+
+  /// Mood face bounce and check-in confetti burst.
+  static const Duration bounce = Duration(milliseconds: 450);
+  static const Duration confetti = Duration(milliseconds: 900);
+}
+
+/// Vita health coach sizes — Figma section 1893:14544.
+class VitaDimens {
+  VitaDimens._();
+
+  static const double avatarLarge = 100.0;
+  static const double avatarSmall = 32.0;
+
+  /// List/info cards on the Vita sub-pages (p-20).
+  static const EdgeInsets cardPadding = EdgeInsets.all(20.0);
+
+  /// Home feature tiles.
+  static const double tileHeight = 48.0;
+  static const double tileGapX = 9.0;
+  static const double tileGapY = 12.0;
+  static const double homeGap = 23.0;
+
+  /// Chat bubbles: 28 radius on three corners; widths as a fraction of the
+  /// 371dp chat column (bot 314, user 295).
+  static const double bubbleRadius = 28.0;
+  static const double botBubbleFraction = 314 / 371;
+  static const double userBubbleFraction = 295 / 371;
+  static const double bubbleLineHeight = 23 / 16;
+  static const double messageGap = 28.0;
+  static const double chatSectionGap = 42.0;
+
+  static const double composerHeight = 100.0;
+  static const double sendButton = 52.0;
+
+  /// Health analysis signal badge.
+  static const double signalBadge = 40.0;
+  static const double signalBadgeRadius = 13.0;
+
+  /// Diet plan calorie pill + indented meal items.
+  static const double pillRadius = 30.0;
+  static const EdgeInsets pillPadding =
+      EdgeInsets.symmetric(horizontal: 10, vertical: 8);
+  static const double mealItemIndent = 17.0;
 }
 
 /// Map annotation sizes for the activity tracking map.

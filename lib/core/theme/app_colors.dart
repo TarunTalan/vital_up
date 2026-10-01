@@ -142,6 +142,28 @@ class AppColors {
   /// Water-intake accent (wave fill, quick-add chips).
   static const Color water = Color(0xFF42A5F5);
 
+  /// Sleep accent (sleep trend bars).
+  static const Color sleep = Color(0xFF7C83FD);
+
+  /// Stress check-in ramp, level 1 (very calm) → 5 (very stressed).
+  static const List<Color> stressLevels = [
+    Color(0xFF26C6A6),
+    Color(0xFF8BD46E),
+    Color(0xFFFFC54D),
+    Color(0xFFFF9248),
+    Color(0xFFF25F5C),
+  ];
+
+  /// Activity goal metric accents.
+  static const Color activitySteps = primary;
+  static const Color activityDistance = Color(0xFF26A69A);
+  static const Color activityCalories = Color(0xFFFF7043);
+  static const Color activityMinutes = Color(0xFFFFC107);
+  static const Color activityWorkouts = Color(0xFF9C6ADE);
+
+  /// Streak flame on the stress check-in.
+  static const Color streak = Color(0xFFFF7A3D);
+
   // ---------------------------------------------------------------------------
   // Gradients
   // ---------------------------------------------------------------------------
@@ -172,6 +194,37 @@ class AppColors {
   /// BPM heart pulse glow.
   static const Color heartGlow = Color(0xFFFF3DBF);
   static const Color heartGlowSoft = Color(0xFFFF6FD8);
+}
+
+/// Vita health coach — Figma section "Health coach" (1893:14544).
+class VitaColors {
+  VitaColors._();
+
+  /// "Meet **Vita**" highlight and home tile labels — Figma #17B0CA.
+  static const Color accent = Color(0xFF17B0CA);
+
+  /// Bot chat bubble — Figma #E8F9FC fill, #B8ECF5 border, teal text.
+  static const Color botBubble = Color(0xFFE8F9FC);
+  static const Color botBubbleBorder = AppColors.highlight;
+  static const Color botText = AppColors.teal;
+
+  /// User chat bubble and quick-reply chips — teal fill, lighter text.
+  static const Color userBubble = AppColors.teal;
+  static const Color userText = AppColors.lighter;
+
+  /// Composer placeholder + idle send button — Figma #A2B8C8.
+  static const Color composerMuted = Color(0xFFA2B8C8);
+
+  /// Calorie pill on diet plan cards — highlight fill, Figma #0B5865 text.
+  static const Color pillFill = AppColors.highlight;
+  static const Color pillText = Color(0xFF0B5865);
+
+  /// Vita avatar placeholders — Figma #E3E3E3 (large) / #C7C5C5 (insight).
+  static const Color avatar = AppColors.lightText;
+  static const Color avatarInsight = Color(0xFFC7C5C5);
+
+  /// Health analysis icon badge — rgba(0,191,165,0.2).
+  static const Color signalBadge = Color(0x3300BFA5);
 }
 
 /// Fixed accents for activity tracking (map markers, soundtrack icons).
