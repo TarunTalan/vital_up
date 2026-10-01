@@ -62,6 +62,8 @@ void showSmoothSnackBar(
   ScaffoldMessenger.of(context).clearSnackBars();
   final controller = ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
+      behavior: SnackBarBehavior.floating,
+      dismissDirection: DismissDirection.horizontal,
       duration: duration,
       margin: const EdgeInsets.symmetric(
         horizontal: AppDimens.gutter,

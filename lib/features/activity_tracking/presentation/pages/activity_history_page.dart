@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -81,69 +83,128 @@ class _ActivityHistoryView extends StatelessWidget {
 
               final loaded = state as ActivityHistoryLoaded;
 
+              final entries = loaded.visibleEntries;
+
               return RefreshIndicator(
                 onRefresh: () async {
                   context.read<ActivityHistoryBloc>().add(
                     LoadActivityHistory(),
                   );
                 },
-                child: Column(
-                  children: [
-                    const SizedBox(height: AppDimens.space16),
-                    _HistorySummary(state: loaded),
-                    const SizedBox(height: AppDimens.space12),
-                    ActivityHistoryFilterBar(
-                      selectedType: loaded.activityTypeFilter,
-                      onTypeSelected: (type) => context
-                          .read<ActivityHistoryBloc>()
-                          .add(FilterByActivityType(type)),
-                      onSearchChanged: (query) => context
-                          .read<ActivityHistoryBloc>()
-                          .add(SearchHistory(query)),
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  slivers: [
+                    // Stats scroll away so the list gets the screen.
+                    SliverPadding(
+                      padding: const EdgeInsets.only(top: AppDimens.space16),
+                      sliver: SliverToBoxAdapter(
+                        child: _HistorySummary(state: loaded),
+                      ),
                     ),
-                    const SizedBox(height: AppDimens.space8),
-                    Expanded(
-                      child: loaded.visibleEntries.isEmpty
-                          ? const _EmptyHistory()
-                          : ListView.builder(
-                              padding: const EdgeInsets.only(
-                                bottom: AppDimens.sectionGap,
-                              ),
-                              itemCount: loaded.visibleEntries.length,
-                              itemBuilder: (context, index) {
-                                final entry = loaded.visibleEntries[index];
-                                return ActivityHistoryCard(
+                    // Filters stay reachable once the stats are gone.
+                    SliverLayoutBuilder(
+                      builder: (context, constraints) => PinnedHeaderSliver(
+                        child: _PinnedFilterBar(
+                          pinned: constraints.scrollOffset > 0,
+                          state: loaded,
+                        ),
+                      ),
+                    ),
+                    if (entries.isEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyHistory(),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.only(
+                          bottom: AppDimens.sectionGap,
+                        ),
+                        sliver: SliverList.builder(
+                          itemCount: entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            return ActivityHistoryCard(
+                              entry: entry,
+                              onTap: () async {
+                                final result = await showSessionDetailSheet(
+                                  context,
                                   entry: entry,
-                                  onTap: () async {
-                                    final result = await showSessionDetailSheet(
-                                      context,
-                                      entry: entry,
-                                    );
-                                    if (result != null && context.mounted) {
-                                      final (tag, note) = result;
-                                      context.read<ActivityHistoryBloc>().add(
-                                        UpdateSessionAnnotation(
-                                          sessionId: entry.session.id,
-                                          tag: tag,
-                                          note: note,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  onDelete: () =>
-                                      context.read<ActivityHistoryBloc>().add(
-                                        DeleteSessionFromHistory(
-                                          entry.session.id,
-                                        ),
-                                      ),
                                 );
+                                if (result != null && context.mounted) {
+                                  final (tag, note) = result;
+                                  context.read<ActivityHistoryBloc>().add(
+                                    UpdateSessionAnnotation(
+                                      sessionId: entry.session.id,
+                                      tag: tag,
+                                      note: note,
+                                    ),
+                                  );
+                                }
                               },
-                            ),
-                    ),
+                              onDelete: () =>
+                                  context.read<ActivityHistoryBloc>().add(
+                                    DeleteSessionFromHistory(entry.session.id),
+                                  ),
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Chips + search, pinned under the page header. Gains a glass backdrop
+/// only while pinned so cards scrolling beneath don't show through.
+class _PinnedFilterBar extends StatelessWidget {
+  final bool pinned;
+  final ActivityHistoryLoaded state;
+
+  const _PinnedFilterBar({required this.pinned, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+
+    // Tree shape stays fixed across pin changes so the search field isn't
+    // remounted (and cleared) mid-scroll.
+    return ClipRect(
+      child: BackdropFilter(
+        enabled: pinned,
+        filter: ImageFilter.blur(
+          sigmaX: AppDimens.headerBlur / 2,
+          sigmaY: AppDimens.headerBlur / 2,
+        ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: pinned ? v.glassFill : Colors.transparent,
+            border: Border(
+              bottom: BorderSide(
+                color: pinned ? v.glassBorder! : Colors.transparent,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.only(
+            top: AppDimens.space12,
+            bottom: AppDimens.space8,
+          ),
+          child: ActivityHistoryFilterBar(
+            selectedType: state.activityTypeFilter,
+            onTypeSelected: (type) => context.read<ActivityHistoryBloc>().add(
+              FilterByActivityType(type),
+            ),
+            onSearchChanged: (query) =>
+                context.read<ActivityHistoryBloc>().add(SearchHistory(query)),
           ),
         ),
       ),
@@ -248,7 +309,7 @@ class _EmptyHistory extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = context.vColors;
     return Center(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(AppDimens.space24),
         child: Column(
           mainAxisSize: MainAxisSize.min,

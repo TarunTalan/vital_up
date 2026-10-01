@@ -6,8 +6,9 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 
 /// Glass page header — Figma `Header` on track/detail/* and home:
-/// translucent fill + bottom hairline, optional back button row, then a
-/// "heading 2" title (+ optional subtitle) with an optional trailing action.
+/// translucent fill + bottom hairline, then one row with an optional back
+/// button, a "heading 2" title (+ optional subtitle) and an optional
+/// trailing action.
 ///
 /// Includes the top safe-area inset, so place it at the top of a page body.
 class AppPageHeader extends StatelessWidget {
@@ -47,48 +48,44 @@ class AppPageHeader extends StatelessWidget {
       child: ResponsiveCenter(
         child: Padding(
           padding: context.pagePadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasBack) ...[
-                BackIcon(onClick: onBack ?? () => Navigator.of(context).maybePop()),
-                const SizedBox(height: AppDimens.space12),
-              ],
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.text.headlineMedium,
-                          ),
-                          if (subtitle != null) ...[
-                            const SizedBox(height: AppDimens.space4),
-                            Text(
-                              subtitle!,
-                              style: context.text.bodyMedium
-                                  ?.copyWith(color: v.grayText),
-                            ),
-                          ],
-                        ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+            child: Row(
+              children: [
+                if (hasBack) ...[
+                  BackIcon(
+                    onClick: onBack ?? () => Navigator.of(context).maybePop(),
+                  ),
+                  const SizedBox(width: AppDimens.space12),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.headlineMedium,
                       ),
-                    ),
-                    if (action != null) ...[
-                      const SizedBox(width: AppDimens.space12),
-                      action!,
+                      if (subtitle != null) ...[
+                        const SizedBox(height: AppDimens.space4),
+                        Text(
+                          subtitle!,
+                          style: context.text.bodyMedium
+                              ?.copyWith(color: v.grayText),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                if (action != null) ...[
+                  const SizedBox(width: AppDimens.space12),
+                  action!,
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -106,6 +103,63 @@ class AppPageHeader extends StatelessWidget {
       );
     }
     return header;
+  }
+}
+
+/// Compact title bar — Figma Vita screens (health coach/*): back button on
+/// the left and a centred "heading 3" title in one row, drawn straight on
+/// the page background (no glass fill or hairline).
+///
+/// Includes the top safe-area inset, so place it at the top of a page body.
+class AppTitleBar extends StatelessWidget {
+  final String? title;
+  final VoidCallback? onBack;
+  final Widget? action;
+
+  const AppTitleBar({super.key, this.title, this.onBack, this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    final hasBack = onBack != null || canPop;
+    // Mirrors the back button so the title stays optically centred.
+    const slot = SizedBox.square(dimension: AppDimens.backButtonSize);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: context.safePadding.top + AppDimens.space20,
+        bottom: AppDimens.space16,
+      ),
+      child: ResponsiveCenter(
+        child: Padding(
+          padding: context.pagePadding,
+          child: Row(
+            children: [
+              if (hasBack)
+                BackIcon(
+                  onClick: onBack ?? () => Navigator.of(context).maybePop(),
+                )
+              else
+                slot,
+              Expanded(
+                child: title == null
+                    ? const SizedBox.shrink()
+                    : Text(
+                        title!,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.headlineSmall?.copyWith(
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+              ),
+              action ?? slot,
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

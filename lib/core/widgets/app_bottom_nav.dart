@@ -112,8 +112,8 @@ class _NavItem extends StatelessWidget {
               AnimatedContainer(
                 duration: AppDurations.medium,
                 curve: Curves.easeOut,
-                width: AppDimens.iconXl,
-                height: AppDimens.iconXl,
+                width: AppDimens.iconLg,
+                height: AppDimens.iconLg,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
@@ -125,8 +125,8 @@ class _NavItem extends StatelessWidget {
                 ),
                 child: SvgPicture.asset(
                   item.iconAsset,
-                  width: AppDimens.iconXl,
-                  height: AppDimens.iconXl,
+                  width: AppDimens.iconLg,
+                  height: AppDimens.iconLg,
                   colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                 ),
               ),
