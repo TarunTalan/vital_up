@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
@@ -29,7 +30,7 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
       ) async {
     emit(const ActivityHistoryLoading());
     try {
-      final entries = await getActivityHistory();
+      final entries = await getActivityHistory().withLoadTimeout();
       emit(ActivityHistoryLoaded(
         allEntries: entries,
         visibleEntries: entries,

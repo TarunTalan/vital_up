@@ -4,13 +4,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/features/dashboard/domain/entities/diet_progress.dart';
+import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
 import 'dashboard_card_header.dart';
+import 'trend_widgets.dart';
 
 /// Today's nutrition summary card shown on the Dashboard home tab.
 /// Requires [MealLogBloc] to be provided above this widget in the tree.
+///
+/// With an active [plan] it becomes the diet plan progress card: calories
+/// and macros against the plan, planned meals ticked off as they're logged,
+/// and a 7-day calories chart (needs a `TrendCubit<MealLogEntry>`).
 class NutritionSummaryCard extends StatelessWidget {
   /// Called when the user taps "View All" — navigate to MealLogHistoryPage.
   final VoidCallback? onViewAll;
@@ -18,10 +26,17 @@ class NutritionSummaryCard extends StatelessWidget {
   /// Called when a meal-type slot with no entry is tapped — open the scanner.
   final VoidCallback? onScanMeal;
 
+  final MealPlan? plan;
+
+  /// Opens the diet progress page (shown instead of "View All" with a plan).
+  final VoidCallback? onOpenProgress;
+
   const NutritionSummaryCard({
     super.key,
     this.onViewAll,
     this.onScanMeal,
+    this.plan,
+    this.onOpenProgress,
   });
 
   @override
@@ -35,7 +50,24 @@ class NutritionSummaryCard extends StatelessWidget {
           );
         }
         if (state is MealLogLoaded) {
-          return _LoadedCard(state: state, onViewAll: onViewAll, onScanMeal: onScanMeal);
+          return _LoadedCard(
+            state: state,
+            plan: plan,
+            onViewAll: onViewAll,
+            onScanMeal: onScanMeal,
+            onOpenProgress: onOpenProgress,
+          );
+        }
+        if (state is MealLogError) {
+          return AppCard(
+            width: double.infinity,
+            child: DashboardCardError(
+              title: "Today's Nutrition",
+              iconAsset: 'assets/icons/fork_knife.svg',
+              onRetry: () =>
+                  context.read<MealLogBloc>().add(const LoadTodaysMeals()),
+            ),
+          );
         }
         return const SizedBox.shrink();
       },
@@ -45,37 +77,49 @@ class NutritionSummaryCard extends StatelessWidget {
 
 class _LoadedCard extends StatelessWidget {
   final MealLogLoaded state;
+  final MealPlan? plan;
   final VoidCallback? onViewAll;
   final VoidCallback? onScanMeal;
+  final VoidCallback? onOpenProgress;
 
   const _LoadedCard({
     required this.state,
+    this.plan,
     this.onViewAll,
     this.onScanMeal,
+    this.onOpenProgress,
   });
 
   @override
   Widget build(BuildContext context) {
+    final plan = this.plan;
+    final calorieGoal =
+        plan?.totalCalories.toDouble() ?? state.dailyCalorieGoal?.toDouble();
+    final goalCalories = state.dailyCalorieGoal;
     return AppCard(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DashboardCardHeader(
-            title: "Today's Nutrition",
+            title: plan != null ? "Today's Diet Plan" : "Today's Nutrition",
             iconAsset: 'assets/icons/fork_knife.svg',
-            trailing: TextButton(
-              onPressed: onViewAll,
-              child: const Text('View All →'),
-            ),
+            trailing: plan != null
+                ? CardLink(label: 'Progress', onTap: onOpenProgress ?? () {})
+                : TextButton(
+                    onPressed: onViewAll,
+                    child: const Text('View All →'),
+                  ),
           ),
           const SizedBox(height: AppDimens.cardInnerGap),
           Row(
             children: [
               _CalorieRing(
                 calories: state.totalCalories,
-                goal: state.dailyCalorieGoal?.toDouble(),
-                progress: state.calorieProgress,
+                goal: calorieGoal,
+                progress: calorieGoal == null || calorieGoal <= 0
+                    ? null
+                    : (state.totalCalories / calorieGoal).clamp(0.0, 1.0),
               ),
               const SizedBox(width: AppDimens.space20),
               Expanded(
@@ -85,27 +129,24 @@ class _LoadedCard extends StatelessWidget {
                     _MacroBar(
                       label: 'Protein',
                       value: state.totalProteinG,
-                      maxValue: (state.dailyCalorieGoal != null)
-                          ? (state.dailyCalorieGoal! * 0.3 / 4)
-                          : 120,
+                      maxValue: plan?.totalProtein.toDouble() ??
+                          (goalCalories != null ? goalCalories * 0.3 / 4 : 120),
                       color: AppColors.protein,
                     ),
                     const SizedBox(height: AppDimens.space8),
                     _MacroBar(
                       label: 'Carbs',
                       value: state.totalCarbsG,
-                      maxValue: (state.dailyCalorieGoal != null)
-                          ? (state.dailyCalorieGoal! * 0.5 / 4)
-                          : 250,
+                      maxValue: plan?.totalCarbs.toDouble() ??
+                          (goalCalories != null ? goalCalories * 0.5 / 4 : 250),
                       color: AppColors.carbs,
                     ),
                     const SizedBox(height: AppDimens.space8),
                     _MacroBar(
                       label: 'Fat',
                       value: state.totalFatG,
-                      maxValue: (state.dailyCalorieGoal != null)
-                          ? (state.dailyCalorieGoal! * 0.2 / 9)
-                          : 65,
+                      maxValue: plan?.totalFat.toDouble() ??
+                          (goalCalories != null ? goalCalories * 0.2 / 9 : 65),
                       color: AppColors.fat,
                     ),
                   ],
@@ -114,21 +155,64 @@ class _LoadedCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppDimens.cardInnerGap),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: MealType.values.map((mealType) {
-              final logged = state.loggedMealTypes.contains(mealType);
-              return Expanded(
-                child: _MealSlot(
-                  mealType: mealType,
-                  logged: logged,
-                  onTap: logged ? null : onScanMeal,
-                ),
-              );
-            }).toList(),
-          ),
+          if (plan != null)
+            _PlannedMealSlots(
+              statuses: plannedMealStatuses(plan, state.entries),
+              onScanMeal: onScanMeal,
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: MealType.values.map((mealType) {
+                final logged = state.loggedMealTypes.contains(mealType);
+                return Expanded(
+                  child: _MealSlot(
+                    mealType: mealType,
+                    logged: logged,
+                    onTap: logged ? null : onScanMeal,
+                  ),
+                );
+              }).toList(),
+            ),
+          if (plan != null) ...[
+            const SizedBox(height: AppDimens.cardInnerGap),
+            Text(
+              'Calories · last 7 days',
+              style: context.text.labelSmall
+                  ?.copyWith(color: context.vColors.grayText),
+            ),
+            const SizedBox(height: AppDimens.space8),
+            MiniTrend<MealLogEntry>(color: context.colors.primary),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// One slot per planned meal (in plan order) with its planned kcal.
+class _PlannedMealSlots extends StatelessWidget {
+  final List<PlannedMealStatus> statuses;
+  final VoidCallback? onScanMeal;
+
+  const _PlannedMealSlots({required this.statuses, this.onScanMeal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final s in statuses)
+          Expanded(
+            child: _MealSlot(
+              mealType: s.type ?? MealType.snack,
+              label: s.meal.name,
+              caption: '${s.meal.calories} kcal',
+              logged: s.logged,
+              onTap: s.logged ? null : onScanMeal,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -287,10 +371,16 @@ class _MealSlot extends StatelessWidget {
   final bool logged;
   final VoidCallback? onTap;
 
+  /// Overrides the meal-type name (planned meal names).
+  final String? label;
+  final String? caption;
+
   const _MealSlot({
     required this.mealType,
     required this.logged,
     this.onTap,
+    this.label,
+    this.caption,
   });
 
   String get _emoji {
@@ -344,7 +434,7 @@ class _MealSlot extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              _label,
+              label ?? _label,
               maxLines: 1,
               style: context.text.labelSmall?.copyWith(
                 fontWeight: FontWeight.w500,
@@ -352,6 +442,15 @@ class _MealSlot extends StatelessWidget {
               ),
             ),
           ),
+          if (caption != null)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                caption!,
+                maxLines: 1,
+                style: context.text.labelSmall?.copyWith(color: v.grayText),
+              ),
+            ),
           const SizedBox(height: AppDimens.space2),
           Icon(
             logged ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,

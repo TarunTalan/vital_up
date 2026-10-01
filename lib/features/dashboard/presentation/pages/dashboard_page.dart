@@ -3,28 +3,38 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_bottom_nav.dart';
-import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
+import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
+import 'package:vital_up/features/dashboard/domain/entities/sleep_session_info.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
+import 'package:vital_up/features/activity_goals/presentation/widgets/activity_goals_card.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/stress_checkin_card.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
+import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
 import '../widgets/water_intake_card.dart';
@@ -79,11 +89,29 @@ class _DashboardPageState extends State<DashboardPage> {
             value: _dietPlanCubit,
           ),
           BlocProvider<WaterIntakeCubit>(
+            create: (context) => sl<WaterIntakeCubit>()..loadData(_userId(context)),
+          ),
+          BlocProvider<TrendCubit<WaterLogCache>>(
             create: (context) {
-              final authState = context.read<AuthCubit>().state;
-              final userId = authState is AuthAuthenticated ? authState.user.id : 'unknown';
-              return sl<WaterIntakeCubit>()..loadData(userId);
+              final userId = _userId(context);
+              return TrendCubit<WaterLogCache>(
+                (range) => sl<TrendsService>().water(userId, range),
+              )..load();
             },
+          ),
+          BlocProvider<ActivityGoalsCubit>(
+            create: (_) => sl<ActivityGoalsCubit>()..load(),
+          ),
+          BlocProvider<StressCheckInCubit>(
+            create: (_) => sl<StressCheckInCubit>()..load(),
+          ),
+          BlocProvider<TrendCubit<MealLogEntry>>(
+            create: (_) =>
+                TrendCubit<MealLogEntry>(sl<TrendsService>().calories)..load(),
+          ),
+          BlocProvider<TrendCubit<SleepSessionInfo>>(
+            create: (_) =>
+                TrendCubit<SleepSessionInfo>(sl<TrendsService>().sleep)..load(),
           ),
           BlocProvider<ScreenTimeCubit>(
             create: (context) => sl<ScreenTimeCubit>()..loadStats(),
@@ -127,6 +155,11 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  static String _userId(BuildContext context) {
+    final authState = context.read<AuthCubit>().state;
+    return authState is AuthAuthenticated ? authState.user.id : 'unknown';
+  }
+
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
       0 => BlocProvider<MealLogBloc>(
@@ -145,12 +178,8 @@ class _DashboardPageState extends State<DashboardPage> {
       1 => FoodScannerPage(
           onBack: () => setState(() => _selectedIndex = 0),
         ),
-      2 => _SimpleTab(
-          title: 'Vita',
-          subtitle: 'Your personal health assistant.',
-          icon: Icons.favorite_rounded,
-          buttonLabel: 'Generate AI Diet Plan',
-          onButtonTap: () => context.pushNamed('diet-plan-prefs'),
+      2 => VitaHomePage(
+          onBack: () => setState(() => _selectedIndex = 0),
         ),
       _ => BlocProvider.value(
           value: _profileCubit,
@@ -187,12 +216,52 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   final VoidCallback? onScanMeal;
   const _HomeTab({this.onScanMeal});
 
   @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  // Health Connect data (steps, synced sleep) changes outside the app.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () {
+      if (!mounted) return;
+      context.read<WaterIntakeCubit>().reload();
+      context.read<TrendCubit<SleepSessionInfo>>().load();
+      context.read<ActivityGoalsCubit>().load();
+      context.read<StressCheckInCubit>().load();
+      context.read<MealLogBloc>().add(const LoadTodaysMeals());
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _push(String route, {Object? extra}) async {
+    final meals = context.read<MealLogBloc>();
+    final calories = context.read<TrendCubit<MealLogEntry>>();
+    final plan = context.read<DietPlanCubit>();
+    await context.pushNamed(route, extra: extra);
+    meals.add(const LoadTodaysMeals());
+    calories.load();
+    plan.loadActiveMealPlan();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final onScanMeal = widget.onScanMeal;
     // With Scaffold.extendBody the floating nav bar height is reported as
     // bottom padding, so content always clears it.
     final bottomInset = context.safePadding.bottom + AppDimens.sectionGap;
@@ -230,72 +299,40 @@ class _HomeTab extends StatelessWidget {
                       children: [
                         const _InsightCard(),
                         const SizedBox(height: AppDimens.cardGap),
-                        NutritionSummaryCard(
-                          onViewAll: () {
-                            context.pushNamed('meal-log-history');
-                          },
-                          onScanMeal: onScanMeal,
-                        ),
-                        const SizedBox(height: AppDimens.cardGap),
-                        BlocBuilder<DietPlanCubit, DietPlanState>(
-                          builder: (context, state) {
-                            if (state is DietPlanLoaded) {
-                              return _ActiveDietPlanCard(
-                                plan: state.mealPlan,
-                                onTap: () {
-                                  context.pushNamed('diet-plan-result', extra: {
-                                    'plan': state.mealPlan,
-                                  });
-                                },
+                        BlocListener<MealLogBloc, MealLogState>(
+                          // A newly logged meal moves today's calories bar.
+                          listenWhen: (_, state) => state is MealLogLoaded,
+                          listener: (context, _) =>
+                              context.read<TrendCubit<MealLogEntry>>().load(),
+                          child: BlocBuilder<DietPlanCubit, DietPlanState>(
+                            builder: (context, state) {
+                              final plan =
+                                  state is DietPlanLoaded ? state.mealPlan : null;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  NutritionSummaryCard(
+                                    plan: plan,
+                                    onViewAll: () => _push('meal-log-history'),
+                                    onOpenProgress: () => _push('diet-progress'),
+                                    onScanMeal: onScanMeal,
+                                  ),
+                                  if (plan == null) ...[
+                                    const SizedBox(height: AppDimens.cardGap),
+                                    _DietPlanCard(
+                                      onTap: () => _push('diet-plan-prefs'),
+                                    ),
+                                  ],
+                                ],
                               );
-                            }
-                            return _DietPlanCard(
-                              onTap: () {
-                                context.pushNamed('diet-plan-prefs');
-                              },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AppDimens.sectionGap),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          clipBehavior: Clip.none,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _QuickActionTile(
-                                label: 'Steps',
-                                iconAsset: 'assets/icons/footprints.svg',
-                              ),
-                              const _QuickActionTile(
-                                label: 'Water',
-                                iconAsset: 'assets/icons/drop.svg',
-                              ),
-                              _QuickActionTile(
-                                label: 'Workout',
-                                iconAsset: 'assets/icons/barbell.svg',
-                                onTap: () => context.pushNamed('activity-tracking'),
-                              ),
-                              const _QuickActionTile(
-                                label: 'Mood',
-                                iconAsset: 'assets/icons/smiley.svg',
-                              ),
-                              const _QuickActionTile(
-                                label: 'Sleep',
-                                iconAsset: 'assets/icons/moon_stars.svg',
-                              ),
-                            ],
+                            },
                           ),
                         ),
-                        const SizedBox(height: AppDimens.sectionGap),
-                        Divider(
-                          color: context.vColors.divider,
-                          height: AppDimens.borderThin,
-                          thickness: AppDimens.borderThin,
-                        ),
-                        const SizedBox(height: AppDimens.sectionGap),
-                        const _DashboardSegmentedTabs(),
-                        const SizedBox(height: AppDimens.sectionGap),
+                        const SizedBox(height: AppDimens.cardGap),
+                        const ActivityGoalsCard(),
+                        const SizedBox(height: AppDimens.cardGap),
+                        const StressCheckInCard(),
+                        const SizedBox(height: AppDimens.cardGap),
                         const WaterIntakeCard(),
                         const SizedBox(height: AppDimens.cardGap),
                         const SleepCard(),
@@ -355,157 +392,6 @@ class _InsightCard extends StatelessWidget {
                 ?.copyWith(color: context.colors.onSurface),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Figma quick-action tile: 80w glass tile, 40 icon badge + small 12 label.
-class _QuickActionTile extends StatelessWidget {
-  final String label;
-  final String iconAsset;
-  final VoidCallback? onTap;
-
-  const _QuickActionTile({
-    required this.label,
-    required this.iconAsset,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      width: context.w(AppDimens.quickActionWidth),
-      margin: const EdgeInsets.only(right: AppDimens.space8),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space4,
-        vertical: AppDimens.space20,
-      ),
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(width: double.infinity),
-          AppIconBadge(icon: _SvgIcon(iconAsset)),
-          const SizedBox(height: AppDimens.space12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              maxLines: 1,
-              style: context.text.labelSmall
-                  ?.copyWith(color: context.colors.onSurface),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashboardSegmentedTabs extends StatelessWidget {
-  const _DashboardSegmentedTabs();
-
-  @override
-  Widget build(BuildContext context) {
-    const tabs = ['Move', 'Rest', 'Fuel', 'Vitals'];
-    const selected = 'Rest';
-    final v = context.vColors;
-
-    return Container(
-      padding: const EdgeInsets.all(AppDimens.space8),
-      decoration: BoxDecoration(
-        color: v.glassFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(color: v.glassBorder!),
-      ),
-      child: Row(
-        children: [
-          for (final tab in tabs)
-            Expanded(
-              child: Container(
-                constraints:
-                    const BoxConstraints(minHeight: AppDimens.segmentHeight),
-                alignment: Alignment.center,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppDimens.space4),
-                decoration: BoxDecoration(
-                  color: tab == selected
-                      ? context.colors.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                  boxShadow: tab == selected ? AppShadows.segment : null,
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    tab,
-                    maxLines: 1,
-                    style: context.text.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: tab == selected
-                          ? v.buttonText
-                          : context.colors.onSurface,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SimpleTab extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String? buttonLabel;
-  final VoidCallback? onButtonTap;
-
-  const _SimpleTab({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.buttonLabel,
-    this.onButtonTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.gutter),
-          child: ResponsiveCenter(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIconBadge(
-                  size: AppDimens.iconBadgeLarge * 2,
-                  icon: Icon(icon),
-                ),
-                const SizedBox(height: AppDimens.space16),
-                Text(title, style: context.text.headlineSmall),
-                const SizedBox(height: AppDimens.space8),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  style: context.text.bodyMedium
-                      ?.copyWith(color: context.vColors.grayText),
-                ),
-                if (buttonLabel != null && onButtonTap != null) ...[
-                  const SizedBox(height: AppDimens.sectionGap),
-                  AppPrimaryButton(
-                    label: buttonLabel!,
-                    onTap: onButtonTap!,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -572,31 +458,6 @@ class _DietPlanCard extends StatelessWidget {
         accent: context.colors.primary,
         title: 'AI Diet Plan',
         subtitle: 'Generate your personalized meal plan',
-      ),
-    );
-  }
-}
-
-class _ActiveDietPlanCard extends StatelessWidget {
-  final dynamic plan;
-  final VoidCallback onTap;
-
-  const _ActiveDietPlanCard({required this.plan, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      tint: v.successTint,
-      borderColor: v.success!.withValues(alpha: 0.3),
-      onTap: onTap,
-      child: _DietPlanRow(
-        icon: Icons.restaurant,
-        accent: v.success!,
-        title: 'Active Diet Plan',
-        subtitle: '${plan.totalCalories} kcal • ${plan.meals.length} meals',
       ),
     );
   }
