@@ -197,6 +197,22 @@ class AppDimens {
   static const double confettiParticle = 6.0;
   static const double confettiSpread = 90.0;
 
+  /// Gamification: level ring on the score card, badge grid tiles,
+  /// leaderboard podium avatars and rank column.
+  static const double levelRing = 72.0;
+  static const double levelRingStroke = 7.0;
+  static const double badgeTile = 56.0;
+  static const double badgeGridMinWidth = 104.0;
+  static const double badgeTileAspect = 0.8;
+  static const double badgeLockedOpacity = 0.35;
+  static const double podiumAvatarFirst = 64.0;
+  static const double podiumAvatarOther = 52.0;
+  static const double podiumStepFirst = 72.0;
+  static const double podiumStepSecond = 52.0;
+  static const double podiumStepThird = 40.0;
+  static const double rankColumnWidth = 32.0;
+  static const double celebrationBadge = 96.0;
+
   // ---------------------------------------------------------------------------
   // Auth
   // ---------------------------------------------------------------------------
