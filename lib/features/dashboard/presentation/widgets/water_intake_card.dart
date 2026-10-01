@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/water_wave_animation.dart';
@@ -199,6 +199,8 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     );
   }
 
+  static const _minGoalMl = 500;
+
   void _showEditGoalSheet(BuildContext context, int currentGoal) {
     final controller = TextEditingController(text: currentGoal.toString());
     _showNumberInputSheet(
@@ -207,9 +209,11 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
       controller: controller,
       onSave: () {
         final val = int.tryParse(controller.text);
-        if (val != null && val > 0) {
-          context.read<WaterIntakeCubit>().updateGoal(val);
+        if (val == null || val < _minGoalMl) {
+          return 'Set a goal of at least $_minGoalMl ml';
         }
+        context.read<WaterIntakeCubit>().updateGoal(val);
+        return null;
       },
     );
   }
@@ -222,9 +226,9 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
       controller: controller,
       onSave: () {
         final val = int.tryParse(controller.text);
-        if (val != null && val > 0) {
-          context.read<WaterIntakeCubit>().addWater(val);
-        }
+        if (val == null || val <= 0) return 'Enter an amount in ml';
+        context.read<WaterIntakeCubit>().addWater(val);
+        return null;
       },
     );
   }
@@ -233,7 +237,7 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     required BuildContext context,
     required String title,
     required TextEditingController controller,
-    required VoidCallback onSave,
+    required String? Function() onSave,
   }) {
     showAppBottomSheet(
       context: context,
@@ -247,11 +251,12 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
 }
 
 /// Figma `track/edit/water`: title + close, divider, "Value" field with a
-/// unit suffix, Cancel / Save row.
-class _NumberInputSheet extends StatelessWidget {
+/// unit suffix, Cancel / Save row. [onSave] returns an error message to
+/// show on the field (the sheet stays open), or null to close.
+class _NumberInputSheet extends StatefulWidget {
   final String title;
   final TextEditingController controller;
-  final VoidCallback onSave;
+  final String? Function() onSave;
 
   const _NumberInputSheet({
     required this.title,
@@ -260,7 +265,24 @@ class _NumberInputSheet extends StatelessWidget {
   });
 
   @override
+  State<_NumberInputSheet> createState() => _NumberInputSheetState();
+}
+
+class _NumberInputSheetState extends State<_NumberInputSheet> {
+  String? _error;
+
+  void _save() {
+    final error = widget.onSave();
+    if (error == null) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _error = error);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final title = widget.title;
     return SafeArea(
       top: false,
       child: Padding(
@@ -289,14 +311,17 @@ class _NumberInputSheet extends StatelessWidget {
             const SizedBox(height: AppDimens.space8),
             Divider(height: AppDimens.borderThin, color: context.vColors.divider),
             const SizedBox(height: AppDimens.sectionGap),
-            Text('Value', style: context.text.titleSmall),
-            const SizedBox(height: AppDimens.inputLabelGap),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            AppTextField.integer(
+              label: 'Value',
+              controller: widget.controller,
+              hint: '0',
+              suffixText: 'ml',
               autofocus: true,
-              decoration: const InputDecoration(hintText: '0', suffixText: 'ml'),
+              error: _error,
+              onSubmitted: (_) => _save(),
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
             ),
             const SizedBox(height: AppDimens.sectionGap),
             Row(
@@ -311,10 +336,7 @@ class _NumberInputSheet extends StatelessWidget {
                 Expanded(
                   child: AppPrimaryButton(
                     label: 'Save',
-                    onTap: () {
-                      onSave();
-                      Navigator.pop(context);
-                    },
+                    onTap: _save,
                   ),
                 ),
               ],

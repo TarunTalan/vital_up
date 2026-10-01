@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -1210,25 +1211,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
-  /// Figma `input/text`: label (body 16 med) 6dp above the field.
-  Widget _labeled(String? label, Widget field) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.space16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (label != null) ...[
-            Text(label, style: context.text.titleSmall),
-            const SizedBox(height: AppDimens.inputLabelGap),
-          ],
-          field,
-        ],
-      ),
-    );
-  }
-
-  Icon _prefixIcon(IconData icon) =>
-      Icon(icon, color: context.colors.primary, size: AppDimens.iconMd);
+  /// Standard 16dp gap below each profile field.
+  Widget _spaced(Widget field) => Padding(
+        padding: const EdgeInsets.only(bottom: AppDimens.space16),
+        child: field,
+      );
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -1240,29 +1227,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     String placeholder = '',
     String? Function(String?)? validator,
   }) {
-    return _labeled(
-      label,
-      TextFormField(
+    return _spaced(
+      AppTextField(
         controller: controller,
+        label: label,
+        hint: placeholder,
+        prefixIcon: icon,
         enabled: enabled,
         keyboardType: keyboardType,
-        validator: validator,
-        style: context.text.bodyLarge?.copyWith(
-          color: enabled ? null : context.vColors.grayText,
-        ),
-        decoration: InputDecoration(
-          hintText: placeholder,
-          prefixIcon: _prefixIcon(icon),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.space16,
-            vertical: AppDimens.space12,
-          ),
-          suffixIcon: suffix == null ? null : Center(widthFactor: 1, child: suffix),
-          suffixIconConstraints: const BoxConstraints(
-            minWidth: AppDimens.space40,
-            minHeight: AppDimens.space40,
-          ),
-        ),
+        suffix: suffix,
+        validator: validator == null ? null : (value) => validator(value),
       ),
     );
   }
@@ -1272,23 +1246,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required String value,
     required IconData icon,
   }) {
-    final grey = context.vColors.grayText;
-    return _labeled(
-      label,
-      InputDecorator(
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: grey, size: AppDimens.iconMd),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.space16,
-            vertical: AppDimens.space12,
-          ),
-        ),
-        child: Text(
-          value.isNotEmpty ? value : 'N/A',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.bodyLarge?.copyWith(color: grey),
-        ),
+    return _spaced(
+      AppDisplayField(
+        label: label,
+        value: value,
+        placeholder: 'N/A',
+        prefixIcon: icon,
       ),
     );
   }
@@ -1301,25 +1264,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     bool enabled = true,
     String? Function(String?)? validator,
   }) {
-    return _labeled(
-      label,
-      TextFormField(
+    return _spaced(
+      AppTextField(
         controller: controller,
+        label: label,
+        prefixIcon: icon,
         enabled: enabled,
         readOnly: true,
-        validator: validator,
         onTap: enabled ? () => _selectDate(context) : null,
-        style: context.text.bodyLarge?.copyWith(
-          color: enabled ? null : context.vColors.grayText,
-        ),
-        decoration: InputDecoration(
-          prefixIcon: _prefixIcon(icon),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.space16,
-            vertical: AppDimens.space12,
-          ),
-          suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
-        ),
+        suffix: const Icon(Icons.arrow_drop_down_rounded),
+        validator: validator == null ? null : (value) => validator(value),
       ),
     );
   }
@@ -1332,29 +1286,14 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required ValueChanged<String?> onChanged,
     bool enabled = true,
   }) {
-    final displayValue = items.contains(value) ? value : (items.isNotEmpty ? items.first : '');
-
-    return _labeled(
-      label,
-      DropdownButtonFormField<String>(
-        initialValue: displayValue.isEmpty ? null : displayValue,
+    return _spaced(
+      AppDropdownField<String>(
+        label: label,
+        value: items.contains(value) ? value : items.firstOrNull,
+        items: items,
+        itemLabel: (item) => item,
+        prefixIcon: icon,
         onChanged: enabled ? onChanged : null,
-        isExpanded: true,
-        style: context.text.bodyLarge?.copyWith(color: context.colors.onSurface),
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        decoration: InputDecoration(
-          prefixIcon: _prefixIcon(icon),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.space16,
-            vertical: AppDimens.space12,
-          ),
-        ),
-        items: items.map<DropdownMenuItem<String>>((String val) {
-          return DropdownMenuItem<String>(
-            value: val,
-            child: Text(val, overflow: TextOverflow.ellipsis),
-          );
-        }).toList(),
       ),
     );
   }
@@ -1364,31 +1303,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    final displayValue = items.contains(value) ? value : (items.isNotEmpty ? items.first : '');
-
-    return _labeled(
-      null,
-      DropdownButtonFormField<String>(
-        initialValue: displayValue.isEmpty ? null : displayValue,
+    return _spaced(
+      AppDropdownField<String>(
+        value: items.contains(value) ? value : items.firstOrNull,
+        items: items,
+        itemLabel: (item) => item,
         onChanged: onChanged,
-        isExpanded: true, // This prevents RenderFlex overflow in narrow spaces
-        style: context.text.bodyLarge?.copyWith(color: context.colors.onSurface),
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        decoration: const InputDecoration(
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: AppDimens.space12,
-            vertical: AppDimens.space12,
-          ),
-        ),
-        items: items.map<DropdownMenuItem<String>>((String val) {
-          return DropdownMenuItem<String>(
-            value: val,
-            child: Text(
-              val,
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }).toList(),
       ),
     );
   }

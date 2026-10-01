@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
-import 'package:vital_up/features/diet_plan/presentation/widgets/diet_plan_number_field.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 
 class GoalSetupPage extends StatefulWidget {
   final Map<String, dynamic> preferences;
@@ -19,6 +18,8 @@ class GoalSetupPage extends StatefulWidget {
 class _GoalSetupPageState extends State<GoalSetupPage> {
   final _weightController = TextEditingController();
   final _timeframeController = TextEditingController(text: '4'); // default 4 weeks
+  String? _weightError;
+  String? _timeframeError;
 
   @override
   void dispose() {
@@ -31,10 +32,14 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
     final weight = double.tryParse(_weightController.text);
     final timeframe = int.tryParse(_timeframeController.text);
 
-    if (weight == null || weight <= 0 || timeframe == null || timeframe <= 0) {
-      showErrorSnackBar(context, 'Please enter valid positive numbers');
-      return;
-    }
+    setState(() {
+      _weightError =
+          weight == null || weight <= 0 ? 'Enter your target weight' : null;
+      _timeframeError = timeframe == null || timeframe < 1
+          ? 'Enter at least 1 week'
+          : null;
+    });
+    if (_weightError != null || _timeframeError != null) return;
 
     context.pushNamed(
       'diet-plan-result',
@@ -56,21 +61,36 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DietPlanNumberField(
-            label: 'What is your target weight?',
-            labelStyle: headingStyle,
+          Text('What is your target weight?', style: headingStyle),
+          const SizedBox(height: AppDimens.space12),
+          AppTextField.decimal(
             controller: _weightController,
             hint: 'e.g. 65',
-            suffix: 'kg',
-            decimal: true,
+            suffixText: 'kg',
+            error: _weightError,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (_weightError != null) setState(() => _weightError = null);
+            },
           ),
           const SizedBox(height: AppDimens.sectionGap),
-          DietPlanNumberField(
-            label: 'In how many weeks do you want to achieve this?',
-            labelStyle: headingStyle,
+          Text(
+            'In how many weeks do you want to achieve this?',
+            style: headingStyle,
+          ),
+          const SizedBox(height: AppDimens.space12),
+          AppTextField.integer(
             controller: _timeframeController,
             hint: 'e.g. 4',
-            suffix: 'weeks',
+            suffixText: 'weeks',
+            error: _timeframeError,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            onChanged: (_) {
+              if (_timeframeError != null) {
+                setState(() => _timeframeError = null);
+              }
+            },
           ),
         ],
       ),
