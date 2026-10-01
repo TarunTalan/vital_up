@@ -86,6 +86,29 @@ class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
                   ),
                   onTap: _askVita,
                 ),
+                const SizedBox(height: AppDimens.space12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppSecondaryButton(
+                        label: 'Edit plan',
+                        onTap: () async {
+                          final cubit = context.read<DietPlanCubit>();
+                          final saved =
+                              await context.pushNamed<bool>('diet-plan-edit');
+                          if (saved == true) cubit.loadActiveMealPlan();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppDimens.cardGap),
+                    Expanded(
+                      child: AppSecondaryButton(
+                        label: 'Create new plan',
+                        onTap: () => context.pushNamed('diet-plan-prefs'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             );
           },

@@ -30,6 +30,7 @@ import 'package:vital_up/features/onboarding/presentation/pages/personal_details
 import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_mode_select_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_preferences_page.dart';
+import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_edit_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
@@ -329,6 +330,14 @@ class AppRouter {
             child: ManualTargetPage(preferences: extra),
           );
         },
+      ),
+      GoRoute(
+        path: '/diet-plan-edit',
+        name: 'diet-plan-edit',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const DietPlanEditPage(),
+        ),
       ),
       GoRoute(
         path: '/diet-plan-result',
