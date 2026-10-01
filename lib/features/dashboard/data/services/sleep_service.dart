@@ -8,11 +8,13 @@ import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import '../../../../core/database/isar_service.dart';
 import '../../../../core/database/collections/sleep_log_cache.dart';
+import '../../../../core/sync/sync_hooks.dart';
 import '../../domain/entities/sleep_session_info.dart';
 
 class SleepService {
   final IsarService _isarService;
   final SharedPreferences _prefs;
+  final SyncHooks? _sync;
   late final Health _health;
 
   static const _goalKey = 'daily_sleep_goal_min';
@@ -21,7 +23,7 @@ class SleepService {
   /// Manual logs written before entries were tied to the signed-in user.
   static const _legacyUserId = 'current_user';
 
-  SleepService(this._isarService, this._prefs) {
+  SleepService(this._isarService, this._prefs, [this._sync]) {
     _health = Health();
   }
 
@@ -234,6 +236,7 @@ class SleepService {
     await _isarService.isar.writeTxn(() async {
       await _isarService.isar.sleepLogCaches.put(log);
     });
+    _sync?.schedule();
     
     return SleepSessionInfo(
       bedTime: bedTime,

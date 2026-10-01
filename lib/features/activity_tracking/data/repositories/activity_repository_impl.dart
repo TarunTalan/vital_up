@@ -4,11 +4,13 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_ses
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
+import 'package:vital_up/core/sync/sync_hooks.dart';
 
 class ActivityRepositoryImpl implements ActivityRepository {
   final AppDatabase database;
+  final SyncHooks? sync;
 
-  ActivityRepositoryImpl(this.database);
+  ActivityRepositoryImpl(this.database, [this.sync]);
 
   @override
   Future<void> saveSession(ActivitySession session) async {
@@ -39,6 +41,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
     )).toList();
 
     await database.saveSessionWithPoints(dbSession, dbPoints);
+    // Checkpoints of a workout still recording aren't uploaded.
+    if (session.endTime != null) sync?.schedule();
   }
 
   @override
@@ -62,7 +66,9 @@ class ActivityRepositoryImpl implements ActivityRepository {
 
   @override
   Future<void> deleteSession(String id) async {
+    final wasSynced = (await database.getSession(id))?.synced ?? false;
     await database.deleteSession(id);
+    if (wasSynced) await sync?.recordDelete('activity_sessions', id);
   }
 
   @override

@@ -22,6 +22,9 @@ class DriftActivitySessions extends Table {
   RealColumn get targetValue => real().nullable()();
   BoolColumn get targetAchieved => boolean().nullable().withDefault(const Constant(false))();
 
+  /// Uploaded to `activity_sessions` (SyncService). Reset on every save.
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -45,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -73,6 +76,12 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             await m.addColumn(driftTrackPoints, driftTrackPoints.altitude);
           }
+          if (from < 5) {
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.synced,
+            );
+          }
         },
         beforeOpen: (details) async {
           // SQLite ships with foreign keys off; without this the cascade on
@@ -87,12 +96,14 @@ class AppDatabase extends _$AppDatabase {
     await delete(driftActivitySessions).go();
   });
 
-  // Insert or update an activity session
-  Future<int> saveSession(DriftActivitySession session) => 
-      into(driftActivitySessions).insertOnConflictUpdate(session);
+  // Insert or update an activity session. Any local change needs uploading.
+  Future<int> saveSession(DriftActivitySession session) =>
+      into(driftActivitySessions)
+          .insertOnConflictUpdate(session.copyWith(synced: false));
 
   Future<int> saveSessionCompanion(DriftActivitySessionsCompanion session) =>
-      into(driftActivitySessions).insertOnConflictUpdate(session);
+      into(driftActivitySessions)
+          .insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
 
   // Insert a track point
   Future<int> saveTrackPoint(DriftTrackPoint point) => 
@@ -132,7 +143,30 @@ class AppDatabase extends _$AppDatabase {
     List<DriftTrackPointsCompanion> points,
   ) async {
     await transaction(() async {
-      await into(driftActivitySessions).insertOnConflictUpdate(session);
+      await into(driftActivitySessions)
+          .insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
+      await replaceTrackPointsForSession(session.id.value, points);
+    });
+  }
+
+  /// Finished workouts not uploaded yet.
+  Future<List<DriftActivitySession>> unsyncedFinishedSessions() =>
+      (select(driftActivitySessions)
+            ..where((t) => t.synced.equals(false) & t.endTime.isNotNull()))
+          .get();
+
+  Future<void> markSessionsSynced(Iterable<String> ids) =>
+      (update(driftActivitySessions)..where((t) => t.id.isIn(ids)))
+          .write(const DriftActivitySessionsCompanion(synced: Value(true)));
+
+  /// Stores a workout downloaded from the cloud, already in sync.
+  Future<void> saveSyncedSession(
+    DriftActivitySessionsCompanion session,
+    List<DriftTrackPointsCompanion> points,
+  ) async {
+    await transaction(() async {
+      await into(driftActivitySessions)
+          .insertOnConflictUpdate(session.copyWith(synced: const Value(true)));
       await replaceTrackPointsForSession(session.id.value, points);
     });
   }
@@ -160,7 +194,7 @@ class AppDatabase extends _$AppDatabase {
     await transaction(() async {
       await customStatement(
         "UPDATE drift_activity_sessions "
-        "SET end_time = start_time + total_duration_seconds "
+        "SET end_time = start_time + total_duration_seconds, synced = 0 "
         "WHERE end_time IS NULL",
       );
       await customStatement(

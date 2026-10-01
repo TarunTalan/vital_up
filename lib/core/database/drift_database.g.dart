@@ -154,6 +154,19 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _syncedMeta = const VerificationMeta('synced');
+  @override
+  late final GeneratedColumn<bool> synced = GeneratedColumn<bool>(
+    'synced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("synced" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -169,6 +182,7 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
     targetType,
     targetValue,
     targetAchieved,
+    synced,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -294,6 +308,12 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
         ),
       );
     }
+    if (data.containsKey('synced')) {
+      context.handle(
+        _syncedMeta,
+        synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
+      );
+    }
     return context;
   }
 
@@ -355,6 +375,10 @@ class $DriftActivitySessionsTable extends DriftActivitySessions
         DriftSqlType.bool,
         data['${effectivePrefix}target_achieved'],
       ),
+      synced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}synced'],
+      )!,
     );
   }
 
@@ -379,6 +403,9 @@ class DriftActivitySession extends DataClass
   final String? targetType;
   final double? targetValue;
   final bool? targetAchieved;
+
+  /// Uploaded to `activity_sessions` (SyncService). Reset on every save.
+  final bool synced;
   const DriftActivitySession({
     required this.id,
     required this.activityType,
@@ -393,6 +420,7 @@ class DriftActivitySession extends DataClass
     this.targetType,
     this.targetValue,
     this.targetAchieved,
+    required this.synced,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -418,6 +446,7 @@ class DriftActivitySession extends DataClass
     if (!nullToAbsent || targetAchieved != null) {
       map['target_achieved'] = Variable<bool>(targetAchieved);
     }
+    map['synced'] = Variable<bool>(synced);
     return map;
   }
 
@@ -444,6 +473,7 @@ class DriftActivitySession extends DataClass
       targetAchieved: targetAchieved == null && nullToAbsent
           ? const Value.absent()
           : Value(targetAchieved),
+      synced: Value(synced),
     );
   }
 
@@ -472,6 +502,7 @@ class DriftActivitySession extends DataClass
       targetType: serializer.fromJson<String?>(json['targetType']),
       targetValue: serializer.fromJson<double?>(json['targetValue']),
       targetAchieved: serializer.fromJson<bool?>(json['targetAchieved']),
+      synced: serializer.fromJson<bool>(json['synced']),
     );
   }
   @override
@@ -491,6 +522,7 @@ class DriftActivitySession extends DataClass
       'targetType': serializer.toJson<String?>(targetType),
       'targetValue': serializer.toJson<double?>(targetValue),
       'targetAchieved': serializer.toJson<bool?>(targetAchieved),
+      'synced': serializer.toJson<bool>(synced),
     };
   }
 
@@ -508,6 +540,7 @@ class DriftActivitySession extends DataClass
     Value<String?> targetType = const Value.absent(),
     Value<double?> targetValue = const Value.absent(),
     Value<bool?> targetAchieved = const Value.absent(),
+    bool? synced,
   }) => DriftActivitySession(
     id: id ?? this.id,
     activityType: activityType ?? this.activityType,
@@ -524,6 +557,7 @@ class DriftActivitySession extends DataClass
     targetAchieved: targetAchieved.present
         ? targetAchieved.value
         : this.targetAchieved,
+    synced: synced ?? this.synced,
   );
   DriftActivitySession copyWithCompanion(DriftActivitySessionsCompanion data) {
     return DriftActivitySession(
@@ -556,6 +590,7 @@ class DriftActivitySession extends DataClass
       targetAchieved: data.targetAchieved.present
           ? data.targetAchieved.value
           : this.targetAchieved,
+      synced: data.synced.present ? data.synced.value : this.synced,
     );
   }
 
@@ -574,7 +609,8 @@ class DriftActivitySession extends DataClass
           ..write('stepCountReliable: $stepCountReliable, ')
           ..write('targetType: $targetType, ')
           ..write('targetValue: $targetValue, ')
-          ..write('targetAchieved: $targetAchieved')
+          ..write('targetAchieved: $targetAchieved, ')
+          ..write('synced: $synced')
           ..write(')'))
         .toString();
   }
@@ -594,6 +630,7 @@ class DriftActivitySession extends DataClass
     targetType,
     targetValue,
     targetAchieved,
+    synced,
   );
   @override
   bool operator ==(Object other) =>
@@ -611,7 +648,8 @@ class DriftActivitySession extends DataClass
           other.stepCountReliable == this.stepCountReliable &&
           other.targetType == this.targetType &&
           other.targetValue == this.targetValue &&
-          other.targetAchieved == this.targetAchieved);
+          other.targetAchieved == this.targetAchieved &&
+          other.synced == this.synced);
 }
 
 class DriftActivitySessionsCompanion
@@ -629,6 +667,7 @@ class DriftActivitySessionsCompanion
   final Value<String?> targetType;
   final Value<double?> targetValue;
   final Value<bool?> targetAchieved;
+  final Value<bool> synced;
   final Value<int> rowid;
   const DriftActivitySessionsCompanion({
     this.id = const Value.absent(),
@@ -644,6 +683,7 @@ class DriftActivitySessionsCompanion
     this.targetType = const Value.absent(),
     this.targetValue = const Value.absent(),
     this.targetAchieved = const Value.absent(),
+    this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftActivitySessionsCompanion.insert({
@@ -660,6 +700,7 @@ class DriftActivitySessionsCompanion
     this.targetType = const Value.absent(),
     this.targetValue = const Value.absent(),
     this.targetAchieved = const Value.absent(),
+    this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        activityType = Value(activityType),
@@ -683,6 +724,7 @@ class DriftActivitySessionsCompanion
     Expression<String>? targetType,
     Expression<double>? targetValue,
     Expression<bool>? targetAchieved,
+    Expression<bool>? synced,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -702,6 +744,7 @@ class DriftActivitySessionsCompanion
       if (targetType != null) 'target_type': targetType,
       if (targetValue != null) 'target_value': targetValue,
       if (targetAchieved != null) 'target_achieved': targetAchieved,
+      if (synced != null) 'synced': synced,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -720,6 +763,7 @@ class DriftActivitySessionsCompanion
     Value<String?>? targetType,
     Value<double?>? targetValue,
     Value<bool?>? targetAchieved,
+    Value<bool>? synced,
     Value<int>? rowid,
   }) {
     return DriftActivitySessionsCompanion(
@@ -736,6 +780,7 @@ class DriftActivitySessionsCompanion
       targetType: targetType ?? this.targetType,
       targetValue: targetValue ?? this.targetValue,
       targetAchieved: targetAchieved ?? this.targetAchieved,
+      synced: synced ?? this.synced,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -784,6 +829,9 @@ class DriftActivitySessionsCompanion
     if (targetAchieved.present) {
       map['target_achieved'] = Variable<bool>(targetAchieved.value);
     }
+    if (synced.present) {
+      map['synced'] = Variable<bool>(synced.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -806,6 +854,7 @@ class DriftActivitySessionsCompanion
           ..write('targetType: $targetType, ')
           ..write('targetValue: $targetValue, ')
           ..write('targetAchieved: $targetAchieved, ')
+          ..write('synced: $synced, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1356,6 +1405,7 @@ typedef $$DriftActivitySessionsTableCreateCompanionBuilder =
       Value<String?> targetType,
       Value<double?> targetValue,
       Value<bool?> targetAchieved,
+      Value<bool> synced,
       Value<int> rowid,
     });
 typedef $$DriftActivitySessionsTableUpdateCompanionBuilder =
@@ -1373,6 +1423,7 @@ typedef $$DriftActivitySessionsTableUpdateCompanionBuilder =
       Value<String?> targetType,
       Value<double?> targetValue,
       Value<bool?> targetAchieved,
+      Value<bool> synced,
       Value<int> rowid,
     });
 
@@ -1484,6 +1535,11 @@ class $$DriftActivitySessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> driftTrackPointsRefs(
     Expression<bool> Function($$DriftTrackPointsTableFilterComposer f) f,
   ) {
@@ -1583,6 +1639,11 @@ class $$DriftActivitySessionsTableOrderingComposer
     column: $table.targetAchieved,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftActivitySessionsTableAnnotationComposer
@@ -1648,6 +1709,9 @@ class $$DriftActivitySessionsTableAnnotationComposer
     column: $table.targetAchieved,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get synced =>
+      $composableBuilder(column: $table.synced, builder: (column) => column);
 
   Expression<T> driftTrackPointsRefs<T extends Object>(
     Expression<T> Function($$DriftTrackPointsTableAnnotationComposer a) f,
@@ -1727,6 +1791,7 @@ class $$DriftActivitySessionsTableTableManager
                 Value<String?> targetType = const Value.absent(),
                 Value<double?> targetValue = const Value.absent(),
                 Value<bool?> targetAchieved = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftActivitySessionsCompanion(
                 id: id,
@@ -1742,6 +1807,7 @@ class $$DriftActivitySessionsTableTableManager
                 targetType: targetType,
                 targetValue: targetValue,
                 targetAchieved: targetAchieved,
+                synced: synced,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1759,6 +1825,7 @@ class $$DriftActivitySessionsTableTableManager
                 Value<String?> targetType = const Value.absent(),
                 Value<double?> targetValue = const Value.absent(),
                 Value<bool?> targetAchieved = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftActivitySessionsCompanion.insert(
                 id: id,
@@ -1774,6 +1841,7 @@ class $$DriftActivitySessionsTableTableManager
                 targetType: targetType,
                 targetValue: targetValue,
                 targetAchieved: targetAchieved,
+                synced: synced,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

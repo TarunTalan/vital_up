@@ -37,4 +37,7 @@ class MealLogCache {
   late bool userConfirmed;
 
   DateTime? createdAt;
+
+  /// Uploaded to `meal_logs` (SyncService).
+  bool isSynced = false;
 }

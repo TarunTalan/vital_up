@@ -2,15 +2,18 @@ import 'package:isar_community/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/sync/sync_adapters.dart';
+import 'package:vital_up/core/sync/sync_hooks.dart';
 
 class WaterIntakeService {
   final IsarService _isarService;
   final SharedPreferences _prefs;
+  final SyncHooks? _sync;
 
   static const _dailyGoalKey = 'daily_water_goal';
   static const _defaultGoalMl = 2500;
 
-  WaterIntakeService(this._isarService, this._prefs);
+  WaterIntakeService(this._isarService, this._prefs, [this._sync]);
 
   Isar get _isar => _isarService.isar;
 
@@ -35,14 +38,22 @@ class WaterIntakeService {
     await _isar.writeTxn(() async {
       await _isar.waterLogCaches.put(log);
     });
+    _sync?.schedule();
     return log;
   }
 
   /// Delete a water intake entry by id (used for undo/delete)
   Future<void> deleteWaterLog(int id) async {
+    final log = await _isar.waterLogCaches.get(id);
     await _isar.writeTxn(() async {
       await _isar.waterLogCaches.delete(id);
     });
+    if (log != null && log.isSynced) {
+      await _sync?.recordDelete(
+        'water_logs',
+        syncId('water', log.userId, log.timestamp),
+      );
+    }
   }
 
   /// Water logs in [from, to) for a user, oldest first.

@@ -6,6 +6,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
@@ -61,6 +62,9 @@ void main() async {
     await sl<RemindersService>().resync();
 
     CrashReporter.watchUser(sl<SupabaseClient>());
+
+    // Back up logs to the cloud and bring back ones from other devices.
+    sl<SyncService>().start();
 
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();

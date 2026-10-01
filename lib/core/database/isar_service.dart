@@ -15,6 +15,7 @@ import 'package:vital_up/core/database/collections/downloaded_track.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 import 'package:vital_up/core/database/collections/barcode_cache.dart';
 import 'package:vital_up/core/database/collections/offline_food.dart';
+import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 
 class IsarService {
   late final Isar isar;
@@ -35,6 +36,7 @@ class IsarService {
         MealLogCacheSchema,
         BarcodeCacheSchema,
         OfflineFoodSchema,
+        WeightLogCacheSchema,
       ],
       directory: dir.path,
     );
@@ -54,6 +56,7 @@ class IsarService {
     await isar.favoriteAudios.clear();
     await isar.downloadedTracks.clear();
     await isar.mealLogCaches.clear();
+    await isar.weightLogCaches.clear();
   });
 
   Future<void> _seedOfflineFoods() async {

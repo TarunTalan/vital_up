@@ -32,84 +32,85 @@ const MealLogCacheSchema = CollectionSchema(
       name: r'imagePath',
       type: IsarType.string,
     ),
+    r'isSynced': PropertySchema(id: 3, name: r'isSynced', type: IsarType.bool),
     r'itemConfidences': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'itemConfidences',
       type: IsarType.doubleList,
     ),
     r'itemIds': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'itemIds',
       type: IsarType.stringList,
     ),
     r'itemNames': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'itemNames',
       type: IsarType.stringList,
     ),
     r'itemQuantities': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'itemQuantities',
       type: IsarType.doubleList,
     ),
     r'itemServingDescriptions': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'itemServingDescriptions',
       type: IsarType.stringList,
     ),
     r'itemUnits': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'itemUnits',
       type: IsarType.stringList,
     ),
     r'mealLogId': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'mealLogId',
       type: IsarType.string,
     ),
-    r'mealType': PropertySchema(id: 10, name: r'mealType', type: IsarType.long),
+    r'mealType': PropertySchema(id: 11, name: r'mealType', type: IsarType.long),
     r'nutritionCalories': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'nutritionCalories',
       type: IsarType.doubleList,
     ),
     r'nutritionCarbsG': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'nutritionCarbsG',
       type: IsarType.doubleList,
     ),
     r'nutritionFatG': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'nutritionFatG',
       type: IsarType.doubleList,
     ),
     r'nutritionFiberG': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'nutritionFiberG',
       type: IsarType.doubleList,
     ),
     r'nutritionProteinG': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'nutritionProteinG',
       type: IsarType.doubleList,
     ),
     r'nutritionSodiumMg': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'nutritionSodiumMg',
       type: IsarType.doubleList,
     ),
     r'nutritionSugarG': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'nutritionSugarG',
       type: IsarType.doubleList,
     ),
     r'totalCalories': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'totalCalories',
       type: IsarType.double,
     ),
     r'userConfirmed': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'userConfirmed',
       type: IsarType.bool,
     ),
@@ -227,23 +228,24 @@ void _mealLogCacheSerialize(
   writer.writeDateTime(offsets[0], object.capturedAt);
   writer.writeDateTime(offsets[1], object.createdAt);
   writer.writeString(offsets[2], object.imagePath);
-  writer.writeDoubleList(offsets[3], object.itemConfidences);
-  writer.writeStringList(offsets[4], object.itemIds);
-  writer.writeStringList(offsets[5], object.itemNames);
-  writer.writeDoubleList(offsets[6], object.itemQuantities);
-  writer.writeStringList(offsets[7], object.itemServingDescriptions);
-  writer.writeStringList(offsets[8], object.itemUnits);
-  writer.writeString(offsets[9], object.mealLogId);
-  writer.writeLong(offsets[10], object.mealType);
-  writer.writeDoubleList(offsets[11], object.nutritionCalories);
-  writer.writeDoubleList(offsets[12], object.nutritionCarbsG);
-  writer.writeDoubleList(offsets[13], object.nutritionFatG);
-  writer.writeDoubleList(offsets[14], object.nutritionFiberG);
-  writer.writeDoubleList(offsets[15], object.nutritionProteinG);
-  writer.writeDoubleList(offsets[16], object.nutritionSodiumMg);
-  writer.writeDoubleList(offsets[17], object.nutritionSugarG);
-  writer.writeDouble(offsets[18], object.totalCalories);
-  writer.writeBool(offsets[19], object.userConfirmed);
+  writer.writeBool(offsets[3], object.isSynced);
+  writer.writeDoubleList(offsets[4], object.itemConfidences);
+  writer.writeStringList(offsets[5], object.itemIds);
+  writer.writeStringList(offsets[6], object.itemNames);
+  writer.writeDoubleList(offsets[7], object.itemQuantities);
+  writer.writeStringList(offsets[8], object.itemServingDescriptions);
+  writer.writeStringList(offsets[9], object.itemUnits);
+  writer.writeString(offsets[10], object.mealLogId);
+  writer.writeLong(offsets[11], object.mealType);
+  writer.writeDoubleList(offsets[12], object.nutritionCalories);
+  writer.writeDoubleList(offsets[13], object.nutritionCarbsG);
+  writer.writeDoubleList(offsets[14], object.nutritionFatG);
+  writer.writeDoubleList(offsets[15], object.nutritionFiberG);
+  writer.writeDoubleList(offsets[16], object.nutritionProteinG);
+  writer.writeDoubleList(offsets[17], object.nutritionSodiumMg);
+  writer.writeDoubleList(offsets[18], object.nutritionSugarG);
+  writer.writeDouble(offsets[19], object.totalCalories);
+  writer.writeBool(offsets[20], object.userConfirmed);
 }
 
 MealLogCache _mealLogCacheDeserialize(
@@ -257,23 +259,24 @@ MealLogCache _mealLogCacheDeserialize(
   object.createdAt = reader.readDateTimeOrNull(offsets[1]);
   object.id = id;
   object.imagePath = reader.readString(offsets[2]);
-  object.itemConfidences = reader.readDoubleList(offsets[3]) ?? [];
-  object.itemIds = reader.readStringList(offsets[4]) ?? [];
-  object.itemNames = reader.readStringList(offsets[5]) ?? [];
-  object.itemQuantities = reader.readDoubleList(offsets[6]) ?? [];
-  object.itemServingDescriptions = reader.readStringList(offsets[7]) ?? [];
-  object.itemUnits = reader.readStringList(offsets[8]) ?? [];
-  object.mealLogId = reader.readString(offsets[9]);
-  object.mealType = reader.readLong(offsets[10]);
-  object.nutritionCalories = reader.readDoubleList(offsets[11]) ?? [];
-  object.nutritionCarbsG = reader.readDoubleList(offsets[12]) ?? [];
-  object.nutritionFatG = reader.readDoubleList(offsets[13]) ?? [];
-  object.nutritionFiberG = reader.readDoubleList(offsets[14]) ?? [];
-  object.nutritionProteinG = reader.readDoubleList(offsets[15]) ?? [];
-  object.nutritionSodiumMg = reader.readDoubleList(offsets[16]) ?? [];
-  object.nutritionSugarG = reader.readDoubleList(offsets[17]) ?? [];
-  object.totalCalories = reader.readDouble(offsets[18]);
-  object.userConfirmed = reader.readBool(offsets[19]);
+  object.isSynced = reader.readBool(offsets[3]);
+  object.itemConfidences = reader.readDoubleList(offsets[4]) ?? [];
+  object.itemIds = reader.readStringList(offsets[5]) ?? [];
+  object.itemNames = reader.readStringList(offsets[6]) ?? [];
+  object.itemQuantities = reader.readDoubleList(offsets[7]) ?? [];
+  object.itemServingDescriptions = reader.readStringList(offsets[8]) ?? [];
+  object.itemUnits = reader.readStringList(offsets[9]) ?? [];
+  object.mealLogId = reader.readString(offsets[10]);
+  object.mealType = reader.readLong(offsets[11]);
+  object.nutritionCalories = reader.readDoubleList(offsets[12]) ?? [];
+  object.nutritionCarbsG = reader.readDoubleList(offsets[13]) ?? [];
+  object.nutritionFatG = reader.readDoubleList(offsets[14]) ?? [];
+  object.nutritionFiberG = reader.readDoubleList(offsets[15]) ?? [];
+  object.nutritionProteinG = reader.readDoubleList(offsets[16]) ?? [];
+  object.nutritionSodiumMg = reader.readDoubleList(offsets[17]) ?? [];
+  object.nutritionSugarG = reader.readDoubleList(offsets[18]) ?? [];
+  object.totalCalories = reader.readDouble(offsets[19]);
+  object.userConfirmed = reader.readBool(offsets[20]);
   return object;
 }
 
@@ -291,23 +294,23 @@ P _mealLogCacheDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readDoubleList(offset) ?? []) as P;
+      return (reader.readBool(offset)) as P;
     case 4:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readDoubleList(offset) ?? []) as P;
     case 5:
       return (reader.readStringList(offset) ?? []) as P;
     case 6:
-      return (reader.readDoubleList(offset) ?? []) as P;
-    case 7:
       return (reader.readStringList(offset) ?? []) as P;
+    case 7:
+      return (reader.readDoubleList(offset) ?? []) as P;
     case 8:
       return (reader.readStringList(offset) ?? []) as P;
     case 9:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringList(offset) ?? []) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 11:
-      return (reader.readDoubleList(offset) ?? []) as P;
+      return (reader.readLong(offset)) as P;
     case 12:
       return (reader.readDoubleList(offset) ?? []) as P;
     case 13:
@@ -321,8 +324,10 @@ P _mealLogCacheDeserializeProp<P>(
     case 17:
       return (reader.readDoubleList(offset) ?? []) as P;
     case 18:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleList(offset) ?? []) as P;
     case 19:
+      return (reader.readDouble(offset)) as P;
+    case 20:
       return (reader.readBool(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1024,6 +1029,15 @@ extension MealLogCacheQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'imagePath', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<MealLogCache, MealLogCache, QAfterFilterCondition>
+  isSyncedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'isSynced', value: value),
       );
     });
   }
@@ -3390,6 +3404,18 @@ extension MealLogCacheQuerySortBy
     });
   }
 
+  QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> sortByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> sortByIsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.desc);
+    });
+  }
+
   QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> sortByMealLogId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'mealLogId', Sort.asc);
@@ -3492,6 +3518,18 @@ extension MealLogCacheQuerySortThenBy
     });
   }
 
+  QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> thenByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> thenByIsSyncedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSynced', Sort.desc);
+    });
+  }
+
   QueryBuilder<MealLogCache, MealLogCache, QAfterSortBy> thenByMealLogId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'mealLogId', Sort.asc);
@@ -3562,6 +3600,12 @@ extension MealLogCacheQueryWhereDistinct
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'imagePath', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<MealLogCache, MealLogCache, QDistinct> distinctByIsSynced() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isSynced');
     });
   }
 
@@ -3705,6 +3749,12 @@ extension MealLogCacheQueryProperty
   QueryBuilder<MealLogCache, String, QQueryOperations> imagePathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'imagePath');
+    });
+  }
+
+  QueryBuilder<MealLogCache, bool, QQueryOperations> isSyncedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isSynced');
     });
   }
 
