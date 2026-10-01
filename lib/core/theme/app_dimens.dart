@@ -147,6 +147,9 @@ class AppDimens {
   // Borders / effects
   // ---------------------------------------------------------------------------
   static const double borderThin = 1.0;
+
+  /// Content opacity of disabled / read-only inputs.
+  static const double disabledOpacity = 0.55;
   static const double borderThick = 2.0;
   static const double hairline = 0.5;
 
