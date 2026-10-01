@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import '../../data/services/water_intake_service.dart';
 import 'water_intake_state.dart';
 
@@ -8,12 +9,17 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
 
   WaterIntakeCubit(this._service) : super(WaterIntakeInitial());
 
+  /// Re-reads today's logs and goal, e.g. after the trends page edited them.
+  Future<void> reload() async {
+    if (_userId != null) await loadData(_userId!);
+  }
+
   Future<void> loadData(String userId) async {
     _userId = userId;
     emit(WaterIntakeLoading());
     try {
       final goal = _service.getDailyGoal();
-      final logs = await _service.getTodayLogs(userId);
+      final logs = await _service.getTodayLogs(userId).withLoadTimeout();
       final currentIntake = logs.fold<int>(0, (sum, log) => sum + log.amountMl);
       
       emit(WaterIntakeLoaded(

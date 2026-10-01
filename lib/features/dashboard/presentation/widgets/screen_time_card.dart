@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import '../cubit/screen_time_cubit.dart';
 import '../cubit/screen_time_state.dart';
 import '../../domain/entities/app_usage_info.dart';
@@ -64,16 +65,7 @@ class ScreenTimeCard extends StatelessWidget {
       children: [
         const DashboardCardHeader(title: _title, iconAsset: _icon),
         const SizedBox(height: AppDimens.cardInnerGap),
-        Text(
-          'Error loading data',
-          style: context.text.bodyMedium?.copyWith(color: context.colors.error),
-        ),
-        const SizedBox(height: AppDimens.space8),
-        Text(
-          message,
-          style: context.text.bodySmall
-              ?.copyWith(color: context.vColors.grayText),
-        ),
+        LoadErrorView(onRetry: context.read<ScreenTimeCubit>().loadStats),
       ],
     );
   }
