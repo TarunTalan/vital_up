@@ -13,6 +13,13 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:vital_up/features/community/presentation/pages/community_hub_page.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/sleep_state.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_state.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/reward_celebration_dialog.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/sleep_session_info.dart';
@@ -72,6 +79,7 @@ class _DashboardPageState extends State<DashboardPage> {
     AppBottomNavItem('Home', 'assets/icons/home.svg'),
     AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
     AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
+    AppBottomNavItem('Community', GamificationIcons.community),
     AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
   ];
 
@@ -85,11 +93,10 @@ class _DashboardPageState extends State<DashboardPage> {
       },
       child: MultiBlocProvider(
         providers: [
-          BlocProvider<DietPlanCubit>.value(
-            value: _dietPlanCubit,
-          ),
+          BlocProvider<DietPlanCubit>.value(value: _dietPlanCubit),
           BlocProvider<WaterIntakeCubit>(
-            create: (context) => sl<WaterIntakeCubit>()..loadData(_userId(context)),
+            create: (context) =>
+                sl<WaterIntakeCubit>()..loadData(_userId(context)),
           ),
           BlocProvider<TrendCubit<WaterLogCache>>(
             create: (context) {
@@ -101,6 +108,11 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           BlocProvider<ActivityGoalsCubit>(
             create: (_) => sl<ActivityGoalsCubit>()..load(),
+          ),
+          BlocProvider<GamificationCubit>(
+            create: (_) => sl<GamificationCubit>()
+              ..load()
+              ..sync(),
           ),
           BlocProvider<StressCheckInCubit>(
             create: (_) => sl<StressCheckInCubit>()..load(),
@@ -120,35 +132,42 @@ class _DashboardPageState extends State<DashboardPage> {
             create: (context) => sl<SleepCubit>()..loadSleepData(),
           ),
         ],
-        child: PopScope(
-          canPop: _navigationQueue.length <= 1,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop) return;
-            if (_navigationQueue.length > 1) {
-              setState(() {
-                _navigationQueue.removeLast();
-                _selectedIndex = _navigationQueue.last;
-              });
-            }
+        child: BlocListener<GamificationCubit, GamificationState>(
+          listenWhen: (prev, next) => next.awardId != prev.awardId,
+          listener: (context, state) {
+            final award = state.award;
+            if (award != null) showRewardCelebration(context, award);
           },
-          child: Scaffold(
-            backgroundColor: context.theme.scaffoldBackgroundColor,
-            extendBody: true,
-            body: _buildSelectedTab(context),
-            bottomNavigationBar: _selectedIndex == 1
-                ? null
-                : AppBottomNav(
-                    items: _items,
-                    selectedIndex: _selectedIndex,
-                    onItemSelected: (index) {
-                      if (_selectedIndex == index) return;
-                      setState(() {
-                        _navigationQueue.remove(index);
-                        _navigationQueue.add(index);
-                        _selectedIndex = index;
-                      });
-                    },
-                  ),
+          child: PopScope(
+            canPop: _navigationQueue.length <= 1,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
+              if (_navigationQueue.length > 1) {
+                setState(() {
+                  _navigationQueue.removeLast();
+                  _selectedIndex = _navigationQueue.last;
+                });
+              }
+            },
+            child: Scaffold(
+              backgroundColor: context.theme.scaffoldBackgroundColor,
+              extendBody: true,
+              body: _buildSelectedTab(context),
+              bottomNavigationBar: _selectedIndex == 1
+                  ? null
+                  : AppBottomNav(
+                      items: _items,
+                      selectedIndex: _selectedIndex,
+                      onItemSelected: (index) {
+                        if (_selectedIndex == index) return;
+                        setState(() {
+                          _navigationQueue.remove(index);
+                          _navigationQueue.add(index);
+                          _selectedIndex = index;
+                        });
+                      },
+                    ),
+            ),
           ),
         ),
       ),
@@ -163,28 +182,23 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildSelectedTab(BuildContext context) {
     return switch (_selectedIndex) {
       0 => BlocProvider<MealLogBloc>(
-          create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
-          child: BlocListener<ProfileCubit, ProfileState>(
-            bloc: _profileCubit,
-            listenWhen: (_, state) => state is ProfileLoaded,
-            // Re-read so the calorie goal appears once the profile syncs.
-            listener: (context, _) =>
-                context.read<MealLogBloc>().add(const LoadTodaysMeals()),
-            child: _HomeTab(
-              onScanMeal: () => setState(() => _selectedIndex = 1),
-            ),
-          ),
+        create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+        child: BlocListener<ProfileCubit, ProfileState>(
+          bloc: _profileCubit,
+          listenWhen: (_, state) => state is ProfileLoaded,
+          // Re-read so the calorie goal appears once the profile syncs.
+          listener: (context, _) =>
+              context.read<MealLogBloc>().add(const LoadTodaysMeals()),
+          child: _HomeTab(onScanMeal: () => setState(() => _selectedIndex = 1)),
         ),
-      1 => FoodScannerPage(
-          onBack: () => setState(() => _selectedIndex = 0),
-        ),
-      2 => VitaHomePage(
-          onBack: () => setState(() => _selectedIndex = 0),
-        ),
+      ),
+      1 => FoodScannerPage(onBack: () => setState(() => _selectedIndex = 0)),
+      2 => VitaHomePage(onBack: () => setState(() => _selectedIndex = 0)),
+      3 => const CommunityHubPage(),
       _ => BlocProvider.value(
-          value: _profileCubit,
-          child: ProfilePage(onLogout: () => _showLogoutDialog(context)),
-        ),
+        value: _profileCubit,
+        child: ProfilePage(onLogout: () => _showLogoutDialog(context)),
+      ),
     };
   }
 
@@ -234,6 +248,7 @@ class _HomeTabState extends State<_HomeTab> {
       context.read<ActivityGoalsCubit>().load();
       context.read<StressCheckInCubit>().load();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
+      context.read<GamificationCubit>().sync();
     },
   );
 
@@ -266,87 +281,112 @@ class _HomeTabState extends State<_HomeTab> {
     // bottom padding, so content always clears it.
     final bottomInset = context.safePadding.bottom + AppDimens.sectionGap;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/bg.png',
-            fit: BoxFit.cover,
-          ),
+    // Any logged data can earn points; the cubit debounces bursts.
+    void sync(BuildContext context, _) =>
+        context.read<GamificationCubit>().sync();
+
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<WaterIntakeCubit, WaterIntakeState>(listener: sync),
+        BlocListener<StressCheckInCubit, StressCheckInState>(listener: sync),
+        BlocListener<SleepCubit, SleepState>(listener: sync),
+        BlocListener<
+          TrendCubit<SleepSessionInfo>,
+          TrendState<SleepSessionInfo>
+        >(listener: sync),
+        BlocListener<ActivityGoalsCubit, ActivityGoalsState>(
+          listenWhen: (prev, next) => next.snapshot != prev.snapshot,
+          listener: sync,
         ),
-        Column(
-          children: [
-            AppPageHeader(
-              showBack: false,
-              title: _greeting(DateTime.now()),
-              subtitle: DateFormat('EEEE, MMMM d').format(DateTime.now()),
-              action: const AppHeaderAction(
-                tooltip: 'Calendar',
-                icon: _SvgIcon('assets/icons/calendar.svg'),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.only(
-                  top: AppDimens.sectionGap,
-                  bottom: bottomInset,
+        BlocListener<MealLogBloc, MealLogState>(
+          listenWhen: (_, state) => state is MealLogLoaded,
+          listener: sync,
+        ),
+        BlocListener<DietPlanCubit, DietPlanState>(listener: sync),
+      ],
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
+          ),
+          Column(
+            children: [
+              AppPageHeader(
+                showBack: false,
+                title: _greeting(DateTime.now()),
+                subtitle: DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                action: const AppHeaderAction(
+                  tooltip: 'Calendar',
+                  icon: _SvgIcon('assets/icons/calendar.svg'),
                 ),
-                child: ResponsiveCenter(
-                  child: Padding(
-                    padding: context.pagePadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _InsightCard(),
-                        const SizedBox(height: AppDimens.cardGap),
-                        BlocListener<MealLogBloc, MealLogState>(
-                          // A newly logged meal moves today's calories bar.
-                          listenWhen: (_, state) => state is MealLogLoaded,
-                          listener: (context, _) =>
-                              context.read<TrendCubit<MealLogEntry>>().load(),
-                          child: BlocBuilder<DietPlanCubit, DietPlanState>(
-                            builder: (context, state) {
-                              final plan =
-                                  state is DietPlanLoaded ? state.mealPlan : null;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  NutritionSummaryCard(
-                                    plan: plan,
-                                    onViewAll: () => _push('meal-log-history'),
-                                    onOpenProgress: () => _push('diet-progress'),
-                                    onScanMeal: onScanMeal,
-                                  ),
-                                  if (plan == null) ...[
-                                    const SizedBox(height: AppDimens.cardGap),
-                                    _DietPlanCard(
-                                      onTap: () => _push('diet-plan-prefs'),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    top: AppDimens.sectionGap,
+                    bottom: bottomInset,
+                  ),
+                  child: ResponsiveCenter(
+                    child: Padding(
+                      padding: context.pagePadding,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const ScoreStreakCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          BlocListener<MealLogBloc, MealLogState>(
+                            // A newly logged meal moves today's calories bar.
+                            listenWhen: (_, state) => state is MealLogLoaded,
+                            listener: (context, _) =>
+                                context.read<TrendCubit<MealLogEntry>>().load(),
+                            child: BlocBuilder<DietPlanCubit, DietPlanState>(
+                              builder: (context, state) {
+                                final plan = state is DietPlanLoaded
+                                    ? state.mealPlan
+                                    : null;
+                                return Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    NutritionSummaryCard(
+                                      plan: plan,
+                                      onViewAll: () =>
+                                          _push('meal-log-history'),
+                                      onOpenProgress: () =>
+                                          _push('diet-progress'),
+                                      onScanMeal: onScanMeal,
                                     ),
+                                    if (plan == null) ...[
+                                      const SizedBox(height: AppDimens.cardGap),
+                                      _DietPlanCard(
+                                        onTap: () => _push('diet-plan-prefs'),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const ActivityGoalsCard(),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const StressCheckInCard(),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const WaterIntakeCard(),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const SleepCard(),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const ScreenTimeCard(),
-                      ],
+                          const SizedBox(height: AppDimens.cardGap),
+                          const ActivityGoalsCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          const StressCheckInCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          const WaterIntakeCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          const SleepCard(),
+                          const SizedBox(height: AppDimens.cardGap),
+                          const ScreenTimeCard(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -367,31 +407,6 @@ class _SvgIcon extends StatelessWidget {
       colorFilter: ColorFilter.mode(
         iconTheme.color ?? context.colors.primary,
         BlendMode.srcIn,
-      ),
-    );
-  }
-}
-
-class _InsightCard extends StatelessWidget {
-  const _InsightCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppCaption("Today's insights"),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          Text(
-            "You've been most active between 9-11am this week. "
-            'Consider scheduling important tasks during this time '
-            'when your energy is naturally higher.',
-            style: context.text.bodyMedium
-                ?.copyWith(color: context.colors.onSurface),
-          ),
-        ],
       ),
     );
   }
@@ -429,8 +444,9 @@ class _DietPlanRow extends StatelessWidget {
               const SizedBox(height: AppDimens.space4),
               Text(
                 subtitle,
-                style: context.text.bodyMedium
-                    ?.copyWith(color: context.vColors.grayText),
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.vColors.grayText,
+                ),
               ),
             ],
           ),
