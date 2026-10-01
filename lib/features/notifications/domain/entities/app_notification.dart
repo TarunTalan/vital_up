@@ -7,6 +7,9 @@ enum NotificationType {
   levelUp('level_up'),
   streak('streak'),
 
+  /// A friend challenged the user (route: challenges).
+  challenge('challenge'),
+
   /// Sent by the VitalUp team (app news, tips, reminders).
   announcement('announcement');
 
@@ -16,7 +19,9 @@ enum NotificationType {
   static NotificationType fromCode(String? code) =>
       values.where((t) => t.code == code).firstOrNull ?? announcement;
 
-  bool get isFriend => this == friendRequest || this == friendAccepted;
+  /// Sent because of a friend (shows their avatar, "Friends" filter).
+  bool get isFriend =>
+      this == friendRequest || this == friendAccepted || this == challenge;
   bool get isAchievement => this == badge || this == levelUp || this == streak;
 }
 
