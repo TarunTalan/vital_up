@@ -1,4 +1,8 @@
+import 'package:dartz/dartz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:isar_community/isar.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/user_profile_cache.dart';
@@ -40,7 +44,13 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
   }
 
   Future<void> _fetchAndEmit(Emitter<MealLogState> emit) async {
-    final result = await getMealLogHistory(DateTime.now());
+    final Either<Failure, List<MealLogEntry>> result;
+    try {
+      result = await getMealLogHistory(DateTime.now()).withLoadTimeout();
+    } catch (_) {
+      emit(const MealLogError(kLoadErrorMessage));
+      return;
+    }
     // Read calorie goal from Isar UserProfileCache first
     int? calorieGoal;
     try {

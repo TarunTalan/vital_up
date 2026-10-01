@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vital_up/core/router/fade_slide_page_route.dart';
+import 'package:vital_up/core/router/app_page_transitions.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
+import 'package:vital_up/features/auth/presentation/utils/post_sign_in_navigation.dart';
 import 'package:vital_up/features/auth/presentation/pages/onboarding_page.dart';
 import 'package:vital_up/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:vital_up/features/auth/presentation/pages/otp_screen.dart';
@@ -10,7 +11,12 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_tracking_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_history_page.dart';
+import 'package:vital_up/features/activity_goals/presentation/pages/activity_goals_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/diet_progress_page.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/sleep_trends_page.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/stress_trends_page.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
@@ -28,6 +34,10 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_diet_plan_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -36,12 +46,12 @@ class AppRouter {
   AppRouter._();
 
   static final GoRouter router = GoRouter(
-    initialLocation: '/health-onboarding/personal-details',
+    initialLocation: '/splash',
     routes: [
       GoRoute(
         path: '/splash',
         name: 'splash',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const SplashPage(),
         ),
@@ -50,11 +60,11 @@ class AppRouter {
         path: '/onboarding',
         name: 'onboarding',
         pageBuilder: (context, state) {
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: OnboardingPage(
               onFinish: () => context.goNamed('login'),
-              onGoogleSignInSuccess: () => context.goNamed('health-onboarding'),
+              onGoogleSignInSuccess: () => goAfterSignIn(context),
             ),
           );
         },
@@ -63,7 +73,7 @@ class AppRouter {
         path: '/login',
         name: 'login',
         pageBuilder: (context, state) {
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: const LoginPage(),
           );
@@ -73,7 +83,7 @@ class AppRouter {
         path: '/forgot-password',
         name: 'forgot-password',
         pageBuilder: (context, state) {
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: const ForgotPasswordPage(),
           );
@@ -86,7 +96,7 @@ class AppRouter {
           final email = state.uri.queryParameters['email'] ?? '';
           final token = state.uri.queryParameters['token'] ?? '';
           final flow = state.uri.queryParameters['flow'] ?? 'signup'; // 'signup' or 'forgot'
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: OtpScreen(
               email: email,
@@ -101,7 +111,7 @@ class AppRouter {
         name: 'reset-password',
         pageBuilder: (context, state) {
           final token = state.uri.queryParameters['token'] ?? '';
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: ResetPasswordPage(resetToken: token),
           );
@@ -110,7 +120,7 @@ class AppRouter {
       GoRoute(
         path: '/reset-completed',
         name: 'reset-completed',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const ResetCompletedPage(),
         ),
@@ -118,16 +128,56 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const DashboardPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/water',
+        name: 'water-trends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const WaterTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/sleep',
+        name: 'sleep-trends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const SleepTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/stress',
+        name: 'stress-trends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const StressTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/activity-goals',
+        name: 'activity-goals',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const ActivityGoalsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/diet',
+        name: 'diet-progress',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const DietProgressPage(),
         ),
       ),
 
       GoRoute(
         path: '/activity-tracking',
         name: 'activity-tracking',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const ActivityTrackingPage(),
         ),
@@ -135,7 +185,7 @@ class AppRouter {
       GoRoute(
         path: '/activity-history',
         name: 'activity-history',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const ActivityHistoryPage(),
         ),
@@ -143,7 +193,7 @@ class AppRouter {
       GoRoute(
         path: '/food-scan',
         name: 'food-scan',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const FoodScannerPage(),
         ),
@@ -151,7 +201,7 @@ class AppRouter {
       GoRoute(
         path: '/meal-log-history',
         name: 'meal-log-history',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const MealLogHistoryPage(),
         ),
@@ -159,7 +209,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding',
         name: 'health-onboarding',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const OnboardingEntryPoint(),
         ),
@@ -167,7 +217,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/personal-details',
         name: 'health-personal-details',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const PersonalDetailsPage(),
         ),
@@ -175,7 +225,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/height',
         name: 'health-height',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const HeightPage(),
         ),
@@ -183,7 +233,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/weight',
         name: 'health-weight',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const WeightPage(),
         ),
@@ -193,7 +243,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/dietary-preference',
         name: 'health-dietary-preference',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: DietaryPreferencePage(
             onNext: () => context.goNamed('health-goals'),
@@ -205,7 +255,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/goals',
         name: 'health-goals',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: GoalsPage(
             onNext: () => context.goNamed('health-activity'),
@@ -217,7 +267,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/activity',
         name: 'health-activity',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: ActivityPage(
             onNext: () => context.goNamed('health-info-permission'),
@@ -230,7 +280,7 @@ class AppRouter {
       GoRoute(
         path: '/health-onboarding/info-permission',
         name: 'health-info-permission',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: InfoAndPermissionPage(
             onNext: () => context.goNamed('dashboard'), // Complete flow
@@ -242,7 +292,7 @@ class AppRouter {
       GoRoute(
         path: '/diet-plan-prefs',
         name: 'diet-plan-prefs',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const DietPlanPreferencesPage(),
         ),
@@ -252,7 +302,7 @@ class AppRouter {
         name: 'diet-plan-mode',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: DietPlanModeSelectPage(preferences: extra),
           );
@@ -263,7 +313,7 @@ class AppRouter {
         name: 'diet-plan-goal',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: GoalSetupPage(preferences: extra),
           );
@@ -274,7 +324,7 @@ class AppRouter {
         name: 'diet-plan-manual',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: ManualTargetPage(preferences: extra),
           );
@@ -285,7 +335,7 @@ class AppRouter {
         name: 'diet-plan-result',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          return FadeSlidePageRoute(
+          return AppPage(
             key: state.pageKey,
             child: DietPlanResultPage(params: extra),
           );
@@ -294,12 +344,53 @@ class AppRouter {
       GoRoute(
         path: '/settings',
         name: 'settings',
-        pageBuilder: (context, state) => FadeSlidePageRoute(
+        pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: BlocProvider<SettingsCubit>(
             create: (context) => sl<SettingsCubit>()..loadSettings(),
             child: const SettingsPage(),
           ),
+        ),
+      ),
+      GoRoute(
+        path: '/vita/chat',
+        name: 'vita-chat',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          final args = extra is VitaChatArgs
+              ? extra
+              : VitaChatArgs(initialPrompt: extra as String?);
+          return AppPage(
+            key: state.pageKey,
+            child: VitaChatPage(
+              initialPrompt: args.initialPrompt,
+              draftPlan: args.draftPlan,
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/vita/analysis',
+        name: 'vita-analysis',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const VitaHealthAnalysisPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/vita/diet-plan',
+        name: 'vita-diet-plan',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: VitaDietPlanPage(fromChat: state.extra == true),
+        ),
+      ),
+      GoRoute(
+        path: '/vita/stress',
+        name: 'vita-stress',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const VitaStressGuidePage(),
         ),
       ),
     ],

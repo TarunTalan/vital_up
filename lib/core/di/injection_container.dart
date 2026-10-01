@@ -27,11 +27,24 @@ import 'package:vital_up/features/diet_plan/domain/usecases/generate_meal_plan.d
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
+import 'package:vital_up/features/vita/data/datasources/vita_local_datasource.dart';
+import 'package:vital_up/features/vita/data/datasources/vita_remote_datasource.dart';
+import 'package:vital_up/features/vita/data/repositories/vita_repository_impl.dart';
+import 'package:vital_up/features/vita/data/services/health_snapshot_builder.dart';
+import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
+import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
+import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart' as vital_up_dashboard;
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/activity_goals/data/datasources/activity_goals_local_datasource.dart';
+import 'package:vital_up/features/activity_goals/data/repositories/activity_goals_repository_impl.dart';
+import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
+import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
+import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
 import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/water_intake_cubit.dart';
 import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source.dart';
@@ -257,6 +270,7 @@ Future<void> initDependencies() async {
         () => DietPlanRepositoryImpl(
       remoteDataSource: sl<DietPlanRemoteDataSource>(),
       isarService: sl<IsarService>(),
+      prefs: sl<SharedPreferences>(),
     ),
   );
   sl.registerLazySingleton(() => GenerateMealPlan(sl<DietPlanRepository>()));
@@ -377,10 +391,57 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService());
   sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
 
-  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>()));
+  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>()));
   sl.registerFactory(() => SleepCubit(sl<SleepService>()));
 
   sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>()));
   sl.registerFactory(() => WaterIntakeCubit(sl<WaterIntakeService>()));
-}
+  sl.registerLazySingleton<TrendsService>(
+    () => TrendsService(
+      sl<WaterIntakeService>(),
+      sl<SleepService>(),
+      sl<VitaRepository>(),
+      sl<GetMealLogHistory>(),
+      sl<GetActiveMealPlan>(),
+    ),
+  );
 
+  // 12. Vita health coach
+  sl.registerLazySingleton<HealthVitalsService>(
+    () => HealthVitalsService(sl<SharedPreferences>()),
+  );
+  sl.registerLazySingleton<HealthSnapshotBuilder>(
+    () => HealthSnapshotBuilder(
+      mealHistory: sl<GetMealLogHistory>(),
+      isar: sl<IsarService>(),
+      water: sl<WaterIntakeService>(),
+      screenTime: sl<vital_up_dashboard.ScreenTimeService>(),
+      activity: sl<GetActivityHistory>(),
+      onboarding: sl<OnboardingDataStore>(),
+      activePlan: sl<GetActiveMealPlan>(),
+      vitals: sl<HealthVitalsService>(),
+      supabase: sl<SupabaseClient>(),
+    ),
+  );
+  sl.registerLazySingleton<VitaRepository>(
+    () => VitaRepositoryImpl(
+      remote: VitaRemoteDataSource(sl<SupabaseClient>()),
+      local: VitaLocalDataSource(sl<SharedPreferences>()),
+      snapshots: sl<HealthSnapshotBuilder>(),
+      vitals: sl<HealthVitalsService>(),
+      supabase: sl<SupabaseClient>(),
+    ),
+  );
+  sl.registerFactory(() => VitaChatCubit(sl<VitaRepository>()));
+  sl.registerFactory(() => StressCheckInCubit(sl<VitaRepository>()));
+
+  // 13. Activity goals
+  sl.registerLazySingleton<ActivityGoalsRepository>(
+    () => ActivityGoalsRepositoryImpl(
+      local: ActivityGoalsLocalDataSource(sl<SharedPreferences>()),
+      history: sl<GetActivityHistory>(),
+      health: sl<HealthVitalsService>(),
+    ),
+  );
+  sl.registerFactory(() => ActivityGoalsCubit(sl<ActivityGoalsRepository>()));
+}

@@ -2,20 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 
 /// Figma `card/big` header: success-tint icon badge + "body 16 med" title,
-/// with an optional trailing widget.
+/// with an optional trailing widget. Pass an SVG [iconAsset] or a Material
+/// [icon].
 class DashboardCardHeader extends StatelessWidget {
   final String title;
-  final String iconAsset;
+  final String? iconAsset;
+  final IconData? icon;
+  final Color? badgeColor;
   final Widget? trailing;
 
   const DashboardCardHeader({
     super.key,
     required this.title,
-    required this.iconAsset,
+    this.iconAsset,
+    this.icon,
+    this.badgeColor,
     this.trailing,
-  });
+  }) : assert(iconAsset != null || icon != null);
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +29,15 @@ class DashboardCardHeader extends StatelessWidget {
     return Row(
       children: [
         AppIconBadge(
-          color: context.vColors.success,
-          icon: SvgPicture.asset(
-            iconAsset,
-            width: AppDimens.iconLg,
-            height: AppDimens.iconLg,
-            colorFilter: ColorFilter.mode(onSurface, BlendMode.srcIn),
-          ),
+          color: badgeColor ?? context.vColors.success,
+          icon: iconAsset != null
+              ? SvgPicture.asset(
+                  iconAsset!,
+                  width: AppDimens.iconLg,
+                  height: AppDimens.iconLg,
+                  colorFilter: ColorFilter.mode(onSurface, BlendMode.srcIn),
+                )
+              : Icon(icon, size: AppDimens.iconLg, color: onSurface),
         ),
         const SizedBox(width: AppDimens.space12),
         Expanded(
@@ -65,6 +73,35 @@ class DashboardMetric extends StatelessWidget {
         maxLines: 1,
         style: AppTextStyles.metric.copyWith(color: context.colors.onSurface),
       ),
+    );
+  }
+}
+
+/// Card header plus "couldn't load" + Retry, for a card whose data failed
+/// or timed out.
+class DashboardCardError extends StatelessWidget {
+  final String title;
+  final String? iconAsset;
+  final IconData? icon;
+  final VoidCallback onRetry;
+
+  const DashboardCardError({
+    super.key,
+    required this.title,
+    required this.onRetry,
+    this.iconAsset,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DashboardCardHeader(title: title, iconAsset: iconAsset, icon: icon),
+        const SizedBox(height: AppDimens.cardInnerGap),
+        LoadErrorView(onRetry: onRetry),
+      ],
     );
   }
 }
