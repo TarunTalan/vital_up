@@ -161,8 +161,19 @@ class AppColors {
   static const Color activityMinutes = Color(0xFFFFC107);
   static const Color activityWorkouts = Color(0xFF9C6ADE);
 
-  /// Streak flame on the stress check-in.
+  /// Streak flame on the stress check-in and the score card.
   static const Color streak = Color(0xFFFF7A3D);
+
+  /// Gamification score categories.
+  static const Color scoreNutrition = protein;
+  static const Color scoreLifestyle = sleep;
+  static const Color scoreFitness = activityCalories;
+  static const Color scoreBonus = activityMinutes;
+
+  /// Leaderboard podium: 1st, 2nd, 3rd.
+  static const Color rankGold = Color(0xFFFFC233);
+  static const Color rankSilver = Color(0xFFB4BDC6);
+  static const Color rankBronze = Color(0xFFD48A55);
 
   // ---------------------------------------------------------------------------
   // Gradients
