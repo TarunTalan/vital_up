@@ -78,6 +78,15 @@ const reminderPresets = <Reminder>[
     isPreset: true,
     route: 'sleep-trends',
   ),
+  Reminder(
+    id: 'preset_morning_sleep',
+    kind: ReminderKind.sleep,
+    title: 'Good morning! ☀️',
+    body: 'Review your sleep quality score and log last night.',
+    times: [ReminderTime(8, 0)],
+    isPreset: true,
+    route: 'sleep-trends',
+  ),
 ];
 
 /// Turned on by the onboarding "Health reminders" choice.
@@ -87,6 +96,7 @@ const starterPresetIds = {
   'preset_lunch',
   'preset_dinner',
   'preset_sleep',
+  'preset_morning_sleep',
 };
 
 /// Saved reminders with any presets they're missing, presets first in their

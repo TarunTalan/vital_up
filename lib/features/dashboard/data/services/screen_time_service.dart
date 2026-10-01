@@ -59,7 +59,7 @@ class ScreenTimeService {
   Future<List<AppUsageInfo>> getUsageStats() async {
     try {
       final endDate = DateTime.now();
-      final startDate = DateTime(endDate.year, endDate.month, endDate.day); // Today exactly at midnight local time
+      final startDate = DateTime(endDate.year, endDate.month, endDate.day); // Today at midnight
 
       final List<AppUsageInfo> infoList = [];
       final List<AppUsageInfo> usage = await _fetchAppUsage(startDate, endDate);
@@ -76,6 +76,87 @@ class ScreenTimeService {
     } catch (e) {
       throw Exception('Failed to get usage stats: $e');
     }
+  }
+
+  /// Fetches weekly history and aggregates statistics (average, lowest, highest, change vs yesterday)
+  Future<ScreenTimeWeeklySummary> getWeeklySummary() async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final List<DailyScreenTime> history = [];
+
+    // Query past 7 days from oldest (6 days ago) to today
+    for (int i = 6; i >= 0; i--) {
+      final day = todayStart.subtract(Duration(days: i));
+      final dayEnd = i == 0 ? now : day.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+
+      try {
+        final usage = await _fetchAppUsage(day, dayEnd);
+        var totalMs = 0;
+        final validApps = <AppUsageInfo>[];
+
+        for (final app in usage) {
+          if (app.usageDuration.inMinutes > 0) {
+            totalMs += app.usageDuration.inMilliseconds;
+            validApps.add(app);
+          }
+        }
+        validApps.sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
+
+        history.add(DailyScreenTime(
+          date: day,
+          duration: Duration(milliseconds: totalMs),
+          topApps: validApps,
+        ));
+      } catch (_) {
+        // Fallback for empty day
+        history.add(DailyScreenTime(
+          date: day,
+          duration: Duration.zero,
+        ));
+      }
+    }
+
+    final todayDaily = history.last;
+    final yesterdayDaily = history.length > 1 ? history[history.length - 2] : null;
+
+    // Filter active days with > 0 screen time for accurate min/max calculations
+    final activeDays = history.where((d) => d.duration.inMinutes > 0).toList();
+
+    var totalMinutes = 0;
+    DailyScreenTime? lowest;
+    DailyScreenTime? highest;
+
+    for (final day in history) {
+      totalMinutes += day.duration.inMinutes;
+      if (highest == null || day.duration > highest.duration) {
+        highest = day;
+      }
+    }
+
+    if (activeDays.isNotEmpty) {
+      lowest = activeDays.reduce((a, b) => a.duration < b.duration ? a : b);
+    } else {
+      lowest = history.first;
+    }
+
+    final avgMinutes = history.isNotEmpty ? (totalMinutes / history.length).round() : 0;
+
+    // Change vs yesterday %
+    double changePct = 0.0;
+    if (yesterdayDaily != null && yesterdayDaily.duration.inMinutes > 0) {
+      changePct = ((todayDaily.duration.inMinutes - yesterdayDaily.duration.inMinutes) /
+              yesterdayDaily.duration.inMinutes) *
+          100.0;
+    }
+
+    return ScreenTimeWeeklySummary(
+      dailyHistory: history,
+      averageDuration: Duration(minutes: avgMinutes),
+      lowestDay: lowest,
+      highestDay: highest,
+      todayDuration: todayDaily.duration,
+      changeVsYesterdayPct: changePct,
+    );
   }
   
   Future<List<AppUsageInfo>> _fetchAppUsage(DateTime startDate, DateTime endDate) async {

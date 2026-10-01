@@ -110,8 +110,8 @@ class WeeklySummaryService {
         if (!inWeek(l.timestamp)) continue;
         waterByDay.update(
           startOfDay(l.timestamp),
-          (ml) => ml + l.amountMl,
-          ifAbsent: () => l.amountMl,
+          (ml) => ml + l.amountMl.toInt(),
+          ifAbsent: () => l.amountMl.toInt(),
         );
       }
       return weekStats(

@@ -3,8 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/circular_sleep_clock.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import '../cubit/sleep_cubit.dart';
 import '../cubit/sleep_state.dart';
@@ -24,8 +27,8 @@ class SleepCard extends StatefulWidget {
 }
 
 class _SleepCardState extends State<SleepCard> {
-  TimeOfDay? _bedTime = const TimeOfDay(hour: 23, minute: 0);
-  TimeOfDay? _wakeTime = const TimeOfDay(hour: 7, minute: 0);
+  TimeOfDay _bedTime = const TimeOfDay(hour: 23, minute: 0);
+  TimeOfDay _wakeTime = const TimeOfDay(hour: 7, minute: 0);
 
   @override
   Widget build(BuildContext context) {
@@ -49,11 +52,9 @@ class _SleepCardState extends State<SleepCard> {
             } else if (state is SleepNeedsHealthConnectInstall) {
               return _buildHealthConnectState(context);
             } else if (state is SleepLoadedAuto) {
-              return _buildLoadedState(context, state.session.duration,
-                  state.session.bedTime, state.session.wakeTime, true);
+              return _buildLoadedState(context, state.session, true);
             } else if (state is SleepLoadedManual) {
-              return _buildLoadedState(context, state.session.duration,
-                  state.session.bedTime, state.session.wakeTime, false);
+              return _buildLoadedState(context, state.session, false);
             } else if (state is SleepNeedsManualEntry) {
               return _buildManualEntryForm(context);
             }
@@ -116,12 +117,24 @@ class _SleepCardState extends State<SleepCard> {
     );
   }
 
-  Widget _buildLoadedState(BuildContext context, Duration duration,
-      DateTime bedTime, DateTime wakeTime, bool isAuto) {
+  Widget _buildLoadedState(
+      BuildContext context, SleepSessionInfo session, bool isAuto) {
     final v = context.vColors;
     final timeFormat = DateFormat.jm();
     final chipColor = isAuto ? v.success! : v.warning!;
     final chipFill = isAuto ? v.successTint : v.warningTint;
+    final score = session.sleepScore;
+
+    Color scoreColor;
+    if (score >= 85) {
+      scoreColor = AppColors.success;
+    } else if (score >= 70) {
+      scoreColor = AppColors.teal;
+    } else if (score >= 50) {
+      scoreColor = AppColors.warning;
+    } else {
+      scoreColor = AppColors.error;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,19 +145,18 @@ class _SleepCardState extends State<SleepCard> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isAuto)
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: AppDimens.iconSm),
-                  color: v.grayText,
-                  tooltip: 'Edit',
-                  onPressed: () =>
-                      context.read<SleepCubit>().showManualEntryForm(),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: AppDimens.iconXl,
-                    minHeight: AppDimens.iconXl,
-                  ),
+              IconButton(
+                icon: const Icon(Icons.mode_edit_outline_rounded,
+                    size: AppDimens.iconSm),
+                color: v.grayText,
+                tooltip: 'Log / Edit Sleep',
+                onPressed: () => _openSleepClockSheet(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: AppDimens.iconXl,
+                  minHeight: AppDimens.iconXl,
                 ),
+              ),
               CardLink(onTap: () => _openTrends(context)),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -156,7 +168,7 @@ class _SleepCardState extends State<SleepCard> {
                   borderRadius: BorderRadius.circular(AppDimens.radiusToast),
                 ),
                 child: Text(
-                  isAuto ? 'Auto-synced' : 'Manual Entry',
+                  isAuto ? 'Auto-synced' : 'Manual',
                   style: context.text.labelSmall?.copyWith(
                     color: chipColor,
                     fontWeight: FontWeight.w600,
@@ -167,16 +179,53 @@ class _SleepCardState extends State<SleepCard> {
           ),
         ),
         const SizedBox(height: AppDimens.cardInnerGap),
-        DashboardMetric(formatDashboardDuration(duration)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            DashboardMetric(formatDashboardDuration(session.duration)),
+            const SizedBox(width: AppDimens.space12),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space10,
+                vertical: AppDimens.space4,
+              ),
+              decoration: BoxDecoration(
+                color: scoreColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+                border: Border.all(color: scoreColor.withAlpha(60)),
+              ),
+              child: Text(
+                'Score: $score% · ${session.scoreCategory}',
+                style: context.text.labelSmall?.copyWith(
+                  color: scoreColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: AppDimens.cardInnerGap),
         Wrap(
           spacing: AppDimens.space32,
           runSpacing: AppDimens.space8,
           children: [
-            _TimeStat(label: 'Bed time', value: timeFormat.format(bedTime)),
-            _TimeStat(label: 'Wake time', value: timeFormat.format(wakeTime)),
+            _TimeStat(
+                label: 'Bed time',
+                value: timeFormat.format(session.bedTime),
+                icon: Icons.nightlight_round,
+                color: AppColors.sleep),
+            _TimeStat(
+                label: 'Wake time',
+                value: timeFormat.format(session.wakeTime),
+                icon: Icons.wb_sunny_rounded,
+                color: AppColors.warning),
           ],
         ),
+        if (session.hasStages) ...[
+          const SizedBox(height: AppDimens.space12),
+          _SleepStagesBar(session: session),
+        ],
         const SizedBox(height: AppDimens.cardInnerGap),
         MiniTrend<SleepSessionInfo>(
           color: AppColors.sleep,
@@ -185,6 +234,17 @@ class _SleepCardState extends State<SleepCard> {
         ),
       ],
     );
+  }
+
+  Future<void> _openSleepClockSheet(BuildContext context) async {
+    final cubit = context.read<SleepCubit>();
+    final saved = await showAppBottomSheet<bool>(
+      context: context,
+      builder: (_) => const _SleepClockDialog(),
+    );
+    if (saved == true) {
+      cubit.loadSleepData();
+    }
   }
 
   Future<void> _openTrends(BuildContext context) async {
@@ -196,17 +256,6 @@ class _SleepCardState extends State<SleepCard> {
   }
 
   Widget _buildManualEntryForm(BuildContext context) {
-    String durationText = '';
-    if (_bedTime != null && _wakeTime != null) {
-      final now = DateTime.now();
-      var bDate = DateTime(now.year, now.month, now.day, _bedTime!.hour, _bedTime!.minute);
-      var wDate = DateTime(now.year, now.month, now.day, _wakeTime!.hour, _wakeTime!.minute);
-      if (wDate.isBefore(bDate)) {
-        wDate = wDate.add(const Duration(days: 1));
-      }
-      durationText = formatDashboardDuration(wDate.difference(bDate));
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -219,73 +268,131 @@ class _SleepCardState extends State<SleepCard> {
         Text('Log your sleep', style: context.text.titleSmall),
         const SizedBox(height: AppDimens.space4),
         Text(
-          'We couldn\'t find auto-synced sleep data.',
+          'Quickly adjust bedtime and wake up on the circular dial.',
           style: context.text.bodyMedium
               ?.copyWith(color: context.vColors.grayText),
         ),
         const SizedBox(height: AppDimens.cardInnerGap),
-        Row(
-          children: [
-            Expanded(
-              child: SleepTimePickerField(
-                label: 'Bed Time',
-                time: _bedTime,
-                onTimeSelected: (t) => setState(() => _bedTime = t),
-                icon: Icons.nightlight_round,
-              ),
-            ),
-            const SizedBox(width: AppDimens.space12),
-            Expanded(
-              child: SleepTimePickerField(
-                label: 'Wake Time',
-                time: _wakeTime,
-                onTimeSelected: (t) => setState(() => _wakeTime = t),
-                icon: Icons.wb_sunny_rounded,
-              ),
-            ),
-          ],
+        CircularSleepClockPicker(
+          initialBedTime: _bedTime,
+          initialWakeTime: _wakeTime,
+          onChanged: (bed, wake) {
+            setState(() {
+              _bedTime = bed;
+              _wakeTime = wake;
+            });
+          },
         ),
         const SizedBox(height: AppDimens.cardInnerGap),
-        if (durationText.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppDimens.cardInnerGap),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.space16,
-                vertical: AppDimens.space12,
-              ),
-              decoration: BoxDecoration(
-                color: context.vColors.primaryFill,
-                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Calculated duration',
-                      style: context.text.bodySmall
-                          ?.copyWith(color: context.vColors.grayText),
-                    ),
-                  ),
-                  Text(
-                    durationText,
-                    style: context.text.titleSmall
-                        ?.copyWith(color: context.colors.primary),
-                  ),
-                ],
-              ),
-            ),
-          ),
         AppPrimaryButton(
-          label: 'Save Entry',
-          enabled: _bedTime != null && _wakeTime != null,
+          label: 'Save Sleep Entry',
           onTap: () {
-            if (_bedTime == null || _wakeTime == null) return;
             final now = DateTime.now();
-            var bDate = DateTime(now.year, now.month, now.day, _bedTime!.hour, _bedTime!.minute);
-            var wDate = DateTime(now.year, now.month, now.day, _wakeTime!.hour, _wakeTime!.minute);
+            var bDate = DateTime(
+                now.year, now.month, now.day, _bedTime.hour, _bedTime.minute);
+            var wDate = DateTime(
+                now.year, now.month, now.day, _wakeTime.hour, _wakeTime.minute);
+            if (!bDate.isBefore(wDate)) {
+              bDate = bDate.subtract(const Duration(days: 1));
+            }
             context.read<SleepCubit>().saveManualSleep(bDate, wDate);
           },
+        ),
+      ],
+    );
+  }
+}
+
+class _SleepStagesBar extends StatelessWidget {
+  final SleepSessionInfo session;
+
+  const _SleepStagesBar({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final deep = session.deepSleepMinutes ?? 0;
+    final rem = session.remSleepMinutes ?? 0;
+    final light = session.lightSleepMinutes ?? 0;
+    final awake = session.awakeMinutes ?? 0;
+    final total = deep + rem + light + awake;
+
+    if (total == 0) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+          child: SizedBox(
+            height: 8,
+            child: Row(
+              children: [
+                if (deep > 0)
+                  Expanded(
+                    flex: deep,
+                    child: Container(color: const Color(0xFF4A148C)),
+                  ),
+                if (rem > 0)
+                  Expanded(
+                    flex: rem,
+                    child: Container(color: const Color(0xFF7B1FA2)),
+                  ),
+                if (light > 0)
+                  Expanded(
+                    flex: light,
+                    child: Container(color: AppColors.teal),
+                  ),
+                if (awake > 0)
+                  Expanded(
+                    flex: awake,
+                    child: Container(color: AppColors.warning),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppDimens.space6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _StageDot(label: 'Deep: ${deep}m', color: const Color(0xFF4A148C)),
+            _StageDot(label: 'REM: ${rem}m', color: const Color(0xFF7B1FA2)),
+            _StageDot(label: 'Light: ${light}m', color: AppColors.teal),
+            if (awake > 0)
+              _StageDot(label: 'Awake: ${awake}m', color: AppColors.warning),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StageDot extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StageDot({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: context.text.labelSmall?.copyWith(
+            fontSize: 10,
+            color: context.vColors.grayText,
+          ),
         ),
       ],
     );
@@ -295,105 +402,116 @@ class _SleepCardState extends State<SleepCard> {
 class _TimeStat extends StatelessWidget {
   final String label;
   final String value;
+  final IconData icon;
+  final Color color;
 
-  const _TimeStat({required this.label, required this.value});
+  const _TimeStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: context.text.bodyMedium
-              ?.copyWith(color: context.vColors.grayText),
+        Container(
+          padding: const EdgeInsets.all(AppDimens.space6),
+          decoration: BoxDecoration(
+            color: color.withAlpha(25),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: AppDimens.iconXs, color: color),
         ),
-        Text(
-          value,
-          style: context.text.titleSmall
-              ?.copyWith(color: context.colors.onSurface),
+        const SizedBox(width: AppDimens.space8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: context.text.labelSmall
+                  ?.copyWith(color: context.vColors.grayText),
+            ),
+            Text(
+              value,
+              style: context.text.titleSmall
+                  ?.copyWith(color: context.colors.onSurface),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-/// Glass tile that opens a time picker (bed / wake time).
-class SleepTimePickerField extends StatelessWidget {
-  final String label;
-  final TimeOfDay? time;
-  final ValueChanged<TimeOfDay> onTimeSelected;
-  final IconData icon;
+class _SleepClockDialog extends StatefulWidget {
+  const _SleepClockDialog();
 
-  const SleepTimePickerField({
-    super.key,
-    required this.label,
-    required this.time,
-    required this.onTimeSelected,
-    required this.icon,
-  });
+  @override
+  State<_SleepClockDialog> createState() => _SleepClockDialogState();
+}
+
+class _SleepClockDialogState extends State<_SleepClockDialog> {
+  TimeOfDay _bed = const TimeOfDay(hour: 23, minute: 0);
+  TimeOfDay _wake = const TimeOfDay(hour: 7, minute: 0);
+  bool _saving = false;
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final wake = today.add(Duration(hours: _wake.hour, minutes: _wake.minute));
+    var bed = today.add(Duration(hours: _bed.hour, minutes: _bed.minute));
+    if (!bed.isBefore(wake)) bed = bed.subtract(const Duration(days: 1));
+    await context.read<SleepCubit>().saveManualSleep(bed, wake);
+    if (mounted) Navigator.pop(context, true);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
-    final radius = BorderRadius.circular(AppDimens.radiusCard);
-
-    return Material(
-      color: v.glassFill,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: v.glassBorder!),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () async {
-          final t = await showTimePicker(
-            context: context,
-            initialTime: time ?? const TimeOfDay(hour: 7, minute: 0),
-          );
-          if (t != null) {
-            onTimeSelected(t);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.space12,
-            vertical: AppDimens.space12,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: AppDimens.iconXs, color: v.grayText),
-                  const SizedBox(width: AppDimens.space6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.labelSmall
-                          ?.copyWith(color: v.grayText),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.space8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  time != null ? time!.format(context) : 'Select',
-                  style: context.text.titleMedium?.copyWith(
-                    color: time != null
-                        ? context.colors.onSurface
-                        : v.grayText,
-                  ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          context.gutter,
+          0,
+          context.gutter,
+          AppDimens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Log Sleep Interval', style: context.text.headlineSmall),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space12),
+            CircularSleepClockPicker(
+              initialBedTime: _bed,
+              initialWakeTime: _wake,
+              onChanged: (b, w) {
+                setState(() {
+                  _bed = b;
+                  _wake = w;
+                });
+              },
+            ),
+            const SizedBox(height: AppDimens.sectionGap),
+            AppPrimaryButton(
+              label: 'Save Sleep',
+              isLoading: _saving,
+              onTap: _save,
+            ),
+          ],
         ),
       ),
     );

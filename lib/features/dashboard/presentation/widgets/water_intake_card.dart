@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
@@ -24,8 +25,6 @@ class WaterIntakeCard extends StatefulWidget {
 }
 
 class _WaterIntakeCardState extends State<WaterIntakeCard> {
-  bool _isExpanded = false;
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<WaterIntakeCubit, WaterIntakeState>(
@@ -38,47 +37,46 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
       listener: (context, _) =>
           context.read<TrendCubit<WaterLogCache>>().load(),
       child: BlocConsumer<WaterIntakeCubit, WaterIntakeState>(
-      listenWhen: (previous, current) {
-        // A new log was added.
-        if (previous is WaterIntakeLoaded && current is WaterIntakeLoaded) {
-          return current.todayLogs.length > previous.todayLogs.length;
-        }
-        return false;
-      },
-      listener: (context, state) {
-        if (state is WaterIntakeLoaded && state.todayLogs.isNotEmpty) {
-          final addedAmount = state.todayLogs.last.amountMl;
-          showSuccessSnackBar(
-            context,
-            'Added $addedAmount ml of water',
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: context.colors.primary,
-              onPressed: () {
-                context.read<WaterIntakeCubit>().undoLast();
-              },
-            ),
+        listenWhen: (previous, current) {
+          if (previous is WaterIntakeLoaded && current is WaterIntakeLoaded) {
+            return current.todayLogs.length > previous.todayLogs.length;
+          }
+          return false;
+        },
+        listener: (context, state) {
+          if (state is WaterIntakeLoaded && state.todayLogs.isNotEmpty) {
+            final addedAmount = state.todayLogs.last.amountMl;
+            showSuccessSnackBar(
+              context,
+              'Added $addedAmount ml of water 💧',
+              action: SnackBarAction(
+                label: 'Undo',
+                textColor: context.colors.primary,
+                onPressed: () {
+                  context.read<WaterIntakeCubit>().undoLast();
+                },
+              ),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is WaterIntakeLoaded) {
+            final percentage = state.dailyGoalMl > 0
+                ? (state.currentIntakeMl / state.dailyGoalMl)
+                : 0.0;
+            return _buildCard(context, state, percentage);
+          }
+          return AppCard(
+            width: double.infinity,
+            child: state is WaterIntakeError
+                ? DashboardCardError(
+                    title: 'Water Intake',
+                    iconAsset: 'assets/icons/drop.svg',
+                    onRetry: context.read<WaterIntakeCubit>().reload,
+                  )
+                : const DashboardCardLoading(),
           );
-        }
-      },
-      builder: (context, state) {
-        if (state is WaterIntakeLoaded) {
-          final percentage = state.dailyGoalMl > 0
-              ? (state.currentIntakeMl / state.dailyGoalMl)
-              : 0.0;
-          return _buildCard(context, state, percentage);
-        }
-        return AppCard(
-          width: double.infinity,
-          child: state is WaterIntakeError
-              ? DashboardCardError(
-                  title: 'Water Intake',
-                  iconAsset: 'assets/icons/drop.svg',
-                  onRetry: context.read<WaterIntakeCubit>().reload,
-                )
-              : const DashboardCardLoading(),
-        );
-      },
+        },
       ),
     );
   }
@@ -97,12 +95,33 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     double percentage,
   ) {
     final int percentageInt = (percentage * 100).clamp(0, 100).toInt();
+    final remainingMl = state.dailyGoalMl - state.currentIntakeMl;
+    final isGoalReached = state.currentIntakeMl >= state.dailyGoalMl;
+
+    // Pace calculation (assuming 16 active waking hours 7am - 11pm)
+    final now = DateTime.now();
+    final currentHour = now.hour.clamp(7, 23);
+    final targetPaceFraction = (currentHour - 7) / 16.0;
+    final expectedMlByNow = (state.dailyGoalMl * targetPaceFraction).round();
+    final isBehindPace = !isGoalReached && (state.currentIntakeMl < expectedMlByNow - 300);
+
+    String statusLabel;
+    Color statusColor;
+    if (isGoalReached) {
+      statusLabel = 'Goal Met 🎉';
+      statusColor = AppColors.success;
+    } else if (isBehindPace) {
+      statusLabel = 'Hydration Nudge ⏰';
+      statusColor = AppColors.warning;
+    } else {
+      statusLabel = 'On Track 💧';
+      statusColor = AppColors.teal;
+    }
 
     return Semantics(
       label: '$percentageInt% of daily water goal, ${state.currentIntakeMl} of ${state.dailyGoalMl} milliliters',
       child: AppCard(
         width: double.infinity,
-        onTap: () => setState(() => _isExpanded = !_isExpanded),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -127,19 +146,53 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
               ),
             ),
             const SizedBox(height: AppDimens.cardInnerGap),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.end,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                DashboardMetric('${state.currentIntakeMl}'),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimens.space4),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  children: [
+                    DashboardMetric('${state.currentIntakeMl}'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppDimens.space4),
+                      child: Text(
+                        ' / ${state.dailyGoalMl} ml',
+                        style: context.text.bodyMedium
+                            ?.copyWith(color: context.vColors.grayText),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space8,
+                    vertical: AppDimens.space2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+                    border: Border.all(color: statusColor.withAlpha(60)),
+                  ),
                   child: Text(
-                    ' / ${state.dailyGoalMl} ml',
-                    style: context.text.bodyMedium
-                        ?.copyWith(color: context.vColors.grayText),
+                    statusLabel,
+                    style: context.text.labelSmall?.copyWith(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: AppDimens.space6),
+            Text(
+              isGoalReached
+                  ? 'Fantastic job staying hydrated today!'
+                  : '${remainingMl > 0 ? remainingMl : 0} ml remaining to hit target',
+              style: context.text.bodySmall?.copyWith(
+                color: context.vColors.grayText,
+              ),
             ),
             const SizedBox(height: AppDimens.cardInnerGap),
             SizedBox(
@@ -155,43 +208,42 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
               color: AppColors.water,
               valueFormatter: WaterTrendsPage.formatMl,
             ),
-            AnimatedSize(
-              duration: AppDurations.slow,
-              curve: Curves.easeInOutCubic,
-              alignment: Alignment.topCenter,
-              child: _isExpanded
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: AppDimens.cardInnerGap),
-                      child: Row(
-                        children: [
-                          const _QuickAddButton(
-                            amountMl: 150,
-                            label: '150ml',
-                            icon: Icons.local_drink_outlined,
-                          ),
-                          const SizedBox(width: AppDimens.space8),
-                          const _QuickAddButton(
-                            amountMl: 250,
-                            label: '250ml',
-                            icon: Icons.local_cafe_outlined,
-                          ),
-                          const SizedBox(width: AppDimens.space8),
-                          const _QuickAddButton(
-                            amountMl: 500,
-                            label: '500ml',
-                            icon: Icons.water_drop_outlined,
-                          ),
-                          const SizedBox(width: AppDimens.space8),
-                          _QuickAddButton(
-                            amountMl: null,
-                            label: 'Custom',
-                            icon: Icons.add,
-                            onTapCustom: () => _showCustomAddSheet(context),
-                          ),
-                        ],
-                      ),
-                    )
-                  : const SizedBox(width: double.infinity),
+            const SizedBox(height: AppDimens.cardInnerGap),
+            // Quick-add glassware containers
+            Row(
+              children: [
+                _QuickAddButton(
+                  amountMl: 150,
+                  label: '150ml',
+                  subLabel: 'Cup',
+                  icon: Icons.local_cafe_outlined,
+                  onLogged: () => HapticFeedback.mediumImpact(),
+                ),
+                const SizedBox(width: AppDimens.space6),
+                _QuickAddButton(
+                  amountMl: 250,
+                  label: '250ml',
+                  subLabel: 'Glass',
+                  icon: Icons.local_drink_outlined,
+                  onLogged: () => HapticFeedback.mediumImpact(),
+                ),
+                const SizedBox(width: AppDimens.space6),
+                _QuickAddButton(
+                  amountMl: 500,
+                  label: '500ml',
+                  subLabel: 'Bottle',
+                  icon: Icons.water_drop_outlined,
+                  onLogged: () => HapticFeedback.mediumImpact(),
+                ),
+                const SizedBox(width: AppDimens.space6),
+                _QuickAddButton(
+                  amountMl: null,
+                  label: 'Custom',
+                  subLabel: 'Add',
+                  icon: Icons.add_rounded,
+                  onTapCustom: () => _showCustomAddSheet(context),
+                ),
+              ],
             ),
           ],
         ),
@@ -222,12 +274,13 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
     final controller = TextEditingController();
     _showNumberInputSheet(
       context: context,
-      title: 'Add Water',
+      title: 'Log Custom Water',
       controller: controller,
       onSave: () {
         final val = int.tryParse(controller.text);
         if (val == null || val <= 0) return 'Enter an amount in ml';
         context.read<WaterIntakeCubit>().addWater(val);
+        HapticFeedback.mediumImpact();
         return null;
       },
     );
@@ -250,9 +303,6 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
   }
 }
 
-/// Figma `track/edit/water`: title + close, divider, "Value" field with a
-/// unit suffix, Cancel / Save row. [onSave] returns an error message to
-/// show on the field (the sheet stays open), or null to close.
 class _NumberInputSheet extends StatefulWidget {
   final String title;
   final TextEditingController controller;
@@ -312,9 +362,9 @@ class _NumberInputSheetState extends State<_NumberInputSheet> {
             Divider(height: AppDimens.borderThin, color: context.vColors.divider),
             const SizedBox(height: AppDimens.sectionGap),
             AppTextField.integer(
-              label: 'Value',
+              label: 'Amount in Milliliters',
               controller: widget.controller,
-              hint: '0',
+              hint: 'e.g. 350',
               suffixText: 'ml',
               autofocus: true,
               error: _error,
@@ -335,7 +385,7 @@ class _NumberInputSheetState extends State<_NumberInputSheet> {
                 const SizedBox(width: AppDimens.space16),
                 Expanded(
                   child: AppPrimaryButton(
-                    label: 'Save',
+                    label: 'Log Water',
                     onTap: _save,
                   ),
                 ),
@@ -351,31 +401,47 @@ class _NumberInputSheetState extends State<_NumberInputSheet> {
 class _QuickAddButton extends StatelessWidget {
   final int? amountMl;
   final String label;
+  final String subLabel;
   final IconData icon;
   final VoidCallback? onTapCustom;
+  final VoidCallback? onLogged;
 
   const _QuickAddButton({
     required this.amountMl,
     required this.label,
+    required this.subLabel,
     required this.icon,
     this.onTapCustom,
+    this.onLogged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(AppDimens.radiusToast);
+    final radius = BorderRadius.circular(AppDimens.radiusCard);
+    final isCustom = amountMl == null;
+
     return Expanded(
       child: Semantics(
         label: 'Add $label of water',
         button: true,
         child: Material(
-          color: AppColors.water.withValues(alpha: 0.15),
-          borderRadius: radius,
+          color: isCustom
+              ? context.vColors.glassFill
+              : AppColors.water.withAlpha(25),
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: BorderSide(
+              color: isCustom
+                  ? context.vColors.glassBorder!
+                  : AppColors.water.withAlpha(50),
+            ),
+          ),
           child: InkWell(
             borderRadius: radius,
             onTap: () {
               if (amountMl != null) {
                 context.read<WaterIntakeCubit>().addWater(amountMl!);
+                onLogged?.call();
               } else if (onTapCustom != null) {
                 onTapCustom!();
               }
@@ -383,12 +449,16 @@ class _QuickAddButton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimens.space4,
-                vertical: AppDimens.space8,
+                vertical: AppDimens.space10,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: AppDimens.iconLg, color: AppColors.water),
+                  Icon(
+                    icon,
+                    size: AppDimens.iconMd,
+                    color: isCustom ? context.colors.onSurface : AppColors.water,
+                  ),
                   const SizedBox(height: AppDimens.space4),
                   FittedBox(
                     fit: BoxFit.scaleDown,
@@ -396,9 +466,19 @@ class _QuickAddButton extends StatelessWidget {
                       label,
                       maxLines: 1,
                       style: context.text.labelSmall?.copyWith(
-                        color: AppColors.water,
-                        fontWeight: FontWeight.w500,
+                        color: isCustom
+                            ? context.colors.onSurface
+                            : AppColors.water,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  ),
+                  Text(
+                    subLabel,
+                    maxLines: 1,
+                    style: context.text.labelSmall?.copyWith(
+                      fontSize: 10,
+                      color: context.vColors.grayText,
                     ),
                   ),
                 ],

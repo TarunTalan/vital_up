@@ -27,7 +27,7 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  static const int _totalMs = 3000;
+  static const int _totalMs = 2400;
 
   // Logo viewBox geometry (500x500 space).
   static const double _viewBox = 500.0;
@@ -64,57 +64,57 @@ class _SplashPageState extends State<SplashPage>
 
     _dropProgress = CurvedAnimation(
       parent: _controller,
-      curve: _interval(0, 800, Curves.easeOutBack),
+      curve: _interval(0, 500, Curves.easeOutBack),
     );
     _dropRotation = Tween<double>(begin: -0.18, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(0, 800, Curves.easeOutCubic),
+        curve: _interval(0, 500, Curves.easeOutCubic),
       ),
     );
     _rippleScale = Tween<double>(begin: 1.0, end: 2.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(800, 1300, Curves.easeOut),
+        curve: _interval(500, 950, Curves.easeOut),
       ),
     );
     _rippleOpacity = Tween<double>(begin: 0.45, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(800, 1300, Curves.easeOut),
+        curve: _interval(500, 950, Curves.easeOut),
       ),
     );
     _logoBottomScale = CurvedAnimation(
       parent: _controller,
-      curve: _interval(800, 1450, Curves.easeOutBack),
+      curve: _interval(500, 1100, Curves.easeOutBack),
     );
     _logoBottomOpacity = CurvedAnimation(
       parent: _controller,
-      curve: _interval(800, 1450, Curves.easeOut),
+      curve: _interval(500, 1100, Curves.easeOut),
     );
     _fillProgress = CurvedAnimation(
       parent: _controller,
-      curve: _interval(1650, 2100, Curves.easeInCubic),
+      curve: _interval(1250, 1650, Curves.easeInCubic),
     );
     _tealProgress = CurvedAnimation(
       parent: _controller,
-      curve: _interval(2100, 2400, Curves.easeOut),
+      curve: _interval(1600, 1850, Curves.easeOut),
     );
     _taglineOpacity = CurvedAnimation(
       parent: _controller,
-      curve: _interval(2150, 2550, Curves.easeOut),
+      curve: _interval(1650, 1950, Curves.easeOut),
     );
     _taglineTranslationY = Tween<double>(begin: AppDimens.space16, end: 0.0)
         .animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(2150, 2550, Curves.easeOut),
+        curve: _interval(1650, 1950, Curves.easeOut),
       ),
     );
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(2750, _totalMs, Curves.easeInOut),
+        curve: _interval(2150, _totalMs, Curves.easeInOut),
       ),
     );
 
@@ -185,7 +185,8 @@ class _SplashPageState extends State<SplashPage>
     final logoSize = context.w(AppDimens.splashLogo);
     final unit = logoSize / _viewBox;
     final circleSize = _circleSize * unit;
-    final dropY = (-_viewBox + (_viewBox + _circleTop) * _dropProgress.value) * unit;
+    const startY = -_circleSize * 1.2;
+    final dropY = (startY + (_circleTop - startY) * _dropProgress.value) * unit;
 
     // Scale needed for the head circle to cover the whole screen.
     final diagonal = math.sqrt(
