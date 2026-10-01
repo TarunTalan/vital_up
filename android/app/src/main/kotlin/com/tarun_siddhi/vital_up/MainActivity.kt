@@ -1,4 +1,4 @@
-package com.example.vital_up
+package com.tarun_siddhi.vital_up
 
 import android.app.AppOpsManager
 import android.content.Context

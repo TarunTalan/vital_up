@@ -79,3 +79,6 @@ lib/core/config/supabase_config.dart
 /linux/flutter/generated_plugin_registrant.h
 /linux/flutter/generated_plugins.cmake
 flutter_export_environment.sh
+# Firebase config (contains API keys): download from the Firebase console
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

@@ -50,6 +50,11 @@ import 'package:vital_up/features/gamification/data/repositories/gamification_re
 import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/notifications/data/datasources/notifications_remote_datasource.dart';
+import 'package:vital_up/features/notifications/data/repositories/notifications_repository_impl.dart';
+import 'package:vital_up/features/notifications/data/services/push_service.dart';
+import 'package:vital_up/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/activity_goals/data/repositories/activity_goals_repository_impl.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
@@ -172,7 +177,12 @@ Future<void> initDependencies() async {
   );
 
   // 7. Blocs / Cubits
-  sl.registerFactory(() => AuthCubit(authRepository: sl<AuthRepository>()));
+  sl.registerFactory(
+    () => AuthCubit(
+      authRepository: sl<AuthRepository>(),
+      beforeSignOut: () => sl<PushService>().unregister(),
+    ),
+  );
   
   // 8. Onboarding
   sl.registerLazySingleton<OnboardingDataStore>(
@@ -314,7 +324,12 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SettingsRepository>(
         () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
   );
-  sl.registerFactory(() => SettingsCubit(settingsRepository: sl<SettingsRepository>()));
+  sl.registerFactory(
+    () => SettingsCubit(
+      settingsRepository: sl<SettingsRepository>(),
+      onNotificationsChanged: (enabled) => sl<PushService>().setEnabled(enabled),
+    ),
+  );
 
   // 9. Activity tracking (Drift DB and Repositories)
   final driftDb = AppDatabase();
@@ -481,4 +496,20 @@ Future<void> initDependencies() async {
   );
   sl.registerFactory(() => CommunityCubit(sl<CommunityRepository>()));
   sl.registerFactory(() => FriendsCubit(sl<CommunityRepository>()));
+
+  // 16. Notifications: friend requests, achievements, announcements
+  sl.registerLazySingleton<NotificationsRepository>(
+    () => NotificationsRepositoryImpl(
+      NotificationsRemoteDataSource(sl<SupabaseClient>()),
+      sl<CommunityRepository>(),
+    ),
+  );
+  sl.registerFactory(() => NotificationsCubit(sl<NotificationsRepository>()));
+  sl.registerLazySingleton(
+    () => PushService(
+      sl<SupabaseClient>(),
+      sl<SettingsRepository>(),
+      sl<NotificationsRepository>(),
+    ),
+  );
 }

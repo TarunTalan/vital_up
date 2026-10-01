@@ -9,3 +9,8 @@ entrypoint = "./functions/fatsecret-proxy/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/fatsecret-proxy/*.html" ]
+
+[functions.send-push]
+enabled = true
+# Called by a database trigger with a shared secret, not a user JWT.
+verify_jwt = false

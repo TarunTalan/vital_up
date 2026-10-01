@@ -50,6 +50,14 @@
         <meta-data
             android:name="com.pravera.flutter_foreground_task.NOTIFICATION_ICON"
             android:resource="@mipmap/ic_launcher" />
+        <!-- FCM: channel and icon for pushes received while the app is in the
+             background (created in PushService). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="vitalup_general" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
 
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"

@@ -9,8 +9,12 @@ import 'settings_state.dart';
 class SettingsCubit extends Cubit<SettingsState> {
   final SettingsRepository _settingsRepository;
 
+  /// Called when the notifications switch changes (push on/off).
+  final Future<void> Function(bool enabled)? _onNotificationsChanged;
+
   SettingsCubit({
     required SettingsRepository settingsRepository,
+    this._onNotificationsChanged,
   })  : _settingsRepository = settingsRepository,
         super(SettingsInitial());
 
@@ -31,10 +35,16 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> updateSettings(SettingsEntity settings) async {
+    final previous = state is SettingsLoaded
+        ? (state as SettingsLoaded).settings.notificationsEnabled
+        : null;
     final result = await _settingsRepository.saveSettings(settings);
     result.fold(
       (failure) => emit(SettingsError(failure.message)),
       (_) => emit(SettingsLoaded(settings)),
     );
+    if (result.isRight() && previous != settings.notificationsEnabled) {
+      await _onNotificationsChanged?.call(settings.notificationsEnabled);
+    }
   }
 }
