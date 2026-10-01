@@ -4,16 +4,23 @@ import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 
 class WaterIntakeService {
   final IsarService _isarService;
   final SharedPreferences _prefs;
   final SyncHooks? _sync;
+  final HabitEvents? _events;
 
   static const _dailyGoalKey = 'daily_water_goal';
   static const _defaultGoalMl = 2500;
 
-  WaterIntakeService(this._isarService, this._prefs, [this._sync]);
+  WaterIntakeService(
+    this._isarService,
+    this._prefs, [
+    this._sync,
+    this._events,
+  ]);
 
   Isar get _isar => _isarService.isar;
 
@@ -39,6 +46,13 @@ class WaterIntakeService {
       await _isar.waterLogCaches.put(log);
     });
     _sync?.schedule();
+    if (_events != null) {
+      final today = await getTodayLogs(userId);
+      final total = today.fold<int>(0, (sum, l) => sum + l.amountMl);
+      _events.logged(
+        HabitLogged(Habit.water, goalReached: total >= getDailyGoal()),
+      );
+    }
     return log;
   }
 

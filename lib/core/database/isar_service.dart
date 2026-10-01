@@ -20,26 +20,26 @@ import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 class IsarService {
   late final Isar isar;
 
+  /// Every collection; background isolates must open Isar with the same list.
+  static const schemas = [
+    UserProfileCacheSchema,
+    StepLogCacheSchema,
+    HeartRateLogCacheSchema,
+    SleepLogCacheSchema,
+    WaterLogCacheSchema,
+    MealPlanModelSchema,
+    FavoriteAudioSchema,
+    DownloadedTrackSchema,
+    MealLogCacheSchema,
+    BarcodeCacheSchema,
+    OfflineFoodSchema,
+    WeightLogCacheSchema,
+  ];
+
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
-    
-    isar = await Isar.open(
-      [
-        UserProfileCacheSchema,
-        StepLogCacheSchema,
-        HeartRateLogCacheSchema,
-        SleepLogCacheSchema,
-        WaterLogCacheSchema,
-        MealPlanModelSchema,
-        FavoriteAudioSchema,
-        DownloadedTrackSchema,
-        MealLogCacheSchema,
-        BarcodeCacheSchema,
-        OfflineFoodSchema,
-        WeightLogCacheSchema,
-      ],
-      directory: dir.path,
-    );
+
+    isar = await Isar.open(schemas, directory: dir.path);
 
     await _seedOfflineFoods();
   }
@@ -66,7 +66,9 @@ class IsarService {
         return; // already seeded
       }
 
-      final jsonString = await rootBundle.loadString('assets/data/popular_indian_foods.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/data/popular_indian_foods.json',
+      );
       final List<dynamic> list = jsonDecode(jsonString) as List<dynamic>;
 
       final List<OfflineFood> foods = list.map((item) {
@@ -87,7 +89,9 @@ class IsarService {
         await isar.offlineFoods.putAll(foods);
       });
 
-      debugPrint('Seeded ${foods.length} popular Indian food items into Isar offline database.');
+      debugPrint(
+        'Seeded ${foods.length} popular Indian food items into Isar offline database.',
+      );
     } catch (e) {
       debugPrint('Error seeding offline foods: $e');
     }
@@ -113,7 +117,9 @@ class IsarService {
 
         // Get existing names to avoid duplicating
         final existingFoods = await isar.offlineFoods.where().findAll();
-        final existingNames = existingFoods.map((f) => f.name.toLowerCase()).toSet();
+        final existingNames = existingFoods
+            .map((f) => f.name.toLowerCase())
+            .toSet();
 
         final List<OfflineFood> newFoods = [];
         for (final item in products) {
@@ -143,9 +149,13 @@ class IsarService {
           await isar.writeTxn(() async {
             await isar.offlineFoods.putAll(newFoods);
           });
-          debugPrint('IsarService: Background sync completed. Added ${newFoods.length} new items from remote DB.');
+          debugPrint(
+            'IsarService: Background sync completed. Added ${newFoods.length} new items from remote DB.',
+          );
         } else {
-          debugPrint('IsarService: Background sync completed. No new items to add.');
+          debugPrint(
+            'IsarService: Background sync completed. No new items to add.',
+          );
         }
       } catch (e) {
         // Silently catch and log to prevent crashes if connection fails
@@ -154,4 +164,3 @@ class IsarService {
     });
   }
 }
-

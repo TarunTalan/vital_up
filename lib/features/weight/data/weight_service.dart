@@ -11,6 +11,7 @@ import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 
 /// Kilograms per pound.
 const kgPerLb = 0.45359237;
@@ -41,6 +42,7 @@ class WeightService {
   final SettingsRepository _settings;
   final SharedPreferences _prefs;
   final SyncHooks? _sync;
+  final HabitEvents? _events;
 
   WeightService(
     this._db,
@@ -48,6 +50,7 @@ class WeightService {
     this._settings,
     this._prefs, [
     this._sync,
+    this._events,
   ]);
 
   static const _keyTargetKg = 'weight_target_kg';
@@ -83,6 +86,7 @@ class WeightService {
       ..source = source;
     await _isar.writeTxn(() => _isar.weightLogCaches.put(log));
     _sync?.schedule();
+    _events?.logged(const HabitLogged(Habit.weight));
     final latest = await this.latest();
     if (latest?.id == log.id) unawaited(_updateProfileWeight(kg));
     return null;

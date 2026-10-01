@@ -126,6 +126,7 @@ import 'package:vital_up/features/activity_tracking/services/in_app_audio_downlo
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
+import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 import 'package:vital_up/features/account/data/account_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
@@ -133,6 +134,7 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 
 
 final GetIt sl = GetIt.instance;
@@ -153,6 +155,9 @@ Future<void> initDependencies() async {
   // 2. SharedPreferences (Local key-value config cache)
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+
+  // App-wide "habit logged" events (reminders stay quiet once done).
+  sl.registerLazySingleton(HabitEvents.new);
 
   // 3. Secure Storage (For OAuth tokens)
   const secureStorage = FlutterSecureStorage();
@@ -221,6 +226,7 @@ Future<void> initDependencies() async {
       isarService: sl<IsarService>(),
       uuid: sl<Uuid>(),
       sync: sl<SyncService>(),
+      events: sl<HabitEvents>(),
     ),
   );
 
@@ -357,7 +363,11 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<AppDatabase>(() => driftDb);
 
   sl.registerLazySingleton<ActivityRepository>(
-        () => ActivityRepositoryImpl(sl<AppDatabase>(), sl<SyncService>()),
+        () => ActivityRepositoryImpl(
+          sl<AppDatabase>(),
+          sl<SyncService>(),
+          sl<HabitEvents>(),
+        ),
   );
   // A workout still open from a previous run means the app was killed
   // mid-recording; close it so its checkpointed progress shows in history.
@@ -447,7 +457,14 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
   sl.registerFactory(() => SleepCubit(sl<SleepService>()));
 
-  sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
+  sl.registerLazySingleton<WaterIntakeService>(
+    () => WaterIntakeService(
+      sl<IsarService>(),
+      sl<SharedPreferences>(),
+      sl<SyncService>(),
+      sl<HabitEvents>(),
+    ),
+  );
   sl.registerFactory(() => WaterIntakeCubit(sl<WaterIntakeService>()));
   sl.registerLazySingleton<TrendsService>(
     () => TrendsService(
@@ -483,6 +500,7 @@ Future<void> initDependencies() async {
       snapshots: sl<HealthSnapshotBuilder>(),
       vitals: sl<HealthVitalsService>(),
       supabase: sl<SupabaseClient>(),
+      events: sl<HabitEvents>(),
     ),
   );
   sl.registerFactory(() => VitaChatCubit(sl<VitaRepository>()));
@@ -543,6 +561,17 @@ Future<void> initDependencies() async {
       sl<SettingsRepository>(),
       sl<NotificationsRepository>(),
       sl<FlutterLocalNotificationsPlugin>(),
+      (response) async {
+        // "+250 ml" on a water reminder while the app is open.
+        final userId = reminderUserId(response);
+        if (response.actionId == ReminderScheduler.logWaterAction &&
+            userId != null) {
+          await sl<WaterIntakeService>().addWaterLog(
+            userId,
+            ReminderScheduler.logWaterMl,
+          );
+        }
+      },
     ),
   );
 
@@ -553,7 +582,8 @@ Future<void> initDependencies() async {
       RemindersLocalDataSource(sl<SharedPreferences>()),
       sl<ReminderScheduler>(),
       sl<SettingsRepository>(),
-    ),
+      userId: () => sl<SupabaseClient>().auth.currentUser?.id,
+    )..watch(sl<HabitEvents>().stream),
   );
   sl.registerFactory(() => RemindersCubit(sl<RemindersService>()));
 
@@ -576,6 +606,7 @@ Future<void> initDependencies() async {
       sl<SettingsRepository>(),
       sl<SharedPreferences>(),
       sl<SyncService>(),
+      sl<HabitEvents>(),
     ),
   );
 

@@ -8,6 +8,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 import 'package:vital_up/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:vital_up/features/reminders/data/reminder_actions.dart';
+import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 
 /// Pushes are shown by the system while the app is in the background; this
@@ -46,7 +48,17 @@ class PushService {
   /// Shared with ReminderScheduler; initialised here.
   final FlutterLocalNotificationsPlugin _local;
 
-  PushService(this._client, this._settings, this._notifications, this._local);
+  /// Handles a notification action button tapped while the app is running
+  /// (e.g. "+250 ml" on a water reminder).
+  final Future<void> Function(NotificationResponse response)? _onAction;
+
+  PushService(
+    this._client,
+    this._settings,
+    this._notifications,
+    this._local, [
+    this._onAction,
+  ]);
 
   /// Must match the channel in AndroidManifest.xml and send-push.
   static const _channel = AndroidNotificationChannel(
@@ -109,17 +121,24 @@ class PushService {
   Future<void> _initLocal() async {
     try {
       await _local.initialize(
-        settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        settings: InitializationSettings(
+          android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
           // Permission is asked for when push or a reminder is turned on.
           iOS: DarwinInitializationSettings(
             requestAlertPermission: false,
             requestBadgePermission: false,
             requestSoundPermission: false,
+            notificationCategories: ReminderScheduler.darwinCategories,
           ),
         ),
-        onDidReceiveNotificationResponse: (response) =>
-            _handlePayload(response.payload),
+        onDidReceiveNotificationResponse: (response) {
+          if (response.actionId != null) {
+            _onAction?.call(response);
+          } else {
+            _handlePayload(response.payload);
+          }
+        },
+        onDidReceiveBackgroundNotificationResponse: reminderActionBackground,
       );
       await _local
           .resolvePlatformSpecificImplementation<

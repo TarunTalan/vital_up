@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
@@ -31,9 +32,16 @@ class _FakeScheduler extends ReminderScheduler {
     return grant;
   }
 
+  Set<String> lastSkipped = const {};
+
   @override
-  Future<List<int>> schedule(ReminderSchedulePlan plan) async {
+  Future<List<int>> schedule(
+    ReminderSchedulePlan plan, {
+    Set<String> skippedToday = const {},
+    String? userId,
+  }) async {
     lastPlan = plan;
+    lastSkipped = skippedToday;
     return [for (final e in plan.entries) e.id];
   }
 
@@ -231,6 +239,64 @@ void main() {
       await service.clear();
       expect(scheduler.cancelled, containsAll(ids));
       expect(service.load().any((r) => !r.isPreset), isFalse);
+    });
+  });
+
+  group('smart skip', () {
+    List<Reminder> enabled(Iterable<String> ids) => [
+      for (final p in reminderPresets)
+        ids.contains(p.id) ? p.copyWith(enabled: true) : p,
+    ];
+
+    test('water reminders stop only once the goal is reached', () {
+      final reminders = enabled(['preset_water']);
+      expect(
+        remindersDoneBy(const HabitLogged(Habit.water), reminders),
+        isEmpty,
+      );
+      expect(
+        remindersDoneBy(
+          const HabitLogged(Habit.water, goalReached: true),
+          reminders,
+        ),
+        {'preset_water'},
+      );
+    });
+
+    test('a logged meal quiets only its own reminder', () {
+      final reminders = enabled(['preset_breakfast', 'preset_lunch']);
+      expect(
+        remindersDoneBy(const HabitLogged(Habit.meal, mealType: 1), reminders),
+        {'preset_lunch'},
+      );
+      expect(
+        remindersDoneBy(const HabitLogged(Habit.meal, mealType: 3), reminders),
+        isEmpty,
+      );
+    });
+
+    test('reminders that are off are never skipped', () {
+      expect(
+        remindersDoneBy(const HabitLogged(Habit.activity), reminderPresets),
+        isEmpty,
+      );
+    });
+
+    test('service skips today and reschedules, unless turned off', () async {
+      SharedPreferences.setMockInitialValues({});
+      final local = RemindersLocalDataSource(
+        await SharedPreferences.getInstance(),
+      );
+      final scheduler = _FakeScheduler();
+      final service = RemindersService(local, scheduler, _FakeSettings());
+      await service.save(enabled(['preset_activity']));
+
+      await service.markDone(const HabitLogged(Habit.activity));
+      expect(scheduler.lastSkipped, {'preset_activity'});
+      expect(local.skippedOn(dayKey(DateTime.now())), {'preset_activity'});
+
+      await service.setSmartSkip(false);
+      expect(scheduler.lastSkipped, isEmpty);
     });
   });
 

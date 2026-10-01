@@ -76,6 +76,48 @@ class RemindersPage extends StatelessWidget {
                   onAction: () => openAppSettings(),
                 ),
               _Section(
+                title: 'Smart reminders',
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppDimens.space8,
+                    ),
+                    child: Row(
+                      children: [
+                        const AppIconBadge(
+                          icon: Icon(Icons.auto_awesome_rounded),
+                        ),
+                        const SizedBox(width: AppDimens.space12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Skip when done',
+                                style: context.text.titleSmall,
+                              ),
+                              const SizedBox(height: AppDimens.space2),
+                              Text(
+                                'No more water reminders once you hit your '
+                                "goal, or meal reminders once it's logged.",
+                                style: context.text.bodySmall?.copyWith(
+                                  color: context.vColors.grayText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        Switch(
+                          value: state.smartSkip,
+                          onChanged: cubit.setSmartSkip,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              _Section(
                 title: 'Healthy habits',
                 children: [
                   for (final r in state.presets)
