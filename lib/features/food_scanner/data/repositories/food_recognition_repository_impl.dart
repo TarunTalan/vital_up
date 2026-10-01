@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,7 +7,10 @@ import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_item_dto.dart';
+import 'package:vital_up/features/food_scanner/data/models/nutrition_response_parser.dart';
+import 'package:vital_up/features/food_scanner/data/utils/food_image_encoder.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/recognized_food.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
 
 class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
@@ -18,7 +22,12 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
     required this.supabaseClient,
   });
 
-  final Map<String, FoodItem> _cache = {};
+  /// Upper bound for one recognition round trip. The edge function caps each
+  /// provider at 30 s and hedges to a second provider, so this only trips
+  /// when the network itself is stuck.
+  static const Duration _recognitionTimeout = Duration(seconds: 50);
+
+  final Map<String, List<RecognizedFood>> _cache = {};
 
   /// Supabase Edge Functions only auto-decode the response body into a
   /// [Map] when the function sets `Content-Type: application/json`.
@@ -32,64 +41,65 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   }
 
   @override
-  Future<Either<Failure, List<FoodItem>>> recognizeFood(File image) async {
+  Future<Either<Failure, List<RecognizedFood>>> recognizeFood(File image) async {
     logger.i('recognizeFood called with image: ${image.path}');
     if (supabaseClient.auth.currentSession?.accessToken == null) {
       logger.e('recognizeFood failed: No active session found.');
       return const Left(ServerFailure('User is not authenticated. Please log in.'));
     }
     try {
-      final cacheKey = image.path;
-      if (_cache.containsKey(cacheKey)) {
+      // The capture flow overwrites the same path with the cropped photo, so
+      // the path alone would return a previous scan's result.
+      final cacheKey = '${image.path}:${(await image.lastModified()).millisecondsSinceEpoch}';
+      final cached = _cache[cacheKey];
+      if (cached != null) {
         logger.d('Returning cached food recognition result');
-        return Right([_cache[cacheKey]!]);
+        return Right(cached);
       }
 
-      logger.d('Reading image bytes...');
-      final imageBytes = await image.readAsBytes();
-      logger.d('Encoding to base64...');
-      final base64Image = base64Encode(imageBytes);
+      final stopwatch = Stopwatch()..start();
+      final imageBytes = await encodeFoodImageForUpload(image.path);
+      logger.d('Encoded image: ${imageBytes.length ~/ 1024} KB in ${stopwatch.elapsedMilliseconds} ms');
 
-      final response = await supabaseClient.functions.invoke(
-        'scan-food',
-        body: {
-          'image': base64Image,
-        },
-      );
+      final response = await supabaseClient.functions
+          .invoke(
+            'scan-food',
+            body: {
+              'image': base64Encode(imageBytes),
+              'mime_type': 'image/jpeg',
+            },
+          )
+          .timeout(_recognitionTimeout);
 
-      logger.d('Supabase response status: ${response.status}');
-      logger.d('Supabase response data: ${response.data}');
+      logger.d('scan-food responded ${response.status} in ${stopwatch.elapsedMilliseconds} ms');
 
       final data = _decodeMap(response.data);
       final itemsData = data['items'] as List<dynamic>?;
-      logger.d('Items data: $itemsData');
+      logger.d('Recognized items (${data['served_by']}): $itemsData');
 
       if (itemsData == null || itemsData.isEmpty) {
         return const Left(NoFoodDetectedFailure());
       }
 
-      final foodItems = itemsData
-          .map((item) => FoodItemDto.fromJson(item as Map<String, dynamic>).toDomain())
-          .toList();
-
-      for (final item in foodItems) {
-        _cache[cacheKey] = item;
-      }
-
-      return Right(foodItems);
+      final foods = itemsData.whereType<Map<String, dynamic>>().map(_toRecognizedFood).toList();
+      _cache[cacheKey] = foods;
+      return Right(foods);
     } on FunctionException catch (e) {
+      // Provider error details are for logs only; never show raw JSON to users.
       logger.e('scan-food function error: status=${e.status} details=${e.details}');
       switch (e.status) {
         case 402:
         case 403:
+        case 429:
           return const Left(ScanQuotaExceededFailure());
         case 503:
-          return Left(RecognitionUnavailableFailure(_detailsMessage(e.details) ??
-              'Food recognition is temporarily busy. Please try again shortly.'));
+          return const Left(RecognitionUnavailableFailure());
         default:
-          return Left(ServerFailure(
-              _detailsMessage(e.details) ?? 'Failed to recognize food. Please try again.'));
+          return const Left(ServerFailure('Failed to recognize food. Please try again.'));
       }
+    } on TimeoutException {
+      logger.e('recognizeFood timed out after ${_recognitionTimeout.inSeconds}s');
+      return const Left(NetworkFailure('Recognition is taking too long. Check your connection and try again.'));
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
       final errorMessage = e.toString();
@@ -100,14 +110,15 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
     }
   }
 
-  String? _detailsMessage(dynamic details) {
-    if (details is Map && details['error'] is String) {
-      final error = details['error'] as String;
-      final extra = details['details'];
-      return extra is String ? '$error ($extra)' : error;
-    }
-    if (details is String && details.isNotEmpty) return details;
-    return null;
+  RecognizedFood _toRecognizedFood(Map<String, dynamic> json) {
+    final dto = FoodItemDto.fromJson(json);
+    final item = dto.toDomain();
+    final nutritionJson = json['nutrition'];
+    return RecognizedFood(
+      item: item,
+      lookupKey: dto.fdcId ?? item.name,
+      nutrition: nutritionJson is Map<String, dynamic> ? parseNutritionResponse(nutritionJson, item) : null,
+    );
   }
 
   @override

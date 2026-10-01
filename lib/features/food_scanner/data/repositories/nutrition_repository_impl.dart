@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/features/food_scanner/data/models/nutrition_response_parser.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
@@ -45,85 +46,20 @@ class NutritionRepositoryImpl implements NutritionRepository {
       return const Left(ServerFailure('User is not authenticated. Please log in.'));
     }
     try {
-      // Get USDA API key from Supabase Edge Function or environment
       final response = await supabaseClient.functions.invoke(
         'scan-food',
         body: {
           'get_nutrition': true,
           'fdc_id': item.id,
+          // Lets the server fall back to a name lookup / estimate when the id
+          // is a USDA id or barcode it can't resolve.
+          'food_name': item.name,
           'serving_description': item.servingDescription,
         },
-      );
+      ).timeout(const Duration(seconds: 25));
 
       if (response.status == 200) {
-        final data = _decodeMap(response.data);
-        // The nutrition edge function only returns calorie/macro numbers —
-        // it has no knowledge of the FoodItem this lookup was for, so it
-        // never sends back a `per` field. Attach the actual item we were
-        // called with directly rather than relying on NutritionInfoDto's
-        // `per` JSON parsing (which would otherwise fall back to an
-        // empty/blank FoodItem).
-        
-        // Parse additional nutrients
-        final additionalNutrientsList = (data['additional_nutrients'] as List<dynamic>?)
-            ?.map((e) => AdditionalNutrient(
-              id: (e['id'] as dynamic)?.toString(),
-              name: e['name'] as String? ?? '',
-              unit: e['unit'] as String? ?? '',
-              value: (e['value'] as num?)?.toDouble() ?? 0.0,
-            ))
-            .toList() ?? [];
-        
-        double caloriesVal = (data['calories'] as num?)?.toDouble() ?? 0.0;
-
-        // Safeguard: Check if the returned calories value is actually in kJ (kilojoules)
-        // If we find an 'Energy' nutrient with unit 'kJ' and matching value, we convert it to kcal.
-        final hasKjEnergy = additionalNutrientsList.any((n) =>
-            (n.name.toLowerCase() == 'energy' || n.id == '1062') &&
-            n.unit.toLowerCase() == 'kj' &&
-            (n.value - caloriesVal).abs() < 0.1);
-
-        if (hasKjEnergy && caloriesVal > 0) {
-          caloriesVal = caloriesVal / 4.184;
-        }
-
-        final nutritionInfo = NutritionInfo(
-          calories: caloriesVal,
-          proteinG: (data['protein_g'] as num?)?.toDouble() ?? 0.0,
-          carbsG: (data['carbs_g'] as num?)?.toDouble() ?? 0.0,
-          fatG: (data['fat_g'] as num?)?.toDouble() ?? 0.0,
-          fiberG: (data['fiber_g'] as num?)?.toDouble() ?? 0.0,
-          sugarG: (data['sugar_g'] as num?)?.toDouble() ?? 0.0,
-          sodiumMg: (data['sodium_mg'] as num?)?.toDouble() ?? 0.0,
-          calciumMg: (data['calcium_mg'] as num?)?.toDouble() ?? 0.0,
-          ironMg: (data['iron_mg'] as num?)?.toDouble() ?? 0.0,
-          vitaminAIu: (data['vitamin_a_iu'] as num?)?.toDouble() ?? 0.0,
-          vitaminCMg: (data['vitamin_c_mg'] as num?)?.toDouble() ?? 0.0,
-          vitaminDIu: (data['vitamin_d_iu'] as num?)?.toDouble() ?? 0.0,
-          vitaminEMg: (data['vitamin_e_mg'] as num?)?.toDouble() ?? 0.0,
-          vitaminKMg: (data['vitamin_k_mg'] as num?)?.toDouble() ?? 0.0,
-          thiaminMg: (data['thiamin_mg'] as num?)?.toDouble() ?? 0.0,
-          riboflavinMg: (data['riboflavin_mg'] as num?)?.toDouble() ?? 0.0,
-          niacinMg: (data['niacin_mg'] as num?)?.toDouble() ?? 0.0,
-          vitaminB6Mg: (data['vitamin_b6_mg'] as num?)?.toDouble() ?? 0.0,
-          vitaminB12Mcg: (data['vitamin_b12_mcg'] as num?)?.toDouble() ?? 0.0,
-          folateMcg: (data['folate_mcg'] as num?)?.toDouble() ?? 0.0,
-          potassiumMg: (data['potassium_mg'] as num?)?.toDouble() ?? 0.0,
-          phosphorusMg: (data['phosphorus_mg'] as num?)?.toDouble() ?? 0.0,
-          magnesiumMg: (data['magnesium_mg'] as num?)?.toDouble() ?? 0.0,
-          zincMg: (data['zinc_mg'] as num?)?.toDouble() ?? 0.0,
-          copperMg: (data['copper_mg'] as num?)?.toDouble() ?? 0.0,
-          manganeseMg: (data['manganese_mg'] as num?)?.toDouble() ?? 0.0,
-          seleniumMcg: (data['selenium_mcg'] as num?)?.toDouble() ?? 0.0,
-          cholesterolMg: (data['cholesterol_mg'] as num?)?.toDouble() ?? 0.0,
-          saturatedFatG: (data['saturated_fat_g'] as num?)?.toDouble() ?? 0.0,
-          transFatG: (data['trans_fat_g'] as num?)?.toDouble() ?? 0.0,
-          monounsaturatedFatG: (data['monounsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
-          polyunsaturatedFatG: (data['polyunsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
-          additionalNutrients: additionalNutrientsList,
-          per: item,
-        );
-        return Right(nutritionInfo);
+        return Right(parseNutritionResponse(_decodeMap(response.data), item));
       } else {
         return const Left(ServerFailure('Failed to retrieve nutrition information.'));
       }

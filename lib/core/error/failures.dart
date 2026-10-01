@@ -46,5 +46,5 @@ class RecognitionUnavailableFailure extends Failure {
 }
 
 class ScanQuotaExceededFailure extends Failure {
-  const ScanQuotaExceededFailure([super.message = 'You have reached your monthly scan limit. Upgrade to Premium for unlimited scans.']);
+  const ScanQuotaExceededFailure([super.message = "You've used today's photo scans. You can still log food by searching or scanning a barcode. Scans reset at midnight."]);
 }
