@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:flutter/widgets.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import '../../data/services/screen_time_service.dart';
+import '../../domain/entities/app_usage_info.dart';
 import 'screen_time_state.dart';
 
 class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver {
@@ -20,7 +21,6 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Refresh stats when app comes back to foreground (e.g. after granting permissions)
       loadStats();
     }
   }
@@ -40,8 +40,19 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
       for (var stat in stats) {
         total += stat.usageDuration;
       }
+
+      ScreenTimeWeeklySummary? summary;
+      try {
+        summary = await _service.getWeeklySummary().withLoadTimeout();
+      } catch (e) {
+        debugPrint('Weekly screen time summary failed: $e');
+      }
       
-      emit(ScreenTimeLoaded(usageStats: stats, totalDuration: total));
+      emit(ScreenTimeLoaded(
+        usageStats: stats,
+        totalDuration: total,
+        weeklySummary: summary,
+      ));
     } catch (e) {
       emit(ScreenTimeError(e.toString()));
     }
