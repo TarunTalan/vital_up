@@ -44,12 +44,25 @@ class DietProgressPage extends StatelessWidget {
         logsTitle: 'Meals logged',
         emptyLogs: 'No meals logged in this period yet.',
         bottomBar: Builder(
-          builder: (context) => AppSecondaryButton(
-            label: 'View full plan',
-            onTap: () => context.pushNamed(
-              'diet-plan-result',
-              extra: {'mode': 'cached'},
-            ),
+          builder: (context) => Row(
+            children: [
+              Expanded(
+                child: AppSecondaryButton(
+                  label: 'View full plan',
+                  onTap: () => context.pushNamed(
+                    'diet-plan-result',
+                    extra: {'mode': 'cached'},
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppDimens.cardGap),
+              Expanded(
+                child: AppPrimaryButton(
+                  label: 'Create new plan',
+                  onTap: () => context.pushNamed('diet-plan-prefs'),
+                ),
+              ),
+            ],
           ),
         ),
         header: (context, _) => const _TodayVsPlan(),
@@ -105,6 +118,21 @@ class _TodayVsPlan extends StatelessWidget {
                         '$done of ${statuses.length} meals',
                         style: context.text.labelSmall
                             ?.copyWith(color: v.grayText),
+                      ),
+                      const SizedBox(width: AppDimens.space8),
+                      CardLink(
+                        label: 'Edit',
+                        onTap: () async {
+                          final plan = context.read<DietPlanCubit>();
+                          final calories =
+                              context.read<TrendCubit<MealLogEntry>>();
+                          final saved =
+                              await context.pushNamed<bool>('diet-plan-edit');
+                          if (saved == true) {
+                            plan.loadActiveMealPlan();
+                            calories.load();
+                          }
+                        },
                       ),
                     ],
                   ),
