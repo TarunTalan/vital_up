@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/profile/data/services/username_service.dart';
+import 'package:vital_up/features/profile/presentation/widgets/username_input.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'dart:math' as math;
 
@@ -22,6 +25,14 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
   String _dob = '';
   String _gender = '';
 
+  final _usernameService = sl<UsernameService>();
+
+  /// Set only for users who still have a generated username (Google
+  /// sign-up); they must choose one before continuing.
+  UsernameInput? _username;
+  bool _savingUsername = false;
+  String? _usernameSaveError;
+
   @override
   void initState() {
     super.initState();
@@ -33,12 +44,63 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     _nameController.addListener(() {
       context.read<OnboardingCubit>().updateFullName(_nameController.text.trim());
     });
+    _loadUsernameStatus();
+  }
+
+  /// If this can't load (offline), the step continues without the field
+  /// and the home screen asks for the username later.
+  Future<void> _loadUsernameStatus() async {
+    try {
+      final status = await _usernameService.fetchStatus();
+      if (!mounted || status == null || status.confirmed) return;
+      setState(() {
+        _username = UsernameInput(_usernameService, initial: status.username)
+          ..addListener(_onUsernameChanged);
+      });
+    } catch (e) {
+      debugPrint('Username status failed to load: $e');
+    }
+  }
+
+  void _onUsernameChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _username?.dispose();
     super.dispose();
+  }
+
+  /// Saves the chosen username. Returns false (showing why) if it failed.
+  Future<bool> _saveUsername() async {
+    final input = _username;
+    if (input == null) return true;
+    input.touch();
+    if (!input.canSubmit) return false;
+    setState(() {
+      _savingUsername = true;
+      _usernameSaveError = null;
+    });
+    try {
+      await _usernameService.setUsername(input.text);
+      return true;
+    } on UsernameException catch (e) {
+      if (e.taken) input.markTaken();
+      if (mounted) setState(() => _usernameSaveError = e.message);
+      return false;
+    } catch (e) {
+      debugPrint('Save username failed: $e');
+      if (mounted) {
+        setState(
+          () => _usernameSaveError = "Couldn't save your username. Try again.",
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _savingUsername = false);
+    }
   }
 
   String? _nameError() {
@@ -130,27 +192,56 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
         setState(() => _showErrors = false);
         context.goNamed('login');
       },
-      onNext: () {
-        if (!_isValid()) {
+      onNext: () async {
+        if (_savingUsername) return;
+        final usernameReady = _username?.canSubmit ?? true;
+        if (!_isValid() || !usernameReady) {
+          _username?.touch();
           setState(() {
             _showErrors = true;
           });
-        } else {
-          context.read<OnboardingCubit>().setCurrentStep('height');
-          context.goNamed('health-height');
+          return;
         }
+        if (!await _saveUsername() || !context.mounted) return;
+        context.read<OnboardingCubit>().setCurrentStep('height');
+        context.goNamed('health-height');
       },
       onSkip: () {
         setState(() => _showErrors = false);
         context.goNamed('health-height');
       },
       title: "About you",
-      nextEnabled: true,
+      nextEnabled: !_savingUsername,
       showSkip: false,
       showBack: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_username case final username?) ...[
+            OnboardingTextField(
+              label: "Username",
+              value: username.text,
+              maxLength: UsernameService.maxLength,
+              onChange: (val) {
+                username.text = val;
+                if (_usernameSaveError != null) {
+                  setState(() => _usernameSaveError = null);
+                }
+              },
+              placeholder: "Choose a username",
+              isError: username.isError,
+              showErrorText: false,
+            ),
+            const SizedBox(height: AppDimens.inputLabelGap),
+            if (_usernameSaveError != null)
+              Text(
+                _usernameSaveError!,
+                style: context.text.bodyLarge?.copyWith(color: errorColor),
+              )
+            else
+              UsernameHint(input: username),
+            const SizedBox(height: AppDimens.space32),
+          ],
           OnboardingTextField(
             label: "Full Name",
             value: _nameController.text,
