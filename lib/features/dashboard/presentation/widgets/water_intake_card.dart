@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/water_wave_animation.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
 import '../cubit/water_intake_cubit.dart';
 import '../cubit/water_intake_state.dart';
 import 'dashboard_card_header.dart';
+import 'trend_widgets.dart';
 
 class WaterIntakeCard extends StatefulWidget {
   const WaterIntakeCard({super.key});
@@ -23,7 +28,16 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<WaterIntakeCubit, WaterIntakeState>(
+    return BlocListener<WaterIntakeCubit, WaterIntakeState>(
+      // Keep today's bar in the mini chart in step with the card.
+      listenWhen: (previous, current) =>
+          current is WaterIntakeLoaded &&
+          (previous is! WaterIntakeLoaded ||
+              previous.currentIntakeMl != current.currentIntakeMl ||
+              previous.dailyGoalMl != current.dailyGoalMl),
+      listener: (context, _) =>
+          context.read<TrendCubit<WaterLogCache>>().load(),
+      child: BlocConsumer<WaterIntakeCubit, WaterIntakeState>(
       listenWhen: (previous, current) {
         // A new log was added.
         if (previous is WaterIntakeLoaded && current is WaterIntakeLoaded) {
@@ -54,12 +68,27 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
               : 0.0;
           return _buildCard(context, state, percentage);
         }
-        return const AppCard(
+        return AppCard(
           width: double.infinity,
-          child: DashboardCardLoading(),
+          child: state is WaterIntakeError
+              ? DashboardCardError(
+                  title: 'Water Intake',
+                  iconAsset: 'assets/icons/drop.svg',
+                  onRetry: context.read<WaterIntakeCubit>().reload,
+                )
+              : const DashboardCardLoading(),
         );
       },
+      ),
     );
+  }
+
+  Future<void> _openTrends(BuildContext context) async {
+    final water = context.read<WaterIntakeCubit>();
+    final trend = context.read<TrendCubit<WaterLogCache>>();
+    await context.pushNamed('water-trends');
+    water.reload();
+    trend.load();
   }
 
   Widget _buildCard(
@@ -80,14 +109,21 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
             DashboardCardHeader(
               title: 'Water Intake',
               iconAsset: 'assets/icons/drop.svg',
-              trailing: IconButton(
-                icon: Icon(
-                  Icons.edit_rounded,
-                  size: AppDimens.iconMd,
-                  color: context.vColors.grayText,
-                ),
-                onPressed: () => _showEditGoalSheet(context, state.dailyGoalMl),
-                tooltip: 'Edit Daily Goal',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.edit_rounded,
+                      size: AppDimens.iconMd,
+                      color: context.vColors.grayText,
+                    ),
+                    onPressed: () =>
+                        _showEditGoalSheet(context, state.dailyGoalMl),
+                    tooltip: 'Edit Daily Goal',
+                  ),
+                  CardLink(onTap: () => _openTrends(context)),
+                ],
               ),
             ),
             const SizedBox(height: AppDimens.cardInnerGap),
@@ -113,6 +149,11 @@ class _WaterIntakeCardState extends State<WaterIntakeCard> {
                 waveColor: AppColors.water,
                 backgroundColor: AppColors.water.withValues(alpha: 0.12),
               ),
+            ),
+            const SizedBox(height: AppDimens.cardInnerGap),
+            const MiniTrend<WaterLogCache>(
+              color: AppColors.water,
+              valueFormatter: WaterTrendsPage.formatMl,
             ),
             AnimatedSize(
               duration: AppDurations.slow,

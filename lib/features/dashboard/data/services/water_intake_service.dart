@@ -45,6 +45,20 @@ class WaterIntakeService {
     });
   }
 
+  /// Water logs in [from, to) for a user, oldest first.
+  Future<List<WaterLogCache>> getLogsBetween(
+    String userId,
+    DateTime from,
+    DateTime to,
+  ) {
+    return _isar.waterLogCaches
+        .filter()
+        .userIdEqualTo(userId)
+        .timestampBetween(from, to, includeUpper: false)
+        .sortByTimestamp()
+        .findAll();
+  }
+
   /// Get all water logs for today for a specific user
   Future<List<WaterLogCache>> getTodayLogs(String userId) async {
     final now = DateTime.now();

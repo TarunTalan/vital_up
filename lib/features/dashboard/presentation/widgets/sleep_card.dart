@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import '../cubit/sleep_cubit.dart';
 import '../cubit/sleep_state.dart';
+import '../cubit/trend_cubit.dart';
+import '../../domain/entities/sleep_session_info.dart';
+import 'trend_widgets.dart';
 import 'dashboard_card_header.dart';
 
 const _title = 'Sleep';
@@ -30,7 +35,12 @@ class _SleepCardState extends State<SleepCard> {
         duration: AppDurations.slow,
         curve: Curves.easeInOut,
         alignment: Alignment.topCenter,
-        child: BlocBuilder<SleepCubit, SleepState>(
+        child: BlocConsumer<SleepCubit, SleepState>(
+          // A saved manual entry changes last night's bar.
+          listenWhen: (_, state) =>
+              state is SleepLoadedAuto || state is SleepLoadedManual,
+          listener: (context, _) =>
+              context.read<TrendCubit<SleepSessionInfo>>().load(),
           builder: (context, state) {
             if (state is SleepLoading || state is SleepInitial) {
               return const DashboardCardLoading();
@@ -101,16 +111,7 @@ class _SleepCardState extends State<SleepCard> {
           ),
         ),
         const SizedBox(height: AppDimens.cardInnerGap),
-        Text(
-          'Error loading data',
-          style: context.text.bodyMedium?.copyWith(color: context.colors.error),
-        ),
-        const SizedBox(height: AppDimens.space8),
-        Text(
-          message,
-          style: context.text.bodySmall
-              ?.copyWith(color: context.vColors.grayText),
-        ),
+        LoadErrorView(onRetry: context.read<SleepCubit>().loadSleepData),
       ],
     );
   }
@@ -144,6 +145,7 @@ class _SleepCardState extends State<SleepCard> {
                     minHeight: AppDimens.iconXl,
                   ),
                 ),
+              CardLink(onTap: () => _openTrends(context)),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppDimens.space8,
@@ -175,8 +177,22 @@ class _SleepCardState extends State<SleepCard> {
             _TimeStat(label: 'Wake time', value: timeFormat.format(wakeTime)),
           ],
         ),
+        const SizedBox(height: AppDimens.cardInnerGap),
+        MiniTrend<SleepSessionInfo>(
+          color: AppColors.sleep,
+          valueFormatter: (h) =>
+              formatDashboardDuration(Duration(minutes: (h * 60).round())),
+        ),
       ],
     );
+  }
+
+  Future<void> _openTrends(BuildContext context) async {
+    final sleep = context.read<SleepCubit>();
+    final trend = context.read<TrendCubit<SleepSessionInfo>>();
+    await context.pushNamed('sleep-trends');
+    sleep.loadSleepData();
+    trend.load();
   }
 
   Widget _buildManualEntryForm(BuildContext context) {
@@ -194,7 +210,11 @@ class _SleepCardState extends State<SleepCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const DashboardCardHeader(title: _title, iconAsset: _icon),
+        DashboardCardHeader(
+          title: _title,
+          iconAsset: _icon,
+          trailing: CardLink(onTap: () => _openTrends(context)),
+        ),
         const SizedBox(height: AppDimens.cardInnerGap),
         Text('Log your sleep', style: context.text.titleSmall),
         const SizedBox(height: AppDimens.space4),
@@ -207,7 +227,7 @@ class _SleepCardState extends State<SleepCard> {
         Row(
           children: [
             Expanded(
-              child: _TimePickerField(
+              child: SleepTimePickerField(
                 label: 'Bed Time',
                 time: _bedTime,
                 onTimeSelected: (t) => setState(() => _bedTime = t),
@@ -216,7 +236,7 @@ class _SleepCardState extends State<SleepCard> {
             ),
             const SizedBox(width: AppDimens.space12),
             Expanded(
-              child: _TimePickerField(
+              child: SleepTimePickerField(
                 label: 'Wake Time',
                 time: _wakeTime,
                 onTimeSelected: (t) => setState(() => _wakeTime = t),
@@ -299,13 +319,15 @@ class _TimeStat extends StatelessWidget {
   }
 }
 
-class _TimePickerField extends StatelessWidget {
+/// Glass tile that opens a time picker (bed / wake time).
+class SleepTimePickerField extends StatelessWidget {
   final String label;
   final TimeOfDay? time;
   final ValueChanged<TimeOfDay> onTimeSelected;
   final IconData icon;
 
-  const _TimePickerField({
+  const SleepTimePickerField({
+    super.key,
     required this.label,
     required this.time,
     required this.onTimeSelected,
