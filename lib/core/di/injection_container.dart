@@ -53,6 +53,7 @@ import 'package:vital_up/features/gamification/presentation/cubit/gamification_c
 import 'package:vital_up/features/notifications/data/datasources/notifications_remote_datasource.dart';
 import 'package:vital_up/features/notifications/data/repositories/notifications_repository_impl.dart';
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
+import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/notifications/domain/repositories/notifications_repository.dart';
 import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/activity_goals/data/repositories/activity_goals_repository_impl.dart';
@@ -497,7 +498,10 @@ Future<void> initDependencies() async {
   sl.registerFactory(() => CommunityCubit(sl<CommunityRepository>()));
   sl.registerFactory(() => FriendsCubit(sl<CommunityRepository>()));
 
-  // 16. Notifications: friend requests, achievements, announcements
+  // 16. Usernames (Google sign-ups choose theirs after sign-in)
+  sl.registerLazySingleton(() => UsernameService(sl<SupabaseClient>()));
+
+  // 17. Notifications: friend requests, achievements, announcements
   sl.registerLazySingleton<NotificationsRepository>(
     () => NotificationsRepositoryImpl(
       NotificationsRemoteDataSource(sl<SupabaseClient>()),

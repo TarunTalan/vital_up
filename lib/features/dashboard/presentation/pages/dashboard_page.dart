@@ -46,6 +46,8 @@ import 'package:vital_up/features/notifications/presentation/widgets/notificatio
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import 'package:vital_up/features/profile/data/services/username_service.dart';
+import 'package:vital_up/features/profile/presentation/widgets/username_input.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
@@ -79,7 +81,27 @@ class _DashboardPageState extends State<DashboardPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final launch = push.takePendingOpen();
       if (launch != null) _openPush(launch);
+      _askForUsernameIfNeeded();
     });
+  }
+
+  /// Google sign-ups who got past onboarding without choosing a username
+  /// (signed up before it was asked, or it couldn't load then).
+  Future<void> _askForUsernameIfNeeded() async {
+    final service = sl<UsernameService>();
+    try {
+      final status = await service.fetchStatus();
+      if (!mounted || status == null || status.confirmed) return;
+      await showUsernamePrompt(
+        context,
+        service: service,
+        suggestion: status.username,
+      );
+      // Profile shows the username; refresh it now it's changed.
+      if (mounted) _profileCubit.loadProfile();
+    } catch (e) {
+      debugPrint('Username check failed: $e');
+    }
   }
 
   /// A tapped push opens the screen its notification links to.

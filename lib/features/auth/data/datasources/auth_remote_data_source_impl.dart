@@ -48,12 +48,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UsernameCheckResponse> checkUsername(String username) async {
     try {
+      // Usernames are unique regardless of case. `_` is a LIKE wildcard,
+      // so escape it (and `%`, `\`) to match the name exactly.
+      final pattern = username.replaceAllMapped(
+        RegExp(r'[\\%_]'),
+        (m) => '\\${m[0]}',
+      );
       final response = await _supabaseClient
           .from('profiles')
           .select('username')
-          .eq('username', username)
+          .ilike('username', pattern)
+          .limit(1)
           .maybeSingle();
-      
+
       final isAvailable = response == null;
       return UsernameCheckResponse(
         available: isAvailable,

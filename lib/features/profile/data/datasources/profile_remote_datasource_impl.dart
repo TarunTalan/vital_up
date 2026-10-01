@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/error/exceptions.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
+import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
@@ -147,7 +148,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       logger.i('Successfully updated profile for user: ${user.id}');
     } catch (e) {
       logger.e('Error updating profile in Supabase: $e');
-      throw ServerException(message: e.toString());
+      throw ServerException(
+        message: UsernameService.messageForServerError(e) ?? e.toString(),
+      );
     }
   }
 
