@@ -15,6 +15,7 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/biometric_lock_guard.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
@@ -25,6 +26,9 @@ import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
+
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,10 +60,11 @@ void main() async {
     await di.initDependencies();
 
     // Push notifications (no-op until Firebase is configured).
-    await sl<PushService>().init();
+    sl<PushService>().init().catchError((e) => debugPrint('Push init error: $e'));
 
     // Re-apply reminders (app update, time-zone change).
-    await sl<RemindersService>().resync();
+    sl<RemindersService>().resync().catchError((e) => debugPrint('Reminders resync error: $e'));
+    sl<RemindersService>().resyncOnNewDay();
 
     CrashReporter.watchUser(sl<SupabaseClient>());
 
@@ -93,38 +98,61 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
         BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
         BlocProvider(create: (context) => sl<SleepCubit>()..loadSleepData()),
+        BlocProvider(create: (context) => sl<SettingsCubit>()..loadSettings()),
       ],
-      child: MaterialApp.router(
-        title: 'VitalUp',
-        debugShowCheckedModeBanner: false,
-        locale: DevicePreview.locale(context),
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        routerConfig: AppRouter.router,
-        builder: (context, child) {
-          final previewChild = DevicePreview.appBuilder(context, child);
-          return MultiBlocListener(
-            listeners: [
-              BlocListener<AuthCubit, AuthState>(
-                listener: (context, state) {
-                  if (state is AuthError) {
-                    showErrorSnackBar(context, state.message);
-                  }
-                },
-              ),
-              BlocListener<OnboardingCubit, OnboardingData>(
-                listenWhen: (previous, current) => previous.status != current.status,
-                listener: (context, state) {
-                  if (state.status == SubmissionStatus.error && state.errorMessage != null) {
-                    showErrorSnackBar(context, state.errorMessage!);
-                  } else if (state.status == SubmissionStatus.success) {
-                    showSuccessSnackBar(context, 'Health profile completed successfully!');
-                  }
-                },
-              ),
-            ],
-            child: ResponsiveTextScale(child: previewChild),
+      child: BlocBuilder<SettingsCubit, SettingsState>(
+        builder: (context, settingsState) {
+          ThemeMode themeMode = ThemeMode.system;
+          if (settingsState is SettingsLoaded) {
+            switch (settingsState.settings.themeMode.toLowerCase()) {
+              case 'light':
+                themeMode = ThemeMode.light;
+                break;
+              case 'dark':
+                themeMode = ThemeMode.dark;
+                break;
+              case 'system':
+              default:
+                themeMode = ThemeMode.system;
+                break;
+            }
+          }
+
+          return MaterialApp.router(
+            title: 'VitalUp',
+            debugShowCheckedModeBanner: false,
+            locale: DevicePreview.locale(context),
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeMode,
+            routerConfig: AppRouter.router,
+            builder: (context, child) {
+              final previewChild = DevicePreview.appBuilder(context, child);
+              return MultiBlocListener(
+                listeners: [
+                  BlocListener<AuthCubit, AuthState>(
+                    listener: (context, state) {
+                      if (state is AuthError) {
+                        showErrorSnackBar(context, state.message);
+                      }
+                    },
+                  ),
+                  BlocListener<OnboardingCubit, OnboardingData>(
+                    listenWhen: (previous, current) => previous.status != current.status,
+                    listener: (context, state) {
+                      if (state.status == SubmissionStatus.error && state.errorMessage != null) {
+                        showErrorSnackBar(context, state.errorMessage!);
+                      } else if (state.status == SubmissionStatus.success) {
+                        showSuccessSnackBar(context, 'Health profile completed successfully!');
+                      }
+                    },
+                  ),
+                ],
+                child: BiometricLockGuard(
+                  child: ResponsiveTextScale(child: previewChild),
+                ),
+              );
+            },
           );
         },
       ),

@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
+import 'package:vital_up/core/services/biometric_auth_service.dart';
+import 'package:vital_up/features/health_report/data/services/health_report_service.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source_impl.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source.dart';
@@ -130,7 +133,6 @@ import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 import 'package:vital_up/features/account/data/account_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
-import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
@@ -160,6 +162,9 @@ Future<void> initDependencies() async {
   // 2. SharedPreferences (Local key-value config cache)
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+  sl.registerLazySingleton<BiometricAuthService>(
+    () => BiometricAuthService(prefs: sl<SharedPreferences>()),
+  );
 
   // App-wide "habit logged" events (reminders stay quiet once done).
   sl.registerLazySingleton(HabitEvents.new);
@@ -353,7 +358,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SettingsRepository>(
         () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
   );
-  sl.registerFactory(
+  sl.registerLazySingleton<SettingsCubit>(
     () => SettingsCubit(
       settingsRepository: sl<SettingsRepository>(),
       onNotificationsChanged: (enabled) async {
@@ -582,6 +587,7 @@ Future<void> initDependencies() async {
 
   // 18. Reminders (local, on-device schedule)
   sl.registerLazySingleton(() => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()));
+
   sl.registerLazySingleton(
     () => RemindersService(
       RemindersLocalDataSource(sl<SharedPreferences>()),
@@ -674,6 +680,17 @@ Future<void> initDependencies() async {
       sl<VitaRepository>(),
       sl<GamificationRepository>(),
       sl<RemindersService>(),
+    ),
+  );
+
+  // 27. Clinical Health Report Service
+  sl.registerLazySingleton(
+    () => HealthReportService(
+      profileRepo: sl<ProfileRepository>(),
+      sleepService: sl<SleepService>(),
+      waterService: sl<WaterIntakeService>(),
+      weightService: sl<WeightService>(),
+      activityHistoryRepo: sl<ActivityHistoryRepository>(),
     ),
   );
 }

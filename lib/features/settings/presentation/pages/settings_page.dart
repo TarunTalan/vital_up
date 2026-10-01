@@ -13,6 +13,9 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/account/data/data_export_service.dart';
 import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
+import 'package:vital_up/core/services/biometric_auth_service.dart';
+import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
+import 'package:vital_up/features/help_support/presentation/widgets/contact_support_sheet.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
@@ -301,6 +304,48 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                 ]),
+                _buildSection('Privacy & Security', [
+                  _buildSettingRow(
+                    icon: Icons.fingerprint_rounded,
+                    iconColor: AppColors.primary,
+                    title: 'Biometric App Lock',
+                    subtitle: 'Protect health records with Fingerprint / Face ID / PIN',
+                    trailing: Switch(
+                      value: sl<BiometricAuthService>().isBiometricEnabled(),
+                      onChanged: (val) async {
+                        final success = await sl<BiometricAuthService>().setBiometricEnabled(val);
+                        if (mounted) {
+                          setState(() {});
+                          if (success) {
+                            showSuccessSnackBar(
+                              context,
+                              val ? 'Biometric App Lock enabled 🔒' : 'Biometric App Lock disabled',
+                            );
+                          } else if (val) {
+                            showErrorSnackBar(
+                              context,
+                              'Biometric authentication failed or not supported on this device',
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                  _buildDivider(),
+                  InkWell(
+                    onTap: () => context.pushNamed('health-report'),
+                    child: _buildSettingRow(
+                      icon: Icons.medical_services_outlined,
+                      iconColor: AppColors.teal,
+                      title: 'Doctor Health Report',
+                      subtitle: 'Generate clinical summary for your physician',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                ]),
                 _buildSection('Account', [
                   InkWell(
                     onTap: () async {
@@ -335,11 +380,70 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                 ]),
-                _buildSection('Info', [
+                _buildSection('Help & Support', [
+                  InkWell(
+                    onTap: () => context.pushNamed('help-support'),
+                    child: _buildSettingRow(
+                      icon: Icons.help_outline_rounded,
+                      iconColor: AppColors.primary,
+                      title: 'Help Center & FAQs',
+                      subtitle: 'Answers, guides, and troubleshooting',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  InkWell(
+                    onTap: () => context.pushNamed('support-chat'),
+                    child: _buildSettingRow(
+                      icon: Icons.smart_toy_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Vital Assistant',
+                      subtitle: 'Instant AI support & diagnostics',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  InkWell(
+                    onTap: () => showContactSupportSheet(
+                      context,
+                      initialCategory: SupportCategory.general,
+                    ),
+                    child: _buildSettingRow(
+                      icon: Icons.mail_outline_rounded,
+                      title: 'Contact Support Team',
+                      subtitle: 'Email support with category & diagnostics',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                ]),
+                _buildSection('Info & About', [
+                  InkWell(
+                    onTap: () => context.pushNamed('about'),
+                    child: _buildSettingRow(
+                      icon: Icons.info_outline_rounded,
+                      iconColor: AppColors.primary,
+                      title: 'About VitalUp',
+                      subtitle: 'Mission, rating, features & creators',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
                   FutureBuilder<PackageInfo>(
                     future: _packageInfo,
                     builder: (context, snap) => _buildSettingRow(
-                      icon: Icons.info_outline_rounded,
+                      icon: Icons.code_rounded,
                       title: 'Version',
                       subtitle: snap.hasData
                           ? 'VitalUp ${snap.data!.version} '
