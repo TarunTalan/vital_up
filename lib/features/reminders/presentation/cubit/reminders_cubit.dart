@@ -14,6 +14,9 @@ class RemindersState extends Equatable {
   /// The system refused notification permission.
   final bool permissionDenied;
 
+  /// Skip the rest of today's reminders once a habit is logged.
+  final bool smartSkip;
+
   /// One-off snackbar text; [messageId] changes each time.
   final String? message;
   final int messageId;
@@ -23,6 +26,7 @@ class RemindersState extends Equatable {
     this.reminders = const [],
     this.notificationsEnabled = true,
     this.permissionDenied = false,
+    this.smartSkip = true,
     this.message,
     this.messageId = 0,
   });
@@ -42,12 +46,14 @@ class RemindersState extends Equatable {
     List<Reminder>? reminders,
     bool? notificationsEnabled,
     bool? permissionDenied,
+    bool? smartSkip,
     String? message,
   }) => RemindersState(
     loading: loading ?? this.loading,
     reminders: reminders ?? this.reminders,
     notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     permissionDenied: permissionDenied ?? this.permissionDenied,
+    smartSkip: smartSkip ?? this.smartSkip,
     message: message ?? this.message,
     messageId: message != null ? messageId + 1 : messageId,
   );
@@ -58,6 +64,7 @@ class RemindersState extends Equatable {
     reminders,
     notificationsEnabled,
     permissionDenied,
+    smartSkip,
     message,
     messageId,
   ];
@@ -78,8 +85,14 @@ class RemindersCubit extends Cubit<RemindersState> {
         loading: false,
         reminders: _service.load(),
         notificationsEnabled: enabled,
+        smartSkip: _service.smartSkip(),
       ),
     );
+  }
+
+  Future<void> setSmartSkip(bool value) async {
+    emit(state.copyWith(smartSkip: value));
+    await _service.setSmartSkip(value);
   }
 
   Future<void> toggle(Reminder reminder, bool enabled) =>

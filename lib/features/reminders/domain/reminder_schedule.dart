@@ -1,3 +1,4 @@
+import 'package:vital_up/core/events/habit_events.dart';
 import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
 
 /// iOS keeps at most 64 pending notifications per app; leave headroom.
@@ -79,3 +80,44 @@ int reminderNotificationId(String reminderId, ReminderTime time, int? weekday) {
   }
   return _idBase + hash % (_idEnd - _idBase + 1);
 }
+
+/// Meal preset each meal type quiets (snacks quiet none).
+const _mealPresetByType = {
+  0: 'preset_breakfast',
+  1: 'preset_lunch',
+  2: 'preset_dinner',
+};
+
+/// Reminders that [event] makes unnecessary for the rest of today.
+Set<String> remindersDoneBy(HabitLogged event, List<Reminder> reminders) {
+  bool ofKind(Reminder r, ReminderKind kind) => r.enabled && r.kind == kind;
+  return switch (event.habit) {
+    Habit.water when event.goalReached => {
+      for (final r in reminders)
+        if (ofKind(r, ReminderKind.water)) r.id,
+    },
+    Habit.water => const {},
+    Habit.meal => {
+      if (_mealPresetByType[event.mealType] case final id?)
+        if (reminders.any((r) => r.id == id && r.enabled)) id,
+    },
+    Habit.activity => {
+      for (final r in reminders)
+        if (ofKind(r, ReminderKind.activity)) r.id,
+    },
+    Habit.mood => {
+      for (final r in reminders)
+        if (ofKind(r, ReminderKind.mood)) r.id,
+    },
+    Habit.weight => {
+      for (final r in reminders)
+        if (ofKind(r, ReminderKind.weight)) r.id,
+    },
+  };
+}
+
+/// `yyyy-mm-dd` of [t] in local time.
+String dayKey(DateTime t) =>
+    '${t.year.toString().padLeft(4, '0')}-'
+    '${t.month.toString().padLeft(2, '0')}-'
+    '${t.day.toString().padLeft(2, '0')}';

@@ -7,16 +7,19 @@ import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_d
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 
 class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
   final IsarService isarService;
   final Uuid uuid;
   final SyncHooks? sync;
+  final HabitEvents? events;
 
   MealLogLocalDataSourceImpl({
     required this.isarService,
     required this.uuid,
     this.sync,
+    this.events,
   });
 
   @override
@@ -26,6 +29,14 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
       await isarService.isar.mealLogCaches.put(cache);
     });
     sync?.schedule();
+    if (_isToday(entry.capturedAt)) {
+      events?.logged(HabitLogged(Habit.meal, mealType: entry.mealType.index));
+    }
+  }
+
+  static bool _isToday(DateTime t) {
+    final now = DateTime.now();
+    return t.year == now.year && t.month == now.month && t.day == now.day;
   }
 
   @override

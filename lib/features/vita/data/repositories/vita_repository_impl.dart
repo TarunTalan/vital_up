@@ -11,6 +11,7 @@ import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/features/vita/domain/services/health_analysis_builder.dart';
 import 'package:vital_up/features/vita/domain/services/stress_estimator.dart';
+import 'package:vital_up/core/events/habit_events.dart';
 
 class VitaRepositoryImpl implements VitaRepository {
   final VitaRemoteDataSource _remote;
@@ -20,6 +21,7 @@ class VitaRepositoryImpl implements VitaRepository {
   final SupabaseClient _supabase;
   final StressEstimator _stress;
   final HealthAnalysisBuilder _analysis;
+  final HabitEvents? _events;
 
   /// Shared by screens opened together so the day's insights are fetched once.
   Future<VitaDailyInsights?>? _insightsInFlight;
@@ -32,6 +34,7 @@ class VitaRepositoryImpl implements VitaRepository {
     required this._supabase,
     this._stress = const StressEstimator(),
     this._analysis = const HealthAnalysisBuilder(),
+    this._events,
   });
 
   String get _userId => _supabase.auth.currentUser?.id ?? 'guest';
@@ -115,6 +118,7 @@ class VitaRepositoryImpl implements VitaRepository {
       _userId,
       StressCheckIn(date: DateTime.now(), level: level.clamp(1, 5), tags: tags),
     );
+    _events?.logged(const HabitLogged(Habit.mood));
   }
 
   @override
