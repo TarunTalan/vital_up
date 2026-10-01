@@ -35,16 +35,21 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
+import 'package:vital_up/features/help_support/presentation/pages/help_support_page.dart';
+import 'package:vital_up/features/help_support/presentation/pages/support_chat_page.dart';
+import 'package:vital_up/features/about/presentation/pages/about_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_page.dart';
+import 'package:vital_up/features/challenges/data/challenges_repository.dart';
+import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
+import 'package:vital_up/features/challenges/presentation/challenges_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_diet_plan_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
@@ -151,6 +156,17 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const WaterTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/challenges',
+        name: 'challenges',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: BlocProvider(
+            create: (_) => ChallengesCubit(sl<ChallengesRepository>())..load(),
+            child: const ChallengesPage(),
+          ),
         ),
       ),
       GoRoute(

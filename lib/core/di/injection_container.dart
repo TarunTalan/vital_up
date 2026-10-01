@@ -134,6 +134,7 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -656,4 +657,7 @@ Future<void> initDependencies() async {
       sl<GamificationRepository>(),
     ),
   );
+
+  // 25. Friend challenges
+  sl.registerLazySingleton(() => ChallengesRepository(sl<SupabaseClient>()));
 }

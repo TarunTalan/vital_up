@@ -110,6 +110,15 @@ class _CommunityHubView extends StatelessWidget {
                       ),
                       onTap: () => _openFriends(context),
                     ),
+                    const SizedBox(height: AppDimens.space8),
+                    AppSecondaryButton(
+                      label: 'Challenges',
+                      leadingIcon: const Icon(
+                        Icons.emoji_events_outlined,
+                        size: AppDimens.iconSm,
+                      ),
+                      onTap: () => context.pushNamed('challenges'),
+                    ),
                     const SizedBox(height: AppDimens.sectionGap),
                     if (state.global case final global?) ...[
                       CommunityTile(

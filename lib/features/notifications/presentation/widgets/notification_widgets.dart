@@ -33,6 +33,7 @@ const notificationLinkableRoutes = {
   'reminders',
   'weight-trends',
   'weekly-summary',
+  'challenges',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.
@@ -42,6 +43,7 @@ String? notificationRoute(NotificationType type, String? route) =>
       NotificationType.friendAccepted => 'friends',
       NotificationType.badge => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
+      NotificationType.challenge => 'challenges',
       NotificationType.announcement =>
         notificationLinkableRoutes.contains(route) ? route : null,
     };
