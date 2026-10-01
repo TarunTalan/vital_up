@@ -35,7 +35,7 @@ class PushOpen {
 
 /// FCM push notifications: keeps this device's token registered for the
 /// signed-in user, shows pushes that arrive while the app is open, and
-/// reports taps through [opens] / [takePendingOpen].
+/// reports taps (pushes and reminders) through [opens] / [takePendingOpen].
 ///
 /// A no-op until Firebase is configured (no `google-services.json`).
 class PushService {
@@ -43,7 +43,10 @@ class PushService {
   final SettingsRepository _settings;
   final NotificationsRepository _notifications;
 
-  PushService(this._client, this._settings, this._notifications);
+  /// Shared with ReminderScheduler; initialised here.
+  final FlutterLocalNotificationsPlugin _local;
+
+  PushService(this._client, this._settings, this._notifications, this._local);
 
   /// Must match the channel in AndroidManifest.xml and send-push.
   static const _channel = AndroidNotificationChannel(
@@ -53,7 +56,6 @@ class PushService {
     importance: Importance.high,
   );
 
-  final _local = FlutterLocalNotificationsPlugin();
   final _opens = StreamController<PushOpen>.broadcast();
   PushOpen? _pending;
   bool _ready = false;
@@ -74,6 +76,10 @@ class PushService {
 
   /// Call once at startup, after Supabase is initialised.
   Future<void> init() async {
+    // Local notifications (reminders, foreground pushes) work without
+    // Firebase, so set them up first.
+    await _initLocal();
+
     try {
       await Firebase.initializeApp();
     } catch (e) {
@@ -82,24 +88,6 @@ class PushService {
     }
     _ready = true;
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
-
-    await _local.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      ),
-      onDidReceiveNotificationResponse: (response) {
-        final payload = response.payload;
-        if (payload == null) return;
-        try {
-          _handleOpen(Map<String, dynamic>.from(jsonDecode(payload) as Map));
-        } catch (_) {}
-      },
-    );
-    await _local
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_channel);
 
     final messaging = FirebaseMessaging.instance;
     FirebaseMessaging.onMessage.listen(_showForeground);
@@ -116,6 +104,44 @@ class PushService {
         register();
       }
     });
+  }
+
+  Future<void> _initLocal() async {
+    try {
+      await _local.initialize(
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          // Permission is asked for when push or a reminder is turned on.
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          ),
+        ),
+        onDidReceiveNotificationResponse: (response) =>
+            _handlePayload(response.payload),
+      );
+      await _local
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_channel);
+
+      // A local notification (e.g. a reminder) that launched the app.
+      final launch = await _local.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        _handlePayload(launch!.notificationResponse?.payload);
+      }
+    } catch (e) {
+      debugPrint('Local notifications unavailable: $e');
+    }
+  }
+
+  void _handlePayload(String? payload) {
+    if (payload == null) return;
+    try {
+      _handleOpen(Map<String, dynamic>.from(jsonDecode(payload) as Map));
+    } catch (_) {}
   }
 
   /// Asks for notification permission (Android 13+), then registers.

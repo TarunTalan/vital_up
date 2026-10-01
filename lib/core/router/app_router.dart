@@ -35,6 +35,8 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
+import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
+import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_diet_plan_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
@@ -416,6 +418,17 @@ class AppRouter {
           child: BlocProvider<SettingsCubit>(
             create: (context) => sl<SettingsCubit>()..loadSettings(),
             child: const SettingsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/reminders',
+        name: 'reminders',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: BlocProvider<RemindersCubit>(
+            create: (context) => sl<RemindersCubit>()..load(),
+            child: const RemindersPage(),
           ),
         ),
       ),
