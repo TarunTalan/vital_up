@@ -178,6 +178,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       await supabaseClient.auth.updateUser(
         UserAttributes(data: {'avatar_url': url}),
       );
+      await _syncLeaderboardAvatar(userId, url);
       await _deleteAvatarFiles(userId, keep: path);
 
       logger.i('Uploaded profile photo for user: $userId');
@@ -201,12 +202,25 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       await supabaseClient.auth.updateUser(
         UserAttributes(data: {'avatar_url': null, 'picture': null}),
       );
+      await _syncLeaderboardAvatar(userId, null);
       logger.i('Removed profile photo for user: $userId');
     } on ServerException {
       rethrow;
     } catch (e) {
       logger.e('Error removing profile photo: $e');
       throw ServerException(message: e.toString());
+    }
+  }
+
+  /// Leaderboards read avatars from the public `profiles` row, not auth
+  /// metadata. Best effort: a failure here shouldn't fail the upload.
+  Future<void> _syncLeaderboardAvatar(String userId, String? url) async {
+    try {
+      await supabaseClient
+          .from('profiles')
+          .update({'avatar_url': url}).eq('id', userId);
+    } catch (e) {
+      logger.w('Could not sync avatar to profiles: $e');
     }
   }
 
