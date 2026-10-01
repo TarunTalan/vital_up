@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
@@ -45,10 +45,16 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
   final _distCtrl = TextEditingController();
   final _calCtrl = TextEditingController();
 
+  /// Shown on the active tab's field when "Set Target" has no value.
+  String? _error;
+
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (_error != null) setState(() => _error = null);
+      });
 
     // Pre-fill existing values
     if (widget.current.targetType == WorkoutTargetType.distance) {
@@ -71,6 +77,10 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
     super.dispose();
   }
 
+  void _clearError(String _) {
+    if (_error != null) setState(() => _error = null);
+  }
+
   void _confirm(WorkoutTargetType type) {
     double val = 0;
     if (type == WorkoutTargetType.distance) {
@@ -80,7 +90,7 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
       val = double.tryParse(_calCtrl.text) ?? 0;
     }
     if (val <= 0) {
-      Navigator.of(context).pop(null);
+      setState(() => _error = 'Enter a target');
       return;
     }
     Navigator.of(context).pop((type, val));
@@ -153,8 +163,14 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
             ),
             const SizedBox(height: AppDimens.space20),
 
-            SizedBox(
-              height: fieldHeight,
+            AnimatedContainer(
+              duration: AppDurations.medium,
+              // Room for the error line under the field.
+              height: fieldHeight +
+                  (_error == null
+                      ? 0
+                      : MediaQuery.textScalerOf(context)
+                          .scale(AppDimens.space32)),
               child: TabBarView(
                 controller: _tabs,
                 children: [
@@ -162,11 +178,15 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                     controller: _distCtrl,
                     hint: 'e.g. 5.0',
                     suffix: distUnitLabel,
+                    error: _error,
+                    onChanged: _clearError,
                   ),
                   _NumberField(
                     controller: _calCtrl,
                     hint: 'e.g. 500',
                     suffix: 'kcal',
+                    error: _error,
+                    onChanged: _clearError,
                   ),
                 ],
               ),
@@ -206,34 +226,27 @@ class _NumberField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final String suffix;
+  final String? error;
+  final ValueChanged<String> onChanged;
 
   const _NumberField({
     required this.controller,
     required this.hint,
     required this.suffix,
+    required this.error,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final valueStyle = context.text.headlineSmall;
     return Align(
       alignment: Alignment.topCenter,
-      child: TextField(
+      child: AppTextField.decimal(
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-        ],
-        style: valueStyle?.copyWith(color: context.colors.onSurface),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: valueStyle?.copyWith(color: context.vColors.grayText),
-          suffixText: suffix,
-          suffixStyle: context.text.bodyMedium?.copyWith(
-            color: context.vColors.grayText,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        hint: hint,
+        suffixText: suffix,
+        error: error,
+        onChanged: onChanged,
       ),
     );
   }

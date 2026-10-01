@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
@@ -255,6 +256,8 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     }
   }
 
+  String? _nameError;
+
   void _handleSave() {
     final name = _nameController.text.trim();
     final quantity = double.tryParse(_quantityController.text) ?? 100.0;
@@ -267,9 +270,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     final sodium = double.tryParse(_sodiumController.text) ?? 0.0;
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a product name')),
-      );
+      setState(() => _nameError = 'Enter a product name');
       return;
     }
 
@@ -293,17 +294,10 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     final v = context.vColors;
     final primary = context.colors.primary;
 
-    // Compact variant of the theme input for dense nutrition rows.
-    const compactPadding = EdgeInsets.symmetric(
-      horizontal: AppDimens.space12,
-      vertical: AppDimens.space12,
-    );
-
     Widget buildField({
       required String label,
       required TextEditingController controller,
       String? suffix,
-      TextInputType keyboardType = TextInputType.number,
     }) {
       return Padding(
         padding: const EdgeInsets.only(bottom: AppDimens.space12),
@@ -322,15 +316,11 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
             const SizedBox(width: AppDimens.space8),
             Expanded(
               flex: 4,
-              child: TextField(
+              child: AppTextField.decimal(
                 controller: controller,
-                keyboardType: keyboardType,
-                style: context.text.bodyMedium,
-                decoration: InputDecoration(
-                  suffixText: suffix,
-                  isDense: true,
-                  contentPadding: compactPadding,
-                ),
+                suffixText: suffix,
+                hint: '0',
+                textInputAction: TextInputAction.next,
               ),
             ),
           ],
@@ -470,13 +460,18 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                               _nameController.text = textEditingController.text;
                             });
 
-                            return TextField(
+                            return AppTextField(
                               controller: textEditingController,
                               focusNode: focusNode,
-                              style: context.text.bodyMedium,
-                              decoration: const InputDecoration(
-                                hintText: 'e.g., Haldiram\'s Bhujia',
-                              ),
+                              hint: 'e.g., Haldiram\'s Bhujia',
+                              error: _nameError,
+                              textCapitalization: TextCapitalization.words,
+                              onSubmitted: (_) => onFieldSubmitted(),
+                              onChanged: (_) {
+                                if (_nameError != null) {
+                                  setState(() => _nameError = null);
+                                }
+                              },
                             );
                           },
                         ),
@@ -491,44 +486,22 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                             const SizedBox(width: AppDimens.space8),
                             Expanded(
                               flex: 2,
-                              child: TextField(
+                              child: AppTextField.decimal(
                                 controller: _quantityController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: context.text.bodyMedium,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: compactPadding,
-                                ),
+                                hint: '1',
                               ),
                             ),
                             const SizedBox(width: AppDimens.space8),
                             Expanded(
                               flex: 2,
-                              child: DropdownButtonFormField<String>(
-                                key: ValueKey(_selectedUnit),
-                                initialValue: _selectedUnit,
-                                isExpanded: true,
-                                style: context.text.bodyMedium,
-                                dropdownColor: v.surfaceElevated,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                                icon: Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: v.grayText,
-                                ),
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: compactPadding,
-                                ),
-                                items: _units.map((unit) {
-                                  return DropdownMenuItem(
-                                    value: unit,
-                                    child: Text(unit),
-                                  );
-                                }).toList(),
+                              child: AppDropdownField<String>(
+                                value: _selectedUnit,
+                                items: _units,
+                                itemLabel: (unit) => unit,
                                 onChanged: (value) {
-                                  setState(() {
-                                    _selectedUnit = value!;
-                                  });
+                                  if (value != null) {
+                                    setState(() => _selectedUnit = value);
+                                  }
                                 },
                               ),
                             ),

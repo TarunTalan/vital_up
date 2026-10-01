@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
@@ -22,6 +23,8 @@ class FoodItemEditDialog extends StatefulWidget {
 class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
   late TextEditingController _nameController;
   late TextEditingController _quantityController;
+  String? _nameError;
+  String? _quantityError;
   String _selectedUnit = 'serving';
 
   final List<String> _units = ['serving', 'g', 'oz', 'cup', 'piece', 'slice', 'tbsp', 'tsp'];
@@ -47,19 +50,11 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
     final name = _nameController.text.trim();
     final quantity = double.tryParse(_quantityController.text) ?? 1.0;
 
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a food name')),
-      );
-      return;
-    }
-
-    if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid quantity')),
-      );
-      return;
-    }
+    setState(() {
+      _nameError = name.isEmpty ? 'Enter a food name' : null;
+      _quantityError = quantity <= 0 ? 'Enter a quantity' : null;
+    });
+    if (_nameError != null || _quantityError != null) return;
 
     widget.onSave(name, quantity, _selectedUnit);
     Navigator.of(context).pop();
@@ -112,51 +107,47 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _FieldLabel('Food Name'),
-                        TextField(
+                        AppTextField(
+                          label: 'Food Name',
                           controller: _nameController,
-                          style: context.text.bodyLarge,
-                          decoration: const InputDecoration(
-                            hintText: 'e.g., Grilled Chicken',
-                          ),
+                          hint: 'e.g., Grilled Chicken',
+                          error: _nameError,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) {
+                            if (_nameError != null) {
+                              setState(() => _nameError = null);
+                            }
+                          },
                         ),
                         const SizedBox(height: AppDimens.space16),
-                        const _FieldLabel('Quantity'),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: TextField(
+                              child: AppTextField.decimal(
+                                label: 'Quantity',
                                 controller: _quantityController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: context.text.bodyLarge,
-                                decoration: const InputDecoration(
-                                  hintText: '1.0',
-                                ),
+                                hint: '1.0',
+                                error: _quantityError,
+                                onChanged: (_) {
+                                  if (_quantityError != null) {
+                                    setState(() => _quantityError = null);
+                                  }
+                                },
                               ),
                             ),
                             const SizedBox(width: AppDimens.space12),
                             Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: _selectedUnit,
-                                isExpanded: true,
-                                style: context.text.bodyLarge,
-                                dropdownColor: v.surfaceElevated,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                                icon: Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: v.grayText,
-                                ),
-                                items: _units.map((unit) {
-                                  return DropdownMenuItem(
-                                    value: unit,
-                                    child: Text(unit),
-                                  );
-                                }).toList(),
+                              child: AppDropdownField<String>(
+                                label: 'Unit',
+                                value: _selectedUnit,
+                                items: _units,
+                                itemLabel: (unit) => unit,
                                 onChanged: (value) {
-                                  setState(() {
-                                    _selectedUnit = value!;
-                                  });
+                                  if (value != null) {
+                                    setState(() => _selectedUnit = value);
+                                  }
                                 },
                               ),
                             ),
@@ -201,16 +192,3 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
 }
 
 /// Field label — Figma input label (body 16 med), 6dp above the field.
-class _FieldLabel extends StatelessWidget {
-  final String text;
-
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.inputLabelGap),
-      child: Text(text, style: context.text.titleSmall),
-    );
-  }
-}
