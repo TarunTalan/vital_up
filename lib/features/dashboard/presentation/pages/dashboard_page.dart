@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -38,6 +40,9 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
+import 'package:vital_up/features/notifications/data/services/push_service.dart';
+import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
@@ -56,6 +61,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
   late final ProfileCubit _profileCubit;
+  StreamSubscription<PushOpen>? _pushOpens;
   int _selectedIndex = 0;
   final List<int> _navigationQueue = [0];
 
@@ -66,10 +72,26 @@ class _DashboardPageState extends State<DashboardPage> {
     // Syncs the profile (incl. calorie goal) into the local cache that the
     // nutrition card reads.
     _profileCubit = sl<ProfileCubit>()..loadProfile();
+
+    final push = sl<PushService>();
+    push.requestPermissionAndRegister();
+    _pushOpens = push.opens.listen(_openPush);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final launch = push.takePendingOpen();
+      if (launch != null) _openPush(launch);
+    });
+  }
+
+  /// A tapped push opens the screen its notification links to.
+  void _openPush(PushOpen open) {
+    if (!mounted) return;
+    final route = notificationRoute(open.type, open.route);
+    if (route != null) context.pushNamed(route);
   }
 
   @override
   void dispose() {
+    _pushOpens?.cancel();
     _dietPlanCubit.close();
     _profileCubit.close();
     super.dispose();
@@ -113,6 +135,11 @@ class _DashboardPageState extends State<DashboardPage> {
             create: (_) => sl<GamificationCubit>()
               ..load()
               ..sync(),
+          ),
+          BlocProvider<NotificationsCubit>(
+            create: (_) => sl<NotificationsCubit>()
+              ..load()
+              ..watch(),
           ),
           BlocProvider<StressCheckInCubit>(
             create: (_) => sl<StressCheckInCubit>()..load(),
@@ -249,6 +276,8 @@ class _HomeTabState extends State<_HomeTab> {
       context.read<StressCheckInCubit>().load();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
       context.read<GamificationCubit>().sync();
+      // The realtime feed can drop while backgrounded.
+      context.read<NotificationsCubit>().load();
     },
   );
 
@@ -315,9 +344,26 @@ class _HomeTabState extends State<_HomeTab> {
                 showBack: false,
                 title: _greeting(DateTime.now()),
                 subtitle: DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                action: const AppHeaderAction(
-                  tooltip: 'Calendar',
-                  icon: _SvgIcon('assets/icons/calendar.svg'),
+                action: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AppHeaderAction(
+                      tooltip: 'Calendar',
+                      icon: _SvgIcon('assets/icons/calendar.svg'),
+                    ),
+                    const SizedBox(width: AppDimens.space8),
+                    BlocBuilder<NotificationsCubit, NotificationsState>(
+                      buildWhen: (prev, next) =>
+                          prev.unreadCount != next.unreadCount,
+                      builder: (context, state) => NotificationBellButton(
+                        unread: state.unreadCount,
+                        onTap: () => context.pushNamed(
+                          'notifications',
+                          extra: context.read<NotificationsCubit>(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(

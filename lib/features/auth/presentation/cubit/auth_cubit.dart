@@ -8,7 +8,10 @@ import 'auth_state.dart';
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _authRepository;
 
-  AuthCubit({required this._authRepository})
+  /// Runs while still signed in, e.g. to stop push notifications.
+  final Future<void> Function()? _beforeSignOut;
+
+  AuthCubit({required this._authRepository, this._beforeSignOut})
       : super(AuthInitial());
 
   // Input Fields State Controllers
@@ -731,6 +734,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> logout() async {
     emit(AuthLoading());
+    await _beforeSignOut?.call();
     await _authRepository.signOut();
     emit(AuthUnauthenticated());
   }

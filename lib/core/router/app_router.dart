@@ -47,6 +47,8 @@ import 'package:vital_up/features/community/presentation/pages/friends_page.dart
 import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
 import 'package:vital_up/features/gamification/presentation/pages/badges_page.dart';
 import 'package:vital_up/features/gamification/presentation/pages/points_history_page.dart';
+import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:vital_up/features/notifications/presentation/pages/notifications_page.dart';
 
 class AppRouter {
   AppRouter._();
@@ -193,6 +195,21 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const PointsHistoryPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        // Opened from the home bell, which passes its cubit so the unread
+        // count stays in sync; without it fall back to the dashboard.
+        redirect: (context, state) =>
+            state.extra is NotificationsCubit ? null : '/dashboard',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: BlocProvider.value(
+            value: state.extra! as NotificationsCubit,
+            child: const NotificationsPage(),
+          ),
         ),
       ),
       GoRoute(

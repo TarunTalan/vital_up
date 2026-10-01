@@ -21,6 +21,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
+import 'package:vital_up/features/notifications/data/services/push_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,9 @@ void main() async {
 
     // Initialize dependency injection (database, network, storage, etc.)
     await di.initDependencies();
+
+    // Push notifications (no-op until Firebase is configured).
+    await sl<PushService>().init();
 
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();

@@ -1,0 +1,101 @@
+import 'package:equatable/equatable.dart';
+
+enum NotificationType {
+  friendRequest('friend_request'),
+  friendAccepted('friend_accepted'),
+  badge('badge'),
+  levelUp('level_up'),
+  streak('streak'),
+
+  /// Sent by the VitalUp team (app news, tips, reminders).
+  announcement('announcement');
+
+  final String code;
+  const NotificationType(this.code);
+
+  static NotificationType fromCode(String? code) =>
+      values.where((t) => t.code == code).firstOrNull ?? announcement;
+
+  bool get isFriend => this == friendRequest || this == friendAccepted;
+  bool get isAchievement => this == badge || this == levelUp || this == streak;
+}
+
+/// One row of the caller's `notifications` inbox.
+class AppNotification extends Equatable {
+  final int id;
+  final NotificationType type;
+  final String title;
+  final String? body;
+  final String? actorId;
+  final Map<String, dynamic> data;
+  final DateTime createdAt;
+  final DateTime? readAt;
+
+  const AppNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.createdAt,
+    this.body,
+    this.actorId,
+    this.data = const {},
+    this.readAt,
+  });
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) =>
+      AppNotification(
+        id: (json['id'] as num).toInt(),
+        type: NotificationType.fromCode(json['type'] as String?),
+        title: json['title'] as String? ?? '',
+        body: json['body'] as String?,
+        actorId: json['actor_id'] as String?,
+        data: json['data'] is Map
+            ? Map<String, dynamic>.from(json['data'] as Map)
+            : const {},
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        readAt: json['read_at'] == null
+            ? null
+            : DateTime.parse(json['read_at'] as String).toLocal(),
+      );
+
+  bool get isRead => readAt != null;
+
+  /// The friend's username / avatar for friend notifications.
+  String? get actorUsername => data['username'] as String?;
+  String? get actorAvatarUrl => data['avatar_url'] as String?;
+
+  /// A friend request still waiting for accept / decline.
+  bool get isPendingRequest =>
+      type == NotificationType.friendRequest && data['status'] == 'pending';
+
+  /// `badges.icon_key` for badge notifications.
+  String? get badgeIconKey => data['icon_key'] as String?;
+
+  /// Optional in-app route name an announcement links to.
+  String? get route => data['route'] as String?;
+
+  AppNotification markedRead() => isRead
+      ? this
+      : AppNotification(
+          id: id,
+          type: type,
+          title: title,
+          body: body,
+          actorId: actorId,
+          data: data,
+          createdAt: createdAt,
+          readAt: DateTime.now(),
+        );
+
+  @override
+  List<Object?> get props => [
+    id,
+    type,
+    title,
+    body,
+    actorId,
+    data,
+    createdAt,
+    readAt,
+  ];
+}
