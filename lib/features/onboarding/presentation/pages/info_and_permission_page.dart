@@ -8,6 +8,8 @@ import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dar
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
 class InfoAndPermissionPage extends StatefulWidget {
@@ -54,6 +56,9 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
           onNext: isSubmitting
               ? () {}
               : () {
+                  if (healthReminders) {
+                    sl<RemindersService>().enableStarterSet();
+                  }
                   context.read<OnboardingCubit>().submitOnboardingDataToBackend();
                 },
           title: "Data privacy",

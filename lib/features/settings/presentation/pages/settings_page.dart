@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -243,7 +244,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSettingRow(
                     icon: Icons.notifications_active_rounded,
                     title: 'Notifications',
-                    subtitle: 'Daily check-in and log reminders',
+                    subtitle: 'Pushes and reminders',
                     trailing: Switch(
                       value: settings.notificationsEnabled,
                       onChanged: (val) {
@@ -251,6 +252,19 @@ class _SettingsPageState extends State<SettingsPage> {
                               settings.copyWith(notificationsEnabled: val),
                             );
                       },
+                    ),
+                  ),
+                  _buildDivider(),
+                  InkWell(
+                    onTap: () => context.pushNamed('reminders'),
+                    child: _buildSettingRow(
+                      icon: Icons.alarm_rounded,
+                      title: 'Reminders',
+                      subtitle: 'Activity, meals, water, sleep',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
                     ),
                   ),
                   _buildDivider(),

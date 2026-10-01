@@ -124,6 +124,11 @@ import 'package:vital_up/features/activity_tracking/services/workout_audio_servi
 import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
+import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
+import 'package:vital_up/features/reminders/data/reminders_service.dart';
+import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 
 
 final GetIt sl = GetIt.instance;
@@ -182,7 +187,10 @@ Future<void> initDependencies() async {
   sl.registerFactory(
     () => AuthCubit(
       authRepository: sl<AuthRepository>(),
-      beforeSignOut: () => sl<PushService>().unregister(),
+      beforeSignOut: () async {
+        await sl<PushService>().unregister();
+        await sl<RemindersService>().clear();
+      },
     ),
   );
   
@@ -329,7 +337,10 @@ Future<void> initDependencies() async {
   sl.registerFactory(
     () => SettingsCubit(
       settingsRepository: sl<SettingsRepository>(),
-      onNotificationsChanged: (enabled) => sl<PushService>().setEnabled(enabled),
+      onNotificationsChanged: (enabled) async {
+        await sl<PushService>().setEnabled(enabled);
+        await sl<RemindersService>().resync();
+      },
     ),
   );
 
@@ -517,11 +528,24 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(() => NotificationsCubit(sl<NotificationsRepository>()));
+  sl.registerLazySingleton(FlutterLocalNotificationsPlugin.new);
   sl.registerLazySingleton(
     () => PushService(
       sl<SupabaseClient>(),
       sl<SettingsRepository>(),
       sl<NotificationsRepository>(),
+      sl<FlutterLocalNotificationsPlugin>(),
     ),
   );
+
+  // 18. Reminders (local, on-device schedule)
+  sl.registerLazySingleton(() => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()));
+  sl.registerLazySingleton(
+    () => RemindersService(
+      RemindersLocalDataSource(sl<SharedPreferences>()),
+      sl<ReminderScheduler>(),
+      sl<SettingsRepository>(),
+    ),
+  );
+  sl.registerFactory(() => RemindersCubit(sl<RemindersService>()));
 }

@@ -27,6 +27,10 @@ const notificationLinkableRoutes = {
   'meal-log-history',
   'activity-history',
   'settings',
+  // Reminder targets.
+  'food-scan',
+  'activity-tracking',
+  'reminders',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.
