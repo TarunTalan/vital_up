@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
+import 'package:vital_up/core/network/retry_interceptor.dart';
 
 class DioClient {
   final Dio _dio;
@@ -19,14 +20,26 @@ class DioClient {
     _dio.options = BaseOptions(
       // Configure with vitalup dev backend endpoint
       baseUrl: 'https://vitalup.dev/api/v1/', 
-      connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     );
 
+    // 1. Exponential Backoff Retry Interceptor for transient network drops (jogging, tunnels, weak signals)
+    _dio.interceptors.add(
+      RetryInterceptor(
+        dio: _dio,
+        logger: _logger,
+        maxRetries: 3,
+        initialDelay: const Duration(milliseconds: 1000),
+        maxDelay: const Duration(seconds: 10),
+      ),
+    );
+
+    // 2. Auth & Logging Interceptors
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
