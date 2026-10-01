@@ -5,6 +5,10 @@ class GetLiveStepsStream {
 
   const GetLiveStepsStream(this.repository);
 
+  Future<bool> ensurePermission() {
+    return repository.ensurePermission();
+  }
+
   Stream<int> call() {
     return repository.watchSteps();
   }

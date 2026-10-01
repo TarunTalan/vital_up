@@ -34,14 +34,18 @@ class DriftTrackPoints extends Table {
   DateTimeColumn get timestamp => dateTime()();
   RealColumn get accuracy => real()();
   RealColumn get speed => real()();
+  RealColumn get altitude => real().withDefault(const Constant(0.0))();
 }
 
 @DriftDatabase(tables: [DriftActivitySessions, DriftTrackPoints])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// For tests: run against e.g. `NativeDatabase.memory()`.
+  AppDatabase.forTesting(super.executor);
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -66,6 +70,14 @@ class AppDatabase extends _$AppDatabase {
               driftActivitySessions.targetAchieved,
             );
           }
+          if (from < 4) {
+            await m.addColumn(driftTrackPoints, driftTrackPoints.altitude);
+          }
+        },
+        beforeOpen: (details) async {
+          // SQLite ships with foreign keys off; without this the cascade on
+          // track points never fires and deleted sessions leave them behind.
+          await customStatement('PRAGMA foreign_keys = ON');
         },
       );
 
@@ -107,6 +119,51 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Upserts a session and replaces its route in one transaction, so a
+  /// crash mid-save never leaves a session paired with a partial route.
+  Future<void> saveSessionWithPoints(
+    DriftActivitySessionsCompanion session,
+    List<DriftTrackPointsCompanion> points,
+  ) async {
+    await transaction(() async {
+      await into(driftActivitySessions).insertOnConflictUpdate(session);
+      await replaceTrackPointsForSession(session.id.value, points);
+    });
+  }
+
+  /// Every track point of every session, grouped by session id and in
+  /// time order. One query instead of one per session.
+  Future<Map<String, List<DriftTrackPoint>>> getAllTrackPointsBySession() async {
+    final rows = await (select(driftTrackPoints)
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.sessionId),
+            (t) => OrderingTerm(expression: t.timestamp),
+          ]))
+        .get();
+    final grouped = <String, List<DriftTrackPoint>>{};
+    for (final row in rows) {
+      (grouped[row.sessionId] ??= []).add(row);
+    }
+    return grouped;
+  }
+
+  /// Closes sessions that were still recording when the app died (they
+  /// are checkpointed with no end time) and drops orphaned track points.
+  /// Must only run when no workout is being recorded, i.e. at startup.
+  Future<void> finalizeInterruptedSessions() async {
+    await transaction(() async {
+      await customStatement(
+        "UPDATE drift_activity_sessions "
+        "SET end_time = start_time + total_duration_seconds "
+        "WHERE end_time IS NULL",
+      );
+      await customStatement(
+        'DELETE FROM drift_track_points '
+        'WHERE session_id NOT IN (SELECT id FROM drift_activity_sessions)',
+      );
+    });
+  }
+
   // Retrieve a session with its track points
   Future<DriftActivitySession?> getSession(String id) =>
       (select(driftActivitySessions)..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -123,8 +180,10 @@ class AppDatabase extends _$AppDatabase {
       (select(driftActivitySessions)..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.desc)])).get();
 
   // Delete a session and cascaded points
-  Future<int> deleteSession(String id) =>
-      (delete(driftActivitySessions)..where((t) => t.id.equals(id))).go();
+  Future<void> deleteSession(String id) => transaction(() async {
+        await (delete(driftTrackPoints)..where((t) => t.sessionId.equals(id))).go();
+        await (delete(driftActivitySessions)..where((t) => t.id.equals(id))).go();
+      });
 }
 
 LazyDatabase _openConnection() {

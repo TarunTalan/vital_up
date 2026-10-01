@@ -25,6 +25,12 @@ class TrackingInProgress extends ActivityTrackingState {
   final bool stepCountReliable;
   final List<TrackPoint> routePoints;
 
+  /// Cumulative climb in meters, with GPS altitude noise filtered out.
+  final double elevationGainMeters;
+
+  /// Current Doppler speed in m/s; drops to 0 when fixes stop arriving.
+  final double currentSpeedMps;
+
   const TrackingInProgress({
     required super.activityType,
     required this.elapsed,
@@ -34,6 +40,8 @@ class TrackingInProgress extends ActivityTrackingState {
     required this.steps,
     required this.stepCountReliable,
     required this.routePoints,
+    this.elevationGainMeters = 0.0,
+    this.currentSpeedMps = 0.0,
   });
 
   @override
@@ -46,6 +54,8 @@ class TrackingInProgress extends ActivityTrackingState {
         steps,
         stepCountReliable,
         routePoints,
+        elevationGainMeters,
+        currentSpeedMps,
       ];
 }
 
@@ -58,6 +68,12 @@ class TrackingPaused extends ActivityTrackingState {
   final bool stepCountReliable;
   final List<TrackPoint> routePoints;
 
+  /// Cumulative climb in meters, with GPS altitude noise filtered out.
+  final double elevationGainMeters;
+
+  /// Current Doppler speed in m/s; drops to 0 when fixes stop arriving.
+  final double currentSpeedMps;
+
   const TrackingPaused({
     required super.activityType,
     required this.elapsed,
@@ -67,6 +83,8 @@ class TrackingPaused extends ActivityTrackingState {
     required this.steps,
     required this.stepCountReliable,
     required this.routePoints,
+    this.elevationGainMeters = 0.0,
+    this.currentSpeedMps = 0.0,
   });
 
   @override
@@ -79,19 +97,27 @@ class TrackingPaused extends ActivityTrackingState {
         steps,
         stepCountReliable,
         routePoints,
+        elevationGainMeters,
+        currentSpeedMps,
       ];
 }
 
 class TrackingCompleted extends ActivityTrackingState {
   final ActivitySession session;
+  final double elevationGainMeters;
+
+  /// False when writing the session to the local database failed.
+  final bool saved;
 
   const TrackingCompleted({
     required super.activityType,
     required this.session,
+    this.elevationGainMeters = 0.0,
+    this.saved = true,
   });
 
   @override
-  List<Object?> get props => [activityType, session];
+  List<Object?> get props => [activityType, session, elevationGainMeters, saved];
 }
 
 class TrackingPermissionDenied extends ActivityTrackingState {

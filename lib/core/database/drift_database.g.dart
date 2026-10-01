@@ -898,6 +898,18 @@ class $DriftTrackPointsTable extends DriftTrackPoints
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _altitudeMeta = const VerificationMeta(
+    'altitude',
+  );
+  @override
+  late final GeneratedColumn<double> altitude = GeneratedColumn<double>(
+    'altitude',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -907,6 +919,7 @@ class $DriftTrackPointsTable extends DriftTrackPoints
     timestamp,
     accuracy,
     speed,
+    altitude,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -971,6 +984,12 @@ class $DriftTrackPointsTable extends DriftTrackPoints
     } else if (isInserting) {
       context.missing(_speedMeta);
     }
+    if (data.containsKey('altitude')) {
+      context.handle(
+        _altitudeMeta,
+        altitude.isAcceptableOrUnknown(data['altitude']!, _altitudeMeta),
+      );
+    }
     return context;
   }
 
@@ -1008,6 +1027,10 @@ class $DriftTrackPointsTable extends DriftTrackPoints
         DriftSqlType.double,
         data['${effectivePrefix}speed'],
       )!,
+      altitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}altitude'],
+      )!,
     );
   }
 
@@ -1025,6 +1048,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
   final DateTime timestamp;
   final double accuracy;
   final double speed;
+  final double altitude;
   const DriftTrackPoint({
     required this.id,
     required this.sessionId,
@@ -1033,6 +1057,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
     required this.timestamp,
     required this.accuracy,
     required this.speed,
+    required this.altitude,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1044,6 +1069,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
     map['timestamp'] = Variable<DateTime>(timestamp);
     map['accuracy'] = Variable<double>(accuracy);
     map['speed'] = Variable<double>(speed);
+    map['altitude'] = Variable<double>(altitude);
     return map;
   }
 
@@ -1056,6 +1082,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
       timestamp: Value(timestamp),
       accuracy: Value(accuracy),
       speed: Value(speed),
+      altitude: Value(altitude),
     );
   }
 
@@ -1072,6 +1099,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
       accuracy: serializer.fromJson<double>(json['accuracy']),
       speed: serializer.fromJson<double>(json['speed']),
+      altitude: serializer.fromJson<double>(json['altitude']),
     );
   }
   @override
@@ -1085,6 +1113,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
       'timestamp': serializer.toJson<DateTime>(timestamp),
       'accuracy': serializer.toJson<double>(accuracy),
       'speed': serializer.toJson<double>(speed),
+      'altitude': serializer.toJson<double>(altitude),
     };
   }
 
@@ -1096,6 +1125,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
     DateTime? timestamp,
     double? accuracy,
     double? speed,
+    double? altitude,
   }) => DriftTrackPoint(
     id: id ?? this.id,
     sessionId: sessionId ?? this.sessionId,
@@ -1104,6 +1134,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
     timestamp: timestamp ?? this.timestamp,
     accuracy: accuracy ?? this.accuracy,
     speed: speed ?? this.speed,
+    altitude: altitude ?? this.altitude,
   );
   DriftTrackPoint copyWithCompanion(DriftTrackPointsCompanion data) {
     return DriftTrackPoint(
@@ -1114,6 +1145,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       accuracy: data.accuracy.present ? data.accuracy.value : this.accuracy,
       speed: data.speed.present ? data.speed.value : this.speed,
+      altitude: data.altitude.present ? data.altitude.value : this.altitude,
     );
   }
 
@@ -1126,7 +1158,8 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
           ..write('longitude: $longitude, ')
           ..write('timestamp: $timestamp, ')
           ..write('accuracy: $accuracy, ')
-          ..write('speed: $speed')
+          ..write('speed: $speed, ')
+          ..write('altitude: $altitude')
           ..write(')'))
         .toString();
   }
@@ -1140,6 +1173,7 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
     timestamp,
     accuracy,
     speed,
+    altitude,
   );
   @override
   bool operator ==(Object other) =>
@@ -1151,7 +1185,8 @@ class DriftTrackPoint extends DataClass implements Insertable<DriftTrackPoint> {
           other.longitude == this.longitude &&
           other.timestamp == this.timestamp &&
           other.accuracy == this.accuracy &&
-          other.speed == this.speed);
+          other.speed == this.speed &&
+          other.altitude == this.altitude);
 }
 
 class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
@@ -1162,6 +1197,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
   final Value<DateTime> timestamp;
   final Value<double> accuracy;
   final Value<double> speed;
+  final Value<double> altitude;
   const DriftTrackPointsCompanion({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
@@ -1170,6 +1206,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
     this.timestamp = const Value.absent(),
     this.accuracy = const Value.absent(),
     this.speed = const Value.absent(),
+    this.altitude = const Value.absent(),
   });
   DriftTrackPointsCompanion.insert({
     this.id = const Value.absent(),
@@ -1179,6 +1216,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
     required DateTime timestamp,
     required double accuracy,
     required double speed,
+    this.altitude = const Value.absent(),
   }) : sessionId = Value(sessionId),
        latitude = Value(latitude),
        longitude = Value(longitude),
@@ -1193,6 +1231,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
     Expression<DateTime>? timestamp,
     Expression<double>? accuracy,
     Expression<double>? speed,
+    Expression<double>? altitude,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1202,6 +1241,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
       if (timestamp != null) 'timestamp': timestamp,
       if (accuracy != null) 'accuracy': accuracy,
       if (speed != null) 'speed': speed,
+      if (altitude != null) 'altitude': altitude,
     });
   }
 
@@ -1213,6 +1253,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
     Value<DateTime>? timestamp,
     Value<double>? accuracy,
     Value<double>? speed,
+    Value<double>? altitude,
   }) {
     return DriftTrackPointsCompanion(
       id: id ?? this.id,
@@ -1222,6 +1263,7 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
       timestamp: timestamp ?? this.timestamp,
       accuracy: accuracy ?? this.accuracy,
       speed: speed ?? this.speed,
+      altitude: altitude ?? this.altitude,
     );
   }
 
@@ -1249,6 +1291,9 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
     if (speed.present) {
       map['speed'] = Variable<double>(speed.value);
     }
+    if (altitude.present) {
+      map['altitude'] = Variable<double>(altitude.value);
+    }
     return map;
   }
 
@@ -1261,7 +1306,8 @@ class DriftTrackPointsCompanion extends UpdateCompanion<DriftTrackPoint> {
           ..write('longitude: $longitude, ')
           ..write('timestamp: $timestamp, ')
           ..write('accuracy: $accuracy, ')
-          ..write('speed: $speed')
+          ..write('speed: $speed, ')
+          ..write('altitude: $altitude')
           ..write(')'))
         .toString();
   }
@@ -1797,6 +1843,7 @@ typedef $$DriftTrackPointsTableCreateCompanionBuilder =
       required DateTime timestamp,
       required double accuracy,
       required double speed,
+      Value<double> altitude,
     });
 typedef $$DriftTrackPointsTableUpdateCompanionBuilder =
     DriftTrackPointsCompanion Function({
@@ -1807,6 +1854,7 @@ typedef $$DriftTrackPointsTableUpdateCompanionBuilder =
       Value<DateTime> timestamp,
       Value<double> accuracy,
       Value<double> speed,
+      Value<double> altitude,
     });
 
 final class $$DriftTrackPointsTableReferences
@@ -1877,6 +1925,11 @@ class $$DriftTrackPointsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get altitude => $composableBuilder(
+    column: $table.altitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$DriftActivitySessionsTableFilterComposer get sessionId {
     final $$DriftActivitySessionsTableFilterComposer composer =
         $composerBuilder(
@@ -1941,6 +1994,11 @@ class $$DriftTrackPointsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get altitude => $composableBuilder(
+    column: $table.altitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$DriftActivitySessionsTableOrderingComposer get sessionId {
     final $$DriftActivitySessionsTableOrderingComposer composer =
         $composerBuilder(
@@ -1992,6 +2050,9 @@ class $$DriftTrackPointsTableAnnotationComposer
 
   GeneratedColumn<double> get speed =>
       $composableBuilder(column: $table.speed, builder: (column) => column);
+
+  GeneratedColumn<double> get altitude =>
+      $composableBuilder(column: $table.altitude, builder: (column) => column);
 
   $$DriftActivitySessionsTableAnnotationComposer get sessionId {
     final $$DriftActivitySessionsTableAnnotationComposer composer =
@@ -2055,6 +2116,7 @@ class $$DriftTrackPointsTableTableManager
                 Value<DateTime> timestamp = const Value.absent(),
                 Value<double> accuracy = const Value.absent(),
                 Value<double> speed = const Value.absent(),
+                Value<double> altitude = const Value.absent(),
               }) => DriftTrackPointsCompanion(
                 id: id,
                 sessionId: sessionId,
@@ -2063,6 +2125,7 @@ class $$DriftTrackPointsTableTableManager
                 timestamp: timestamp,
                 accuracy: accuracy,
                 speed: speed,
+                altitude: altitude,
               ),
           createCompanionCallback:
               ({
@@ -2073,6 +2136,7 @@ class $$DriftTrackPointsTableTableManager
                 required DateTime timestamp,
                 required double accuracy,
                 required double speed,
+                Value<double> altitude = const Value.absent(),
               }) => DriftTrackPointsCompanion.insert(
                 id: id,
                 sessionId: sessionId,
@@ -2081,6 +2145,7 @@ class $$DriftTrackPointsTableTableManager
                 timestamp: timestamp,
                 accuracy: accuracy,
                 speed: speed,
+                altitude: altitude,
               ),
           withReferenceMapper: (p0) => p0
               .map(
