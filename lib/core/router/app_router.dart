@@ -14,6 +14,7 @@ import 'package:vital_up/features/activity_tracking/presentation/pages/activity_
 import 'package:vital_up/features/activity_goals/presentation/pages/activity_goals_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/diet_progress_page.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/screen_time_trends_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/sleep_trends_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/stress_trends_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
@@ -34,8 +35,11 @@ import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_edit_pa
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_result_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
-import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
+import 'package:vital_up/features/help_support/presentation/pages/help_support_page.dart';
+import 'package:vital_up/features/help_support/presentation/pages/support_chat_page.dart';
+import 'package:vital_up/features/about/presentation/pages/about_page.dart';
+import 'package:vital_up/features/health_report/presentation/pages/health_report_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
@@ -189,6 +193,14 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const SleepTrendsPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/screen-time',
+        name: 'screen-time-trends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const ScreenTimeTrendsPage(),
         ),
       ),
       GoRoute(
@@ -447,10 +459,7 @@ class AppRouter {
         name: 'settings',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: BlocProvider<SettingsCubit>(
-            create: (context) => sl<SettingsCubit>()..loadSettings(),
-            child: const SettingsPage(),
-          ),
+          child: const SettingsPage(),
         ),
       ),
       GoRoute(
@@ -462,6 +471,38 @@ class AppRouter {
             create: (context) => sl<RemindersCubit>()..load(),
             child: const RemindersPage(),
           ),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/help',
+        name: 'help-support',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const HelpSupportPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/help/chat',
+        name: 'support-chat',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const SupportChatPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/about',
+        name: 'about',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const AboutPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/health-report',
+        name: 'health-report',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const HealthReportPage(),
         ),
       ),
       GoRoute(
