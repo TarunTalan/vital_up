@@ -1,7 +1,7 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 
 class AuthTextField extends StatefulWidget {
   final String label;
@@ -57,7 +57,8 @@ class AuthTextField extends StatefulWidget {
   State<AuthTextField> createState() => _AuthTextFieldState();
 }
 
-class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProviderStateMixin {
+class _AuthTextFieldState extends State<AuthTextField>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   bool _focused = false;
@@ -76,7 +77,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     super.initState();
     _controller = TextEditingController(text: widget.value);
     _focusNode = FocusNode();
-    
+
     _focusNode.addListener(() {
       setState(() {
         _focused = _focusNode.hasFocus;
@@ -84,7 +85,9 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
           _showRequirements = false;
         }
       });
-      if (!_focusNode.hasFocus && widget.error == null && widget.validate != null) {
+      if (!_focusNode.hasFocus &&
+          widget.error == null &&
+          widget.validate != null) {
         widget.validate!();
       }
     });
@@ -143,7 +146,7 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
   String _sanitizeInput(String input) {
     final maxLen = widget.isPassword ? 16 : widget.maxLength;
     String filtered = input;
-    
+
     if (widget.keyboardType == TextInputType.emailAddress) {
       filtered = input.replaceAll(RegExp(r'[^A-Za-z0-9@._%+\-]'), '');
     } else if (widget.keyboardType == TextInputType.number) {
@@ -180,45 +183,20 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     final hasFieldError = widget.error != null && !isAvailable;
     final isFilled = widget.value.isNotEmpty;
 
-    // Figma input/text states: default / active / filled / error.
-    final Color fillColor;
-    final Color borderColor;
-    final double borderWidth;
-    if (hasFieldError) {
-      fillColor = v.errorFill!;
-      borderColor = colors.error;
-      borderWidth = AppDimens.borderThick;
-    } else if (isAvailable) {
-      fillColor = v.primaryFill!;
-      borderColor = v.success!;
-      borderWidth = AppDimens.borderThick;
-    } else if (_focused) {
-      fillColor = v.glassFill!;
-      borderColor = colors.primary;
-      borderWidth = AppDimens.borderThick;
-    } else if (isFilled) {
-      fillColor = v.primaryFill!;
-      borderColor = v.glassBorder!;
-      borderWidth = AppDimens.borderThin;
-    } else {
-      fillColor = v.glassFill!;
-      borderColor = v.glassBorder!;
-      borderWidth = AppDimens.borderThin;
-    }
-
     final textColor = hasFieldError
         ? colors.error
         : _focused
-            ? AppColors.primaryActive
-            : colors.onSurface;
+        ? AppColors.primaryActive
+        : colors.onSurface;
 
     final iconColor = hasFieldError
         ? colors.error
         : _focused
-            ? colors.primary
-            : colors.onSurface;
+        ? colors.primary
+        : colors.onSurface;
 
-    final localPasswordError = widget.showValidation &&
+    final localPasswordError =
+        widget.showValidation &&
             widget.isPassword &&
             widget.value.isNotEmpty &&
             widget.value.length < 8
@@ -229,11 +207,14 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
         ? 'Username is available'
         : (widget.error ?? localPasswordError);
 
-    final hasError = isAvailable || (showErrText != null && showErrText.isNotEmpty);
-    final showForgotRow = widget.isPassword && widget.showForgot && widget.onForgotPassword != null;
+    final hasError =
+        isAvailable || (showErrText != null && showErrText.isNotEmpty);
+    final showForgotRow =
+        widget.isPassword &&
+        widget.showForgot &&
+        widget.onForgotPassword != null;
 
     final inputHeight = AppTheme.responsiveInputHeight(context);
-    final radius = BorderRadius.circular(AppDimens.radiusInput);
 
     final helperStyle = context.text.bodyLarge?.copyWith(
       color: (isAvailable && !widget.isPassword) ? v.success : colors.error,
@@ -244,16 +225,16 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
     );
 
     Widget helperText(String text) => Text(
-          text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: helperStyle,
-        );
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: helperStyle,
+    );
 
     Widget forgotLink() => GestureDetector(
-          onTap: widget.onForgotPassword,
-          child: Text('Forgot password?', style: forgotStyle),
-        );
+      onTap: widget.onForgotPassword,
+      child: Text('Forgot password?', style: forgotStyle),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,145 +247,128 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
         Stack(
           clipBehavior: Clip.none,
           children: [
-            AnimatedContainer(
-              duration: AppDurations.medium,
-              decoration: BoxDecoration(
-                borderRadius: radius,
-                boxShadow: _focused && !hasFieldError ? AppShadows.inputFocus : null,
-              ),
-              child: ClipRRect(
-                borderRadius: radius,
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(
-                    sigmaX: AppDimens.glassBlur,
-                    sigmaY: AppDimens.glassBlur,
-                  ),
-                  child: AnimatedContainer(
-                    duration: AppDurations.medium,
-                    width: double.infinity,
-                    constraints: BoxConstraints(minHeight: inputHeight),
-                    decoration: BoxDecoration(
-                      color: fillColor,
-                      borderRadius: radius,
-                      border: Border.all(color: borderColor, width: borderWidth),
-                    ),
-                    padding: const EdgeInsetsDirectional.only(
-                      start: AppDimens.space16,
-                      end: AppDimens.space4,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: widget.singleLine ? 0 : AppDimens.space16,
+            AppInputBox(
+              focused: _focused,
+              filled: isFilled,
+              hasError: hasFieldError,
+              success: isAvailable,
+              enabled: widget.enabled,
+              multiline: !widget.singleLine,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      autofocus: widget.autofocus,
+                      enabled: widget.enabled,
+                      obscureText: widget.isPassword && !_passwordVisible,
+                      keyboardType: widget.keyboardType,
+                      textInputAction: widget.textInputAction,
+                      onSubmitted: widget.onSubmitted,
+                      autofillHints: widget.autofillHints,
+                      maxLines: widget.singleLine ? 1 : null,
+                      enableInteractiveSelection: !widget.isPassword,
+                      onTapOutside: (event) {},
+                      style: context.text.bodyMedium?.copyWith(
+                        color: textColor,
+                      ),
+                      cursorColor: hasFieldError
+                          ? colors.error
+                          : colors.primary,
+                      onChanged: (text) {
+                        setState(() {
+                          _showRequirements = false;
+                        });
+                        final sanitized = _sanitizeInput(text);
+                        if (sanitized != text) {
+                          _controller.value = _controller.value.copyWith(
+                            text: sanitized,
+                            selection: TextSelection.collapsed(
+                              offset: sanitized.length,
                             ),
-                            child: TextField(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              autofocus: widget.autofocus,
-                              enabled: widget.enabled,
-                              obscureText: widget.isPassword && !_passwordVisible,
-                              keyboardType: widget.keyboardType,
-                              textInputAction: widget.textInputAction,
-                              onSubmitted: widget.onSubmitted,
-                              autofillHints: widget.autofillHints,
-                              maxLines: widget.singleLine ? 1 : null,
-                              enableInteractiveSelection: !widget.isPassword,
-                              onTapOutside: (event) {},
-                              style: context.text.bodyMedium?.copyWith(color: textColor),
-                              cursorColor: hasFieldError ? colors.error : colors.primary,
-                              onChanged: (text) {
-                                setState(() {
-                                  _showRequirements = false;
-                                });
-                                final sanitized = _sanitizeInput(text);
-                                if (sanitized != text) {
-                                  _controller.value = _controller.value.copyWith(
-                                    text: sanitized,
-                                    selection: TextSelection.collapsed(offset: sanitized.length),
-                                  );
-                                }
-                                widget.onChange(sanitized);
-                              },
-                              decoration: InputDecoration(
-                                hintText: widget.placeholder,
-                                hintStyle: context.text.bodyMedium?.copyWith(
-                                  color: hasFieldError ? colors.error : v.grayText,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                errorBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                                filled: false,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                          );
+                        }
+                        widget.onChange(sanitized);
+                      },
+                      decoration: InputDecoration(
+                        hintText: widget.placeholder,
+                        hintStyle: context.text.bodyMedium?.copyWith(
+                          color: hasFieldError ? colors.error : v.grayText,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
+                  if (widget.isPassword) ...[
+                    if (widget.error != null && widget.showRequirementsInfo)
+                      IconButton(
+                        icon: Icon(
+                          Icons.info_outline,
+                          color: colors.error,
+                          size: AppDimens.iconMd,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showRequirements = !_showRequirements;
+                          });
+                        },
+                        tooltip: 'Show requirements',
+                      ),
+                    IconButton(
+                      icon: _SvgEyeIcon(
+                        visible: _passwordVisible,
+                        color: iconColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _passwordVisible = !_passwordVisible;
+                          _manuallyToggledVisible = _passwordVisible;
+                          _showingDueToError = false;
+                        });
+                        if (_passwordVisible) {
+                          _strikeController.reverse();
+                        } else {
+                          _strikeController.forward();
+                        }
+                      },
+                    ),
+                  ] else ...[
+                    if (widget.isChecking)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AppDimens.space12,
+                        ),
+                        child: SizedBox.square(
+                          dimension: AppDimens.iconSm,
+                          child: CircularProgressIndicator(
+                            strokeWidth: AppDimens.borderThick,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.primaryActive,
                             ),
                           ),
                         ),
-                        if (widget.isPassword) ...[
-                          if (widget.error != null && widget.showRequirementsInfo)
-                            IconButton(
-                              icon: Icon(
-                                Icons.info_outline,
-                                color: colors.error,
-                                size: AppDimens.iconMd,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _showRequirements = !_showRequirements;
-                                });
-                              },
-                              tooltip: 'Show requirements',
-                            ),
-                          IconButton(
-                            icon: _SvgEyeIcon(
-                              visible: _passwordVisible,
-                              color: iconColor,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _passwordVisible = !_passwordVisible;
-                                _manuallyToggledVisible = _passwordVisible;
-                                _showingDueToError = false;
-                              });
-                              if (_passwordVisible) {
-                                _strikeController.reverse();
-                              } else {
-                                _strikeController.forward();
-                              }
-                            },
-                          ),
-                        ] else ...[
-                          if (widget.isChecking)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(end: AppDimens.space12),
-                              child: SizedBox.square(
-                                dimension: AppDimens.iconSm,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: AppDimens.borderThick,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(
-                                    AppColors.primaryActive,
-                                  ),
-                                ),
-                              ),
-                            )
-                          else if (isAvailable)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(end: AppDimens.space12),
-                              child: Icon(
-                                Icons.check_circle,
-                                color: v.success,
-                                size: AppDimens.iconMd,
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
+                      )
+                    else if (isAvailable)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AppDimens.space12,
+                        ),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: v.success,
+                          size: AppDimens.iconMd,
+                        ),
+                      ),
+                  ],
+                ],
               ),
             ),
             if (widget.isPassword && _showRequirements)
@@ -464,7 +428,9 @@ class _AuthTextFieldState extends State<AuthTextField> with SingleTickerProvider
             alignment: Alignment.topCenter,
             child: (hasError || showForgotRow)
                 ? Padding(
-                    padding: const EdgeInsets.only(top: AppDimens.inputLabelGap),
+                    padding: const EdgeInsets.only(
+                      top: AppDimens.inputLabelGap,
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -490,10 +456,7 @@ class _SvgEyeIcon extends StatelessWidget {
   final bool visible;
   final Color color;
 
-  const _SvgEyeIcon({
-    required this.visible,
-    required this.color,
-  });
+  const _SvgEyeIcon({required this.visible, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -689,7 +652,7 @@ class AuthPasswordField extends StatelessWidget {
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
       autofillHints: [
-        showForgot ? AutofillHints.password : AutofillHints.newPassword
+        showForgot ? AutofillHints.password : AutofillHints.newPassword,
       ],
       enabled: enabled,
     );
@@ -739,7 +702,6 @@ class AuthNumberField extends StatelessWidget {
   }
 }
 
-
 /// Rounded speech bubble with a downward arrow near its trailing edge
 /// (pointing at the requirements info icon inside the field).
 class SpeechBubblePainter extends CustomPainter {
@@ -770,18 +732,28 @@ class SpeechBubblePainter extends CustomPainter {
     final path = Path()
       ..moveTo(radius, 0)
       ..lineTo(size.width - radius, 0)
-      ..arcToPoint(Offset(size.width, radius), radius: const Radius.circular(radius))
+      ..arcToPoint(
+        Offset(size.width, radius),
+        radius: const Radius.circular(radius),
+      )
       ..lineTo(size.width, size.height - radius - arrowHeight)
-      ..arcToPoint(Offset(size.width - radius, size.height - arrowHeight),
-          radius: const Radius.circular(radius))
+      ..arcToPoint(
+        Offset(size.width - radius, size.height - arrowHeight),
+        radius: const Radius.circular(radius),
+      )
       ..lineTo(arrowX + arrowWidth / 2, size.height - arrowHeight)
       ..lineTo(arrowX, size.height)
       ..lineTo(arrowX - arrowWidth / 2, size.height - arrowHeight)
       ..lineTo(radius, size.height - arrowHeight)
-      ..arcToPoint(Offset(0, size.height - radius - arrowHeight),
-          radius: const Radius.circular(radius))
+      ..arcToPoint(
+        Offset(0, size.height - radius - arrowHeight),
+        radius: const Radius.circular(radius),
+      )
       ..lineTo(0, radius)
-      ..arcToPoint(const Offset(radius, 0), radius: const Radius.circular(radius))
+      ..arcToPoint(
+        const Offset(radius, 0),
+        radius: const Radius.circular(radius),
+      )
       ..close();
 
     canvas.drawPath(path, paint);
