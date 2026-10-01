@@ -14,3 +14,8 @@ entrypoint = "./functions/fatsecret-proxy/index.ts"
 enabled = true
 # Called by a database trigger with a shared secret, not a user JWT.
 verify_jwt = false
+
+[functions.delete-account]
+enabled = true
+# Called by the signed-in user; the JWT identifies whose account to delete.
+verify_jwt = true

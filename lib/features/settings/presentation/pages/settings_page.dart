@@ -9,6 +9,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
@@ -64,13 +65,14 @@ class _SettingsPageState extends State<SettingsPage> {
     required IconData icon,
     required String title,
     required String subtitle,
+    Color? iconColor,
     Widget? trailing,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
       child: Row(
         children: [
-          AppIconBadge(icon: Icon(icon)),
+          AppIconBadge(icon: Icon(icon), color: iconColor),
           const SizedBox(width: AppDimens.space12),
           Expanded(
             child: Column(
@@ -282,6 +284,21 @@ class _SettingsPageState extends State<SettingsPage> {
                               settings.copyWith(healthSyncEnabled: val),
                             );
                       },
+                    ),
+                  ),
+                ]),
+                _buildSection('Account', [
+                  InkWell(
+                    onTap: () => showDeleteAccountSheet(context),
+                    child: _buildSettingRow(
+                      icon: Icons.delete_forever_rounded,
+                      iconColor: context.colors.error,
+                      title: 'Delete account',
+                      subtitle: 'Permanently remove your account and data',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
                     ),
                   ),
                 ]),

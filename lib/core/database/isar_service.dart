@@ -42,6 +42,20 @@ class IsarService {
     await _seedOfflineFoods();
   }
 
+  /// Deletes everything personal: logs, profile, meal plans, saved audio.
+  /// Shared reference data (offline foods, barcode lookups) is kept.
+  Future<void> clearUserData() => isar.writeTxn(() async {
+    await isar.userProfileCaches.clear();
+    await isar.stepLogCaches.clear();
+    await isar.heartRateLogCaches.clear();
+    await isar.sleepLogCaches.clear();
+    await isar.waterLogCaches.clear();
+    await isar.mealPlanModels.clear();
+    await isar.favoriteAudios.clear();
+    await isar.downloadedTracks.clear();
+    await isar.mealLogCaches.clear();
+  });
+
   Future<void> _seedOfflineFoods() async {
     try {
       final count = await isar.offlineFoods.count();
