@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -269,13 +270,51 @@ class _DashboardPageState extends State<DashboardPage> {
             style: TextButton.styleFrom(foregroundColor: errorColor),
             onPressed: () {
               Navigator.of(context).pop();
-              cubit.logout();
+              _logoutAfterBackup(cubit);
             },
             child: const Text('Logout'),
           ),
         ],
       ),
     );
+  }
+
+  /// Logging out removes this account's logs from the device, so make sure
+  /// they're backed up first, and warn if some can't be (offline).
+  Future<void> _logoutAfterBackup(AuthCubit cubit) async {
+    final sync = sl<SyncService>();
+    await sync.sync();
+    final pending = await sync.pendingCount();
+    if (!mounted) return;
+    if (pending > 0) {
+      final errorColor = context.colors.error;
+      final proceed = await showSmoothDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Not backed up yet'),
+          content: Text(
+            pending == 1
+                ? "1 entry hasn't been backed up because you're offline. "
+                      'If you log out now, it will be lost.'
+                : "$pending entries haven't been backed up because you're "
+                      'offline. If you log out now, they will be lost.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Stay logged in'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: errorColor),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Log out anyway'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+    cubit.logout();
   }
 }
 

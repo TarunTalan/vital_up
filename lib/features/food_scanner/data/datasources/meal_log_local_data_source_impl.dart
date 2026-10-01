@@ -2,6 +2,7 @@ import 'package:isar_community/isar.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_data_source.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
@@ -10,10 +11,12 @@ import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.da
 class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
   final IsarService isarService;
   final Uuid uuid;
+  final SyncHooks? sync;
 
   MealLogLocalDataSourceImpl({
     required this.isarService,
     required this.uuid,
+    this.sync,
   });
 
   @override
@@ -22,6 +25,7 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
     await isarService.isar.writeTxn(() async {
       await isarService.isar.mealLogCaches.put(cache);
     });
+    sync?.schedule();
   }
 
   @override
@@ -50,12 +54,19 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
 
   @override
   Future<void> deleteMealLog(String id) async {
+    final wasSynced = await isarService.isar.mealLogCaches
+        .where()
+        .mealLogIdEqualTo(id)
+        .filter()
+        .isSyncedEqualTo(true)
+        .isNotEmpty();
     await isarService.isar.writeTxn(() async {
       await isarService.isar.mealLogCaches
           .where()
           .mealLogIdEqualTo(id)
           .deleteAll();
     });
+    if (wasSynced) await sync?.recordDelete('meal_logs', id);
   }
 
   MealLogCache _toCache(MealLogEntry entry) {

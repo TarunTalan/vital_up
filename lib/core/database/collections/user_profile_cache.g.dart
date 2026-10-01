@@ -59,7 +59,7 @@ const UserProfileCacheSchema = CollectionSchema(
       type: IsarType.string,
     ),
     r'weightKg': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'weightKg',
       type: IsarType.double,
     ),
@@ -133,6 +133,7 @@ void _userProfileCacheSerialize(
   writer.writeString(offsets[6], object.supabaseId);
   writer.writeDouble(offsets[7], object.targetWeightKg);
   writer.writeString(offsets[8], object.username);
+  writer.writeDouble(offsets[9], object.weightKg);
 }
 
 UserProfileCache _userProfileCacheDeserialize(
@@ -152,6 +153,7 @@ UserProfileCache _userProfileCacheDeserialize(
   object.supabaseId = reader.readString(offsets[6]);
   object.targetWeightKg = reader.readDoubleOrNull(offsets[7]);
   object.username = reader.readString(offsets[8]);
+  object.weightKg = reader.readDoubleOrNull(offsets[9]);
   return object;
 }
 
@@ -180,7 +182,7 @@ P _userProfileCacheDeserializeProp<P>(
       return (reader.readDoubleOrNull(offset)) as P;
     case 8:
       return (reader.readString(offset)) as P;
-    case 6:
+    case 9:
       return (reader.readDoubleOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');

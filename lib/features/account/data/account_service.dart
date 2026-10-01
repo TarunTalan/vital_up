@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 
@@ -16,6 +17,7 @@ class AccountService {
   final IsarService _isar;
   final AppDatabase _drift;
   final SharedPreferences _prefs;
+  final SyncService _sync;
 
   AccountService(
     this._client,
@@ -24,6 +26,7 @@ class AccountService {
     this._isar,
     this._drift,
     this._prefs,
+    this._sync,
   );
 
   /// Null on success, otherwise a message to show.
@@ -47,24 +50,31 @@ class AccountService {
     return null;
   }
 
+  /// Removes the signed-in user's logs, workouts and reminders from this
+  /// device (sign-out). Settings and goals stay.
+  Future<void> clearLocalUserData() async {
+    await _step('reminders', _reminders.clear);
+    await _step('isar', _isar.clearUserData);
+    await _step('drift', _drift.clearAll);
+    await _step('sync state', _sync.reset);
+  }
+
   /// Removes every trace of the user from this device and signs out.
   Future<void> wipeDevice() async {
-    Future<void> step(String name, Future<void> Function() run) async {
-      try {
-        await run();
-      } catch (e) {
-        debugPrint('Wipe step "$name" failed: $e');
-      }
-    }
-
-    await step('reminders', _reminders.clear);
-    await step('isar', _isar.clearUserData);
-    await step('drift', _drift.clearAll);
-    await step('preferences', _prefs.clear);
-    await step(
+    await clearLocalUserData();
+    await _step('preferences', _prefs.clear);
+    await _step(
       'session',
       () => _client.auth.signOut(scope: SignOutScope.local),
     );
-    await step('auth', () async => _auth.signOut());
+    await _step('auth', () async => _auth.signOut());
+  }
+
+  static Future<void> _step(String name, Future<void> Function() run) async {
+    try {
+      await run();
+    } catch (e) {
+      debugPrint('Wipe step "$name" failed: $e');
+    }
   }
 }

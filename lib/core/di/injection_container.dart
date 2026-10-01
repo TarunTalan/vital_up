@@ -127,6 +127,8 @@ import 'package:vital_up/features/activity_tracking/services/voice_coach_service
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/account/data/account_service.dart';
+import 'package:vital_up/core/sync/sync_adapters.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -190,7 +192,10 @@ Future<void> initDependencies() async {
       authRepository: sl<AuthRepository>(),
       beforeSignOut: () async {
         await sl<PushService>().unregister();
-        await sl<RemindersService>().clear();
+        // Back up what's left, then remove this account's data from the
+        // device; it comes back from the cloud on the next sign-in.
+        await sl<SyncService>().sync();
+        await sl<AccountService>().clearLocalUserData();
       },
     ),
   );
@@ -214,6 +219,7 @@ Future<void> initDependencies() async {
     () => MealLogLocalDataSourceImpl(
       isarService: sl<IsarService>(),
       uuid: sl<Uuid>(),
+      sync: sl<SyncService>(),
     ),
   );
 
@@ -350,7 +356,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<AppDatabase>(() => driftDb);
 
   sl.registerLazySingleton<ActivityRepository>(
-        () => ActivityRepositoryImpl(sl<AppDatabase>()),
+        () => ActivityRepositoryImpl(sl<AppDatabase>(), sl<SyncService>()),
   );
   // A workout still open from a previous run means the app was killed
   // mid-recording; close it so its checkpointed progress shows in history.
@@ -437,10 +443,10 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService());
   sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
 
-  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>()));
+  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
   sl.registerFactory(() => SleepCubit(sl<SleepService>()));
 
-  sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>()));
+  sl.registerLazySingleton<WaterIntakeService>(() => WaterIntakeService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
   sl.registerFactory(() => WaterIntakeCubit(sl<WaterIntakeService>()));
   sl.registerLazySingleton<TrendsService>(
     () => TrendsService(
@@ -550,7 +556,18 @@ Future<void> initDependencies() async {
   );
   sl.registerFactory(() => RemindersCubit(sl<RemindersService>()));
 
-  // 19. Account deletion
+  // 19. Cloud backup of logs (water, sleep, meals, workouts, weight)
+  sl.registerLazySingleton(
+    () => SyncService(sl<SupabaseClient>(), sl<SharedPreferences>(), [
+      WaterSyncAdapter(sl<IsarService>()),
+      SleepSyncAdapter(sl<IsarService>()),
+      MealSyncAdapter(sl<IsarService>()),
+      WeightSyncAdapter(sl<IsarService>()),
+      ActivitySyncAdapter(sl<AppDatabase>()),
+    ]),
+  );
+
+  // 20. Account deletion
   sl.registerLazySingleton(
     () => AccountService(
       sl<SupabaseClient>(),
@@ -559,6 +576,7 @@ Future<void> initDependencies() async {
       sl<IsarService>(),
       sl<AppDatabase>(),
       sl<SharedPreferences>(),
+      sl<SyncService>(),
     ),
   );
 }
