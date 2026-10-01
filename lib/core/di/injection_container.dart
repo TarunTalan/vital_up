@@ -135,6 +135,7 @@ import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
+import 'package:vital_up/features/account/data/data_export_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -660,4 +661,19 @@ Future<void> initDependencies() async {
 
   // 25. Friend challenges
   sl.registerLazySingleton(() => ChallengesRepository(sl<SupabaseClient>()));
+
+  // 26. Data export (Settings > Account)
+  sl.registerLazySingleton(
+    () => DataExportService(
+      sl<SupabaseClient>(),
+      sl<WaterIntakeService>(),
+      sl<SleepService>(),
+      sl<GetMealLogHistory>(),
+      sl<WeightService>(),
+      sl<ActivityRepository>(),
+      sl<VitaRepository>(),
+      sl<GamificationRepository>(),
+      sl<RemindersService>(),
+    ),
+  );
 }
