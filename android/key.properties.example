@@ -1,0 +1,8 @@
+# Android Release Keystore Signing Configuration Example
+# Copy this file to 'android/key.properties' and fill in your secure credentials.
+# NOTE: 'android/key.properties' is ignored by Git to protect secrets.
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=vitalup
+storeFile=vitalup-release-key.jks

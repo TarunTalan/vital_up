@@ -82,3 +82,9 @@ flutter_export_environment.sh
 # Firebase config (contains API keys): download from the Firebase console
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Keystore & Android Release Signing
+*.jks
+*.keystore
+key.properties
+android/key.properties
