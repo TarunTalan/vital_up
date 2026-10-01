@@ -42,6 +42,11 @@ import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
+import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
+import 'package:vital_up/features/gamification/presentation/pages/badges_page.dart';
+import 'package:vital_up/features/gamification/presentation/pages/points_history_page.dart';
 
 class AppRouter {
   AppRouter._();
@@ -172,6 +177,42 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const DietProgressPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/badges',
+        name: 'badges',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const BadgesPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard/points',
+        name: 'points-history',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const PointsHistoryPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/friends',
+        name: 'friends',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: FriendsPage(myUsername: state.extra as String?),
+        ),
+      ),
+      GoRoute(
+        path: '/community/:id',
+        name: 'leaderboard',
+        // Opened from the community tab, which passes the Community; without
+        // it (a stale deep link) fall back to the dashboard.
+        redirect: (context, state) =>
+            state.extra is Community ? null : '/dashboard',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: LeaderboardPage(community: state.extra! as Community),
         ),
       ),
 

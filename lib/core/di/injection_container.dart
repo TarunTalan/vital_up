@@ -40,6 +40,16 @@ import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/activity_goals/data/datasources/activity_goals_local_datasource.dart';
+import 'package:vital_up/features/community/data/datasources/community_remote_datasource.dart';
+import 'package:vital_up/features/community/data/repositories/community_repository_impl.dart';
+import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
+import 'package:vital_up/features/community/presentation/cubit/community_cubit.dart';
+import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
+import 'package:vital_up/features/gamification/data/datasources/gamification_remote_datasource.dart';
+import 'package:vital_up/features/gamification/data/repositories/gamification_repository_impl.dart';
+import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
+import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/activity_goals/data/repositories/activity_goals_repository_impl.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
@@ -444,4 +454,31 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(() => ActivityGoalsCubit(sl<ActivityGoalsRepository>()));
+
+  // 14. Gamification: points, levels, badges, streaks
+  sl.registerLazySingleton<GamificationRepository>(
+    () => GamificationRepositoryImpl(
+      remote: GamificationRemoteDataSource(sl<SupabaseClient>()),
+      collector: DailyMetricsCollector(
+        goals: sl<ActivityGoalsRepository>(),
+        history: sl<GetActivityHistory>(),
+        health: sl<HealthVitalsService>(),
+        meals: sl<GetMealLogHistory>(),
+        activePlan: sl<GetActiveMealPlan>(),
+        water: sl<WaterIntakeService>(),
+        sleep: sl<SleepService>(),
+        vita: VitaLocalDataSource(sl<SharedPreferences>()),
+        isar: sl<IsarService>(),
+      ),
+      prefs: sl<SharedPreferences>(),
+    ),
+  );
+  sl.registerFactory(() => GamificationCubit(sl<GamificationRepository>()));
+
+  // 15. Community, friends & leaderboards
+  sl.registerLazySingleton<CommunityRepository>(
+    () => CommunityRepositoryImpl(CommunityRemoteDataSource(sl<SupabaseClient>())),
+  );
+  sl.registerFactory(() => CommunityCubit(sl<CommunityRepository>()));
+  sl.registerFactory(() => FriendsCubit(sl<CommunityRepository>()));
 }
