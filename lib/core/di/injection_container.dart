@@ -126,6 +126,7 @@ import 'package:vital_up/features/activity_tracking/services/in_app_audio_downlo
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
+import 'package:vital_up/features/account/data/account_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -548,4 +549,16 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(() => RemindersCubit(sl<RemindersService>()));
+
+  // 19. Account deletion
+  sl.registerLazySingleton(
+    () => AccountService(
+      sl<SupabaseClient>(),
+      sl<AuthRepository>(),
+      sl<RemindersService>(),
+      sl<IsarService>(),
+      sl<AppDatabase>(),
+      sl<SharedPreferences>(),
+    ),
+  );
 }

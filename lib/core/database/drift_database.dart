@@ -81,6 +81,12 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
+  /// Deletes every workout and its track points.
+  Future<void> clearAll() => transaction(() async {
+    await delete(driftTrackPoints).go();
+    await delete(driftActivitySessions).go();
+  });
+
   // Insert or update an activity session
   Future<int> saveSession(DriftActivitySession session) => 
       into(driftActivitySessions).insertOnConflictUpdate(session);

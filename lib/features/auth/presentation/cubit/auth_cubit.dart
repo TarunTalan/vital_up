@@ -739,6 +739,9 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthUnauthenticated());
   }
 
+  /// The account was deleted and the device already wiped (AccountService).
+  void accountDeleted() => emit(AuthUnauthenticated());
+
   void reset() {
     emit(AuthInitial());
     clearErrorsOnly();
