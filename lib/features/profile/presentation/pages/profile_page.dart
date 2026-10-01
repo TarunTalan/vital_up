@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -213,6 +215,13 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           _populateFields(state.updatedProfile);
           setState(() => _isEditing = false);
           showSuccessSnackBar(context, 'Profile updated successfully!');
+        } else if (state is ProfilePhotoUpdated) {
+          showSuccessSnackBar(
+            context,
+            state.removed ? 'Profile photo removed' : 'Profile photo updated',
+          );
+        } else if (state is ProfilePhotoFailed) {
+          showErrorSnackBar(context, state.message);
         } else if (state is ProfileError) {
           showErrorSnackBar(context, state.message);
         }
@@ -232,6 +241,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           profile = state.updatedProfile;
         } else if (state is ProfileSaving) {
           profile = state.currentProfile;
+        } else if (state is ProfilePhotoUpdating) {
+          profile = state.profile;
+        } else if (state is ProfilePhotoUpdated) {
+          profile = state.profile;
+        } else if (state is ProfilePhotoFailed) {
+          profile = state.profile;
         } else if (state is ProfileError) {
           return _buildErrorView();
         }
@@ -372,17 +387,115 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   Widget _buildAvatar(ProfileEntity profile, double size, TextStyle? initialStyle) {
+    final photoUrl = profile.photoUrl;
+    final uploading = context.read<ProfileCubit>().state is ProfilePhotoUpdating;
+
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: context.vColors.primaryTint,
-      backgroundImage: profile.photoUrl != null ? NetworkImage(profile.photoUrl!) : null,
-      child: profile.photoUrl == null
-          ? Text(
-              _initial(profile),
-              style: initialStyle?.copyWith(color: context.colors.primary),
+      backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+      // Falls back to the tint + initial instead of throwing on a dead URL.
+      onBackgroundImageError: photoUrl != null ? (_, _) {} : null,
+      child: uploading
+          ? SizedBox.square(
+              dimension: size / 3,
+              child: CircularProgressIndicator(
+                strokeWidth: AppDimens.borderThick,
+                color: context.colors.primary,
+              ),
             )
-          : null,
+          : photoUrl == null
+              ? Text(
+                  _initial(profile),
+                  style: initialStyle?.copyWith(color: context.colors.primary),
+                )
+              : null,
     );
+  }
+
+  /// Camera / gallery / remove sheet for the profile photo.
+  Future<void> _showPhotoOptions(ProfileEntity profile) async {
+    final cubit = context.read<ProfileCubit>();
+    if (cubit.state is ProfilePhotoUpdating) return;
+
+    final choice = await showAppBottomSheet<_PhotoAction>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppDimens.space16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Take photo'),
+                onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from gallery'),
+                onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.gallery),
+              ),
+              if (profile.photoUrl != null)
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: context.colors.error),
+                  title: Text(
+                    'Remove photo',
+                    style: TextStyle(color: context.colors.error),
+                  ),
+                  onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.remove),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+
+    if (choice == _PhotoAction.remove) {
+      final confirmed = await showSmoothDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Remove photo?'),
+          content: const Text('Your profile will show your initial instead.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: context.colors.error),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) await cubit.removePhoto();
+      return;
+    }
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: choice == _PhotoAction.camera ? ImageSource.camera : ImageSource.gallery,
+        // Avatars render at most ~100dp; this keeps uploads small.
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
+      if (picked == null) return;
+      await cubit.uploadPhoto(File(picked.path));
+    } catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(
+        context,
+        choice == _PhotoAction.camera
+            ? 'Camera access is needed to take a photo. You can allow it in Settings.'
+            : 'Photo access is needed to choose a picture. You can allow it in Settings.',
+      );
+    }
   }
 
   Widget _buildHeaderBackground(
@@ -453,14 +566,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                   bottom: 0,
                                   right: 0,
                                   child: GestureDetector(
-                                    onTap: () {
-                                      showSmoothSnackBar(
-                                        context,
-                                        message:
-                                            'Avatar image upload is handled via Google OAuth or future updates.',
-                                        iconColor: AppColors.info,
-                                      );
-                                    },
+                                    onTap: () => _showPhotoOptions(profile),
                                     child: Container(
                                       padding: const EdgeInsets.all(AppDimens.space6),
                                       decoration: BoxDecoration(
@@ -1147,6 +1253,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         decoration: InputDecoration(
           hintText: placeholder,
           prefixIcon: _prefixIcon(icon),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space12,
+          ),
           suffixIcon: suffix == null ? null : Center(widthFactor: 1, child: suffix),
           suffixIconConstraints: const BoxConstraints(
             minWidth: AppDimens.space40,
@@ -1168,6 +1278,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       InputDecorator(
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: grey, size: AppDimens.iconMd),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space12,
+          ),
         ),
         child: Text(
           value.isNotEmpty ? value : 'N/A',
@@ -1200,6 +1314,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
         decoration: InputDecoration(
           prefixIcon: _prefixIcon(icon),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space12,
+          ),
           suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
         ),
       ),
@@ -1224,7 +1342,13 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         isExpanded: true,
         style: context.text.bodyLarge?.copyWith(color: context.colors.onSurface),
         borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        decoration: InputDecoration(prefixIcon: _prefixIcon(icon)),
+        decoration: InputDecoration(
+          prefixIcon: _prefixIcon(icon),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space12,
+          ),
+        ),
         items: items.map<DropdownMenuItem<String>>((String val) {
           return DropdownMenuItem<String>(
             value: val,
@@ -1253,7 +1377,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         decoration: const InputDecoration(
           contentPadding: EdgeInsets.symmetric(
             horizontal: AppDimens.space12,
-            vertical: AppDimens.space16,
+            vertical: AppDimens.space12,
           ),
         ),
         items: items.map<DropdownMenuItem<String>>((String val) {
@@ -1269,3 +1393,5 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 }
+
+enum _PhotoAction { camera, gallery, remove }

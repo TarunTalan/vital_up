@@ -74,6 +74,8 @@ class ProfileEntity extends Equatable {
     String? sleep,
     String? photoUrl,
     int? dailyCalorieGoal,
+    /// [photoUrl] can't express "remove", so pass true to clear it.
+    bool clearPhotoUrl = false,
   }) {
     return ProfileEntity(
       id: id ?? this.id,
@@ -96,7 +98,7 @@ class ProfileEntity extends Equatable {
       bpm: bpm ?? this.bpm,
       activity: activity ?? this.activity,
       sleep: sleep ?? this.sleep,
-      photoUrl: photoUrl ?? this.photoUrl,
+      photoUrl: clearPhotoUrl ? null : photoUrl ?? this.photoUrl,
       dailyCalorieGoal: dailyCalorieGoal ?? this.dailyCalorieGoal,
     );
   }
