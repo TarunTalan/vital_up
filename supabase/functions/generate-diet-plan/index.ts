@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
+import { consumeDailyQuota, dailyLimit, refundDailyQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,39 +14,41 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    // Service-role client, used both to validate the caller's JWT and for the
+    // quota RPCs. Passing the token to getUser() explicitly (same as
+    // scan-food) is reliable; relying on a global Authorization header with
+    // an argument-less getUser() is not.
+    const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const authHeader = req.headers.get("Authorization") || "";
-    console.log("--- DEBUG INFO START ---");
     console.time("TotalExecution");
-    console.log("Auth Header (first 20 chars):", authHeader.substring(0, 20));
-    console.log("Has SUPABASE_URL:", !!Deno.env.get("SUPABASE_URL"));
-    console.log("Has SUPABASE_ANON_KEY:", !!Deno.env.get("SUPABASE_ANON_KEY"));
-    console.log("--- DEBUG INFO END ---");
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
 
     console.time("SetupAndAuth");
     const [authResult, bodyResult] = await Promise.allSettled([
-      supabaseClient.auth.getUser(),
+      token ? serviceClient.auth.getUser(token) : Promise.reject(new Error("missing bearer token")),
       req.json()
     ]);
     console.timeEnd("SetupAndAuth");
 
-    // BYPASS AUTHORIZATION FOR TESTING
-    // if (authResult.status === "rejected" || (authResult.status === "fulfilled" && (authResult.value.error || !authResult.value.data.user))) {
-    //   console.timeEnd("TotalExecution");
-    //   return new Response(JSON.stringify({ error: "Unauthorized" }), {
-    //     status: 401,
-    //     headers: { ...corsHeaders, "Content-Type": "application/json" },
-    //   });
-    // }
+    // Plans cost a paid-for / quota-limited LLM call, so only signed-in users
+    // may generate them.
+    const user = authResult.status === "fulfilled" ? authResult.value.data.user : null;
+    if (!user) {
+      const reason = authResult.status === "fulfilled"
+        ? authResult.value.error?.message
+        : (authResult.reason as Error)?.message;
+      console.warn(`generate-diet-plan auth rejected: ${reason ?? "no user"}`);
+      console.timeEnd("TotalExecution");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (bodyResult.status === "rejected") {
       console.timeEnd("TotalExecution");
@@ -54,10 +58,48 @@ serve(async (req) => {
       });
     }
 
-    const { target, preferences } = bodyResult.value;
+    const { target, preferences, instructions, basePlan } = bodyResult.value;
+    // Optional tweak request (from Vita or the plan screen): a free-text change
+    // applied to the plan the user already has.
+    const tweak = typeof instructions === "string" ? instructions.trim().slice(0, 600) : "";
+    const baseMeals: { name?: unknown; items?: unknown; calories?: unknown }[] =
+      tweak && Array.isArray(basePlan?.meals) ? basePlan.meals.slice(0, 8) : [];
+    if (!target?.calories || !preferences) {
+      console.timeEnd("TotalExecution");
+      return new Response(JSON.stringify({ error: "target and preferences are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Per-user daily fair-use cap: all users share one free-tier LLM quota.
+    const quota = await consumeDailyQuota(serviceClient, user.id, "diet_plan", dailyLimit("DIET_PLAN_DAILY_LIMIT", 15));
+    if (!quota.allowed) {
+      console.timeEnd("TotalExecution");
+      return new Response(JSON.stringify({ error: "Daily diet plan limit reached", code: "daily_limit", limit: quota.limit }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const refundQuota = () => refundDailyQuota(serviceClient, user.id, "diet_plan");
 
     // Used to force divergence between calls with an otherwise-identical prompt.
     const varietySeed = crypto.randomUUID();
+
+    const baseMealLines = baseMeals
+      .map((m) => `- ${String(m.name ?? "Meal")} (${Number(m.calories) || "?"} kcal): ${
+        Array.isArray(m.items) ? m.items.map(String).join(", ") : ""
+      }`)
+      .join("\n");
+    const tweakSection = tweak
+      ? `
+
+    TWEAK REQUEST (highest priority after dietary type, allergies and avoid list):
+    The user wants to change their current plan as follows: "${tweak}"
+    ${baseMealLines ? `Current plan:\n${baseMealLines}\n    Keep meals and dishes the request does not mention as close to the current plan as possible; change only what is needed.` : ""}
+    If the request asks for more/less calories or a macro, adjust the totals accordingly; otherwise match the target.
+    The VARIETY rules below do not apply to dishes kept from the current plan.`
+      : "";
 
     const prompt = `You are a meal-planning assistant specializing in Indian cuisine.
     Given a daily nutrition target and dietary constraints, generate a one-day
@@ -71,7 +113,7 @@ serve(async (req) => {
     Number of meals: ${preferences.mealsPerDay || 4}
 
     Recently used items (do not reuse any of these dishes in this response): ${preferences.recentItems?.join(", ") || "None"}
-    Variety seed (use this to intentionally pick a different combination of dishes than you would by default; do not mention it in the output): ${varietySeed}
+    Variety seed (use this to intentionally pick a different combination of dishes than you would by default; do not mention it in the output): ${varietySeed}${tweakSection}
 
     Use realistic Indian dishes and meal structures appropriate to the time of day
     (e.g. poha/idli/paratha/upma for breakfast; dal/sabzi/roti/rice/curry for lunch
@@ -125,6 +167,10 @@ serve(async (req) => {
 
     const geminiKey = Deno.env.get("FOOD_RECOMMEND_GEMINI_API_KEY");
     const groqKey = Deno.env.get("FOOD_RECOMMEND_GROQ_API_KEY");
+    // Model lists self-heal when a model is retired (see _shared/llm.ts) and
+    // can be overridden without a deploy via these secrets.
+    const geminiModels = envList("DIET_PLAN_GEMINI_MODELS", GEMINI_DEFAULT_MODELS);
+    const groqModels = envList("DIET_PLAN_GROQ_MODELS", ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]);
     let resultJson = null;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -133,80 +179,42 @@ serve(async (req) => {
         let aiResponseText = "";
 
         const timeoutMs = attempt === 1 ? 20000 : 15000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const promptText = prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "");
 
         console.time(`GeminiCall_Attempt${attempt}`);
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": geminiKey ?? "",
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }] }],
-              generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.9,
-                topP: 0.95
-              }
-            }),
-            signal: controller.signal
-          }
-        );
-        clearTimeout(timeoutId);
-
-        console.log(`Gemini attempt ${attempt} status:`, geminiRes.status);
-
-        const shouldFallback = (geminiRes.status === 429 || geminiRes.status === 404 || geminiRes.status >= 500) && !!groqKey;
-
-        if (shouldFallback) {
-          usedProvider = "groq";
-          const geminiErrBody = await geminiRes.clone().json().catch(() => null);
-          console.error(`Gemini failed (status ${geminiRes.status}), falling back to Groq. Error:`, geminiErrBody?.error?.message);
-
-          const groqController = new AbortController();
-          const groqTimeoutId = setTimeout(() => groqController.abort(), timeoutMs);
-          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${groqKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              messages: [{ role: "user", content: prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "") }],
-              temperature: 0.9,
-            }),
-            signal: groqController.signal
+        try {
+          if (!geminiKey) throw new Error("FOOD_RECOMMEND_GEMINI_API_KEY is not set");
+          aiResponseText = await geminiGenerate(geminiKey, [{ text: promptText }], {
+            models: geminiModels,
+            signal: AbortSignal.timeout(timeoutMs),
+            json: true,
+            temperature: 0.9,
+            topP: 0.95,
+            maxOutputTokens: 8192,
           });
-          clearTimeout(groqTimeoutId);
-          const groqData = await groqRes.json();
-          if (!groqRes.ok) throw new Error(groqData.error?.message || "Groq Error");
-          aiResponseText = groqData.choices?.[0]?.message?.content || "";
-        } else {
-          const geminiData = await geminiRes.json();
-          if (!geminiRes.ok) throw new Error(geminiData.error?.message || "Gemini Error");
-          aiResponseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        } catch (geminiErr) {
+          if (!groqKey) throw geminiErr;
+          usedProvider = "groq";
+          console.error("Gemini failed, falling back to Groq:", (geminiErr as Error).message);
+          aiResponseText = await groqGenerate(groqKey, promptText, {
+            models: groqModels,
+            capability: "text",
+            signal: AbortSignal.timeout(timeoutMs),
+            json: true,
+            temperature: 0.9,
+            maxTokens: 4096,
+          });
         }
         console.timeEnd(`GeminiCall_Attempt${attempt}`);
 
-        let cleanJsonStr = aiResponseText.trim();
-        if (cleanJsonStr.startsWith("```json")) {
-          cleanJsonStr = cleanJsonStr.replace(/^```json/, "").replace(/```$/, "").trim();
-        } else if (cleanJsonStr.startsWith("```")) {
-          cleanJsonStr = cleanJsonStr.replace(/^```/, "").replace(/```$/, "").trim();
-        }
-
-        resultJson = JSON.parse(cleanJsonStr);
+        resultJson = extractJson(aiResponseText) as any;
         resultJson._debugProvider = usedProvider;
 
         const tCal = resultJson.totalCalories;
         const targetCal = target.calories;
         const diffPercent = Math.abs(tCal - targetCal) / targetCal;
-        if (diffPercent > 0.1) {
+        // A tweak may legitimately move calories ("lighter dinner").
+        if (diffPercent > (tweak ? 0.25 : 0.1)) {
           if (attempt === 1) throw new Error("Macros off by more than 10%");
           else resultJson.approximate = true;
         }
@@ -227,7 +235,8 @@ serve(async (req) => {
           }
           if (containsAllergen) {
              if (attempt === 1) throw new Error("Contains allergen");
-             else return new Response(JSON.stringify({ error: "Could not generate a safe meal plan matching your allergies. Please try again." }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+             await refundQuota();
+             return new Response(JSON.stringify({ error: "Could not generate a safe meal plan matching your allergies. Please try again." }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
         }
 
@@ -237,6 +246,7 @@ serve(async (req) => {
         console.error(`Attempt ${attempt} failed:`, e);
         if (attempt === 2) {
           console.timeEnd("TotalExecution");
+          await refundQuota();
           return new Response(JSON.stringify({
             error: "Failed to generate valid plan.",
             details: e.message

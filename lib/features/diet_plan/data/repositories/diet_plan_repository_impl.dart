@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:isar_community/isar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/api_result.dart';
 import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_datasource.dart';
@@ -10,20 +13,28 @@ import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_reposi
 class DietPlanRepositoryImpl implements DietPlanRepository {
   final DietPlanRemoteDataSource remoteDataSource;
   final IsarService isarService;
+  final SharedPreferences prefs;
+
+  static const _preferencesKey = 'active_plan_preferences';
 
   DietPlanRepositoryImpl({
     required this.remoteDataSource,
     required this.isarService,
+    required this.prefs,
   });
 
   @override
   Future<ApiResult<MealPlan>> generateMealPlan({
     required NutritionTarget target,
     required Map<String, dynamic> preferences,
+    String? instructions,
+    MealPlan? basePlan,
   }) async {
     final result = await remoteDataSource.generateDietPlan(
       target: target,
       preferences: preferences,
+      instructions: instructions,
+      basePlan: basePlan,
     );
 
     if (result is ApiSuccess<MealPlanModel>) {
@@ -42,11 +53,26 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
   }
 
   @override
-  Future<void> setActiveMealPlan(MealPlan plan) async {
+  Future<void> setActiveMealPlan(
+    MealPlan plan, {
+    Map<String, dynamic> preferences = const {},
+  }) async {
     final isar = isarService.isar;
     final model = MealPlanModel.fromEntity(plan, 'active_plan');
     await isar.writeTxn(() async {
       await isar.mealPlanModels.put(model);
     });
+    await prefs.setString(_preferencesKey, jsonEncode(preferences));
+  }
+
+  @override
+  Future<Map<String, dynamic>> getActivePlanPreferences() async {
+    final raw = prefs.getString(_preferencesKey);
+    if (raw == null) return {};
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return {};
+    }
   }
 }

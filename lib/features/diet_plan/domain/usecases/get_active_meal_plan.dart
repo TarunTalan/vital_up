@@ -9,4 +9,8 @@ class GetActiveMealPlan {
   Future<MealPlan?> call() async {
     return repository.getActiveMealPlan();
   }
+
+  /// Preferences the active plan was generated with ({} if unknown).
+  Future<Map<String, dynamic>> preferences() =>
+      repository.getActivePlanPreferences();
 }

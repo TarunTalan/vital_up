@@ -6,7 +6,10 @@ class SetActiveMealPlan {
 
   SetActiveMealPlan(this.repository);
 
-  Future<void> call(MealPlan plan) async {
-    return repository.setActiveMealPlan(plan);
+  Future<void> call(
+    MealPlan plan, {
+    Map<String, dynamic> preferences = const {},
+  }) async {
+    return repository.setActiveMealPlan(plan, preferences: preferences);
   }
 }
