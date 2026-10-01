@@ -120,14 +120,17 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   }
 
   @override
-  Future<void> setOnboardingCompleted(bool completed) async {
-    await _secureStorage.write(key: _onboardingCompletedKey, value: completed ? 'true' : 'false');
+  Future<void> setOnboardingCompleted(String userId, bool completed) async {
+    await _secureStorage.write(
+      key: '${_onboardingCompletedKey}_$userId',
+      value: completed ? 'true' : 'false',
+    );
   }
 
   @override
-  Future<bool> hasCompletedOnboarding() async {
-    final value = await _secureStorage.read(key: _onboardingCompletedKey);
-    return value == 'true';
+  Future<bool?> hasCompletedOnboarding(String userId) async {
+    final value = await _secureStorage.read(key: '${_onboardingCompletedKey}_$userId');
+    return value == null ? null : value == 'true';
   }
 
   String? _extractUsernameFromToken(String token) {

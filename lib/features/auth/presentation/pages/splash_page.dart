@@ -126,8 +126,10 @@ class _SplashPageState extends State<SplashPage>
     });
   }
 
-  void _checkSessionAndNavigate() {
-    if (!mounted || !_animationCompleted) return;
+  bool _navigating = false;
+
+  Future<void> _checkSessionAndNavigate() async {
+    if (!mounted || !_animationCompleted || _navigating) return;
 
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthInitial || authState is AuthLoading) {
@@ -135,8 +137,11 @@ class _SplashPageState extends State<SplashPage>
       return;
     }
 
+    _navigating = true;
     if (authState is AuthAuthenticated) {
-      context.goNamed('dashboard');
+      final completed = await context.read<AuthCubit>().hasCompletedOnboarding();
+      if (!mounted) return;
+      context.goNamed(completed ? 'dashboard' : 'health-onboarding');
     } else {
       context.goNamed('onboarding');
     }

@@ -33,4 +33,9 @@ abstract class AuthRepository {
   Future<Either<Failure, void>> signOut();
   Future<Either<Failure, UserEntity?>> getCurrentUser();
   Future<Either<Failure, bool>> isSessionActive();
+
+  /// Whether the signed-in user finished health onboarding
+  /// (`user_health_data.onboarding_completed`). Never fails: offline it uses
+  /// the last known value, and assumes completed if it has none.
+  Future<bool> hasCompletedOnboarding();
 }

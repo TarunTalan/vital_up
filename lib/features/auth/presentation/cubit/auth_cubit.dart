@@ -702,6 +702,9 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
+  /// See [AuthRepository.hasCompletedOnboarding].
+  Future<bool> hasCompletedOnboarding() => _authRepository.hasCompletedOnboarding();
+
   Future<void> checkSession() async {
     final active = await _authRepository.isSessionActive();
     active.fold(
