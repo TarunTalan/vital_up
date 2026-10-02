@@ -38,6 +38,8 @@ import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_pag
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
 import 'package:vital_up/features/help_support/presentation/pages/help_support_page.dart';
 import 'package:vital_up/features/help_support/presentation/pages/support_chat_page.dart';
+import 'package:vital_up/features/help_support/presentation/pages/contact_support_page.dart';
+import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
 import 'package:vital_up/features/about/presentation/pages/about_page.dart';
 import 'package:vital_up/features/health_report/presentation/pages/health_report_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
@@ -487,6 +489,17 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const SupportChatPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/help/contact',
+        name: 'contact-support',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: ContactSupportPage(
+            args: state.extra as ContactSupportArgs? ??
+                const ContactSupportArgs(initialCategory: SupportCategory.general),
+          ),
         ),
       ),
       GoRoute(

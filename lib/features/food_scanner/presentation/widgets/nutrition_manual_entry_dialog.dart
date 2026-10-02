@@ -80,6 +80,21 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   String _selectedUnit = 'g';
   final List<String> _units = ['g', 'serving', 'oz', 'cup', 'piece', 'slice', 'tbsp', 'tsp'];
 
+  /// Cloud search is an edge function call, so it waits for typing to pause
+  /// and skips very short prefixes; offline matches show on every keystroke.
+  static const Duration _remoteSearchDebounce = Duration(milliseconds: 400);
+  static const int _minRemoteQueryLength = 3;
+
+  /// Bumped per keystroke; a cloud search only applies if it is still the latest.
+  int _queryGeneration = 0;
+
+  /// Cloud results for this dialog, by normalized query.
+  final Map<String, List<AutocompleteSuggestion>> _remoteByQuery = {};
+
+  /// Cloud results for the latest query when they arrive after its offline
+  /// matches are already showing; merged into the open options list.
+  final ValueNotifier<List<AutocompleteSuggestion>> _lateRemote = ValueNotifier(const []);
+
   @override
   void initState() {
     super.initState();
@@ -108,18 +123,22 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     _fiberController.dispose();
     _sugarController.dispose();
     _sodiumController.dispose();
+    _lateRemote.dispose();
     super.dispose();
   }
 
   Future<Iterable<AutocompleteSuggestion>> _fetchSuggestions(String query) async {
-    if (query.trim().isEmpty) {
+    final generation = ++_queryGeneration;
+    _lateRemote.value = const [];
+    final normalized = query.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty) {
       return const [];
     }
 
     final repository = GetIt.instance<NutritionRepository>();
 
     // 1. Fetch offline suggestions from Isar (instant)
-    final offlineFoods = await repository.searchOfflineFoods(query);
+    final offlineFoods = await repository.searchOfflineFoods(normalized);
     final offlineSuggestions = offlineFoods.map((f) => AutocompleteSuggestion(
       name: f.name,
       servingSize: f.servingSize,
@@ -133,7 +152,34 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       isOffline: true,
     )).toList();
 
-    // 2. Fetch online suggestions if connected
+    if (normalized.length < _minRemoteQueryLength) return offlineSuggestions;
+
+    // 2. Online suggestions: already fetched, or debounced in the background
+    final known = _remoteByQuery[normalized];
+    if (known != null) return _mergeSuggestions(offlineSuggestions, known);
+
+    final remote = _searchRemote(repository, normalized, generation);
+    if (offlineSuggestions.isNotEmpty) {
+      // Show local matches now; cloud ones join via [_lateRemote].
+      remote.then((items) {
+        if (mounted && items != null && generation == _queryGeneration) _lateRemote.value = items;
+      });
+      return offlineSuggestions;
+    }
+    // Nothing local to show, so wait for the cloud.
+    return _mergeSuggestions(offlineSuggestions, await remote ?? const []);
+  }
+
+  /// Cloud search for [query] after the debounce. Null if a newer keystroke
+  /// superseded it before the request went out.
+  Future<List<AutocompleteSuggestion>?> _searchRemote(
+    NutritionRepository repository,
+    String query,
+    int generation,
+  ) async {
+    await Future<void>.delayed(_remoteSearchDebounce);
+    if (!mounted || generation != _queryGeneration) return null;
+
     List<AutocompleteSuggestion> onlineSuggestions = [];
     try {
       final searchResult = await repository.searchByName(query);
@@ -153,20 +199,23 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
             isOffline: false,
             fdcId: item.id,
           )).toList();
+          _remoteByQuery[query] = onlineSuggestions;
         },
       );
     } catch (_) {}
+    return onlineSuggestions;
+  }
 
-    // Deduplicate by name (prefer offline local suggestions)
+  /// Deduplicates by name, keeping the first (offline suggestions go first).
+  static List<AutocompleteSuggestion> _mergeSuggestions(
+    Iterable<AutocompleteSuggestion> first,
+    Iterable<AutocompleteSuggestion> second,
+  ) {
     final Map<String, AutocompleteSuggestion> unique = {};
-    for (final suggestion in [...offlineSuggestions, ...onlineSuggestions]) {
-      final nameKey = suggestion.name.toLowerCase().trim();
-      if (!unique.containsKey(nameKey)) {
-        unique[nameKey] = suggestion;
-      }
+    for (final suggestion in [...first, ...second]) {
+      unique.putIfAbsent(suggestion.name.toLowerCase().trim(), () => suggestion);
     }
-
-    return unique.values;
+    return unique.values.toList();
   }
 
   void _onSuggestionSelected(AutocompleteSuggestion suggestion) async {
@@ -418,32 +467,38 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                                    child: ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      shrinkWrap: true,
-                                      itemCount: options.length,
-                                      separatorBuilder: (_, _) => Divider(color: divider),
-                                      itemBuilder: (BuildContext context, int index) {
-                                        final option = options.elementAt(index);
-                                        final tone = option.isOffline ? primary : grey;
-                                        return ListTile(
-                                          dense: true,
-                                          title: Text(
-                                            option.name,
-                                            style: context.text.bodyMedium?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          subtitle: Text(
-                                            option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
-                                            style: context.text.bodySmall?.copyWith(color: tone),
-                                          ),
-                                          trailing: Icon(
-                                            option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
-                                            size: AppDimens.iconXs,
-                                            color: tone,
-                                          ),
-                                          onTap: () => onSelected(option),
+                                    child: ValueListenableBuilder<List<AutocompleteSuggestion>>(
+                                      valueListenable: _lateRemote,
+                                      builder: (context, lateRemote, _) {
+                                        final shown = lateRemote.isEmpty ? options : _mergeSuggestions(options, lateRemote);
+                                        return ListView.separated(
+                                          padding: EdgeInsets.zero,
+                                          shrinkWrap: true,
+                                          itemCount: shown.length,
+                                          separatorBuilder: (_, _) => Divider(color: divider),
+                                          itemBuilder: (BuildContext context, int index) {
+                                            final option = shown.elementAt(index);
+                                            final tone = option.isOffline ? primary : grey;
+                                            return ListTile(
+                                              dense: true,
+                                              title: Text(
+                                                option.name,
+                                                style: context.text.bodyMedium?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              subtitle: Text(
+                                                option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
+                                                style: context.text.bodySmall?.copyWith(color: tone),
+                                              ),
+                                              trailing: Icon(
+                                                option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
+                                                size: AppDimens.iconXs,
+                                                color: tone,
+                                              ),
+                                              onTap: () => onSelected(option),
+                                            );
+                                          },
                                         );
                                       },
                                     ),

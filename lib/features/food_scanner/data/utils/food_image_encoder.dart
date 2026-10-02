@@ -14,8 +14,11 @@ const int kFoodImageJpegQuality = 85;
 /// Downscales, applies EXIF orientation and re-encodes [path] as JPEG in a
 /// background isolate. Falls back to the original bytes if decoding fails
 /// (e.g. HEIC on older devices) so a scan is never blocked by this step.
-Future<Uint8List> encodeFoodImageForUpload(String path) async {
-  final original = await File(path).readAsBytes();
+Future<Uint8List> encodeFoodImageForUpload(String path) async =>
+    encodeFoodImageBytesForUpload(await File(path).readAsBytes());
+
+/// [encodeFoodImageForUpload] for bytes already read from disk.
+Future<Uint8List> encodeFoodImageBytesForUpload(Uint8List original) async {
   try {
     return await Isolate.run(() => _encode(original));
   } catch (_) {

@@ -209,13 +209,23 @@ class _ChallengeTile extends StatelessWidget {
 }
 
 /// Live standings of one challenge.
-class _LeaderboardSheet extends StatelessWidget {
+class _LeaderboardSheet extends StatefulWidget {
   final Challenge challenge;
 
   const _LeaderboardSheet({required this.challenge});
 
   @override
+  State<_LeaderboardSheet> createState() => _LeaderboardSheetState();
+}
+
+class _LeaderboardSheetState extends State<_LeaderboardSheet> {
+  // Created once so rebuilds (e.g. the sheet resizing) don't refetch.
+  late final Future<List<ChallengeStanding>> _standings =
+      sl<ChallengesRepository>().getLeaderboard(widget.challenge.id);
+
+  @override
   Widget build(BuildContext context) {
+    final challenge = widget.challenge;
     final v = context.vColors;
     return SafeArea(
       top: false,
@@ -227,7 +237,7 @@ class _LeaderboardSheet extends StatelessWidget {
           AppDimens.space16,
         ),
         child: FutureBuilder<List<ChallengeStanding>>(
-          future: sl<ChallengesRepository>().getLeaderboard(challenge.id),
+          future: _standings,
           builder: (context, snap) {
             final standings = snap.data;
             return Column(

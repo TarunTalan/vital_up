@@ -19,6 +19,9 @@ class CommunitySettings {
 }
 
 abstract class CommunityRepository {
+  /// For actions that can't be queued and need the network now.
+  static const offlineMessage = "You're offline. Try again when connected.";
+
   /// Global, the caller's local community and every interest community.
   Future<List<Community>> getCommunities();
 

@@ -4,12 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:isar_community/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 import 'package:vital_up/core/events/habit_events.dart';
 
@@ -24,7 +27,9 @@ enum WeightUnit {
   final String label;
   const WeightUnit(this.label);
 
-  static WeightUnit fromCode(String? code) => code == 'lbs' ? lbs : kg;
+  /// Settings use 'lbs'; onboarding stores 'lb'.
+  static WeightUnit fromCode(String? code) =>
+      code != null && code.toLowerCase().startsWith('lb') ? lbs : kg;
 
   double fromKg(double kg) => this == lbs ? kg / kgPerLb : kg;
   double toKg(double value) => this == lbs ? value * kgPerLb : value;
@@ -41,6 +46,8 @@ class WeightService {
   final SupabaseClient _client;
   final SettingsRepository _settings;
   final SharedPreferences _prefs;
+  final CacheStore _cache;
+  final PendingWrites _pendingWrites;
   final SyncHooks? _sync;
   final HabitEvents? _events;
 
@@ -48,12 +55,22 @@ class WeightService {
     this._db,
     this._client,
     this._settings,
-    this._prefs, [
+    this._prefs,
+    this._cache,
+    this._pendingWrites, [
     this._sync,
     this._events,
   ]);
 
+  /// Pre-cache builds kept the goal here (not per user); read as a fallback.
   static const _keyTargetKg = 'weight_target_kg';
+
+  /// Goal weight (kg) in [CacheStore]; onboarding writes it too.
+  static String targetCacheKey(String userId) => 'weight:target:$userId';
+
+  /// The goal only changes in onboarding / goal setup, which update the
+  /// cache directly, so the chart rarely needs to ask the server.
+  static const _targetMaxAge = Duration(hours: 12);
   static const minKg = 20.0;
   static const maxKg = 400.0;
 
@@ -140,24 +157,30 @@ class WeightService {
         .isNotEmpty();
   }
 
-  /// Goal weight from onboarding / goal setup, cached for offline use.
+  /// Goal weight from onboarding / goal setup. Cache-first, so drawing the
+  /// chart doesn't cost a request each time; works offline.
   Future<double?> targetKg() async {
     final userId = _userId;
     if (userId != null) {
       try {
-        final row = await _client
-            .from('user_health_data')
-            .select('target_weight, target_weight_unit')
-            .eq('id', userId)
-            .maybeSingle();
-        final value = (row?['target_weight'] as num?)?.toDouble();
-        if (value != null && value > 0) {
-          final kg = WeightUnit.fromCode(
-            row?['target_weight_unit'] as String?,
-          ).toKg(value);
-          await _prefs.setDouble(_keyTargetKg, kg);
-          return kg;
-        }
+        final kg = await _cache.fetch<double?>(
+          targetCacheKey(userId),
+          remote: () async {
+            final row = await _client
+                .from('user_health_data')
+                .select('target_weight, target_weight_unit')
+                .eq('id', userId)
+                .maybeSingle();
+            final value = (row?['target_weight'] as num?)?.toDouble();
+            if (value == null || value <= 0) return null;
+            return WeightUnit.fromCode(
+              row?['target_weight_unit'] as String?,
+            ).toKg(value);
+          },
+          maxAge: _targetMaxAge,
+          decode: (json) => (json as num?)?.toDouble(),
+        );
+        if (kg != null) return kg;
       } catch (e) {
         debugPrint('Target weight unavailable: $e');
       }
@@ -183,22 +206,36 @@ class WeightService {
   }
 
   /// Keeps the profile's weight (used for calorie targets) current, in the
-  /// unit the profile already uses.
+  /// unit the profile already uses (from the cached profile, else Settings).
+  /// One write, queued when offline, and mirrored into the cached profile.
   Future<void> _updateProfileWeight(double kg) async {
     final userId = _userId;
     if (userId == null) return;
     try {
-      final row = await _client
-          .from('user_health_data')
-          .select('weight_unit')
-          .eq('id', userId)
-          .maybeSingle();
-      if (row == null) return;
-      final unit = WeightUnit.fromCode(row['weight_unit'] as String?);
-      await _client
-          .from('user_health_data')
-          .update({'weight': unit.fromKg(kg).toStringAsFixed(1)})
-          .eq('id', userId);
+      final key = ProfileCache.key(userId);
+      final cached = (await _cache.read<Object?>(key))?.value;
+      final profileUnit = cached is Map ? cached['weight_unit'] : null;
+      final unit = profileUnit is String && profileUnit.isNotEmpty
+          ? WeightUnit.fromCode(profileUnit)
+          : await this.unit();
+      final values = <String, dynamic>{
+        'weight': unit.fromKg(kg).toStringAsFixed(1),
+        // Unit unknown locally: say which one the number is in.
+        if (profileUnit is! String || profileUnit.isEmpty)
+          'weight_unit': unit.label,
+      };
+      await _cache.update(key, (data) => ProfileCache.patch(data, values));
+      await _pendingWrites.sendOrQueue(
+        _client,
+        PendingWrite.update(
+          'user_health_data',
+          values: values,
+          match: {'id': userId},
+          userId: userId,
+          // Not the profile's upsert key: an update would replace it.
+          key: 'health:weight:$userId',
+        ),
+      );
     } catch (e) {
       debugPrint('Profile weight not updated: $e');
     }

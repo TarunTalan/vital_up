@@ -6,6 +6,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -74,7 +75,7 @@ void main() async {
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();
     final supabase = sl<SupabaseClient>();
-    isarService.syncOfflineFoodsBackground(supabase);
+    isarService.syncOfflineFoodsBackground(supabase, sl<SharedPreferences>());
   } catch (e, stackTrace) {
     CrashReporter.report(e, stackTrace, reason: 'Initialization failed');
   }

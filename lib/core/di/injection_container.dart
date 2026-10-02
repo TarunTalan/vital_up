@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/network/dio_client.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
 import 'package:vital_up/features/health_report/data/services/health_report_service.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
@@ -132,6 +135,8 @@ import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 import 'package:vital_up/features/account/data/account_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
+import 'package:vital_up/core/sync/backup_sync.dart';
+import 'package:vital_up/features/diet_plan/data/diet_plan_backup.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
@@ -182,10 +187,33 @@ Future<void> initDependencies() async {
   }
   sl.registerLazySingleton<IsarService>(() => isarService);
 
-  // 5. Network (Dio client)
-  sl.registerLazySingleton<Dio>(() => Dio());
+  // 5. Network
+  // Online/offline tracking drives sync-on-reconnect and cache fallbacks.
+  final connectivity = ConnectivityService();
+  await connectivity.init();
+  sl.registerLazySingleton<ConnectivityService>(() => connectivity);
+  // Persistent cache for server reads (instant screens, offline fallback).
+  sl.registerLazySingleton<CacheStore>(
+    () => CacheStore(sl<ConnectivityService>()),
+  );
+  // Outbox for server writes made offline; flushed by SyncService.
+  sl.registerLazySingleton<PendingWrites>(
+    () => PendingWrites(sl<SharedPreferences>(), sl<ConnectivityService>()),
+  );
+
+  // Plain Dio for third-party APIs (Open Food Facts). DioClient gets its
+  // own instance: it adds the Supabase bearer token and retries, which
+  // must not leak onto other hosts.
+  sl.registerLazySingleton<Dio>(
+    () => Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    ),
+  );
   sl.registerLazySingleton<DioClient>(() => DioClient(
-        dio: sl<Dio>(),
+        dio: Dio(),
         logger: sl<Logger>(),
       ));
 
@@ -221,10 +249,15 @@ Future<void> initDependencies() async {
     () => SharedPreferencesOnboardingDataStore(sl<SharedPreferences>()),
   );
   sl.registerLazySingleton<OnboardingRemoteDataSource>(
-    () => OnboardingRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+    () => OnboardingRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), pendingWrites: sl<PendingWrites>(), logger: sl<Logger>()),
   );
   sl.registerLazySingleton<OnboardingRepository>(
-    () => OnboardingRepositoryImpl(remoteDataSource: sl<OnboardingRemoteDataSource>()),
+    () => OnboardingRepositoryImpl(
+      remoteDataSource: sl<OnboardingRemoteDataSource>(),
+      authLocalDataSource: sl<AuthLocalDataSource>(),
+      cacheStore: sl<CacheStore>(),
+      currentUserId: () => sl<SupabaseClient>().auth.currentUser?.id,
+    ),
   );
   sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
 
@@ -244,6 +277,8 @@ Future<void> initDependencies() async {
     () => FoodRecognitionRepositoryImpl(
       logger: sl<Logger>(),
       supabaseClient: sl<SupabaseClient>(),
+      cacheStore: sl<CacheStore>(),
+      connectivity: sl<ConnectivityService>(),
     ),
   );
 
@@ -253,6 +288,9 @@ Future<void> initDependencies() async {
       logger: sl<Logger>(),
       supabaseClient: sl<SupabaseClient>(),
       isarService: sl<IsarService>(),
+      cacheStore: sl<CacheStore>(),
+      connectivity: sl<ConnectivityService>(),
+      pendingWrites: sl<PendingWrites>(),
     ),
   );
 
@@ -260,6 +298,7 @@ Future<void> initDependencies() async {
     () => SubscriptionRepositoryImpl(
       supabaseClient: sl<SupabaseClient>(),
       logger: sl<Logger>(),
+      cacheStore: sl<CacheStore>(),
     ),
   );
 
@@ -340,12 +379,14 @@ Future<void> initDependencies() async {
 
   // 10. Profile Screen Dependencies
   sl.registerLazySingleton<ProfileRemoteDataSource>(
-        () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+        () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), pendingWrites: sl<PendingWrites>(), logger: sl<Logger>()),
   );
   sl.registerLazySingleton<ProfileRepository>(
         () => ProfileRepositoryImpl(
       remoteDataSource: sl<ProfileRemoteDataSource>(),
       isarService: sl<IsarService>(),
+      cacheStore: sl<CacheStore>(),
+      currentUserId: () => sl<SupabaseClient>().auth.currentUser?.id,
       logger: sl<Logger>(),
     ),
   );
@@ -542,25 +583,32 @@ Future<void> initDependencies() async {
         isar: sl<IsarService>(),
       ),
       prefs: sl<SharedPreferences>(),
+      cache: sl<CacheStore>(),
     ),
   );
-  sl.registerFactory(() => GamificationCubit(sl<GamificationRepository>()));
+  sl.registerFactory(
+    () => GamificationCubit(
+      sl<GamificationRepository>(),
+      onlineChanges: sl<ConnectivityService>().onlineChanges,
+    ),
+  );
 
   // 15. Community, friends & leaderboards
   sl.registerLazySingleton<CommunityRepository>(
-    () => CommunityRepositoryImpl(CommunityRemoteDataSource(sl<SupabaseClient>())),
+    () => CommunityRepositoryImpl(CommunityRemoteDataSource(sl<SupabaseClient>(), sl<PendingWrites>()), sl<CacheStore>()),
   );
   sl.registerFactory(() => CommunityCubit(sl<CommunityRepository>()));
   sl.registerFactory(() => FriendsCubit(sl<CommunityRepository>()));
 
   // 16. Usernames (Google sign-ups choose theirs after sign-in)
-  sl.registerLazySingleton(() => UsernameService(sl<SupabaseClient>()));
+  sl.registerLazySingleton(() => UsernameService(sl<SupabaseClient>(), sl<CacheStore>()));
 
   // 17. Notifications: friend requests, achievements, announcements
   sl.registerLazySingleton<NotificationsRepository>(
     () => NotificationsRepositoryImpl(
-      NotificationsRemoteDataSource(sl<SupabaseClient>()),
+      NotificationsRemoteDataSource(sl<SupabaseClient>(), sl<PendingWrites>()),
       sl<CommunityRepository>(),
+      sl<CacheStore>(),
     ),
   );
   sl.registerFactory(() => NotificationsCubit(sl<NotificationsRepository>()));
@@ -571,6 +619,7 @@ Future<void> initDependencies() async {
       sl<SettingsRepository>(),
       sl<NotificationsRepository>(),
       sl<FlutterLocalNotificationsPlugin>(),
+      sl<SharedPreferences>(),
       (response) async {
         // "+250 ml" on a water reminder while the app is open.
         final userId = reminderUserId(response);
@@ -600,13 +649,47 @@ Future<void> initDependencies() async {
 
   // 19. Cloud backup of logs (water, sleep, meals, workouts, weight)
   sl.registerLazySingleton(
-    () => SyncService(sl<SupabaseClient>(), sl<SharedPreferences>(), [
-      WaterSyncAdapter(sl<IsarService>()),
-      SleepSyncAdapter(sl<IsarService>()),
-      MealSyncAdapter(sl<IsarService>()),
-      WeightSyncAdapter(sl<IsarService>()),
-      ActivitySyncAdapter(sl<AppDatabase>()),
-    ]),
+    () => SyncService(
+      sl<SupabaseClient>(),
+      sl<SharedPreferences>(),
+      [
+        WaterSyncAdapter(sl<IsarService>()),
+        SleepSyncAdapter(sl<IsarService>()),
+        MealSyncAdapter(sl<IsarService>()),
+        WeightSyncAdapter(sl<IsarService>()),
+        ActivitySyncAdapter(sl<AppDatabase>()),
+        // Small per-user data kept in preferences / Isar (user_backups).
+        BackupSyncAdapter(sl<SharedPreferences>(), [
+          PrefsBackupSource('settings', sl<SharedPreferences>(), [
+            'settings_theme_mode',
+            'settings_notifications_enabled',
+            'settings_weight_unit',
+            'settings_height_unit',
+          ]),
+          PrefsBackupSource('goals', sl<SharedPreferences>(), [
+            'activity_goals_v1',
+            'daily_water_goal',
+            'daily_sleep_goal_min',
+          ]),
+          PrefsBackupSource(
+            'reminders',
+            sl<SharedPreferences>(),
+            ['reminders_v1', 'reminders_smart_skip'],
+            onRestored: () => sl<RemindersService>().resync(),
+          ),
+          PrefsBackupSource('stress', sl<SharedPreferences>(), [
+            'vita_checkins_{user}',
+            'vita_scores_{user}',
+          ]),
+          PrefsBackupSource('workout_notes', sl<SharedPreferences>(), [
+            ActivityHistoryRepositoryImpl.annotationsKey,
+          ]),
+          DietPlanBackupSource(sl<IsarService>(), sl<SharedPreferences>()),
+        ]),
+      ],
+      sl<ConnectivityService>(),
+      sl<PendingWrites>(),
+    ),
   );
 
   // 21. Weight log
@@ -616,6 +699,8 @@ Future<void> initDependencies() async {
       sl<SupabaseClient>(),
       sl<SettingsRepository>(),
       sl<SharedPreferences>(),
+      sl<CacheStore>(),
+      sl<PendingWrites>(),
       sl<SyncService>(),
       sl<HabitEvents>(),
     ),
@@ -631,6 +716,7 @@ Future<void> initDependencies() async {
       sl<AppDatabase>(),
       sl<SharedPreferences>(),
       sl<SyncService>(),
+      sl<CacheStore>(),
     ),
   );
 
@@ -653,6 +739,8 @@ Future<void> initDependencies() async {
       sl<SleepService>(),
       sl<GetMealLogHistory>(),
       sl<WeightService>(),
+      sl<PendingWrites>(),
+      sl<SharedPreferences>(),
     ),
   );
 
@@ -666,7 +754,7 @@ Future<void> initDependencies() async {
   );
 
   // 25. Friend challenges
-  sl.registerLazySingleton(() => ChallengesRepository(sl<SupabaseClient>()));
+  sl.registerLazySingleton(() => ChallengesRepository(sl<SupabaseClient>(), sl<CacheStore>()));
 
   // 26. Data export (Settings > Account)
   sl.registerLazySingleton(

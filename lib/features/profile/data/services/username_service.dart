@@ -1,3 +1,5 @@
+import 'package:vital_up/core/cache/cache_store.dart';
+import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// The caller's username and whether they chose it. Google sign-ups start
@@ -27,7 +29,14 @@ class UsernameException implements Exception {
 class UsernameService {
   final SupabaseClient _client;
 
-  UsernameService(this._client);
+  /// Optional: remembers a confirmed username (so the dashboard's check
+  /// doesn't hit the network every launch) and keeps the cached profile's
+  /// username in step after [setUsername].
+  final CacheStore? _cache;
+
+  UsernameService(this._client, [this._cache]);
+
+  static String _statusKey(String userId) => 'username:status:$userId';
 
   static const minLength = 3;
   static const maxLength = 20;
@@ -59,15 +68,38 @@ class UsernameService {
   Future<UsernameStatus?> fetchStatus() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return null;
+    // Confirmation is one-way, so once seen it never needs re-checking.
+    final known = (await _cache?.read<Object?>(_statusKey(userId)))?.value;
+    if (known is Map && known['confirmed'] == true) {
+      return UsernameStatus(
+        username: known['username'] as String? ?? '',
+        confirmed: true,
+      );
+    }
     final row = await _client
         .from('profiles')
         .select('username, username_confirmed')
         .eq('id', userId)
         .maybeSingle();
     if (row == null) return null;
-    return UsernameStatus(
+    final status = UsernameStatus(
       username: row['username'] as String? ?? '',
       confirmed: row['username_confirmed'] as bool? ?? true,
+    );
+    if (status.confirmed) await _remember(userId, status.username);
+    return status;
+  }
+
+  Future<void> _remember(String userId, String username) async {
+    final cache = _cache;
+    if (cache == null) return;
+    await cache.write(
+      _statusKey(userId),
+      {'username': username, 'confirmed': true},
+    );
+    await cache.update(
+      ProfileCache.key(userId),
+      (data) => ProfileCache.patch(data, {'username': username}),
     );
   }
 
@@ -84,11 +116,14 @@ class UsernameService {
     final error = formatError(username);
     if (error != null) throw UsernameException(error);
     try {
-      return await _client.rpc(
+      final saved = await _client.rpc(
             'set_username',
             params: {'p_username': username.trim()},
           )
           as String;
+      final userId = _client.auth.currentUser?.id;
+      if (userId != null) await _remember(userId, saved);
+      return saved;
     } on PostgrestException catch (e) {
       throw UsernameException(
         messageForServerError(e) ?? "Couldn't save your username. Try again.",

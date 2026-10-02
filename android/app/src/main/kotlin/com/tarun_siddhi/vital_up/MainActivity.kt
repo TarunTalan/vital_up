@@ -7,11 +7,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Process
 import androidx.annotation.NonNull
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val AUDIO_CHANNEL = "com.example.vital_up/audio_intent"
     private val USAGE_CHANNEL = "com.example.vital_up/usage_stats"
 

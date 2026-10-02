@@ -1,8 +1,10 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
@@ -76,6 +78,8 @@ class WeeklySummaryService {
   final SleepService _sleep;
   final GetMealLogHistory _meals;
   final WeightService _weight;
+  final PendingWrites _pending;
+  final SharedPreferences _prefs;
 
   WeeklySummaryService(
     this._client,
@@ -84,7 +88,12 @@ class WeeklySummaryService {
     this._sleep,
     this._meals,
     this._weight,
+    this._pending,
+    this._prefs,
   );
+
+  /// `user|zone` last saved on the server.
+  static const _keyReportedZone = 'weekly_summary_reported_tz';
 
   /// Last 7 days (ending today) and the 7 before them.
   Future<WeeklySummary> load({DateTime? now}) async {
@@ -137,12 +146,27 @@ class WeeklySummaryService {
     return WeeklySummary(week(thisFrom, to), week(lastFrom, thisFrom));
   }
 
-  /// Saves the device time zone on the profile (once per app start).
+  /// Saves the device time zone on the profile when it (or the user) has
+  /// changed since it was last saved. Queued when offline.
   Future<void> reportTimezone() async {
-    if (_client.auth.currentUser == null) return;
+    final user = _client.auth.currentUser?.id;
+    if (user == null) return;
     try {
-      final zone = await FlutterTimezone.getLocalTimezone();
-      await _client.rpc('set_my_timezone', params: {'p_tz': zone.identifier});
+      final zone = (await FlutterTimezone.getLocalTimezone()).identifier;
+      final marker = '$user|$zone';
+      if (_prefs.getString(_keyReportedZone) == marker) return;
+      final sent = await _pending.sendOrQueue(
+        _client,
+        PendingWrite.rpc(
+          'set_my_timezone',
+          params: {'p_tz': zone},
+          userId: user,
+          key: 'rpc:set_my_timezone',
+        ),
+      );
+      // A queued write isn't remembered: the next call re-queues it (same
+      // key, so it replaces rather than duplicates) until one gets through.
+      if (sent) await _prefs.setString(_keyReportedZone, marker);
     } catch (e) {
       debugPrint('Time zone not reported: $e');
     }

@@ -371,7 +371,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 AppPrimaryButton(
                   label: 'Retry',
                   expand: false,
-                  onTap: () => context.read<ProfileCubit>().loadProfile(),
+                  onTap: () => context
+                      .read<ProfileCubit>()
+                      .loadProfile(forceRefresh: true),
                 ),
               ],
             ),

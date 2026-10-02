@@ -15,7 +15,10 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
   final IsarService isarService;
   final SharedPreferences prefs;
 
-  static const _preferencesKey = 'active_plan_preferences';
+  /// Isar dateKey of the plan in use, and its prefs key (also backed up,
+  /// see DietPlanBackupSource).
+  static const activePlanKey = 'active_plan';
+  static const preferencesKey = 'active_plan_preferences';
 
   DietPlanRepositoryImpl({
     required this.remoteDataSource,
@@ -48,7 +51,7 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
   @override
   Future<MealPlan?> getActiveMealPlan() async {
     final isar = isarService.isar;
-    final cached = await isar.mealPlanModels.where().dateKeyEqualTo('active_plan').findFirst();
+    final cached = await isar.mealPlanModels.where().dateKeyEqualTo(activePlanKey).findFirst();
     return cached?.toEntity();
   }
 
@@ -58,16 +61,16 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
     Map<String, dynamic> preferences = const {},
   }) async {
     final isar = isarService.isar;
-    final model = MealPlanModel.fromEntity(plan, 'active_plan');
+    final model = MealPlanModel.fromEntity(plan, activePlanKey);
     await isar.writeTxn(() async {
       await isar.mealPlanModels.put(model);
     });
-    await prefs.setString(_preferencesKey, jsonEncode(preferences));
+    await prefs.setString(preferencesKey, jsonEncode(preferences));
   }
 
   @override
   Future<Map<String, dynamic>> getActivePlanPreferences() async {
-    final raw = prefs.getString(_preferencesKey);
+    final raw = prefs.getString(preferencesKey);
     if (raw == null) return {};
     try {
       return Map<String, dynamic>.from(jsonDecode(raw) as Map);

@@ -84,6 +84,8 @@ class _DashboardPageState extends State<DashboardPage> {
     _profileCubit = sl<ProfileCubit>()..loadProfile();
 
     sl<HealthImportService>().start();
+    // Both only reach the server when something changed (time zone, push
+    // token or account) since they last did.
     sl<WeeklySummaryService>().reportTimezone();
 
     final push = sl<PushService>();
@@ -360,7 +362,8 @@ class _HomeTabState extends State<_HomeTab> {
       context.read<StressCheckInCubit>().load();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
       context.read<GamificationCubit>().sync();
-      // The realtime feed can drop while backgrounded.
+      // The realtime feed can drop while backgrounded; cache-first, so this
+      // only refetches when the inbox is a few minutes old.
       context.read<NotificationsCubit>().load();
     },
   );
