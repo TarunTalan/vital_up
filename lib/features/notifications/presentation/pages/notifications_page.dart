@@ -91,7 +91,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ? LoadErrorView(onRetry: cubit.load)
                           : const Center(child: CircularProgressIndicator())
                     : RefreshIndicator(
-                        onRefresh: cubit.load,
+                        onRefresh: cubit.refresh,
                         child: ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: context.pagePadding.add(

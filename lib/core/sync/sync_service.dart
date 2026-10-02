@@ -6,21 +6,40 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
 
 /// Backs up the logs recorded on this device to Supabase and brings back
-/// entries made on other devices (see migration 20261008_synced_logs.sql).
+/// entries made on other devices (see migration 20261008_synced_logs.sql),
+/// and flushes server writes queued while offline ([PendingWrites]).
 ///
 /// Offline first: everything is written locally, then uploaded when
-/// possible. Includes exponential backoff retry scheduling for intermittent
-/// network drops when users are jogging or in low-connectivity areas.
+/// possible.
+/// - Local edits trigger an upload only (debounced); downloads happen on
+///   sign-in, app resume and reconnect, at most every [_minPullInterval].
+/// - With no network interface nothing is attempted; the run happens as
+///   soon as [ConnectivityService] reports the network is back.
+/// - When the network is up but requests still fail, retries back off
+///   exponentially (2 s to 5 min, with jitter).
+/// - Each table syncs independently, so one failing table doesn't block
+///   the others.
 class SyncService with WidgetsBindingObserver implements SyncHooks {
   final SupabaseClient _client;
   final SharedPreferences _prefs;
   final List<SyncAdapter> _adapters;
+  final ConnectivityService _connectivity;
+  final PendingWrites _writes;
 
-  SyncService(this._client, this._prefs, this._adapters);
+  SyncService(
+    this._client,
+    this._prefs,
+    this._adapters,
+    this._connectivity,
+    this._writes,
+  );
 
   static const _keyDeletes = 'sync_pending_deletes';
   static const _pageSize = 500;
@@ -30,56 +49,73 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   /// order. Merging is idempotent, so re-reading them is harmless.
   static const _pullOverlap = Duration(minutes: 2);
 
+  /// Other devices' changes are fetched at most this often (unless forced).
+  static const _minPullInterval = Duration(minutes: 5);
+
+  static const _maxBackoff = Duration(minutes: 5);
+
   Future<void>? _running;
+  Future<void>? _queued;
+  bool _rerunPull = false;
   Timer? _debounce;
   Timer? _retryTimer;
-  DateTime? _lastForegroundSync;
+  DateTime? _lastPull;
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<bool>? _onlineSub;
   int _consecutiveFailures = 0;
   final Random _random = Random();
 
   String? get _userId => _client.auth.currentUser?.id;
 
-  /// Starts syncing on sign-in and app resume. Call once at startup.
+  /// Starts syncing on sign-in, app resume and reconnect. Call once at
+  /// startup.
   void start() {
     WidgetsBinding.instance.addObserver(this);
+    _writes.attach(this);
     _authSub = _client.auth.onAuthStateChange.listen((auth) {
       if (auth.session != null &&
           (auth.event == AuthChangeEvent.initialSession ||
               auth.event == AuthChangeEvent.signedIn)) {
         _consecutiveFailures = 0;
-        sync();
+        sync(force: true);
       }
+    });
+    _onlineSub = _connectivity.onlineChanges.listen((online) {
+      if (!online) return;
+      _consecutiveFailures = 0;
+      _retryTimer?.cancel();
+      sync();
     });
   }
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
+    _onlineSub?.cancel();
     _debounce?.cancel();
     _retryTimer?.cancel();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) return;
-    final last = _lastForegroundSync;
-    if (last != null &&
-        DateTime.now().difference(last) < const Duration(minutes: 1)) {
+    // Leaving the app: upload what changed (settings, goals and other
+    // backed-up data don't announce their edits).
+    if (state == AppLifecycleState.paused) {
+      sync(pull: false);
       return;
     }
-    _lastForegroundSync = DateTime.now();
-    // Reset failure backoff on app foregrounding so we attempt fresh sync immediately
+    if (state != AppLifecycleState.resumed) return;
+    // Fresh attempt on foregrounding; the pull itself is rate-limited.
     _consecutiveFailures = 0;
     _retryTimer?.cancel();
     sync();
   }
 
-  /// Call after a local change; batches bursts of edits into one sync.
+  /// Call after a local change; batches bursts of edits into one upload.
   @override
   void schedule() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 5), sync);
+    _debounce = Timer(const Duration(seconds: 5), () => sync(pull: false));
   }
 
   /// Remembers a deleted entry so other devices drop it too.
@@ -94,16 +130,37 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     schedule();
   }
 
-  /// Uploads and downloads everything. Safe to call often: concurrent
-  /// calls share one run. Never throws.
-  Future<void> sync() =>
-      _running ??= _run().whenComplete(() => _running = null);
+  /// Uploads local changes and (when due, or with [force]) downloads other
+  /// devices' changes. Set [pull] to false to only upload.
+  ///
+  /// Safe to call often: calls during a run share one follow-up run, and
+  /// the returned future completes after it (so "sync, then wipe" on
+  /// sign-out really uploads the latest changes). Never throws.
+  Future<void> sync({bool pull = true, bool force = false}) {
+    final wantsPull = pull &&
+        (force ||
+            _lastPull == null ||
+            DateTime.now().difference(_lastPull!) >= _minPullInterval);
+    if (_running != null) {
+      _rerunPull |= wantsPull;
+      return _queued ??= _running!.then((_) {
+        _queued = null;
+        final pullAgain = _rerunPull;
+        _rerunPull = false;
+        return sync(pull: pullAgain, force: pullAgain);
+      });
+    }
+    return _running = _run(pull: wantsPull).whenComplete(() {
+      _running = null;
+    });
+  }
 
   /// Entries recorded here but not backed up yet.
   Future<int> pendingCount() async {
     final userId = _userId;
     if (userId == null) return 0;
-    var count = (_prefs.getStringList(_keyDeletes) ?? const []).length;
+    var count = (_prefs.getStringList(_keyDeletes) ?? const []).length +
+        _writes.countFor(userId);
     for (final adapter in _adapters) {
       try {
         count += (await adapter.pending(userId)).length;
@@ -119,50 +176,71 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       if (key.startsWith('sync_cursor_')) await _prefs.remove(key);
     }
     await _prefs.remove(_keyDeletes);
+    _lastPull = null;
   }
 
-  Future<void> _run() async {
+  Future<void> _run({required bool pull}) async {
     final userId = _userId;
     if (userId == null) return;
+    // No network at all: wait for the reconnect event instead of retrying.
+    if (!_connectivity.hasNetwork) return;
+
+    var failed = false;
     try {
+      await _writes.flush(_client, userId);
       await _pushDeletes(userId);
       for (final adapter in _adapters) {
-        await _push(adapter, userId);
-        await _pull(adapter, userId);
+        try {
+          await _push(adapter, userId);
+          if (pull) await _pull(adapter, userId);
+        } catch (e, stack) {
+          if (isOfflineError(e)) rethrow;
+          failed = true;
+          CrashReporter.report(
+            e,
+            stack,
+            reason: 'Sync of ${adapter.table} failed',
+          );
+        }
       }
-      // On full success, reset exponential backoff counter and cancel retries
+      _connectivity.reportSuccess();
+      if (pull) _lastPull = DateTime.now();
+    } catch (e, stack) {
+      failed = true;
+      if (isOfflineError(e)) {
+        _connectivity.reportFailure();
+      } else {
+        CrashReporter.report(e, stack, reason: 'Sync failed');
+      }
+    }
+
+    if (failed) {
+      _scheduleRetry();
+    } else {
       _consecutiveFailures = 0;
       _retryTimer?.cancel();
-    } catch (e, stack) {
-      if (_looksOffline(e)) {
-        _scheduleExponentialBackoffRetry();
-        return;
-      }
-      CrashReporter.report(e, stack, reason: 'Sync failed');
-      _scheduleExponentialBackoffRetry();
     }
   }
 
-  /// Schedules an automatic retry with exponential backoff and jitter
-  /// for intermittent drops during workouts / jogging.
-  void _scheduleExponentialBackoffRetry() {
+  /// Retries with exponential backoff and jitter, for flaky networks
+  /// (jogging, tunnels). Skipped when there's no network at all.
+  void _scheduleRetry() {
     _consecutiveFailures++;
     _retryTimer?.cancel();
+    if (!_connectivity.hasNetwork) return;
 
-    // Exponential delays: 2s, 4s, 8s, 16s, 32s, capped at 60s
-    final baseSeconds = min(60, 2 * pow(2, min(_consecutiveFailures - 1, 5)).toInt());
-    // Jitter: +/- 25%
-    final jitterFactor = 0.75 + (_random.nextDouble() * 0.50);
-    final delayMs = (baseSeconds * 1000 * jitterFactor).round();
-
-    debugPrint(
-      '[SyncService] Sync dropped or offline (failure #$_consecutiveFailures). Retrying in ${delayMs}ms...',
+    final baseMs = min(
+      _maxBackoff.inMilliseconds,
+      2000 * pow(2, min(_consecutiveFailures - 1, 8)).toInt(),
     );
-
-    _retryTimer = Timer(Duration(milliseconds: delayMs), () {
-      if (_userId != null) {
-        sync();
-      }
+    final jitter = 0.75 + _random.nextDouble() * 0.5;
+    final delay = Duration(milliseconds: (baseMs * jitter).round());
+    debugPrint(
+      '[SyncService] Sync failed (#$_consecutiveFailures), '
+      'retrying in ${delay.inSeconds}s',
+    );
+    _retryTimer = Timer(delay, () {
+      if (_userId != null) sync();
     });
   }
 
@@ -221,7 +299,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
               .eq('id', d['id'] as String);
         });
       } catch (e) {
-        if (_looksOffline(e)) {
+        if (isOfflineError(e)) {
           remaining.addAll(queued.skip(i));
           break;
         }
@@ -242,23 +320,12 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       try {
         return await action();
       } catch (e) {
-        if (attempts >= maxAttempts || !_looksOffline(e)) {
+        if (attempts >= maxAttempts || !isOfflineError(e)) {
           rethrow;
         }
         final delayMs = (300 * pow(2, attempts - 1)).toInt();
         await Future<void>.delayed(Duration(milliseconds: delayMs));
       }
     }
-  }
-
-  static bool _looksOffline(Object e) {
-    final text = e.toString().toLowerCase();
-    return text.contains('socketexception') ||
-        text.contains('clientexception') ||
-        text.contains('failed host lookup') ||
-        text.contains('connection') ||
-        text.contains('timeout') ||
-        text.contains('handshake') ||
-        text.contains('network is unreachable');
   }
 }

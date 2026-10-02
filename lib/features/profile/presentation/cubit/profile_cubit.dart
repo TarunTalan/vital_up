@@ -16,11 +16,15 @@ class ProfileCubit extends Cubit<ProfileState> {
   })  : _profileRepository = profileRepository,
         super(ProfileInitial());
 
-  Future<void> loadProfile() async {
+  /// Cached copy while fresh; [forceRefresh] (retry / pull-to-refresh)
+  /// goes to the server.
+  Future<void> loadProfile({bool forceRefresh = false}) async {
     emit(ProfileLoading());
     final Either<Failure, ProfileEntity> result;
     try {
-      result = await _profileRepository.getProfile().withLoadTimeout();
+      result = await _profileRepository
+          .getProfile(forceRefresh: forceRefresh)
+          .withLoadTimeout();
     } catch (_) {
       if (!isClosed) emit(const ProfileError(kLoadErrorMessage));
       return;

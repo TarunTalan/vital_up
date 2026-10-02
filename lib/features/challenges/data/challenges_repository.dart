@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 
 /// What a challenge ranks on; scores come from synced workouts.
 enum ChallengeMetric {
@@ -142,60 +144,106 @@ class ChallengeException implements Exception {
   String toString() => message;
 }
 
+/// Reads are cache-first (see [CacheStore]) so the list and standings open
+/// instantly and stay readable offline. Creating and answering need the
+/// server's answer (limits, expired invites), so they are online only.
 class ChallengesRepository {
   final SupabaseClient _client;
+  final CacheStore _cache;
 
-  ChallengesRepository(this._client);
+  ChallengesRepository(this._client, this._cache);
 
-  Future<List<Challenge>> getChallenges() async {
-    final rows = await _call(() => _client.rpc('get_challenges'));
-    return [
-      for (final r in rows as List)
-        Challenge.fromJson(Map<String, dynamic>.from(r as Map)),
-    ];
+  static const _maxAge = Duration(minutes: 3);
+
+  /// Gives up on a hung request early enough to fall back to the cache.
+  static const _requestTimeout = Duration(seconds: 10);
+
+  static const _offline = ChallengeException(
+    "You're offline. Try again when connected.",
+  );
+
+  String get _user {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) throw const ChallengeException('Sign in first.');
+    return id;
   }
 
-  Future<List<ChallengeStanding>> getLeaderboard(String challengeId) async {
-    final rows = await _call(
+  String get _listKey => 'challenges:list:$_user';
+  String _boardKey(String challengeId) => 'challenges:board:$_user:$challengeId';
+
+  Future<List<Map<String, dynamic>>> _rows(
+    String key,
+    Future<dynamic> Function() remote,
+  ) => _call(
+    () => _cache.fetch<List<Map<String, dynamic>>>(
+      key,
+      remote: () async => [
+        for (final r in await remote().timeout(_requestTimeout) as List)
+          Map<String, dynamic>.from(r as Map),
+      ],
+      maxAge: _maxAge,
+      decode: (json) => [
+        for (final r in json as List) Map<String, dynamic>.from(r as Map),
+      ],
+    ),
+  );
+
+  Future<List<Challenge>> getChallenges() async => [
+    for (final r in await _rows(_listKey, () => _client.rpc('get_challenges')))
+      Challenge.fromJson(r),
+  ];
+
+  Future<List<ChallengeStanding>> getLeaderboard(String challengeId) async => [
+    for (final r in await _rows(
+      _boardKey(challengeId),
       () => _client.rpc(
         'get_challenge_leaderboard',
         params: {'p_challenge': challengeId},
       ),
-    );
-    return [
-      for (final r in rows as List)
-        ChallengeStanding.fromJson(Map<String, dynamic>.from(r as Map)),
-    ];
-  }
+    ))
+      ChallengeStanding.fromJson(r),
+  ];
 
   Future<void> create({
     required ChallengeMetric metric,
     required int days,
     required List<String> friendIds,
-  }) => _call(
-    () => _client.rpc(
-      'create_challenge',
-      params: {
-        'p_metric': metric.code,
-        'p_days': days,
-        'p_friend_ids': friendIds,
-      },
-    ),
-  );
+  }) async {
+    await _call(
+      () => _client.rpc(
+        'create_challenge',
+        params: {
+          'p_metric': metric.code,
+          'p_days': days,
+          'p_friend_ids': friendIds,
+        },
+      ),
+    );
+    await _cache.remove(_listKey);
+  }
 
-  Future<void> respond(Challenge challenge, {required bool accept}) => _call(
-    () => _client.rpc(
-      'respond_to_challenge',
-      params: {'p_challenge': challenge.id, 'p_accept': accept},
-    ),
-  );
+  /// Online only: the server rejects a repeat (`invite_not_found`), so a
+  /// replayed answer would fail.
+  Future<void> respond(Challenge challenge, {required bool accept}) async {
+    await _call(
+      () => _client.rpc(
+        'respond_to_challenge',
+        params: {'p_challenge': challenge.id, 'p_accept': accept},
+      ),
+    );
+    await _cache.remove(_listKey);
+    await _cache.remove(_boardKey(challenge.id));
+  }
 
-  Future<dynamic> _call(Future<dynamic> Function() run) async {
+  Future<T> _call<T>(Future<T> Function() run) async {
     try {
       return await run();
+    } on ChallengeException {
+      rethrow;
     } on PostgrestException catch (e) {
       throw ChallengeException.fromServer(e.message);
-    } catch (_) {
+    } catch (e) {
+      if (isOfflineError(e)) throw _offline;
       throw const ChallengeException("Couldn't reach the server. Try again.");
     }
   }

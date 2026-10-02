@@ -36,9 +36,6 @@ class _FakeRecognition implements FoodRecognitionRepository {
 
   @override
   Future<Either<Failure, List<RecognizedFood>>> recognizeFood(File image) async => result;
-
-  @override
-  Future<Either<Failure, List<FoodItem>>> searchByName(String query) async => const Right([]);
 }
 
 class _FakeNutrition implements NutritionRepository {

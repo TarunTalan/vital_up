@@ -6,9 +6,14 @@ import 'package:vital_up/features/gamification/domain/entities/score_category.da
 
 abstract class GamificationRepository {
   /// Reports every day since the last successful sync (at most the last
-  /// three days, which the server accepts) and returns what was awarded.
-  /// Null when signed out. Throws when the server can't be reached.
+  /// three days, which the server accepts) whose metrics changed since they
+  /// were last sent, and returns what was awarded. Null when signed out or
+  /// nothing needed sending. Throws when the server can't be reached.
   Future<AwardResult?> sync();
+
+  // Reads are cache-first: fresh copies are served without a request and,
+  // offline, the last copy is returned. They throw only when nothing is
+  // cached and the server can't be reached.
 
   Future<PlayerStats> getStats();
 

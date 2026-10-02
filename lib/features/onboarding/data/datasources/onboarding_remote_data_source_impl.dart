@@ -1,28 +1,25 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/error/exceptions.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/features/profile/data/profile_cache.dart';
 
 class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
   final SupabaseClient supabaseClient;
+  final PendingWrites pendingWrites;
   final Logger logger;
 
   OnboardingRemoteDataSourceImpl({
     required this.supabaseClient,
+    required this.pendingWrites,
     required this.logger,
   });
 
-  @override
-  Future<void> submitOnboardingData(OnboardingData data) async {
-    try {
-      final user = supabaseClient.auth.currentUser;
-      if (user == null) {
-        throw const ServerException(message: 'User is not authenticated');
-      }
-
-      final payload = {
-        'id': user.id,
+  /// The `user_health_data` row written for [data].
+  static Map<String, dynamic> payloadFor(String userId, OnboardingData data) => {
+        'id': userId,
         'full_name': data.fullName,
         'dob': data.dob,
         'gender': data.gender,
@@ -46,11 +43,32 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
         'onboarding_completed': true,
       };
 
-      await supabaseClient
-          .from('user_health_data')
-          .upsert(payload);
+  @override
+  Future<bool> submitOnboardingData(OnboardingData data) async {
+    try {
+      final user = supabaseClient.auth.currentUser;
+      if (user == null) {
+        throw const ServerException(message: 'User is not authenticated');
+      }
 
-      logger.i('Successfully submitted onboarding data for user: ${user.id}');
+      // Same outbox key as profile edits, so offline changes to the row
+      // coalesce into one upsert.
+      final sent = await pendingWrites.sendOrQueue(
+        supabaseClient,
+        PendingWrite.upsert(
+          'user_health_data',
+          values: payloadFor(user.id, data),
+          userId: user.id,
+          key: ProfileCache.healthWriteKey(user.id),
+        ),
+      );
+
+      logger.i(sent
+          ? 'Successfully submitted onboarding data for user: ${user.id}'
+          : 'Onboarding data queued offline for user: ${user.id}');
+      return sent;
+    } on ServerException {
+      rethrow;
     } catch (e) {
       logger.e('Error submitting onboarding data: $e');
       throw ServerException(message: e.toString());

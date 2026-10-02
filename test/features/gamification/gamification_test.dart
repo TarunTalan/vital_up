@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/gamification/data/datasources/gamification_remote_datasource.dart';
 import 'package:vital_up/features/gamification/data/repositories/gamification_repository_impl.dart';
@@ -21,11 +26,12 @@ const _levels = [
 
 class _FakeCollector implements DailyMetricsCollector {
   final collected = <DateTime>[];
+  int foodLogs = 2;
 
   @override
   Future<DailyMetrics> collect(String userId, DateTime day, {DateTime? now}) async {
     collected.add(day);
-    return DailyMetrics(day: day, foodLogs: 2);
+    return DailyMetrics(day: day, foodLogs: foodLogs);
   }
 }
 
@@ -37,6 +43,13 @@ class _FakeRemote implements GamificationRemoteDataSource {
       (_) => {'points_awarded': 6, 'level': 1, 'level_up': false, 'streak': 0};
   bool fail = false;
 
+  /// Reads throw as if there were no network.
+  bool offline = false;
+  int statsFetches = 0;
+  int levelFetches = 0;
+  int eventFetches = 0;
+  Map<String, dynamic>? stats = {'total_points': 120};
+
   @override
   Future<Map<String, dynamic>> submitDailyReport(DailyMetrics metrics) async {
     if (fail) throw Exception('offline');
@@ -45,9 +58,21 @@ class _FakeRemote implements GamificationRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>?> fetchStats(String userId) async => null;
+  Future<Map<String, dynamic>?> fetchStats(String userId) async {
+    if (offline) throw const SocketException('Failed host lookup');
+    statsFetches++;
+    return stats;
+  }
+
   @override
-  Future<List<Map<String, dynamic>>> fetchLevels() async => const [];
+  Future<List<Map<String, dynamic>>> fetchLevels() async {
+    if (offline) throw const SocketException('Failed host lookup');
+    levelFetches++;
+    return [
+      for (final l in _levels)
+        {'level': l.level, 'min_points': l.minPoints, 'title': l.title},
+    ];
+  }
   @override
   Future<List<Map<String, dynamic>>> fetchBadges() async => const [];
   @override
@@ -57,8 +82,18 @@ class _FakeRemote implements GamificationRemoteDataSource {
     String userId, {
     required DateTime from,
     DateTime? to,
-  }) async =>
-      const [];
+  }) async {
+    if (offline) throw const SocketException('Failed host lookup');
+    eventFetches++;
+    return [
+      {
+        'day': GamificationRemoteDataSource.dayParam(from),
+        'source': 'food_log',
+        'category': 'nutrition',
+        'points': 6,
+      },
+    ];
+  }
   @override
   Future<List<Map<String, dynamic>>> fetchRules() async => const [];
 }
@@ -85,6 +120,11 @@ class _FakeRepository implements GamificationRepository {
   @override
   Future<List<PointRule>> getRules() async => const [];
 }
+
+CacheStore _cache() => CacheStore(
+  ConnectivityService(),
+  directory: Directory.systemTemp.createTempSync('gamification_cache'),
+);
 
 DateTime _today() {
   final n = DateTime.now();
@@ -195,16 +235,22 @@ void main() {
     late _FakeRemote remote;
     late _FakeCollector collector;
     late SharedPreferences prefs;
+    late CacheStore cache;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       remote = _FakeRemote();
       collector = _FakeCollector();
+      cache = _cache();
     });
 
-    GamificationRepositoryImpl repo() =>
-        GamificationRepositoryImpl(remote: remote, collector: collector, prefs: prefs);
+    GamificationRepositoryImpl repo() => GamificationRepositoryImpl(
+      remote: remote,
+      collector: collector,
+      prefs: prefs,
+      cache: cache,
+    );
 
     test('first sync reports today only', () async {
       final result = await repo().sync();
@@ -242,6 +288,109 @@ void main() {
       expect(await repo().sync(), isNull);
       expect(collector.collected, isEmpty);
     });
+
+    test('days whose metrics did not change are not re-sent', () async {
+      final r = repo();
+      await r.sync();
+      expect(await r.sync(), isNull);
+      expect(remote.submitted, hasLength(1));
+
+      collector.foodLogs = 3;
+      await r.sync();
+      expect(remote.submitted, hasLength(2));
+    });
+
+    test('overlapping syncs share one run', () async {
+      final r = repo();
+      await Future.wait([r.sync(), r.sync(), r.sync()]);
+      expect(remote.submitted, hasLength(1));
+    });
+
+    test('a day the server no longer accepts is skipped', () async {
+      final oldest = _daysAgo(2);
+      await prefs.setString(
+        'gamification_synced_day_u1',
+        GamificationRemoteDataSource.dayParam(oldest),
+      );
+      remote.respond = (m) => m.day == oldest
+          ? throw Exception('day out of range')
+          : {'points_awarded': 6};
+      final result = await repo().sync();
+      expect(result?.pointsAwarded, 12);
+      expect(
+        prefs.getString('gamification_synced_day_u1'),
+        GamificationRemoteDataSource.dayParam(_today()),
+      );
+    });
+  });
+
+  group('GamificationRepositoryImpl reads', () {
+    late _FakeRemote remote;
+    late SharedPreferences prefs;
+    late CacheStore cache;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      remote = _FakeRemote();
+      cache = _cache();
+    });
+
+    GamificationRepositoryImpl repo() => GamificationRepositoryImpl(
+      remote: remote,
+      collector: _FakeCollector(),
+      prefs: prefs,
+      cache: cache,
+    );
+
+    test('fresh copies are shared across callers', () async {
+      final r = repo();
+      final (a, b, today) = await (
+        r.getStats(),
+        r.getStats(),
+        r.getPointsForDay(DateTime.now()),
+      ).wait;
+      await r.getStats();
+      await r.getPointsForDay(DateTime.now());
+      expect(a.level.level, 2);
+      expect(b.totalPoints, 120);
+      expect(today, {ScoreCategory.nutrition: 6});
+      expect(remote.statsFetches, 1);
+      expect(remote.levelFetches, 1);
+      expect(remote.eventFetches, 1);
+    });
+
+    test('offline returns the last copy instead of failing', () async {
+      final r = repo();
+      await r.getStats();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await r.sync(); // Marks the cached score stale.
+      remote.offline = true;
+      final stats = await r.getStats();
+      expect(stats.totalPoints, 120);
+      expect(remote.statsFetches, 1);
+    });
+
+    test('offline with nothing cached throws', () async {
+      remote.offline = true;
+      await expectLater(repo().getStats(), throwsA(anything));
+    });
+
+    test('a report that reached the server refreshes the score', () async {
+      final r = repo();
+      await r.getStats();
+      await r.getPointsForDay(DateTime.now());
+      // The report must land strictly after the cached copies.
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await r.sync();
+      remote.stats = {'total_points': 300};
+      expect((await r.getStats()).totalPoints, 300);
+      await r.getPointsForDay(DateTime.now());
+      expect(remote.statsFetches, 2);
+      expect(remote.eventFetches, 2);
+      // Levels are reference data and stay cached.
+      expect(remote.levelFetches, 1);
+    });
   });
 
   group('GamificationCubit', () {
@@ -257,6 +406,20 @@ void main() {
       expect(repo.syncs, 1);
       expect(cubit.state.todayTotal, 6);
       await cubit.close();
+    });
+
+    testWidgets('syncs when the network comes back', (tester) async {
+      final repo = _FakeRepository();
+      final online = StreamController<bool>.broadcast();
+      final cubit = GamificationCubit(repo, onlineChanges: online.stream);
+      online
+        ..add(false)
+        ..add(true);
+      await tester.pump(GamificationCubit.syncDebounce + const Duration(milliseconds: 100));
+      await tester.pump();
+      expect(repo.syncs, 1);
+      await cubit.close();
+      await online.close();
     });
 
     testWidgets('emits a new award id for level-ups and badges', (tester) async {

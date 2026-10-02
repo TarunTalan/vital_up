@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
@@ -144,14 +145,16 @@ class CommunityCubit extends Cubit<CommunityState> {
       emit(
         state.copyWith(
           busy: {...state.busy}..remove(community.id),
-          message:
-              "Couldn't ${joining ? 'join' : 'leave'} ${community.name}. Try again.",
+          message: isOfflineError(e)
+              ? CommunityRepository.offlineMessage
+              : "Couldn't ${joining ? 'join' : 'leave'} ${community.name}. Try again.",
         ),
       );
     }
   }
 
-  /// Returns false when saving failed.
+  /// Returns false when saving failed. Offline, the change is queued and
+  /// counts as saved.
   Future<bool> setCity(String city, String countryCode) async {
     try {
       await _repository.setCity(city, countryCode).withLoadTimeout();

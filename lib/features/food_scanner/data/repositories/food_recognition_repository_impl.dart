@@ -1,33 +1,43 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:dartz/dartz.dart';
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_item_dto.dart';
 import 'package:vital_up/features/food_scanner/data/models/nutrition_response_parser.dart';
+import 'package:vital_up/features/food_scanner/data/utils/food_cache_keys.dart';
 import 'package:vital_up/features/food_scanner/data/utils/food_image_encoder.dart';
-import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/recognized_food.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
+
+/// Top-level so the isolate closure captures only [bytes].
+Future<String> _hashInBackground(Uint8List bytes) => Isolate.run(() => hashBytes(bytes));
 
 class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   final Logger logger;
   final SupabaseClient supabaseClient;
+  final CacheStore cacheStore;
+  final ConnectivityService connectivity;
 
   FoodRecognitionRepositoryImpl({
     required this.logger,
     required this.supabaseClient,
+    required this.cacheStore,
+    required this.connectivity,
   });
 
   /// Upper bound for one recognition round trip. The edge function caps each
   /// provider at 30 s and hedges to a second provider, so this only trips
   /// when the network itself is stuck.
   static const Duration _recognitionTimeout = Duration(seconds: 50);
-
-  final Map<String, List<RecognizedFood>> _cache = {};
 
   /// Supabase Edge Functions only auto-decode the response body into a
   /// [Map] when the function sets `Content-Type: application/json`.
@@ -43,22 +53,30 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   @override
   Future<Either<Failure, List<RecognizedFood>>> recognizeFood(File image) async {
     logger.i('recognizeFood called with image: ${image.path}');
-    if (supabaseClient.auth.currentSession?.accessToken == null) {
-      logger.e('recognizeFood failed: No active session found.');
-      return const Left(ServerFailure('User is not authenticated. Please log in.'));
-    }
     try {
-      // The capture flow overwrites the same path with the cropped photo, so
-      // the path alone would return a previous scan's result.
-      final cacheKey = '${image.path}:${(await image.lastModified()).millisecondsSinceEpoch}';
-      final cached = _cache[cacheKey];
+      // Keyed by content, not path: the capture flow overwrites one path with
+      // each new photo, and the gallery picker copies the same photo to a new
+      // path every time. Hashing a few MB is milliseconds, far cheaper than
+      // the edge function call (and a scan from the daily quota) it saves.
+      final original = await image.readAsBytes();
+      final cacheKey = FoodCacheKeys.recognition(await _hashInBackground(original));
+      final cached = await cacheStore.read<List<dynamic>>(cacheKey, decode: (json) => json as List<dynamic>);
       if (cached != null) {
         logger.d('Returning cached food recognition result');
-        return Right(cached);
+        return Right(_toRecognizedFoods(cached.value));
+      }
+
+      // Photos aren't queued for later: the user is waiting on the result.
+      if (!connectivity.hasNetwork) {
+        return const Left(NetworkFailure('No internet connection. Photo scans need a connection; you can still search or scan a barcode.'));
+      }
+      if (supabaseClient.auth.currentSession?.accessToken == null) {
+        logger.e('recognizeFood failed: No active session found.');
+        return const Left(ServerFailure('User is not authenticated. Please log in.'));
       }
 
       final stopwatch = Stopwatch()..start();
-      final imageBytes = await encodeFoodImageForUpload(image.path);
+      final imageBytes = await encodeFoodImageBytesForUpload(original);
       logger.d('Encoded image: ${imageBytes.length ~/ 1024} KB in ${stopwatch.elapsedMilliseconds} ms');
 
       final response = await supabaseClient.functions
@@ -70,6 +88,7 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
             },
           )
           .timeout(_recognitionTimeout);
+      connectivity.reportSuccess();
 
       logger.d('scan-food responded ${response.status} in ${stopwatch.elapsedMilliseconds} ms');
 
@@ -81,9 +100,10 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         return const Left(NoFoodDetectedFailure());
       }
 
-      final foods = itemsData.whereType<Map<String, dynamic>>().map(_toRecognizedFood).toList();
-      _cache[cacheKey] = foods;
-      return Right(foods);
+      // Empty results aren't cached so a retry of the same photo gets a fresh try.
+      await cacheStore.write(cacheKey, itemsData);
+      await _consumeCachedScan();
+      return Right(_toRecognizedFoods(itemsData));
     } on FunctionException catch (e) {
       // Provider error details are for logs only; never show raw JSON to users.
       logger.e('scan-food function error: status=${e.status} details=${e.details}');
@@ -95,6 +115,10 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         case 503:
           return const Left(RecognitionUnavailableFailure());
         default:
+          if (isOfflineError(e)) {
+            connectivity.reportFailure();
+            return const Left(NetworkFailure('No internet connection. Please check your connection.'));
+          }
           return const Left(ServerFailure('Failed to recognize food. Please try again.'));
       }
     } on TimeoutException {
@@ -102,13 +126,27 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       return const Left(NetworkFailure('Recognition is taking too long. Check your connection and try again.'));
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
-      final errorMessage = e.toString();
-      if (errorMessage.contains('SocketException') || errorMessage.contains('Failed host lookup')) {
+      if (isOfflineError(e)) {
+        connectivity.reportFailure();
         return const Left(NetworkFailure('No internet connection. Please check your connection.'));
       }
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
   }
+
+  /// The server just used one of today's scans; keep the cached quota in
+  /// step so the next check doesn't need a request to notice.
+  Future<void> _consumeCachedScan() async {
+    final userId = supabaseClient.auth.currentUser?.id;
+    if (userId == null) return;
+    await cacheStore.update(
+      FoodCacheKeys.remainingScans(userId),
+      (data) => data is int && data > 0 ? data - 1 : data,
+    );
+  }
+
+  List<RecognizedFood> _toRecognizedFoods(List<dynamic> items) =>
+      items.whereType<Map<String, dynamic>>().map(_toRecognizedFood).toList();
 
   RecognizedFood _toRecognizedFood(Map<String, dynamic> json) {
     final dto = FoodItemDto.fromJson(json);
@@ -119,45 +157,5 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       lookupKey: dto.fdcId ?? item.name,
       nutrition: nutritionJson is Map<String, dynamic> ? parseNutritionResponse(nutritionJson, item) : null,
     );
-  }
-
-  @override
-  Future<Either<Failure, List<FoodItem>>> searchByName(String query) async {
-    if (supabaseClient.auth.currentSession?.accessToken == null) {
-      logger.e('searchByName failed: No active session found.');
-      return const Left(ServerFailure('User is not authenticated. Please log in.'));
-    }
-    try {
-      final response = await supabaseClient.functions.invoke(
-        'scan-food',
-        body: {
-          'search_query': query,
-        },
-      );
-
-      if (response.status == 200) {
-        final data = _decodeMap(response.data);
-        final itemsData = data['items'] as List<dynamic>?;
-
-        if (itemsData == null || itemsData.isEmpty) {
-          return const Left(ServerFailure('No results found.'));
-        }
-
-        final foodItems = itemsData
-            .map((item) => FoodItemDto.fromJson(item as Map<String, dynamic>).toDomain())
-            .toList();
-
-        return Right(foodItems);
-      } else {
-        return const Left(ServerFailure('Failed to search food. Please try again.'));
-      }
-    } catch (e) {
-      logger.e('Unexpected error in searchByName: $e');
-      return const Left(ServerFailure('An unexpected error occurred.'));
-    }
-  }
-
-  void clearCache() {
-    _cache.clear();
   }
 }

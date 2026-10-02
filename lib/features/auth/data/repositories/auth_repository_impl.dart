@@ -349,7 +349,13 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, bool>> isSessionActive() async {
     try {
       final session = Supabase.instance.client.auth.currentSession;
-      return Right(session != null && !session.isExpired);
+      if (session == null) return const Right(false);
+      // An expired access token is normal after a while offline: the
+      // refresh token renews it once the network is back (Supabase
+      // auto-refresh). Only a session without one is really over;
+      // a revoked refresh token surfaces later as a signedOut event.
+      final canRefresh = session.refreshToken?.isNotEmpty ?? false;
+      return Right(!session.isExpired || canRefresh);
     } catch (e) {
       return const Right(false);
     }
@@ -359,6 +365,13 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<bool> hasCompletedOnboarding() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return false;
+
+    // Onboarding never un-completes, so a local "done" is final. Trusting
+    // it also covers onboarding finished offline whose upload is still
+    // queued (the server would still say false), and saves a request.
+    if (await _localDataSource.hasCompletedOnboarding(userId) == true) {
+      return true;
+    }
 
     try {
       final row = await Supabase.instance.client

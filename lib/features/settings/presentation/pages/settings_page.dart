@@ -15,7 +15,7 @@ import 'package:vital_up/features/account/presentation/delete_account_sheet.dart
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
 import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
-import 'package:vital_up/features/help_support/presentation/widgets/contact_support_sheet.dart';
+import 'package:vital_up/features/help_support/presentation/pages/contact_support_page.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
@@ -410,7 +410,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   _buildDivider(),
                   InkWell(
-                    onTap: () => showContactSupportSheet(
+                    onTap: () => openContactSupport(
                       context,
                       initialCategory: SupportCategory.general,
                     ),

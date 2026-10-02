@@ -134,6 +134,10 @@ class AppTextField extends StatefulWidget {
   final bool readOnly;
   final bool autofocus;
   final bool multiline;
+  final int? minLines;
+  final int? maxLines;
+  final int? maxLength;
+  final bool showCounter;
 
   /// Keeps space for the error line so the layout doesn't jump.
   final bool reserveErrorSpace;
@@ -160,6 +164,10 @@ class AppTextField extends StatefulWidget {
     this.readOnly = false,
     this.autofocus = false,
     this.multiline = false,
+    this.minLines,
+    this.maxLines,
+    this.maxLength,
+    this.showCounter = false,
     this.reserveErrorSpace = false,
   });
 
@@ -186,7 +194,11 @@ class AppTextField extends StatefulWidget {
        textCapitalization = TextCapitalization.none,
        onTap = null,
        readOnly = false,
-       multiline = false;
+       multiline = false,
+       minLines = null,
+       maxLines = 1,
+       maxLength = null,
+       showCounter = false;
 
   /// Numbers with an optional decimal part.
   const AppTextField.decimal({
@@ -211,7 +223,11 @@ class AppTextField extends StatefulWidget {
        textCapitalization = TextCapitalization.none,
        onTap = null,
        readOnly = false,
-       multiline = false;
+       multiline = false,
+       minLines = null,
+       maxLines = 1,
+       maxLength = null,
+       showCounter = false;
 
   static const _digitsOnly = _RegexFormatter(r'^\d*$');
   static const _decimalOnly = _RegexFormatter(r'^\d*\.?\d*$');
@@ -279,10 +295,23 @@ class _AppTextFieldState extends State<AppTextField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.label != null) ...[
-          Text(
-            widget.label!,
-            style: context.text.titleSmall?.copyWith(color: colors.onSurface),
+        if (widget.label != null || (widget.showCounter && widget.maxLength != null)) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (widget.label != null)
+                Text(
+                  widget.label!,
+                  style: context.text.titleSmall?.copyWith(color: colors.onSurface),
+                )
+              else
+                const SizedBox.shrink(),
+              if (widget.showCounter && widget.maxLength != null)
+                Text(
+                  '${widget.controller.text.length}/${widget.maxLength}',
+                  style: context.text.bodySmall?.copyWith(color: v.grayText),
+                ),
+            ],
           ),
           const SizedBox(height: AppDimens.inputLabelGap),
         ],
@@ -309,13 +338,16 @@ class _AppTextFieldState extends State<AppTextField> {
                   enabled: widget.enabled,
                   readOnly: widget.readOnly,
                   autofocus: widget.autofocus,
+                  maxLength: widget.maxLength,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   keyboardType: widget.multiline
                       ? TextInputType.multiline
                       : widget.keyboardType,
                   inputFormatters: widget.inputFormatters,
                   textInputAction: widget.textInputAction,
                   textCapitalization: widget.textCapitalization,
-                  maxLines: widget.multiline ? null : 1,
+                  minLines: widget.multiline ? (widget.minLines ?? 1) : 1,
+                  maxLines: widget.multiline ? widget.maxLines : 1,
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   onTap: widget.onTap,

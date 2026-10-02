@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 import 'package:vital_up/features/notifications/domain/repositories/notifications_repository.dart';
@@ -48,6 +49,9 @@ class PushService {
   /// Shared with ReminderScheduler; initialised here.
   final FlutterLocalNotificationsPlugin _local;
 
+  /// Remembers the last registration so it isn't repeated on every launch.
+  final SharedPreferences _prefs;
+
   /// Handles a notification action button tapped while the app is running
   /// (e.g. "+250 ml" on a water reminder).
   final Future<void> Function(NotificationResponse response)? _onAction;
@@ -56,7 +60,8 @@ class PushService {
     this._client,
     this._settings,
     this._notifications,
-    this._local, [
+    this._local,
+    this._prefs, [
     this._onAction,
   ]);
 
@@ -68,10 +73,21 @@ class PushService {
     importance: Importance.high,
   );
 
+  static const _keyToken = 'push_registered_token';
+  static const _keyUser = 'push_registered_user';
+  static const _keyAt = 'push_registered_at';
+
+  /// Re-registers an unchanged token this often, so the server's copy stays
+  /// fresh (it drops the oldest tokens per account).
+  static const _reregisterAfter = Duration(days: 7);
+
+  /// Sign-out waits at most this long for the token to be removed.
+  static const _unregisterTimeout = Duration(seconds: 4);
+
   final _opens = StreamController<PushOpen>.broadcast();
   PushOpen? _pending;
   bool _ready = false;
-  String? _registeredToken;
+  Future<void>? _registering;
 
   /// Taps while the app is running.
   Stream<PushOpen> get opens => _opens.stream;
@@ -175,9 +191,15 @@ class PushService {
     await register();
   }
 
-  /// Saves this device's token for the signed-in user, if allowed.
-  Future<void> register() async {
-    if (!_ready || _client.auth.currentUser == null) return;
+  /// Saves this device's token for the signed-in user, if allowed. Skipped
+  /// when the same token was registered for the same user recently.
+  /// Concurrent calls (startup, sign-in, home screen) share one attempt.
+  Future<void> register() =>
+      _registering ??= _register().whenComplete(() => _registering = null);
+
+  Future<void> _register() async {
+    final user = _client.auth.currentUser?.id;
+    if (!_ready || user == null) return;
     if (!await _enabledInSettings()) return;
     try {
       final settings = await FirebaseMessaging.instance
@@ -185,12 +207,23 @@ class PushService {
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
+      final at = _prefs.getInt(_keyAt);
+      if (token == _prefs.getString(_keyToken) &&
+          user == _prefs.getString(_keyUser) &&
+          at != null &&
+          DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(at)) <
+              _reregisterAfter) {
+        return;
+      }
       await _client.rpc(
         'register_push_token',
         params: {'p_token': token, 'p_platform': _platform},
       );
-      _registeredToken = token;
+      await _prefs.setString(_keyToken, token);
+      await _prefs.setString(_keyUser, user);
+      await _prefs.setInt(_keyAt, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
+      // Not remembered, so the next launch tries again.
       debugPrint('Push token registration failed: $e');
     }
   }
@@ -198,14 +231,23 @@ class PushService {
   /// Stops pushes to this device for the current user. Call before signing
   /// out (the request needs the session) or when notifications are turned
   /// off in settings.
+  ///
+  /// Best effort and quick, so an offline sign-out isn't held up. If the
+  /// request fails the server keeps the token until the next account that
+  /// signs in on this device claims it (register_push_token reassigns it).
   Future<void> unregister() async {
     if (!_ready || _client.auth.currentUser == null) return;
+    final saved = _prefs.getString(_keyToken);
+    // Forget it first: whatever happens, the next sign-in registers again.
+    await _prefs.remove(_keyToken);
+    await _prefs.remove(_keyUser);
+    await _prefs.remove(_keyAt);
     try {
-      final token =
-          _registeredToken ?? await FirebaseMessaging.instance.getToken();
-      if (token == null) return;
-      await _client.rpc('unregister_push_token', params: {'p_token': token});
-      _registeredToken = null;
+      await () async {
+        final token = saved ?? await FirebaseMessaging.instance.getToken();
+        if (token == null) return;
+        await _client.rpc('unregister_push_token', params: {'p_token': token});
+      }().timeout(_unregisterTimeout);
     } catch (e) {
       debugPrint('Push token removal failed: $e');
     }

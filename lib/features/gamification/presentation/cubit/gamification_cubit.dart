@@ -15,7 +15,8 @@ class GamificationState extends Equatable {
   /// Points earned today per category.
   final Map<ScoreCategory, int> today;
 
-  /// Last load failed or timed out (any earlier [stats] is kept).
+  /// Last load failed or timed out with nothing cached (any earlier
+  /// [stats] is kept). Offline, loads return the last cached values.
   final bool failed;
 
   /// Latest level-up / new-badge result to celebrate; [awardId] changes
@@ -60,8 +61,14 @@ class GamificationCubit extends Cubit<GamificationState> {
   Timer? _debounce;
   bool _syncing = false;
   bool _syncAgain = false;
+  StreamSubscription<bool>? _online;
 
-  GamificationCubit(this._repository) : super(const GamificationState());
+  /// [onlineChanges] (ConnectivityService) sends days reported offline as
+  /// soon as the network is back.
+  GamificationCubit(this._repository, {Stream<bool>? onlineChanges})
+    : super(const GamificationState()) {
+    _online = onlineChanges?.where((online) => online).listen((_) => sync());
+  }
 
   Future<void> load() async {
     try {
@@ -118,6 +125,7 @@ class GamificationCubit extends Cubit<GamificationState> {
   @override
   Future<void> close() {
     _debounce?.cancel();
+    _online?.cancel();
     return super.close();
   }
 }

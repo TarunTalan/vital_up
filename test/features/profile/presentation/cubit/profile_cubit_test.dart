@@ -18,7 +18,7 @@ class FakeProfileRepository implements ProfileRepository {
   int updateProfileCallCount = 0;
 
   @override
-  Future<Either<Failure, ProfileEntity>> getProfile() async {
+  Future<Either<Failure, ProfileEntity>> getProfile({bool forceRefresh = false}) async {
     getProfileCallCount++;
     return getProfileResult ?? const Left(ServerFailure('Error fetching profile'));
   }

@@ -9,7 +9,8 @@ class ActivityHistoryRepositoryImpl implements ActivityHistoryRepository {
   final ActivityRepository activityRepository;
   final SharedPreferences sharedPreferences;
 
-  static const String _kAnnotationsKey = 'activity_annotations';
+  /// Workout notes and tags (backed up as `workout_notes`).
+  static const String annotationsKey = 'activity_annotations';
 
   ActivityHistoryRepositoryImpl({
     required this.activityRepository,
@@ -50,7 +51,7 @@ class ActivityHistoryRepositoryImpl implements ActivityHistoryRepository {
   }
 
   Map<String, SessionAnnotation> _getStoredAnnotations() {
-    final jsonString = sharedPreferences.getString(_kAnnotationsKey);
+    final jsonString = sharedPreferences.getString(annotationsKey);
     if (jsonString == null) return {};
 
     try {
@@ -82,6 +83,6 @@ class ActivityHistoryRepositoryImpl implements ActivityHistoryRepository {
         'updatedAt': value.updatedAt.toIso8601String(),
       },
     )));
-    await sharedPreferences.setString(_kAnnotationsKey, encoded);
+    await sharedPreferences.setString(annotationsKey, encoded);
   }
 }

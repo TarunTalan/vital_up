@@ -75,10 +75,13 @@ class HomeWidgetService {
           'water_goal_ml',
           _water.getDailyGoal(),
         );
-        // Score needs the network; keep the last values when offline.
+        // Cache-first: served from the copy the app last loaded unless it
+        // is stale; keeps the last values when offline with nothing cached.
         try {
-          final stats = await _game.getStats();
-          final points = await _game.getPointsForDay(DateTime.now());
+          final (stats, points) = await (
+            _game.getStats(),
+            _game.getPointsForDay(DateTime.now()),
+          ).wait;
           await HomeWidget.saveWidgetData<int>('streak', stats.streak);
           await HomeWidget.saveWidgetData<int>(
             'points_today',

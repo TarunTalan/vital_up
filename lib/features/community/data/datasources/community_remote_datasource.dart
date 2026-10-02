@@ -1,15 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 
 /// Community RPCs and membership rows. Local communities are only joined
 /// through `set_my_city`; RLS allows direct joins for interest ones only.
 class CommunityRemoteDataSource {
   final SupabaseClient _client;
+  final PendingWrites _pending;
 
-  CommunityRemoteDataSource(this._client);
+  CommunityRemoteDataSource(this._client, this._pending);
 
   String? get userId => _client.auth.currentUser?.id;
 
-  String _requireUser() {
+  String requireUser() {
     final id = userId;
     if (id == null) throw const AuthException('Not signed in');
     return id;
@@ -18,31 +20,53 @@ class CommunityRemoteDataSource {
   Future<List<Map<String, dynamic>>> fetchCommunities() async =>
       _rows(await _client.rpc('get_communities'));
 
+  /// Online only: the row has no upsert policy, so a replayed insert would
+  /// fail on the primary key.
   Future<void> join(String communityId) => _client
       .from('community_members')
-      .insert({'community_id': communityId, 'user_id': _requireUser()});
+      .insert({'community_id': communityId, 'user_id': requireUser()});
 
+  /// Online only, so it can't be replayed after a later [join].
   Future<void> leave(String communityId) => _client
       .from('community_members')
       .delete()
       .eq('community_id', communityId)
-      .eq('user_id', _requireUser());
+      .eq('user_id', requireUser());
 
   Future<Map<String, dynamic>?> fetchSettings() => _client
       .from('profiles')
       .select('username, city, country_code, leaderboard_visible')
-      .eq('id', _requireUser())
+      .eq('id', requireUser())
       .maybeSingle();
 
-  Future<void> setCity(String city, String countryCode) => _client.rpc(
-    'set_my_city',
-    params: {'p_city': city, 'p_country_code': countryCode},
-  );
+  /// Queued when offline (the latest city wins). True if it reached the
+  /// server.
+  Future<bool> setCity(String city, String countryCode) {
+    final user = requireUser();
+    return _pending.sendOrQueue(
+      _client,
+      PendingWrite.rpc(
+        'set_my_city',
+        params: {'p_city': city, 'p_country_code': countryCode},
+        userId: user,
+        key: 'rpc:set_my_city',
+      ),
+    );
+  }
 
-  Future<void> setLeaderboardVisible(bool visible) => _client
-      .from('profiles')
-      .update({'leaderboard_visible': visible})
-      .eq('id', _requireUser());
+  /// Queued when offline. True if it reached the server.
+  Future<bool> setLeaderboardVisible(bool visible) {
+    final user = requireUser();
+    return _pending.sendOrQueue(
+      _client,
+      PendingWrite.update(
+        'profiles',
+        values: {'leaderboard_visible': visible},
+        match: {'id': user},
+        userId: user,
+      ),
+    );
+  }
 
   Future<List<Map<String, dynamic>>> fetchLeaderboard({
     required String communityId,
@@ -70,13 +94,22 @@ class CommunityRemoteDataSource {
       await _client.rpc('send_friend_request', params: {'p_username': username})
           as String;
 
+  /// Online only: the server rejects a repeat (`request_not_found`).
   Future<void> respondToRequest(String requesterId, bool accept) => _client.rpc(
     'respond_friend_request',
     params: {'p_requester': requesterId, 'p_accept': accept},
   );
 
-  Future<void> removeFriend(String userId) =>
-      _client.rpc('remove_friend', params: {'p_user': userId});
+  /// Idempotent on the server, so queued when offline. True if it reached
+  /// the server.
+  Future<bool> removeFriend(String userId) => _pending.sendOrQueue(
+    _client,
+    PendingWrite.rpc(
+      'remove_friend',
+      params: {'p_user': userId},
+      userId: requireUser(),
+    ),
+  );
 
   /// The caller and every friend, ranked; small enough to fetch whole.
   Future<List<Map<String, dynamic>>> fetchFriendsLeaderboard({

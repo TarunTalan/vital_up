@@ -1,10 +1,18 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
+import 'package:vital_up/features/food_scanner/data/utils/food_cache_keys.dart';
 import 'package:vital_up/features/food_scanner/data/models/nutrition_response_parser.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
@@ -19,14 +27,29 @@ class NutritionRepositoryImpl implements NutritionRepository {
   final Logger logger;
   final SupabaseClient supabaseClient;
   final IsarService isarService;
+  final CacheStore cacheStore;
+  final ConnectivityService connectivity;
+  final PendingWrites pendingWrites;
 
   NutritionRepositoryImpl({
     required this.dio,
     required this.logger,
     required this.supabaseClient,
     required this.isarService,
+    required this.cacheStore,
+    required this.connectivity,
+    required this.pendingWrites,
   });
 
+  /// Nutrition facts and search results for a food don't change, so a
+  /// lookup is served from cache for a long time.
+  static const Duration _lookupMaxAge = Duration(days: 30);
+
+  /// Id prefix for [FoodItem]s built from the seeded offline foods, whose
+  /// nutrition is resolved locally.
+  static const String _offlineIdPrefix = 'offline:';
+
+  static const _offlineMessage = 'No internet connection. Please check your connection.';
 
   /// Supabase Edge Functions only auto-decode the response body into a
   /// [Map] when the function sets `Content-Type: application/json`.
@@ -39,16 +62,59 @@ class NutritionRepositoryImpl implements NutritionRepository {
     throw FormatException('Unexpected response type: ${raw.runtimeType}');
   }
 
-  @override
-  Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item) async {
-    if (supabaseClient.auth.currentSession?.accessToken == null) {
-      logger.e('getNutrition failed: No active session found.');
-      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+  /// Calls the `scan-food` edge function through [cacheStore]: a cached
+  /// response is reused for [_lookupMaxAge], concurrent identical lookups
+  /// share one request, and offline the last response is returned.
+  ///
+  /// Responses failing [worthCaching] (empty / placeholder answers) are
+  /// returned but not stored, so a later lookup tries the server again.
+  ///
+  /// Throws a [SocketException] straight away when there is no network and
+  /// nothing cached, rather than waiting for the request to fail, and
+  /// [_NoSession] when a request is needed but nobody is signed in.
+  Future<Map<String, dynamic>> _invokeCached(
+    String key,
+    Map<String, dynamic> body, {
+    required bool Function(Map<String, dynamic> data) worthCaching,
+    Duration timeout = const Duration(seconds: 25),
+  }) async {
+    if (!connectivity.hasNetwork) {
+      final cached = await cacheStore.read<Map<String, dynamic>>(key, decode: _asMap);
+      if (cached != null) return cached.value;
+      throw const SocketException('No network');
     }
     try {
-      final response = await supabaseClient.functions.invoke(
-        'scan-food',
-        body: {
+      return await cacheStore.fetch<Map<String, dynamic>>(
+        key,
+        maxAge: _lookupMaxAge,
+        decode: _asMap,
+        remote: () async {
+          if (supabaseClient.auth.currentSession?.accessToken == null) throw const _NoSession();
+          final response = await supabaseClient.functions.invoke('scan-food', body: body).timeout(timeout);
+          if (response.status != 200) throw _BadStatus(response.status);
+          final data = _decodeMap(response.data);
+          if (!worthCaching(data)) throw _Uncached(data);
+          return data;
+        },
+      );
+    } on _Uncached catch (e) {
+      return e.data;
+    }
+  }
+
+  static Map<String, dynamic> _asMap(Object? json) => Map<String, dynamic>.from(json as Map);
+
+  @override
+  Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item) async {
+    // Seeded offline foods carry their own facts; no request needed.
+    if (item.id.startsWith(_offlineIdPrefix)) {
+      final local = await _offlineNutrition(item);
+      if (local != null) return Right(local);
+    }
+    try {
+      final data = await _invokeCached(
+        FoodCacheKeys.nutrition(item.id, item.name, item.servingDescription),
+        {
           'get_nutrition': true,
           'fdc_id': item.id,
           // Lets the server fall back to a name lookup / estimate when the id
@@ -56,17 +122,68 @@ class NutritionRepositoryImpl implements NutritionRepository {
           'food_name': item.name,
           'serving_description': item.servingDescription,
         },
-      ).timeout(const Duration(seconds: 25));
-
-      if (response.status == 200) {
-        return Right(parseNutritionResponse(_decodeMap(response.data), item));
-      } else {
-        return const Left(ServerFailure('Failed to retrieve nutrition information.'));
-      }
+        // All zeros means "not found, estimate offline"; worth asking again later.
+        worthCaching: (data) => const ['calories', 'protein_g', 'carbs_g', 'fat_g'].any((k) => (data[k] as num? ?? 0) != 0),
+      );
+      return Right(parseNutritionResponse(data, item));
+    } on _NoSession {
+      logger.e('getNutrition failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    } on _BadStatus {
+      return const Left(ServerFailure('Failed to retrieve nutrition information.'));
     } catch (e) {
+      if (isOfflineError(e)) {
+        final local = await _offlineNutrition(item);
+        if (local != null) {
+          logger.i('getNutrition offline: using seeded offline food for "${item.name}"');
+          return Right(local);
+        }
+        return const Left(NetworkFailure(_offlineMessage));
+      }
       logger.e('Unexpected error in getNutrition: $e');
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
+  }
+
+  /// Nutrition for [item] from the seeded offline foods (exact name match),
+  /// scaled from the food's serving to [item]'s quantity where the units
+  /// line up. Null when there is no match.
+  Future<NutritionInfo?> _offlineNutrition(FoodItem item) async {
+    final name = item.id.startsWith(_offlineIdPrefix) ? item.id.substring(_offlineIdPrefix.length) : item.name;
+    final wanted = normalizeFoodQuery(name);
+    if (wanted.isEmpty) return null;
+    final matches = await searchOfflineFoods(wanted);
+    final food = matches.where((f) => normalizeFoodQuery(f.name) == wanted).firstOrNull;
+    if (food == null) return null;
+
+    final base = NutritionInfo(
+      calories: food.calories,
+      proteinG: food.proteinG,
+      carbsG: food.carbsG,
+      fatG: food.fatG,
+      fiberG: food.fiberG,
+      sugarG: food.sugarG,
+      sodiumMg: food.sodiumMg,
+      per: item,
+    );
+    final factor = servingScale(food.servingSize, item);
+    return factor == 1.0 ? base : base.scaledBy(factor).copyWith(per: item);
+  }
+
+  /// How many of [serving] (e.g. "1 bowl (150g)", "2 pieces (60g)") make up
+  /// [item]'s quantity: by weight for gram quantities, by count otherwise.
+  /// 1.0 when it can't tell.
+  @visibleForTesting
+  static double servingScale(String serving, FoodItem item) {
+    if (item.quantity <= 0) return 1.0;
+    final unit = item.unit.toLowerCase();
+    if (unit == 'g' || unit == 'ml') {
+      final grams = RegExp(r'(\d+(?:\.\d+)?)\s*(?:g|ml)\b').firstMatch(serving.toLowerCase());
+      final amount = double.tryParse(grams?.group(1) ?? '');
+      return amount == null || amount <= 0 ? 1.0 : item.quantity / amount;
+    }
+    final count = double.tryParse(RegExp(r'^\s*(\d+(?:\.\d+)?)').firstMatch(serving)?.group(1) ?? '');
+    return count == null || count <= 0 ? item.quantity : item.quantity / count;
   }
 
   @override
@@ -124,6 +241,11 @@ class NutritionRepositoryImpl implements NutritionRepository {
         }
       } catch (cacheErr) {
         logger.e('Failed to lookup barcode in local Isar cache: $cacheErr');
+      }
+
+      // Not cached and no network: don't wait on two requests to time out.
+      if (!connectivity.hasNetwork) {
+        return const Left(NetworkFailure(_offlineMessage));
       }
 
       // 2. Query Open Food Facts directly from client (Indian mirror preferred)
@@ -240,6 +362,11 @@ class NutritionRepositoryImpl implements NutritionRepository {
         }
       } catch (e) {
         logger.w('Open Food Facts lookup failed or timed out: $e');
+        // Unreachable network: the edge function fallback would fail the same way.
+        if (isOfflineError(e)) {
+          connectivity.reportFailure();
+          return const Left(NetworkFailure(_offlineMessage));
+        }
       }
 
       if (offSuccess && offNutrition != null) {
@@ -260,7 +387,7 @@ class NutritionRepositoryImpl implements NutritionRepository {
         body: {
           'barcode': cleanBarcode,
         },
-      );
+      ).timeout(const Duration(seconds: 25));
 
       final decoded = _decodeMap(response.data);
       if (response.status == 200 && decoded.containsKey('productName')) {
@@ -308,12 +435,16 @@ class NutritionRepositoryImpl implements NutritionRepository {
       if (e.status == 404) {
         return const Left(BarcodeNotFoundFailure());
       }
+      if (isOfflineError(e)) {
+        connectivity.reportFailure();
+        return const Left(NetworkFailure(_offlineMessage));
+      }
       return const Left(ServerFailure('Failed to lookup barcode. Please try again.'));
     } catch (e) {
       logger.e('Unexpected error in lookupBarcode: $e');
-      final errorMessage = e.toString();
-      if (errorMessage.contains('SocketException') || errorMessage.contains('Failed host lookup')) {
-        return const Left(NetworkFailure('No internet connection. Please check your connection.'));
+      if (isOfflineError(e)) {
+        connectivity.reportFailure();
+        return const Left(NetworkFailure(_offlineMessage));
       }
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
@@ -340,7 +471,14 @@ class NutritionRepositoryImpl implements NutritionRepository {
         nutrition,
       );
 
-      // 2. Cache remotely in Supabase proprietary_products database
+      // 2. Cache remotely in Supabase proprietary_products database. The
+      // local copy above is what lookups use, so the remote write can wait
+      // in the outbox when offline.
+      final userId = supabaseClient.auth.currentUser?.id;
+      if (userId == null) {
+        logger.w('Not signed in; saved barcode "$cleanBarcode" locally only.');
+        return const Right(null);
+      }
       logger.i('Saving barcode "$cleanBarcode" to Supabase proprietary_products...');
       final payload = {
         'barcode': cleanBarcode,
@@ -357,11 +495,29 @@ class NutritionRepositoryImpl implements NutritionRepository {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      await supabaseClient.from('proprietary_products').upsert(payload);
-      logger.i('Successfully saved product "$productName" to remote proprietary DB.');
+      try {
+        final sent = await pendingWrites.sendOrQueue(
+          supabaseClient,
+          PendingWrite.upsert(
+            'proprietary_products',
+            values: payload,
+            userId: userId,
+            // One queued write per barcode; a re-edit offline replaces it.
+            key: 'proprietary_products:$cleanBarcode',
+          ),
+        );
+        logger.i(sent
+            ? 'Successfully saved product "$productName" to remote proprietary DB.'
+            : 'Offline: queued product "$productName" for the remote proprietary DB.');
+      } catch (e) {
+        // Rejected by the server; the local copy still serves this device.
+        logger.e('Remote save of barcode "$cleanBarcode" failed: $e');
+      }
 
-      // 3. Contribute to Open Food Facts in the background
-      _contributeToOpenFoodFacts(cleanBarcode, productName, nutrition);
+      // 3. Contribute to Open Food Facts in the background (best effort, online only)
+      if (connectivity.isOnline) {
+        unawaited(_contributeToOpenFoodFacts(cleanBarcode, productName, nutrition));
+      }
 
       return const Right(null);
     } catch (e) {
@@ -399,7 +555,7 @@ class NutritionRepositoryImpl implements NutritionRepository {
     }
   }
 
-  void _contributeToOpenFoodFacts(
+  Future<void> _contributeToOpenFoodFacts(
     String barcode,
     String productName,
     NutritionInfo nutrition,
@@ -434,9 +590,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
       await dio.get(
         'https://in.openfoodfacts.org/cgi/product_jqm2.pl',
         queryParameters: params,
+        // Fire-and-forget: give up quickly rather than hold a connection.
         options: Options(
-          sendTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 8),
           headers: {
             'User-Agent': 'VitalUp - Android/iOS - Version 1.0.0',
           },
@@ -444,51 +601,65 @@ class NutritionRepositoryImpl implements NutritionRepository {
       );
       logger.i('Successfully sent contribution request to Open Food Facts write API.');
     } catch (e) {
-      logger.e('Failed to contribute to Open Food Facts: $e');
+      logger.w('Failed to contribute to Open Food Facts: $e');
     }
   }
 
   @override
   Future<Either<Failure, List<FoodItem>>> searchByName(String query) async {
-    if (supabaseClient.auth.currentSession?.accessToken == null) {
-      logger.e('searchByName failed: No active session found.');
-      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    if (normalizeFoodQuery(query).isEmpty) {
+      return const Left(ServerFailure('No results found.'));
     }
     try {
-      final response = await supabaseClient.functions.invoke(
-        'scan-food',
-        body: {
-          'search_query': query,
-        },
+      final data = await _invokeCached(
+        FoodCacheKeys.search(query),
+        {'search_query': normalizeFoodQuery(query)},
+        // An empty answer may be a provider hiccup; don't remember it.
+        worthCaching: (data) => (data['items'] as List<dynamic>?)?.isNotEmpty ?? false,
       );
+      final itemsData = data['items'] as List<dynamic>?;
 
-      if (response.status == 200) {
-        final data = _decodeMap(response.data);
-        final itemsData = data['items'] as List<dynamic>?;
-
-        if (itemsData == null || itemsData.isEmpty) {
-          return const Left(ServerFailure('No results found.'));
-        }
-
-        final foodItems = itemsData
-            .map((item) {
-          final dto = item as Map<String, dynamic>;
-          return FoodItem(
-            id: dto['fdc_id']?.toString() ?? dto['id']?.toString() ?? '',
-            name: dto['name'] as String? ?? '',
-            confidenceScore: 1.0,
-            servingDescription: dto['serving_description'] as String? ?? '100g',
-            quantity: 1.0,
-            unit: 'serving',
-          );
-        })
-            .toList();
-
-        return Right(foodItems);
-      } else {
-        return const Left(ServerFailure('Failed to search food. Please try again.'));
+      if (itemsData == null || itemsData.isEmpty) {
+        return const Left(ServerFailure('No results found.'));
       }
+
+      final foodItems = itemsData
+          .map((item) {
+        final dto = item as Map<String, dynamic>;
+        return FoodItem(
+          id: dto['fdc_id']?.toString() ?? dto['id']?.toString() ?? '',
+          name: dto['name'] as String? ?? '',
+          confidenceScore: 1.0,
+          servingDescription: dto['serving_description'] as String? ?? '100g',
+          quantity: 1.0,
+          unit: 'serving',
+        );
+      })
+          .toList();
+
+      return Right(foodItems);
+    } on _NoSession {
+      logger.e('searchByName failed: No active session found.');
+      return const Left(ServerFailure('User is not authenticated. Please log in.'));
+    } on _BadStatus {
+      return const Left(ServerFailure('Failed to search food. Please try again.'));
     } catch (e) {
+      if (isOfflineError(e)) {
+        // Offline and never searched before: answer from the seeded foods.
+        final offline = await searchOfflineFoods(query);
+        if (offline.isEmpty) return const Left(NetworkFailure(_offlineMessage));
+        return Right([
+          for (final f in offline)
+            FoodItem(
+              id: '$_offlineIdPrefix${f.name}',
+              name: f.name,
+              confidenceScore: 1.0,
+              servingDescription: f.servingSize,
+              quantity: 1.0,
+              unit: 'serving',
+            ),
+        ]);
+      }
       logger.e('Unexpected error in searchByName: $e');
       return const Left(ServerFailure('An unexpected error occurred.'));
     }
@@ -521,4 +692,24 @@ class NutritionRepositoryImpl implements NutritionRepository {
       return [];
     }
   }
+}
+
+/// The edge function answered with a non-200 status.
+class _BadStatus implements Exception {
+  final int status;
+  const _BadStatus(this.status);
+
+  @override
+  String toString() => 'scan-food responded $status';
+}
+
+/// A request was needed but there is no signed-in session.
+class _NoSession implements Exception {
+  const _NoSession();
+}
+
+/// A response to return without caching (see `_invokeCached`).
+class _Uncached implements Exception {
+  final Map<String, dynamic> data;
+  const _Uncached(this.data);
 }

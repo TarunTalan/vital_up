@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/error/exceptions.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
+import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   final SupabaseClient supabaseClient;
+  final PendingWrites pendingWrites;
   final Logger logger;
 
   /// Public Supabase Storage bucket for profile photos; each user may only
@@ -25,6 +29,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
 
   ProfileRemoteDataSourceImpl({
     required this.supabaseClient,
+    required this.pendingWrites,
     required this.logger,
   });
 
@@ -37,22 +42,24 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       }
       final userId = user.id;
 
-      // 1. Fetch profiles table details
-      final profileRes = await supabaseClient
-          .from('profiles')
-          .select()
-          .eq('id', userId)
-          .single();
+      // Only the columns the profile uses; both tables in parallel.
+      final results = await Future.wait([
+        supabaseClient
+            .from('profiles')
+            .select('username, email')
+            .eq('id', userId)
+            .single(),
+        supabaseClient
+            .from('user_health_data')
+            .select(_healthColumns)
+            .eq('id', userId)
+            .maybeSingle(),
+      ]);
+      final profileRes = results[0]!;
+      final healthRes = results[1];
 
       final username = profileRes['username'] as String? ?? '';
       final email = profileRes['email'] as String? ?? user.email ?? '';
-
-      // 2. Fetch user_health_data table details
-      final healthRes = await supabaseClient
-          .from('user_health_data')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
 
       final String fullName = healthRes?['full_name'] as String? ??
           user.userMetadata?['full_name'] ??
@@ -87,24 +94,46 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         photoUrl: photoUrl.isEmpty ? null : photoUrl,
         dailyCalorieGoal: (healthRes?['calorie_goal'] as num?)?.toInt(),
       );
+    } on ServerException {
+      rethrow;
     } catch (e) {
       logger.e('Error fetching profile from Supabase: $e');
+      // Kept as-is so the cache can tell "offline" from a real failure.
+      if (isOfflineError(e)) rethrow;
       throw ServerException(message: e.toString());
     }
   }
 
+  static const _healthColumns = 'full_name, dob, gender, weight, weight_unit, '
+      'height, height_unit, oxygen_level, health_conditions, allergies, '
+      'medicines, smokes, blood_pressure_top, blood_pressure_bottom, bpm, '
+      'activity, sleep, calorie_goal';
+
   @override
-  Future<void> updateProfile(ProfileEntity profile) async {
+  Future<bool> updateProfile(
+    ProfileEntity profile, {
+    ProfileEntity? previous,
+  }) async {
     try {
       final user = supabaseClient.auth.currentUser;
       if (user == null) {
         throw const ServerException(message: 'User is not authenticated');
       }
+      var sent = true;
 
-      // 1. Update profiles table
-      await supabaseClient.from('profiles').update({
-        'username': profile.username,
-      }).eq('id', user.id);
+      // 1. Update profiles table (skipped when the username is unchanged).
+      if (previous == null || previous.username != profile.username) {
+        sent &= await pendingWrites.sendOrQueue(
+          supabaseClient,
+          PendingWrite.update(
+            'profiles',
+            values: {'username': profile.username},
+            match: {'id': user.id},
+            userId: user.id,
+            key: ProfileCache.profilesWriteKey(user.id),
+          ),
+        );
+      }
 
       // 2. Update user_health_data table
       final payload = {
@@ -129,23 +158,36 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         'onboarding_completed': true,
       };
 
-      await supabaseClient.from('user_health_data').upsert(payload);
-
-      // 3. Update auth metadata (such as full_name and avatar_url)
-      final metaUpdates = <String, dynamic>{
-        'full_name': profile.fullName,
-      };
-      if (profile.photoUrl != null) {
-        metaUpdates['avatar_url'] = profile.photoUrl;
-      }
-
-      await supabaseClient.auth.updateUser(
-        UserAttributes(
-          data: metaUpdates,
+      sent &= await pendingWrites.sendOrQueue(
+        supabaseClient,
+        PendingWrite.upsert(
+          'user_health_data',
+          values: payload,
+          userId: user.id,
+          key: ProfileCache.healthWriteKey(user.id),
         ),
       );
 
-      logger.i('Successfully updated profile for user: ${user.id}');
+      // 3. Auth metadata mirrors the name (the profile reads
+      // user_health_data first). It can't be queued, so it's best effort.
+      final nameChanged =
+          previous == null || previous.fullName != profile.fullName;
+      if (nameChanged && sent) {
+        try {
+          await supabaseClient.auth.updateUser(
+            UserAttributes(data: {'full_name': profile.fullName}),
+          );
+        } catch (e) {
+          logger.w('Could not sync name to auth metadata: $e');
+        }
+      }
+
+      logger.i(sent
+          ? 'Successfully updated profile for user: ${user.id}'
+          : 'Profile saved offline for user: ${user.id}; queued for sync');
+      return sent;
+    } on ServerException {
+      rethrow;
     } catch (e) {
       logger.e('Error updating profile in Supabase: $e');
       throw ServerException(

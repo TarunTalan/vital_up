@@ -2,10 +2,13 @@
 # VitalUp Production ProGuard / R8 Rules
 # ==============================================================================
 
-# 1. Google ML Kit (Barcode & Text Recognition OCR)
+# 1. Google ML Kit & Google Play Services Auth (Google Sign-In)
 -keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**
 -keep class com.google.android.gms.vision.** { *; }
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-dontwarn com.google.android.gms.**
 
 # 2. Isar Community Database & Native Libs
 -keep class dev.isar.** { *; }

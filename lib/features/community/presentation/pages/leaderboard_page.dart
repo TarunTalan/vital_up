@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -59,11 +60,13 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
           memberCount: community.memberCount + (joining ? 1 : -1),
         ),
       );
-    } catch (_) {
+    } catch (e) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            "Couldn't ${joining ? 'join' : 'leave'} ${community.name}.",
+            isOfflineError(e)
+                ? CommunityRepository.offlineMessage
+                : "Couldn't ${joining ? 'join' : 'leave'} ${community.name}.",
           ),
         ),
       );

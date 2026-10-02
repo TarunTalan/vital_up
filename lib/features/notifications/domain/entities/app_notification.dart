@@ -79,18 +79,26 @@ class AppNotification extends Equatable {
   /// Optional in-app route name an announcement links to.
   String? get route => data['route'] as String?;
 
-  AppNotification markedRead() => isRead
-      ? this
-      : AppNotification(
-          id: id,
-          type: type,
-          title: title,
-          body: body,
-          actorId: actorId,
-          data: data,
-          createdAt: createdAt,
-          readAt: DateTime.now(),
-        );
+  AppNotification markedRead() => isRead ? this : _copy(readAt: DateTime.now());
+
+  /// A friend request after it was accepted (what the server trigger does:
+  /// no more buttons, and read).
+  AppNotification acceptedRequest() => _copy(
+    data: {...data, 'status': 'accepted'},
+    readAt: readAt ?? DateTime.now(),
+  );
+
+  AppNotification _copy({Map<String, dynamic>? data, DateTime? readAt}) =>
+      AppNotification(
+        id: id,
+        type: type,
+        title: title,
+        body: body,
+        actorId: actorId,
+        data: data ?? this.data,
+        createdAt: createdAt,
+        readAt: readAt ?? this.readAt,
+      );
 
   @override
   List<Object?> get props => [

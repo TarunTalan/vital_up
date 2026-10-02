@@ -16,5 +16,7 @@ void main() {
   test('unknown setting falls back to kg', () {
     expect(WeightUnit.fromCode(null), WeightUnit.kg);
     expect(WeightUnit.fromCode('lbs'), WeightUnit.lbs);
+    // Onboarding stores pounds as 'lb'.
+    expect(WeightUnit.fromCode('lb'), WeightUnit.lbs);
   });
 }

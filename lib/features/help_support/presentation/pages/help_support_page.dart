@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -8,10 +9,11 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import '../../data/datasources/faq_data.dart';
 import '../../domain/entities/faq_item.dart';
 import '../../domain/entities/support_ticket.dart';
-import '../widgets/contact_support_sheet.dart';
+import 'contact_support_page.dart';
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -49,552 +51,515 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     }).toList();
   }
 
+  Future<void> _sendDirectEmail({String subject = 'Support Inquiry - VitalUp'}) async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: 'support@vitalup.app',
+      queryParameters: subject.isNotEmpty ? {'subject': subject} : null,
+    );
+
+    try {
+      final launched = await launchUrl(
+        emailUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        await Clipboard.setData(const ClipboardData(text: 'support@vitalup.app'));
+        if (mounted) {
+          showSuccessSnackBar(
+            context,
+            'Support email copied to clipboard: support@vitalup.app',
+          );
+        }
+      }
+    } catch (e) {
+      await Clipboard.setData(const ClipboardData(text: 'support@vitalup.app'));
+      if (mounted) {
+        showSuccessSnackBar(
+          context,
+          'Support email copied to clipboard: support@vitalup.app',
+        );
+      }
+    }
+  }
+
+  void _contactSupport({String subject = ''}) {
+    openContactSupport(
+      context,
+      initialCategory: SupportCategory.general,
+      initialSubject: subject,
+    );
+  }
+
+  void _openAssistant() => context.pushNamed('support-chat');
+
+  void _toggleFaq(FaqItem faq) {
+    setState(() {
+      if (!_expandedFaqIds.remove(faq.id)) _expandedFaqIds.add(faq.id);
+    });
+    HapticFeedback.selectionClick();
+  }
+
+  void _vote(FaqItem faq, bool helpful) {
+    setState(() => _helpfulVotes[faq.id] = helpful);
+    HapticFeedback.lightImpact();
+    if (helpful) {
+      showSuccessSnackBar(context, 'Thanks for your feedback! 👍');
+    } else {
+      _contactSupport(subject: 'Help Article Feedback: ${faq.question}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
     final faqs = _filteredFaqs;
 
     return AppScaffold(
-      header: AppPageHeader(
-        title: 'Help & Support',
-        action: IconButton(
-          tooltip: 'Email Support Team',
-          icon: const Icon(Icons.mail_outline_rounded),
-          onPressed: () {
-            showContactSupportSheet(
-              context,
-              initialCategory: SupportCategory.general,
-            );
-          },
-        ),
+      header: const AppPageHeader(title: 'Help & Support'),
+      bodyPadding: EdgeInsets.fromLTRB(
+        context.gutter,
+        AppDimens.sectionGap,
+        context.gutter,
+        AppDimens.sectionGap + context.safePadding.bottom,
       ),
-      padBody: false,
-      scrollable: true,
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(
-          context.gutter,
-          AppDimens.sectionGap,
-          context.gutter,
-          AppDimens.sectionGap + context.safePadding.bottom,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Search Bar
-            _buildSearchBar(context),
-            const SizedBox(height: AppDimens.space16),
-
-            // 2. Quick Action Cards (Chatbot + Contact Support)
-            _buildSupportActionCards(context),
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // 3. Category Filter Chips
-            AppCaption('TOPICS & CATEGORIES'),
-            const SizedBox(height: AppDimens.space8),
-            _buildCategoryChips(),
-            const SizedBox(height: AppDimens.space16),
-
-            // 4. FAQ Accordion List
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                AppCaption('FREQUENTLY ASKED QUESTIONS'),
-                Text(
-                  '${faqs.length} ${faqs.length == 1 ? 'article' : 'articles'}',
-                  style: context.text.labelSmall?.copyWith(color: v.grayText),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimens.space8),
-
-            if (faqs.isEmpty)
-              _buildEmptySearchResults(context)
-            else
-              ...faqs.map((faq) => _buildFaqCard(context, faq)),
-
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // 5. Still need help footer
-            _buildStillNeedHelpCard(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context) {
-    final v = context.vColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: v.glassFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(color: v.glassBorder ?? AppColors.glassBorder),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: AppDimens.space12),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (_) => setState(() {}),
-        style: context.text.bodyMedium?.copyWith(
-          color: context.colors.onSurface,
-        ),
-        decoration: InputDecoration(
-          icon: Icon(Icons.search_rounded, color: v.grayText),
-          hintText: 'Search FAQs, topics, or errors...',
-          hintStyle: context.text.bodyMedium?.copyWith(color: v.grayText),
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: AppDimens.space12),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: AppDimens.iconSm),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                )
-              : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSupportActionCards(BuildContext context) {
-    final v = context.vColors;
-
-    return Row(
-      children: [
-        // AI Assistant Card
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-              onTap: () => context.pushNamed('support-chat'),
-              child: Container(
-                padding: const EdgeInsets.all(AppDimens.space16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary.withAlpha(35),
-                      AppColors.primary.withAlpha(15),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                  border: Border.all(
-                    color: AppColors.primary.withAlpha(70),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppDimens.space8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                      ),
-                      child: const Icon(
-                        Icons.smart_toy_rounded,
-                        color: AppColors.buttonText,
-                        size: AppDimens.iconMd,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space10),
-                    Text(
-                      'Vital Assistant',
-                      style: context.text.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space2),
-                    Text(
-                      'Chat for instant AI guidance & diagnostics',
-                      style: context.text.labelSmall?.copyWith(
-                        color: v.grayText,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: AppDimens.space12),
-
-        // Email Support Card
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-              onTap: () {
-                showContactSupportSheet(
-                  context,
-                  initialCategory: SupportCategory.general,
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(AppDimens.space16),
-                decoration: BoxDecoration(
-                  color: v.glassFill,
-                  borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                  border: Border.all(
-                    color: v.glassBorder ?? AppColors.glassBorder,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppDimens.space8),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withAlpha(40),
-                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                      ),
-                      child: const Icon(
-                        Icons.mail_outline_rounded,
-                        color: AppColors.primary,
-                        size: AppDimens.iconMd,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space10),
-                    Text(
-                      'Contact Team',
-                      style: context.text.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space2),
-                    Text(
-                      'Submit ticket with category & description',
-                      style: context.text.labelSmall?.copyWith(
-                        color: v.grayText,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryChips() {
-    final v = context.vColors;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: FaqCategory.values.map((cat) {
-          final isSelected = _selectedCategory == cat;
-          return Padding(
-            padding: const EdgeInsets.only(right: AppDimens.space8),
-            child: ChoiceChip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(cat.icon),
-                  const SizedBox(width: AppDimens.space4),
-                  Text(cat.label),
-                ],
-              ),
-              selected: isSelected,
-              selectedColor: AppColors.primary.withAlpha(45),
-              backgroundColor: v.glassFill,
-              side: BorderSide(
-                color: isSelected
-                    ? AppColors.primary
-                    : (v.glassBorder ?? Colors.transparent),
-              ),
-              labelStyle: context.text.bodySmall?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppColors.primary : context.colors.onSurface,
-              ),
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => _selectedCategory = cat);
-                  HapticFeedback.selectionClick();
-                }
-              },
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildFaqCard(BuildContext context, FaqItem faq) {
-    final v = context.vColors;
-    final isExpanded = _expandedFaqIds.contains(faq.id);
-    final userVote = _helpfulVotes[faq.id];
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.space10),
-      child: AppCard(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppDimens.space16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InkWell(
-              borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-              onTap: () {
-                setState(() {
-                  if (isExpanded) {
-                    _expandedFaqIds.remove(faq.id);
-                  } else {
-                    _expandedFaqIds.add(faq.id);
-                  }
-                });
-                HapticFeedback.selectionClick();
-              },
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space6,
-                      vertical: AppDimens.space2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(20),
-                      borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                    ),
-                    child: Text(
-                      faq.category.icon,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimens.space10),
-                  Expanded(
-                    child: Text(
-                      faq.question,
-                      style: context.text.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isExpanded ? AppColors.primary : null,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimens.space8),
-                  Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    color: isExpanded ? AppColors.primary : v.grayText,
-                  ),
-                ],
-              ),
-            ),
-            if (isExpanded) ...[
-              const SizedBox(height: AppDimens.space12),
-              Divider(
-                color: v.divider,
-                height: AppDimens.borderThin,
-                thickness: AppDimens.borderThin,
-              ),
-              const SizedBox(height: AppDimens.space12),
-              Text(
-                faq.answer,
-                style: context.text.bodyMedium?.copyWith(
-                  color: context.colors.onSurface,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: AppDimens.space12),
-
-              // Action button & Helpful buttons row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (faq.actionLabel != null && faq.actionRoute != null)
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space10,
-                          vertical: AppDimens.space4,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: AppColors.primary.withAlpha(25),
-                        foregroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                        ),
-                      ),
-                      icon: const Icon(
-                        Icons.open_in_new_rounded,
-                        size: AppDimens.iconSm,
-                      ),
-                      label: Text(
-                        faq.actionLabel!,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        context.pushNamed(faq.actionRoute!);
-                      },
-                    )
-                  else
-                    const SizedBox.shrink(),
-
-                  // Thumbs up / down feedback
-                  Row(
-                    children: [
-                      Text(
-                        'Helpful?',
-                        style: context.text.labelSmall?.copyWith(color: v.grayText),
-                      ),
-                      const SizedBox(width: AppDimens.space6),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 18,
-                        icon: Icon(
-                          userVote == true
-                              ? Icons.thumb_up_alt_rounded
-                              : Icons.thumb_up_alt_outlined,
-                          color: userVote == true
-                              ? AppColors.primary
-                              : v.grayText,
-                        ),
-                        onPressed: () {
-                          setState(() => _helpfulVotes[faq.id] = true);
-                          HapticFeedback.lightImpact();
-                          showSuccessSnackBar(context, 'Thanks for your feedback! 👍');
-                        },
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 18,
-                        icon: Icon(
-                          userVote == false
-                              ? Icons.thumb_down_alt_rounded
-                              : Icons.thumb_down_alt_outlined,
-                          color: userVote == false
-                              ? AppColors.error
-                              : v.grayText,
-                        ),
-                        onPressed: () {
-                          setState(() => _helpfulVotes[faq.id] = false);
-                          HapticFeedback.lightImpact();
-                          showContactSupportSheet(
-                            context,
-                            initialCategory: SupportCategory.general,
-                            initialSubject: 'Help Article Feedback: ${faq.question}',
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptySearchResults(BuildContext context) {
-    final v = context.vColors;
-    return AppCard(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space24),
-      child: Column(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('🔍', style: TextStyle(fontSize: 40)),
-          const SizedBox(height: AppDimens.space12),
-          Text(
-            'No matching articles found',
-            style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: AppDimens.space6),
-          Text(
-            'Try different keywords or chat directly with Vital Assistant.',
-            textAlign: TextAlign.center,
-            style: context.text.bodySmall?.copyWith(color: v.grayText),
+          AppTextField(
+            controller: _searchController,
+            hint: 'Search FAQs, topics, or errors...',
+            prefixIcon: Icons.search_rounded,
+            textInputAction: TextInputAction.search,
+            onChanged: (_) => setState(() {}),
+            suffix: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: AppDimens.iconSm,
+                      color: v.grayText,
+                    ),
+                    onPressed: () => setState(_searchController.clear),
+                  ),
           ),
           const SizedBox(height: AppDimens.space16),
-          AppPrimaryButton(
-            label: 'Ask Vital Assistant',
-            leadingIcon: const Icon(Icons.smart_toy_rounded, size: AppDimens.iconSm),
-            onTap: () => context.pushNamed('support-chat'),
+          _SupportActions(
+            onAssistant: _openAssistant,
+            onContact: _contactSupport,
+          ),
+          const SizedBox(height: AppDimens.sectionGap),
+          const AppCaption('Topics & categories'),
+          const SizedBox(height: AppDimens.space8),
+          _CategoryChips(
+            selected: _selectedCategory,
+            onSelected: (cat) {
+              setState(() => _selectedCategory = cat);
+              HapticFeedback.selectionClick();
+            },
+          ),
+          const SizedBox(height: AppDimens.sectionGap),
+          Row(
+            children: [
+              const Expanded(child: AppCaption('Frequently asked questions')),
+              const SizedBox(width: AppDimens.space8),
+              Text(
+                '${faqs.length} ${faqs.length == 1 ? 'article' : 'articles'}',
+                style: context.text.labelSmall?.copyWith(color: v.grayText),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space8),
+          if (faqs.isEmpty)
+            _EmptySearchResults(onAssistant: _openAssistant)
+          else
+            for (final faq in faqs)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppDimens.space8),
+                child: _FaqCard(
+                  faq: faq,
+                  expanded: _expandedFaqIds.contains(faq.id),
+                  vote: _helpfulVotes[faq.id],
+                  onToggle: () => _toggleFaq(faq),
+                  onVote: (helpful) => _vote(faq, helpful),
+                  onAction: faq.actionRoute == null
+                      ? null
+                      : () => context.pushNamed(faq.actionRoute!),
+                ),
+              ),
+          const SizedBox(height: AppDimens.sectionGap),
+          _StillNeedHelpCard(onEmail: _sendDirectEmail),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Vital Assistant" + "Contact Team" entry cards — side by side, stacked on
+/// very narrow screens so the copy never gets squeezed.
+class _SupportActions extends StatelessWidget {
+  final VoidCallback onAssistant;
+  final VoidCallback onContact;
+
+  const _SupportActions({required this.onAssistant, required this.onContact});
+
+  @override
+  Widget build(BuildContext context) {
+    final assistant = _ActionCard(
+      icon: Icons.smart_toy_rounded,
+      title: 'Vital Assistant',
+      subtitle: 'Chat for instant AI guidance & diagnostics',
+      highlighted: true,
+      onTap: onAssistant,
+    );
+    final contact = _ActionCard(
+      icon: Icons.mail_outline_rounded,
+      title: 'Contact Team',
+      subtitle: 'Submit a ticket with category & description',
+      onTap: onContact,
+    );
+
+    if (context.isSmallPhone) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          assistant,
+          const SizedBox(height: AppDimens.cardGap),
+          contact,
+        ],
+      );
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: assistant),
+          const SizedBox(width: AppDimens.cardGap),
+          Expanded(child: contact),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool highlighted;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      highlighted: highlighted,
+      borderColor: highlighted ? context.vColors.primaryBorder : null,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconBadge(icon: Icon(icon)),
+          const SizedBox(height: AppDimens.space12),
+          Text(title, style: context.text.titleSmall),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            subtitle,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStillNeedHelpCard(BuildContext context) {
-    final v = context.vColors;
-    return Container(
-      padding: const EdgeInsets.all(AppDimens.space16),
-      decoration: BoxDecoration(
-        color: v.glassFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(color: v.glassBorder ?? AppColors.glassBorder),
-      ),
+class _CategoryChips extends StatelessWidget {
+  final FaqCategory selected;
+  final ValueChanged<FaqCategory> onSelected;
+
+  const _CategoryChips({required this.selected, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(AppDimens.space10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(25),
-              shape: BoxShape.circle,
+          for (final cat in FaqCategory.values) ...[
+            if (cat != FaqCategory.values.first)
+              const SizedBox(width: AppDimens.space8),
+            ChoiceChip(
+              label: Text('${cat.icon}  ${cat.label}'),
+              selected: cat == selected,
+              showCheckmark: false,
+              onSelected: (_) => onSelected(cat),
             ),
-            child: const Icon(
-              Icons.support_agent_rounded,
-              color: AppColors.primary,
-              size: AppDimens.iconLg,
-            ),
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Still have questions?',
-                  style: context.text.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FaqCard extends StatelessWidget {
+  final FaqItem faq;
+  final bool expanded;
+  final bool? vote;
+  final VoidCallback onToggle;
+  final ValueChanged<bool> onVote;
+  final VoidCallback? onAction;
+
+  const _FaqCard({
+    required this.faq,
+    required this.expanded,
+    required this.vote,
+    required this.onToggle,
+    required this.onVote,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final primary = context.colors.primary;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: AppDimens.cardPadding,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(faq.category.icon, style: context.text.titleSmall),
+                  const SizedBox(width: AppDimens.space12),
+                  Expanded(
+                    child: Text(
+                      faq.question,
+                      style: context.text.titleSmall?.copyWith(
+                        color: expanded ? primary : context.colors.onSurface,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppDimens.space2),
-                Text(
-                  'Our dedicated support team is here to assist you.',
-                  style: context.text.labelSmall?.copyWith(color: v.grayText),
-                ),
-              ],
+                  const SizedBox(width: AppDimens.space8),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: AppDurations.medium,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: AppDimens.iconLg,
+                      color: expanded ? primary : v.grayText,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: AppDimens.space8),
-          TextButton(
-            style: TextButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.buttonText,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.space12,
-                vertical: AppDimens.space8,
-              ),
+          AnimatedSize(
+            duration: AppDurations.medium,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? _FaqAnswer(
+                    faq: faq,
+                    vote: vote,
+                    onVote: onVote,
+                    onAction: onAction,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FaqAnswer extends StatelessWidget {
+  final FaqItem faq;
+  final bool? vote;
+  final ValueChanged<bool> onVote;
+  final VoidCallback? onAction;
+
+  const _FaqAnswer({
+    required this.faq,
+    required this.vote,
+    required this.onVote,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final hasAction = faq.actionLabel != null && onAction != null;
+
+    final feedback = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Helpful?',
+          style: context.text.labelSmall?.copyWith(color: v.grayText),
+        ),
+        IconButton(
+          tooltip: 'Helpful',
+          visualDensity: VisualDensity.compact,
+          iconSize: AppDimens.iconSm,
+          icon: Icon(
+            vote == true
+                ? Icons.thumb_up_alt_rounded
+                : Icons.thumb_up_alt_outlined,
+            color: vote == true ? context.colors.primary : v.grayText,
+          ),
+          onPressed: () => onVote(true),
+        ),
+        IconButton(
+          tooltip: 'Not helpful',
+          visualDensity: VisualDensity.compact,
+          iconSize: AppDimens.iconSm,
+          icon: Icon(
+            vote == false
+                ? Icons.thumb_down_alt_rounded
+                : Icons.thumb_down_alt_outlined,
+            color: vote == false ? context.colors.error : v.grayText,
+          ),
+          onPressed: () => onVote(false),
+        ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppDimens.space16,
+        0,
+        AppDimens.space16,
+        AppDimens.space8,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Divider(),
+          const SizedBox(height: AppDimens.space12),
+          Text(
+            faq.answer,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurface,
             ),
-            onPressed: () {
-              showContactSupportSheet(
-                context,
-                initialCategory: SupportCategory.general,
-              );
-            },
-            child: const Text(
-              'Contact',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          // Wraps the feedback under the action button on narrow cards.
+          Wrap(
+            alignment:
+                hasAction ? WrapAlignment.spaceBetween : WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: AppDimens.space4,
+            children: [
+              if (hasAction)
+                AppSecondaryButton(
+                  label: faq.actionLabel!,
+                  expand: false,
+                  leadingIcon: const Icon(Icons.open_in_new_rounded),
+                  onTap: onAction!,
+                ),
+              feedback,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptySearchResults extends StatelessWidget {
+  final VoidCallback onAssistant;
+
+  const _EmptySearchResults({required this.onAssistant});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    return AppCard(
+      padding: AppDimens.cardPaddingLarge,
+      child: Column(
+        children: [
+          Icon(Icons.search_off_rounded, size: AppDimens.iconXxl, color: v.grayText),
+          const SizedBox(height: AppDimens.space12),
+          Text(
+            'No matching articles found',
+            textAlign: TextAlign.center,
+            style: context.text.titleSmall,
+          ),
+          const SizedBox(height: AppDimens.space6),
+          Text(
+            'Try different keywords or chat directly with Vital Assistant.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(color: v.grayText),
+          ),
+          const SizedBox(height: AppDimens.space16),
+          AppPrimaryButton(
+            label: 'Ask Vital Assistant',
+            leadingIcon: const Icon(Icons.smart_toy_rounded),
+            onTap: onAssistant,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StillNeedHelpCard extends StatelessWidget {
+  final VoidCallback onEmail;
+
+  const _StillNeedHelpCard({required this.onEmail});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const AppIconBadge(
+                icon: Icon(Icons.support_agent_rounded),
+                size: AppDimens.iconBadgeLarge,
+              ),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Still have questions?', style: context.text.titleSmall),
+                    const SizedBox(height: AppDimens.space2),
+                    Text(
+                      'Email our support team directly for fast assistance.',
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.vColors.grayText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space16),
+          AppSecondaryButton(
+            label: 'Contact Support via Email',
+            leadingIcon: const Icon(Icons.mail_outline_rounded),
+            onTap: onEmail,
           ),
         ],
       ),
