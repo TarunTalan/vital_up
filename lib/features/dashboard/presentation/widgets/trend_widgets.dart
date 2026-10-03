@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -8,6 +9,7 @@ import 'package:vital_up/core/widgets/charts/trend_bar_chart.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
+import 'package:vital_up/features/home_widget/home_widget_service.dart';
 
 /// 7D / 30D switch on trend detail pages.
 class TrendRangeToggle extends StatelessWidget {
@@ -142,6 +144,7 @@ class TrendDetailScaffold<L> extends StatelessWidget {
   final Widget Function(BuildContext context, L log) logBuilder;
   final String emptyLogs;
   final Widget? bottomBar;
+  final Future<void> Function()? onRefresh;
 
   const TrendDetailScaffold({
     super.key,
@@ -155,13 +158,22 @@ class TrendDetailScaffold<L> extends StatelessWidget {
     this.logsTitle = 'Logs',
     this.emptyLogs = 'Nothing logged in this period yet.',
     this.bottomBar,
+    this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<TrendCubit<L>>();
     return AppScaffold(
       header: AppPageHeader(title: title),
       bottomBar: bottomBar,
+      onRefresh: onRefresh ??
+          () async {
+            await cubit.load();
+            try {
+              await sl<HomeWidgetService>().refresh();
+            } catch (_) {}
+          },
       body: BlocBuilder<TrendCubit<L>, TrendState<L>>(
         builder: (context, state) {
           final data = state.data;
