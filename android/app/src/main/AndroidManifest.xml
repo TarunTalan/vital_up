@@ -123,6 +123,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Custom User Widget -->
+        <receiver android:name=".CustomWidgetProvider"
+            android:exported="true"
+            android:label="Custom VitalUp Widget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/custom_widget_info" />
+        </receiver>
+
         <!-- 1. Multi-Feature Vitals Widget -->
         <receiver android:name=".VitalUpWidgetProvider"
             android:exported="true"
