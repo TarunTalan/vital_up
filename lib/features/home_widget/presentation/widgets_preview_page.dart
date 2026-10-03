@@ -199,7 +199,7 @@ class _WidgetsPreviewPageState extends State<WidgetsPreviewPage> {
                   // Widget 4: Mood & Mindfulness
                   _buildPreviewCard(
                     title: 'Mood & Mindfulness',
-                    size: '3 × 2',
+                    size: '3 × 3',
                     androidProvider: providerMood,
                     preview: _buildMoodLogPreview(),
                   ),
