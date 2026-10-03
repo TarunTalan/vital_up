@@ -39,13 +39,25 @@ const allWidgetProviders = [
   providerShortcuts,
 ];
 
+/// Helper to parse stress tags from raw string
+StressTag? parseStressTag(String raw) {
+  final clean = raw.trim().toLowerCase();
+  for (final t in StressTag.values) {
+    if (t.name.toLowerCase() == clean || t.label.toLowerCase() == clean) {
+      return t;
+    }
+  }
+  return null;
+}
+
 /// Background callback triggered from Home Screen Widget interactive buttons.
 @pragma('vm:entry-point')
 Future<void> homeWidgetCallback(Uri? uri) async {
   if (uri == null || uri.host != 'widget') return;
   try {
-    final userId = await HomeWidget.getWidgetData<String>('user_id')
+    final rawUserId = await HomeWidget.getWidgetData<String>('user_id')
         .timeout(const Duration(seconds: 4), onTimeout: () => null);
+    final userId = (rawUserId != null && rawUserId.isNotEmpty) ? rawUserId : 'guest';
 
     if (uri.path.startsWith('/add-water')) {
       int amount = HomeWidgetService.addMl;
@@ -59,12 +71,10 @@ Future<void> homeWidgetCallback(Uri? uri) async {
         amount = int.tryParse(uri.queryParameters['amount']!) ?? 250;
       }
 
-      if (userId != null && userId.isNotEmpty) {
-        final total = await addWaterInBackground(userId, amount)
-            .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-        if (total > 0) {
-          await HomeWidget.saveWidgetData<int>('water_ml', total);
-        }
+      final total = await addWaterInBackground(userId, amount)
+          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
+      if (total > 0) {
+        await HomeWidget.saveWidgetData<int>('water_ml', total);
       } else {
         final current = await HomeWidget.getWidgetData<int>('water_ml') ?? 0;
         await HomeWidget.saveWidgetData<int>('water_ml', current + amount);
@@ -76,6 +86,22 @@ Future<void> homeWidgetCallback(Uri? uri) async {
         'last_updated',
         DateTime.now().toIso8601String(),
       );
+    } else if (uri.path == '/toggle-tag') {
+      final tag = uri.queryParameters['tag'] ?? '';
+      if (tag.isNotEmpty) {
+        final currentTags = await HomeWidget.getWidgetData<String>('mood_selected_tags') ?? '';
+        final tagList = currentTags.isEmpty ? <String>[] : currentTags.split(',').toList();
+        if (tagList.contains(tag)) {
+          tagList.remove(tag);
+        } else {
+          tagList.add(tag);
+        }
+        await HomeWidget.saveWidgetData<String>('mood_selected_tags', tagList.join(','));
+        await HomeWidget.saveWidgetData<String>(
+          'last_updated',
+          DateTime.now().toIso8601String(),
+        );
+      }
     } else if (uri.path == '/submit-mood' || uri.path == '/checkin-mood') {
       final level = (await HomeWidget.getWidgetData<int>('mood_selected_level') ?? 2).clamp(1, 5);
       final tags = await HomeWidget.getWidgetData<String>('mood_selected_tags') ?? '';
@@ -92,19 +118,17 @@ Future<void> homeWidgetCallback(Uri? uri) async {
       final subtitle = tags.isNotEmpty ? tags.split(',').join(' · ') : defaultSubtitle;
 
       // Save directly into local database (SharedPreferences/VitaLocalDataSource)
-      if (userId != null && userId.isNotEmpty) {
-        final parsedTags = tags.isNotEmpty
-            ? tags
-                .split(',')
-                .map((t) => StressTag.fromName(t.trim().toLowerCase()))
-                .whereType<StressTag>()
-                .toList()
-            : <StressTag>[];
-        final streak = await saveMoodInBackground(userId, level, parsedTags)
-            .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-        if (streak > 0) {
-          await HomeWidget.saveWidgetData<int>('streak', streak);
-        }
+      final parsedTags = tags.isNotEmpty
+          ? tags
+              .split(',')
+              .map((t) => parseStressTag(t))
+              .whereType<StressTag>()
+              .toList()
+          : <StressTag>[];
+      final streak = await saveMoodInBackground(userId, level, parsedTags)
+          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
+      if (streak > 0) {
+        await HomeWidget.saveWidgetData<int>('streak', streak);
       }
 
       await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
@@ -117,12 +141,10 @@ Future<void> homeWidgetCallback(Uri? uri) async {
       );
     } else if (uri.path == '/reset-mood' || uri.path == '/edit-mood') {
       // Remove today's check-in from database
-      if (userId != null && userId.isNotEmpty) {
-        final streak = await resetMoodInBackground(userId)
-            .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-        if (streak >= 0) {
-          await HomeWidget.saveWidgetData<int>('streak', streak);
-        }
+      final streak = await resetMoodInBackground(userId)
+          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
+      if (streak >= 0) {
+        await HomeWidget.saveWidgetData<int>('streak', streak);
       }
 
       await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
@@ -132,33 +154,31 @@ Future<void> homeWidgetCallback(Uri? uri) async {
         DateTime.now().toIso8601String(),
       );
     } else if (uri.path == '/refresh') {
-      if (userId != null && userId.isNotEmpty) {
-        // Read latest water from database
-        final total = await getTodayWaterInBackground(userId)
-            .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-        if (total > 0) {
-          await HomeWidget.saveWidgetData<int>('water_ml', total);
-        }
+      // Read latest water from database
+      final total = await getTodayWaterInBackground(userId)
+          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
+      if (total > 0) {
+        await HomeWidget.saveWidgetData<int>('water_ml', total);
+      }
 
-        // Read latest mood from database
-        final todayCheckIn = await getTodayMoodInBackground(userId)
-            .timeout(const Duration(seconds: 5), onTimeout: () => null);
-        if (todayCheckIn != null) {
-          final message = switch (todayCheckIn.level) {
-            1 || 2 => 'Nice — keep that calm going.',
-            3 => 'Steady day. A short walk can lift it.',
-            _ => 'Tough one. Try a 2-minute breathing break.',
-          };
-          final subtitle = todayCheckIn.tags.isNotEmpty
-              ? todayCheckIn.tags.map((t) => t.label).join(' · ')
-              : message;
-          await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
-          await HomeWidget.saveWidgetData<int>('mood_level', todayCheckIn.level);
-          await HomeWidget.saveWidgetData<String>('mood_state', todayCheckIn.label);
-          await HomeWidget.saveWidgetData<String>('mood_subtitle', subtitle);
-        } else {
-          await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
-        }
+      // Read latest mood from database
+      final todayCheckIn = await getTodayMoodInBackground(userId)
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      if (todayCheckIn != null) {
+        final message = switch (todayCheckIn.level) {
+          1 || 2 => 'Nice — keep that calm going.',
+          3 => 'Steady day. A short walk can lift it.',
+          _ => 'Tough one. Try a 2-minute breathing break.',
+        };
+        final subtitle = todayCheckIn.tags.isNotEmpty
+            ? todayCheckIn.tags.map((t) => t.label).join(' · ')
+            : message;
+        await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
+        await HomeWidget.saveWidgetData<int>('mood_level', todayCheckIn.level);
+        await HomeWidget.saveWidgetData<String>('mood_state', todayCheckIn.label);
+        await HomeWidget.saveWidgetData<String>('mood_subtitle', subtitle);
+      } else {
+        await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
       }
       await HomeWidget.saveWidgetData<String>(
         'last_updated',
@@ -253,23 +273,23 @@ class HomeWidgetService {
   Future<void> refresh() async {
     if (!_supported) return;
     try {
-      final userId = _client.auth.currentUser?.id;
-      final isSignedIn = userId != null && userId.isNotEmpty;
+      final rawUserId = _client.auth.currentUser?.id;
+      final userId = (rawUserId != null && rawUserId.isNotEmpty) ? rawUserId : 'guest';
+      final isSignedIn = rawUserId != null && rawUserId.isNotEmpty;
       await HomeWidget.saveWidgetData<bool>('signed_in', isSignedIn);
-      await HomeWidget.saveWidgetData<String>('user_id', userId ?? '');
+      await HomeWidget.saveWidgetData<String>('user_id', userId);
 
-      if (isSignedIn) {
-        final futures = <Future<void>>[
-          // 1. Water logs & goal
-          _water
-              .getTodayLogs(userId)
-              .then((todayLogs) async {
-                final waterTotal = todayLogs.fold<int>(0, (sum, l) => sum + l.amountMl);
-                final waterGoal = _water.getDailyGoal();
-                await HomeWidget.saveWidgetData<int>('water_ml', waterTotal);
-                await HomeWidget.saveWidgetData<int>('water_goal_ml', waterGoal);
-              })
-              .catchError((_) {}),
+      final futures = <Future<void>>[
+        // 1. Water logs & goal
+        _water
+            .getTodayLogs(userId)
+            .then((todayLogs) async {
+              final waterTotal = todayLogs.fold<int>(0, (sum, l) => sum + l.amountMl);
+              final waterGoal = _water.getDailyGoal();
+              await HomeWidget.saveWidgetData<int>('water_ml', waterTotal);
+              await HomeWidget.saveWidgetData<int>('water_goal_ml', waterGoal);
+            })
+            .catchError((_) {}),
 
           // 2. Gamification: streak & daily points
           _game
@@ -405,7 +425,6 @@ class HomeWidgetService {
 
         // Global timeout of 6 seconds for all concurrent API updates
         await Future.wait(futures).timeout(const Duration(seconds: 6), onTimeout: () => []);
-      }
     } catch (e) {
       debugPrint('Home widget update failed: $e');
     } finally {
