@@ -1,111 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hydration Tracker Home Screen Widget -->
+<!-- Hydration Tracker Home Screen Widget matching HydrationPreview Card with multiple log options -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_hydration_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp">
 
-    <!-- Header Row -->
+    <!-- Top Row: Icon Badge with Circular Progress Ring, Status Info & Refresh -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <!-- Water Icon Badge with Circular Progress Ring -->
+        <FrameLayout
+            android:layout_width="44dp"
+            android:layout_height="44dp">
+
+            <ProgressBar
+                android:id="@+id/widget_hydration_circular_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="70"
+                android:progressDrawable="@drawable/widget_circular_water_progress" />
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_water" />
+        </FrameLayout>
+
+        <!-- Center Content: Title, Amount, Goal -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:fontFamily="sans-serif-medium"
-            android:text="💧 Hydration"
-            android:textColor="@color/widget_water"
-            android:textSize="12sp" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/widget_hydration_percent"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="70%"
-            android:textColor="@color/widget_water"
-            android:textSize="11sp" />
-
-        <!-- Refresh Button -->
-        <ImageView
-            android:id="@+id/widget_hydration_refresh_btn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/widget_refresh_tooltip"
-            android:padding="4dp"
-            android:src="@drawable/ic_widget_refresh" />
-    </LinearLayout>
-
-    <!-- Main Water Intake -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="vertical">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="bottom"
-            android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:autoSizeMaxTextSize="13sp"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="Daily Hydration"
+                android:textColor="@color/widget_water"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_hydration_val"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:autoSizeMaxTextSize="22sp"
+                android:autoSizeMinTextSize="14sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
+                android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
-                android:text="1,750"
+                android:maxLines="1"
+                android:text="1,750 ml"
                 android:textColor="@color/widget_text"
-                android:textSize="18sp" />
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_hydration_goal"
+                android:id="@+id/widget_hydration_goal_percent"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="2dp"
+                android:layout_marginTop="1dp"
+                android:autoSizeMaxTextSize="13sp"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
+                android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
-                android:text="/ 2,500 ml"
+                android:maxLines="1"
+                android:text="Goal: 2,500 ml (70%)"
                 android:textColor="@color/widget_secondary_text"
-                android:textSize="11sp" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/widget_hydration_remaining"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="2dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="750 ml left"
-                android:textColor="@color/widget_water"
-                android:textSize="11sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/widget_hydration_progress_bar"
-            style="@android:style/Widget.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="4dp"
-            android:max="100"
-            android:progress="70"
-            android:progressDrawable="@drawable/widget_progress" />
+        <!-- Refresh Button & Spinner -->
+        <FrameLayout
+            android:layout_width="26dp"
+            android:layout_height="26dp">
+
+            <ImageView
+                android:id="@+id/widget_hydration_refresh_btn"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_refresh_tooltip"
+                android:padding="2dp"
+                android:src="@drawable/ic_widget_refresh" />
+
+            <ProgressBar
+                android:id="@+id/widget_hydration_refresh_progress"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- Interactive Quick Buttons -->
+    <!-- Bottom Row: Multiple Quick Water Logging Options -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -113,33 +132,93 @@
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/widget_hydration_add_100"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:background="@drawable/widget_chip_bg"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minHeight="36dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="+100ml"
+            android:textColor="@color/widget_water"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
             android:id="@+id/widget_hydration_add_250"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_button"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:background="@drawable/widget_chip_bg"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
-            android:text="+250 ml"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp" />
+            android:maxLines="1"
+            android:minHeight="36dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="+250ml"
+            android:textColor="@color/widget_water"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_hydration_add_500"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_button"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:background="@drawable/widget_chip_bg"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
-            android:text="+500 ml"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp" />
+            android:maxLines="1"
+            android:minHeight="36dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="+500ml"
+            android:textColor="@color/widget_water"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_hydration_add_1000"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_weight="1"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="9sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:background="@drawable/widget_chip_bg"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minHeight="36dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="+1,000ml"
+            android:textColor="@color/widget_water"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

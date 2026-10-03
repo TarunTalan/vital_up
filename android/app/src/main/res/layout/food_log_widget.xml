@@ -6,7 +6,10 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp">
 
     <!-- Header Row -->
     <LinearLayout
@@ -20,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="sans-serif-medium"
-            android:text="🥗 Food &amp; Macros"
+            android:text="Food &amp; Macros" android:drawableStart="@drawable/ic_widget_food" android:drawablePadding="6dp"
             android:textColor="@color/widget_calories"
             android:textSize="12sp" />
 
@@ -39,15 +42,29 @@
             android:textColor="#FFFFFFFF"
             android:textSize="11sp" />
 
-        <!-- Refresh Button -->
-        <ImageView
-            android:id="@+id/widget_food_refresh_btn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/widget_refresh_tooltip"
-            android:padding="4dp"
-            android:src="@drawable/ic_widget_refresh" />
+        <!-- Refresh Button & Spinner -->
+        <FrameLayout
+            android:layout_width="26dp"
+            android:layout_height="26dp">
+
+            <ImageView
+                android:id="@+id/widget_food_refresh_btn"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_refresh_tooltip"
+                android:padding="2dp"
+                android:src="@drawable/ic_widget_refresh" />
+
+            <ProgressBar
+                android:id="@+id/widget_food_refresh_progress"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Calories Consumed vs Goal -->
@@ -70,7 +87,8 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="1,640"
                 android:textColor="@color/widget_text"
-                android:textSize="18sp" />
+                android:textSize="24sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_food_goal"
@@ -81,9 +99,9 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="/ 2,000 kcal"
                 android:textColor="@color/widget_secondary_text"
-                android:textSize="11sp" />
+                android:textSize="13sp" />
 
-            <View
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
@@ -96,7 +114,8 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="360 kcal left"
                 android:textColor="@color/widget_calories"
-                android:textSize="11sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <ProgressBar
@@ -112,6 +131,7 @@
 
     <!-- 3 Macro Cards: Protein, Carbs, Fat -->
     <LinearLayout
+        android:id="@+id/widget_food_macros_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"

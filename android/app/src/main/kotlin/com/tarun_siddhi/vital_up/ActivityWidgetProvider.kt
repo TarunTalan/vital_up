@@ -18,21 +18,16 @@ class ActivityWidgetProvider : HomeWidgetProvider() {
     ) {
         val steps = widgetData.getInt("steps", 7420)
         val stepsGoal = widgetData.getInt("steps_goal", 10000).coerceAtLeast(1)
-        val activeMin = widgetData.getInt("active_minutes", 42)
-        val burned = widgetData.getInt("calories_burned", 380)
-        val distanceKm = widgetData.getString("activity_distance", "5.2 km") ?: "5.2 km"
+        val streak = widgetData.getInt("streak", 3)
         val percent = (steps * 100 / stepsGoal).coerceIn(0, 100)
 
         for (id in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.activity_widget).apply {
                 setTextViewText(R.id.widget_activity_steps, "%,d".format(steps))
-                setTextViewText(R.id.widget_activity_goal, "/ %,d steps".format(stepsGoal))
-                setTextViewText(R.id.widget_activity_percent, "$percent%")
-                setProgressBar(R.id.widget_activity_progress_bar, 100, percent, false)
-
-                setTextViewText(R.id.widget_activity_time, "$activeMin min")
-                setTextViewText(R.id.widget_activity_burned, "$burned kcal")
-                setTextViewText(R.id.widget_activity_distance, distanceKm)
+                setTextViewText(R.id.widget_activity_goal, "Goal: %,d steps".format(stepsGoal))
+                setProgressBar(R.id.widget_activity_progress, 100, percent, false)
+                
+                setTextViewText(R.id.widget_activity_streak, "🔥 $streak days")
 
                 // Root & Track Button -> Activity Tracking Deep Link
                 val activityIntent = HomeWidgetLaunchIntent.getActivity(
@@ -43,14 +38,13 @@ class ActivityWidgetProvider : HomeWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_activity_root, activityIntent)
                 setOnClickPendingIntent(R.id.widget_activity_track_btn, activityIntent)
 
-                // Refresh Button
-                setOnClickPendingIntent(
-                    R.id.widget_activity_refresh_btn,
-                    HomeWidgetBackgroundIntent.getBroadcast(
-                        context,
-                        Uri.parse("vitalup://widget/refresh"),
-                    ),
+                // Streak Tap -> Points & Streak History
+                val streakIntent = HomeWidgetLaunchIntent.getActivity(
+                    context,
+                    MainActivity::class.java,
+                    Uri.parse("vitalup://widget/open?route=points-history"),
                 )
+                setOnClickPendingIntent(R.id.widget_activity_streak, streakIntent)
             }
             appWidgetManager.updateAppWidget(id, views)
         }

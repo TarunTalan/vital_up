@@ -15,6 +15,11 @@ class MainActivity : FlutterFragmentActivity() {
     private val AUDIO_CHANNEL = "com.example.vital_up/audio_intent"
     private val USAGE_CHANNEL = "com.example.vital_up/usage_stats"
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
