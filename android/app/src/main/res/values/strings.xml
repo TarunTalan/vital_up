@@ -1,6 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_title">VitalUp today</string>
-    <string name="widget_description">Today\'s water, streak and points, with a quick +250 ml button.</string>
+    <string name="widget_title">VitalUp Multi-Feature</string>
+    <string name="widget_description">Today\'s water, steps, calories, streak, quick login &amp; fast actions.</string>
+    <string name="widget_sleep_title">VitalUp Sleep &amp; Recovery</string>
+    <string name="widget_sleep_description">Track sleep duration, bedtime, wake time, and rest quality score.</string>
+    <string name="widget_food_title">VitalUp Food &amp; Macros</string>
+    <string name="widget_food_description">Track daily calories and protein, carbs, and fat macros breakdown.</string>
+    <string name="widget_mood_title">VitalUp Mood &amp; Mind</string>
+    <string name="widget_mood_description">Monitor mood state, stress levels, mindfulness, and HRV.</string>
+    <string name="widget_stats_title">VitalUp Stats &amp; Progress</string>
+    <string name="widget_stats_description">Track streak, daily XP points, and habit goal completion.</string>
+    <string name="widget_hydration_title">VitalUp Hydration</string>
+    <string name="widget_hydration_description">Quick water intake logging (+250ml) and daily hydration goal.</string>
+    <string name="widget_activity_title">VitalUp Activity &amp; Steps</string>
+    <string name="widget_activity_description">Daily step counter, active minutes, calories burned, and distance.</string>
+    <string name="widget_shortcuts_title">VitalUp Quick Shortcuts</string>
+    <string name="widget_shortcuts_description">Fast 1-tap shortcuts for Water, Activity, Scan, and Vita AI.</string>
     <string name="widget_add_water">+250 ml</string>
+    <string name="widget_quick_login">⚡ Quick Sign In</string>
+    <string name="widget_scan_food">📷 Scan</string>
+    <string name="widget_track_activity">🏃 Track</string>
+    <string name="widget_vita_ai">🤖 Vita</string>
+    <string name="widget_water_label">Water</string>
+    <string name="widget_steps_label">Steps</string>
+    <string name="widget_calories_label">Calories</string>
+    <string name="widget_refresh_tooltip">Refresh</string>
 </resources>
