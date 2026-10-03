@@ -189,6 +189,18 @@ class AppDimens {
   /// Opacity of past-day bars (today's bar is fully opaque).
   static const double chartInactiveAlpha = 0.4;
 
+  /// Trackers: progress ring on detail heroes, status chip, quick-log tiles,
+  /// stage/legend dots and the alpha used for tinted fills and borders.
+  static const double trackerRing = 96.0;
+  static const double trackerRingStroke = 10.0;
+  static const double trackerTile = 96.0;
+  static const double trackerPreset = 72.0;
+  static const double stageBarHeight = 8.0;
+  static const double legendDot = 6.0;
+  static const double tintAlpha = 0.12;
+  static const double tintBorderAlpha = 0.3;
+  static const double completedOpacity = 0.85;
+
   /// Stress check-in: emoji faces, mood strip dots, confetti.
   static const double moodFaceSize = 30.0;
   static const double moodFaceBox = 52.0;

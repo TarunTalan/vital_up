@@ -164,6 +164,21 @@ class AppColors {
   /// Streak flame on the stress check-in and the score card.
   static const Color streak = Color(0xFFFF7A3D);
 
+  /// Tracker accents — one colour per tracked metric, used on its home card,
+  /// detail page, log sheet and goal editor so each metric reads the same
+  /// everywhere.
+  static const Color trackNutrition = primary;
+  static const Color trackActivity = activityCalories;
+  static const Color trackMood = Color(0xFF26C6A6);
+  static const Color trackWater = water;
+  static const Color trackSleep = sleep;
+  static const Color trackWeight = teal;
+  static const Color trackScreenTime = info;
+
+  /// Sleep stage segments (deep / REM; light and awake reuse teal / warning).
+  static const Color sleepDeep = Color(0xFF4A148C);
+  static const Color sleepRem = Color(0xFF7B1FA2);
+
   /// Gamification score categories.
   static const Color scoreNutrition = protein;
   static const Color scoreLifestyle = sleep;

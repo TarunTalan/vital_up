@@ -502,7 +502,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<InAppAudioDownloader>(() => InAppAudioDownloader(sl<IsarService>()));
   sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
   // 10. Dashboard / Screen Time / Sleep
-  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService());
+  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()));
   sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
 
   sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
@@ -752,6 +752,7 @@ Future<void> initDependencies() async {
       sl<GamificationRepository>(),
       activityGoals: sl<ActivityGoalsRepository>(),
       mealLogs: sl<GetMealLogHistory>(),
+      vita: sl<VitaRepository>(),
     ),
   );
 

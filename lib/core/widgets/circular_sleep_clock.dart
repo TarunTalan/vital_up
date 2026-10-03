@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
 /// An interactive, circular 24-hour sleep clock picker with drag handles for
@@ -373,10 +374,11 @@ class _ScheduleTimeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.edit_outlined,
-                size: AppDimens.iconXs,
-                color: v.grayText,
+              SvgPicture.asset(
+                'assets/icons/edit.svg',
+                width: AppDimens.iconXs,
+                height: AppDimens.iconXs,
+                colorFilter: ColorFilter.mode(v.grayText!, BlendMode.srcIn),
               ),
             ],
           ),

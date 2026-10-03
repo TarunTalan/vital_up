@@ -45,6 +45,7 @@ import 'package:vital_up/features/health_report/presentation/pages/health_report
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
+import 'package:vital_up/features/goals/presentation/my_goals_page.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_page.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
@@ -64,6 +65,7 @@ import 'package:vital_up/features/notifications/presentation/cubit/notifications
 import 'package:vital_up/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:vital_up/features/home_widget/presentation/widgets_preview_page.dart';
 import 'package:vital_up/features/home_widget/presentation/custom_widget_builder_page.dart';
+import 'package:vital_up/features/home_widget/home_widget_service.dart';
 
 class AppRouter {
   AppRouter._();
@@ -229,6 +231,14 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: const DietProgressPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/goals',
+        name: 'my-goals',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const MyGoalsPage(),
         ),
       ),
       GoRoute(
@@ -576,6 +586,32 @@ class AppRouter {
           key: state.pageKey,
           child: const VitaStressGuidePage(),
         ),
+      ),
+      GoRoute(
+        path: '/open',
+        redirect: (context, state) {
+          final target = state.uri.queryParameters['route'] ??
+              state.uri.queryParameters['feature'] ??
+              'dashboard';
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final route = HomeWidgetService.normalizeFeatureRoute(target);
+            HomeWidgetService.navigateWithBackstack(null, route);
+          });
+          return '/dashboard';
+        },
+      ),
+      GoRoute(
+        path: '/widget/open',
+        redirect: (context, state) {
+          final target = state.uri.queryParameters['route'] ??
+              state.uri.queryParameters['feature'] ??
+              'dashboard';
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final route = HomeWidgetService.normalizeFeatureRoute(target);
+            HomeWidgetService.navigateWithBackstack(null, route);
+          });
+          return '/dashboard';
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
