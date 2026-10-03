@@ -163,6 +163,39 @@ class _DashboardPageState extends State<DashboardPage> {
     AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
   ];
 
+  void _selectTab(int index) {
+    if (_selectedIndex == index) return;
+    setState(() {
+      if (index == 0) {
+        _navigationQueue
+          ..clear()
+          ..add(0);
+      } else {
+        _navigationQueue.remove(index);
+        _navigationQueue.add(index);
+      }
+      _selectedIndex = index;
+    });
+  }
+
+  void _handlePop() {
+    if (_navigationQueue.length > 1) {
+      setState(() {
+        _navigationQueue.removeLast();
+        _selectedIndex = _navigationQueue.last;
+      });
+    } else if (_selectedIndex != 0) {
+      setState(() {
+        _navigationQueue
+          ..clear()
+          ..add(0);
+        _selectedIndex = 0;
+      });
+    }
+  }
+
+  bool get _canPop => _selectedIndex == 0 && _navigationQueue.length <= 1;
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthCubit, AuthState>(
@@ -228,15 +261,10 @@ class _DashboardPageState extends State<DashboardPage> {
             if (award != null) showRewardCelebration(context, award);
           },
           child: PopScope(
-            canPop: _navigationQueue.length <= 1,
+            canPop: _canPop,
             onPopInvokedWithResult: (didPop, _) {
               if (didPop) return;
-              if (_navigationQueue.length > 1) {
-                setState(() {
-                  _navigationQueue.removeLast();
-                  _selectedIndex = _navigationQueue.last;
-                });
-              }
+              _handlePop();
             },
             child: Scaffold(
               backgroundColor: context.theme.scaffoldBackgroundColor,
@@ -247,14 +275,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   : AppBottomNav(
                       items: _items,
                       selectedIndex: _selectedIndex,
-                      onItemSelected: (index) {
-                        if (_selectedIndex == index) return;
-                        setState(() {
-                          _navigationQueue.remove(index);
-                          _navigationQueue.add(index);
-                          _selectedIndex = index;
-                        });
-                      },
+                      onItemSelected: _selectTab,
                     ),
             ),
           ),
@@ -278,11 +299,11 @@ class _DashboardPageState extends State<DashboardPage> {
           // Re-read so the calorie goal appears once the profile syncs.
           listener: (context, _) =>
               context.read<MealLogBloc>().add(const LoadTodaysMeals()),
-          child: _HomeTab(onScanMeal: () => setState(() => _selectedIndex = 1)),
+          child: _HomeTab(onScanMeal: () => _selectTab(1)),
         ),
       ),
-      1 => FoodScannerPage(onBack: () => setState(() => _selectedIndex = 0)),
-      2 => VitaHomePage(onBack: () => setState(() => _selectedIndex = 0)),
+      1 => FoodScannerPage(onBack: _handlePop),
+      2 => VitaHomePage(onBack: _handlePop),
       3 => const CommunityHubPage(),
       _ => BlocProvider.value(
         value: _profileCubit,
@@ -373,7 +394,7 @@ class _HomeTabState extends State<_HomeTab> {
       context.read<WaterIntakeCubit>().reload();
       context.read<TrendCubit<SleepSessionInfo>>().load();
       context.read<ActivityGoalsCubit>().load();
-      context.read<StressCheckInCubit>().load();
+      context.read<StressCheckInCubit>().reload();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
       context.read<GamificationCubit>().sync();
       // The realtime feed can drop while backgrounded; cache-first, so this
@@ -403,7 +424,7 @@ class _HomeTabState extends State<_HomeTab> {
     context.read<ScreenTimeCubit>().loadStats();
     context.read<TrendCubit<WeightLogCache>>().load();
     context.read<ActivityGoalsCubit>().load();
-    context.read<StressCheckInCubit>().load();
+    context.read<StressCheckInCubit>().reload();
     context.read<MealLogBloc>().add(const LoadTodaysMeals());
     context.read<DietPlanCubit>().loadActiveMealPlan();
     context.read<GamificationCubit>().sync();
