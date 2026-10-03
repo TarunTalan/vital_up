@@ -47,7 +47,6 @@ class ScreenTimeCard extends StatelessWidget {
               ),
             ],
             child: const TrackerPrompt(
-              icon: Icons.privacy_tip_rounded,
               title: 'Track screen time automatically',
               message:
                   'Grant Usage Access so VitalUp can total your '
