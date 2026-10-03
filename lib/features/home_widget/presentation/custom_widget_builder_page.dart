@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -14,7 +15,8 @@ const _androidProvider = 'com.tarun_siddhi.vital_up.VitalUpWidgetProvider';
 enum WidgetSizeOption {
   compact('2 × 1', 'Compact Quick Bar', Icons.view_headline_rounded),
   medium('3 × 2', 'Balanced Daily View', Icons.dashboard_rounded),
-  large('4 × 2', 'Full Dashboard', Icons.grid_view_rounded);
+  large('4 × 2', 'Full Dashboard', Icons.grid_view_rounded),
+  extraLarge('4 × 3', 'Comprehensive View', Icons.grid_on_rounded);
 
   final String sizeLabel;
   final String description;
@@ -38,7 +40,8 @@ class CustomWidgetBuilderPage extends StatefulWidget {
   const CustomWidgetBuilderPage({super.key});
 
   @override
-  State<CustomWidgetBuilderPage> createState() => _CustomWidgetBuilderPageState();
+  State<CustomWidgetBuilderPage> createState() =>
+      _CustomWidgetBuilderPageState();
 }
 
 class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
@@ -56,9 +59,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
   Future<void> _pinCustomWidget() async {
     HapticFeedback.mediumImpact();
     try {
-      await HomeWidget.requestPinWidget(
-        qualifiedAndroidName: _androidProvider,
-      );
+      await HomeWidget.requestPinWidget(qualifiedAndroidName: _androidProvider);
       if (mounted) {
         showSuccessSnackBar(context, 'Widget added to your home screen!');
       }
@@ -122,9 +123,12 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
             // Add / Pin Button
             AppPrimaryButton(
               label: 'Save & Add Widget',
-              leadingIcon: const Icon(Icons.check_circle_rounded, size: AppDimens.iconMd),
+              leadingIcon: const Icon(
+                Icons.check_circle_rounded,
+                size: AppDimens.iconMd,
+              ),
               containerColor: _selectedTheme.primaryColor,
-              contentColor: Colors.white,
+              contentColor: AppColors.buttonText,
               onTap: _pinCustomWidget,
             ),
           ],
@@ -168,14 +172,24 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.streak.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppDimens.radiusSm,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('🔥 ', style: TextStyle(fontSize: 12)),
+                            SvgPicture.asset(
+                              'assets/icons/streak.svg',
+                              width: 12,
+                              height: 12,
+                              colorFilter: const ColorFilter.mode(
+                                AppColors.streak,
+                                BlendMode.srcIn,
+                              ),
+                            ),
                             Text(
-                              '5-Day Streak',
+                              '  5-Day Streak',
                               style: context.text.labelSmall?.copyWith(
                                 color: AppColors.streak,
                                 fontWeight: FontWeight.w600,
@@ -229,18 +243,34 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                       decoration: BoxDecoration(
                         color: AppColors.water.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                        border: Border.all(color: AppColors.water.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: AppColors.water.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              '💧 1,750 / 2,500 ml',
-                              overflow: TextOverflow.ellipsis,
-                              style: context.text.labelSmall?.copyWith(
-                                color: AppColors.water,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            child: Row(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/icons/drop.svg',
+                                  width: 14,
+                                  height: 14,
+                                  colorFilter: const ColorFilter.mode(
+                                    AppColors.water,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '1,750 / 2,500 ml',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.text.labelSmall?.copyWith(
+                                    color: AppColors.water,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: AppDimens.space6),
@@ -251,7 +281,9 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.water,
-                              borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                              borderRadius: BorderRadius.circular(
+                                AppDimens.radiusSm,
+                              ),
                             ),
                             child: Text(
                               '+250 ml',
@@ -277,19 +309,36 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                               padding: const EdgeInsets.all(AppDimens.space6),
                               decoration: BoxDecoration(
                                 color: v.glassFill,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                                borderRadius: BorderRadius.circular(
+                                  AppDimens.radiusSm,
+                                ),
                                 border: Border.all(color: v.glassBorder!),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '👟 Steps',
-                                    style: context.text.labelSmall?.copyWith(
-                                      color: v.grayText,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                  Row(
+                                    children: [
+                                      SvgPicture.asset(
+                                        'assets/icons/steps.svg',
+                                        width: 14,
+                                        height: 14,
+                                        colorFilter: const ColorFilter.mode(
+                                          AppColors.success,
+                                          BlendMode.srcIn,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Steps',
+                                        style: context.text.labelSmall
+                                            ?.copyWith(
+                                              color: v.grayText,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
                                   Text(
                                     '7,840 / 10k',
@@ -310,19 +359,36 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                               padding: const EdgeInsets.all(AppDimens.space6),
                               decoration: BoxDecoration(
                                 color: v.glassFill,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                                borderRadius: BorderRadius.circular(
+                                  AppDimens.radiusSm,
+                                ),
                                 border: Border.all(color: v.glassBorder!),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '🔥 Calories',
-                                    style: context.text.labelSmall?.copyWith(
-                                      color: v.grayText,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                  Row(
+                                    children: [
+                                      SvgPicture.asset(
+                                        'assets/icons/streak_3.svg',
+                                        width: 14,
+                                        height: 14,
+                                        colorFilter: const ColorFilter.mode(
+                                          AppColors.warning,
+                                          BlendMode.srcIn,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Calories',
+                                        style: context.text.labelSmall
+                                            ?.copyWith(
+                                              color: v.grayText,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
                                   Text(
                                     '1,620 kcal',
@@ -350,18 +416,36 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                               padding: const EdgeInsets.all(AppDimens.space6),
                               decoration: BoxDecoration(
                                 color: AppColors.sleep.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                                border: Border.all(color: AppColors.sleep.withValues(alpha: 0.2)),
+                                borderRadius: BorderRadius.circular(
+                                  AppDimens.radiusSm,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.sleep.withValues(alpha: 0.2),
+                                ),
                               ),
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '🌙 7h 45m Sleep',
-                                  style: context.text.labelSmall?.copyWith(
-                                    color: AppColors.sleep,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Row(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/moon_stars.svg',
+                                      width: 14,
+                                      height: 14,
+                                      colorFilter: const ColorFilter.mode(
+                                        AppColors.sleep,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '7h 45m Sleep',
+                                      style: context.text.labelSmall?.copyWith(
+                                        color: AppColors.sleep,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -373,19 +457,41 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                             child: Container(
                               padding: const EdgeInsets.all(AppDimens.space6),
                               decoration: BoxDecoration(
-                                color: AppColors.stressLevels[0].withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                                border: Border.all(color: AppColors.stressLevels[0].withValues(alpha: 0.25)),
+                                color: AppColors.stressLevels[0].withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppDimens.radiusSm,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.stressLevels[0].withValues(
+                                    alpha: 0.25,
+                                  ),
+                                ),
                               ),
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '😊 Calm & Good',
-                                  style: context.text.labelSmall?.copyWith(
-                                    color: AppColors.stressLevels[0],
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Row(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/mood.svg',
+                                      width: 14,
+                                      height: 14,
+                                      colorFilter: ColorFilter.mode(
+                                        AppColors.stressLevels[0],
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Calm & Good',
+                                      style: context.text.labelSmall?.copyWith(
+                                        color: AppColors.stressLevels[0],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -401,14 +507,30 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                   const SizedBox(height: AppDimens.space4),
                   Row(
                     children: [
-                      _buildMiniShortcut('📷 Scan', accent),
+                      _buildMiniShortcut(
+                        'assets/icons/scanner.svg',
+                        'Scan',
+                        accent,
+                      ),
                       const SizedBox(width: AppDimens.space4),
-                      _buildMiniShortcut('🏃 Run', accent),
+                      _buildMiniShortcut(
+                        'assets/icons/person_run.svg',
+                        'Run',
+                        accent,
+                      ),
                       const SizedBox(width: AppDimens.space4),
-                      _buildMiniShortcut('🤖 Vita', accent),
+                      _buildMiniShortcut(
+                        'assets/icons/vita.svg',
+                        'Vita',
+                        accent,
+                      ),
                       if (_selectedSize == WidgetSizeOption.large) ...[
                         const SizedBox(width: AppDimens.space4),
-                        _buildMiniShortcut('💧 +250ml', AppColors.water),
+                        _buildMiniShortcut(
+                          'assets/icons/drop.svg',
+                          '+250ml',
+                          AppColors.water,
+                        ),
                       ],
                     ],
                   ),
@@ -421,7 +543,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
     );
   }
 
-  Widget _buildMiniShortcut(String label, Color color) {
+  Widget _buildMiniShortcut(String iconAsset, String label, Color color) {
     final v = context.vColors;
     return Expanded(
       child: Container(
@@ -437,11 +559,23 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
         alignment: Alignment.center,
         child: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            style: context.text.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                iconAsset,
+                width: 14,
+                height: 14,
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              ),
+              const SizedBox(width: AppDimens.space4),
+              Text(
+                label,
+                style: context.text.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -464,16 +598,23 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
             child: Container(
               padding: const EdgeInsets.all(AppDimens.space12),
               decoration: BoxDecoration(
-                color: isSelected ? color.withValues(alpha: 0.1) : context.vColors.glassFill,
+                color: isSelected
+                    ? color.withValues(alpha: 0.1)
+                    : context.vColors.glassFill,
                 borderRadius: BorderRadius.circular(AppDimens.radiusCard),
                 border: Border.all(
                   color: isSelected ? color : context.vColors.glassBorder!,
-                  width: isSelected ? AppDimens.borderThick : AppDimens.borderThin,
+                  width: isSelected
+                      ? AppDimens.borderThick
+                      : AppDimens.borderThin,
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(size.icon, color: isSelected ? color : context.vColors.grayText),
+                  Icon(
+                    size.icon,
+                    color: isSelected ? color : context.vColors.grayText,
+                  ),
                   const SizedBox(width: AppDimens.space12),
                   Expanded(
                     child: Column(
@@ -498,7 +639,11 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                     ),
                   ),
                   if (isSelected)
-                    Icon(Icons.check_circle_rounded, color: color, size: AppDimens.iconMd),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: color,
+                      size: AppDimens.iconMd,
+                    ),
                 ],
               ),
             ),
@@ -535,13 +680,17 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                         color: theme.primaryColor,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? context.colors.onSurface : Colors.transparent,
+                          color: isSelected
+                              ? context.colors.onSurface
+                              : Colors.transparent,
                           width: 2.5,
                         ),
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: theme.primaryColor.withValues(alpha: 0.5),
+                                  color: theme.primaryColor.withValues(
+                                    alpha: 0.5,
+                                  ),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),
@@ -549,15 +698,23 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
                             : null,
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check_rounded, color: Colors.white, size: AppDimens.iconSm)
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: AppDimens.iconSm,
+                            )
                           : null,
                     ),
                     const SizedBox(height: AppDimens.space4),
                     Text(
                       theme.name,
                       style: context.text.labelSmall?.copyWith(
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? theme.primaryColor : context.vColors.grayText,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? theme.primaryColor
+                            : context.vColors.grayText,
                       ),
                     ),
                   ],
@@ -577,42 +734,102 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
       child: Column(
         children: [
           _buildToggleRow(
-            '💧 Hydration (Water Tracker)',
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/drop.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    context.colors.onSurface,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Hydration (Water Tracker)'),
+              ],
+            ),
             'Quick-add logs & progress',
             _showWater,
             (val) => setState(() => _showWater = val),
           ),
           const Divider(height: AppDimens.space12),
           _buildToggleRow(
-            '👟 Daily Steps',
+            const Row(
+              children: [
+                Icon(Icons.directions_walk_rounded, size: 16),
+                SizedBox(width: 8),
+                Text('Daily Steps'),
+              ],
+            ),
             'Step counter & progress toward goal',
             _showSteps,
             (val) => setState(() => _showSteps = val),
           ),
           const Divider(height: AppDimens.space12),
           _buildToggleRow(
-            '🔥 Calories & Nutrition',
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/streak_3.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    context.colors.onSurface,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Calories & Nutrition'),
+              ],
+            ),
             'Daily calorie intake breakdown',
             _showCalories,
             (val) => setState(() => _showCalories = val),
           ),
           const Divider(height: AppDimens.space12),
           _buildToggleRow(
-            '🌙 Sleep Duration',
+            const Row(
+              children: [
+                Icon(Icons.bedtime_rounded, size: 16),
+                SizedBox(width: 8),
+                Text('Sleep Duration'),
+              ],
+            ),
             'Last night rest & sleep goal',
             _showSleep,
             (val) => setState(() => _showSleep = val),
           ),
           const Divider(height: AppDimens.space12),
           _buildToggleRow(
-            '😊 Mood & Stress Check-in',
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/mood.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    context.colors.onSurface,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Mood & Stress Check-in'),
+              ],
+            ),
             'Current state & daily streak',
             _showMood,
             (val) => setState(() => _showMood = val),
           ),
           const Divider(height: AppDimens.space12),
           _buildToggleRow(
-            '⚡ Quick Action Shortcuts',
+            const Row(
+              children: [
+                Icon(Icons.bolt_rounded, size: 16),
+                SizedBox(width: 8),
+                Text('Quick Action Shortcuts'),
+              ],
+            ),
             'Scan food, start workout, chat with AI',
             _showShortcuts,
             (val) => setState(() => _showShortcuts = val),
@@ -623,7 +840,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
   }
 
   Widget _buildToggleRow(
-    String title,
+    Widget title,
     String subtitle,
     bool value,
     ValueChanged<bool> onChanged,
@@ -634,7 +851,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: context.text.titleSmall),
+              DefaultTextStyle(style: context.text.titleSmall!, child: title),
               const SizedBox(height: AppDimens.space2),
               Text(
                 subtitle,
