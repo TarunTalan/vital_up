@@ -193,7 +193,7 @@ extension MoodPreview on _WidgetsPreviewPageState {
               child: Text(
                 'Check In',
                 style: context.text.labelMedium?.copyWith(
-                  color: Colors.white,
+                  color: context.isDark ? Colors.black : Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),

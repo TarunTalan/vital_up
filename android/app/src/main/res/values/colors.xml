@@ -21,4 +21,5 @@
     <color name="widget_carbs">#FFF59E0B</color>
     <color name="widget_fat">#FF3B82F6</color>
     <color name="widget_action_bg">#FFF1F5F9</color>
+    <color name="widget_btn_text">#FFFFFFFF</color>
 </resources>
