@@ -1,24 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/charts/trend_bar_chart.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 
-/// All activity goals with progress, the selected goal's trend, and the
-/// workouts logged in the period.
+const _metric = TrackerMetric.activity;
+
+/// Activity: every goal with today's progress, the selected goal's trend
+/// and insights, and the workouts in the period — the same order as the
+/// other tracker pages, with several goals instead of one.
 class ActivityGoalsPage extends StatelessWidget {
   const ActivityGoalsPage({super.key});
 
@@ -54,21 +61,33 @@ class _ActivityGoalsView extends StatelessWidget {
         final cubit = context.read<ActivityGoalsCubit>();
         final snapshot = state.snapshot;
         final selected = state.selected;
+        final canAdd =
+            state.goals.length <
+            GoalMetric.values.length * GoalPeriod.values.length;
         return AppScaffold(
-          header: const AppPageHeader(title: 'Activity Goals'),
+          header: AppPageHeader(
+            title: _metric.label,
+            action: AppHeaderAction(
+              tooltip: 'Workout history',
+              icon: const Icon(Icons.history_rounded),
+              onTap: () => context.pushNamed('activity-history'),
+            ),
+          ),
           onRefresh: () => cubit.load(),
           bottomBar: AppPrimaryButton(
-            label: 'Add goal',
-            enabled: state.goals.length <
-                GoalMetric.values.length * GoalPeriod.values.length,
-            onTap: () => _openEditor(context),
+            label: _metric.logLabel,
+            leadingIcon: Icon(_metric.logIcon),
+            onTap: () async {
+              await context.pushNamed('activity-tracking');
+              cubit.load();
+            },
           ),
           body: snapshot == null
-              ? Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space48),
+              ? SizedBox(
+                  height: AppDimens.trendChartHeight * 2,
                   child: state.failed
                       ? LoadErrorView(onRetry: cubit.load)
-                      : const Center(child: CircularProgressIndicator()),
+                      : TrackerLoading(color: _metric.color),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,14 +96,31 @@ class _ActivityGoalsView extends StatelessWidget {
                       const Padding(
                         padding: EdgeInsets.only(bottom: AppDimens.cardGap),
                         child: AppInfoNote(
-                          message: 'Steps come from workouts tracked in '
+                          message:
+                              'Steps come from workouts tracked in '
                               'VitalUp. Connect Health in Vita to count all '
                               'your daily steps.',
                         ),
                       ),
+                    TrackerSectionTitle(
+                      'Goals',
+                      actionLabel: canAdd ? 'Add goal' : null,
+                      onAction: () => _openEditor(context),
+                    ),
+                    const SizedBox(height: AppDimens.cardGap),
                     if (state.goals.isEmpty)
-                      const AppInfoNote(
-                        message: 'No goals yet — add one to start tracking.',
+                      AppCard(
+                        width: double.infinity,
+                        padding: AppDimens.cardPaddingCompact,
+                        onTap: () => _openEditor(context),
+                        child: TrackerPrompt(
+                          icon: Icons.flag_rounded,
+                          title: 'Set your first goal',
+                          message:
+                              'Pick steps, distance, calories, active '
+                              'minutes or workouts — daily or weekly.',
+                          color: _metric.color,
+                        ),
                       ),
                     for (final g in state.goals) ...[
                       GoalProgressRow(
@@ -105,31 +141,32 @@ class _ActivityGoalsView extends StatelessWidget {
                     if (state.goals.isNotEmpty)
                       Text(
                         'Tap a goal to chart it, tap again to edit.',
-                        style: context.text.bodySmall
-                            ?.copyWith(color: context.vColors.grayText),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.vColors.grayText,
+                        ),
                       ),
                     if (selected != null) ...[
-                      const SizedBox(height: AppDimens.sectionGap),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              selected.goal.metric.label,
-                              style: context.text.headlineSmall,
-                            ),
-                          ),
-                          TrendRangeToggle(
-                            value: state.range,
-                            onChanged: cubit.load,
-                          ),
-                        ],
-                      ),
                       const SizedBox(height: AppDimens.cardGap),
                       AppCard(
                         width: double.infinity,
+                        padding: AppDimens.cardPaddingCompact,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppCaption(
+                                    '${selected.goal.metric.label} trend',
+                                  ),
+                                ),
+                                TrendRangeToggle(
+                                  value: state.range,
+                                  onChanged: cubit.load,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppDimens.cardInnerGap),
                             TrendBarChart(
                               series: selected.series,
                               color: selected.goal.metric.color,
@@ -143,17 +180,30 @@ class _ActivityGoalsView extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(height: AppDimens.cardGap),
+                      TrackerInsightsCard(
+                        insights: seriesInsights(
+                          selected.series,
+                          format: selected.goal.metric.formatWithUnit,
+                          noun: 'your activity',
+                        ),
+                      ),
                     ],
                     const SizedBox(height: AppDimens.sectionGap),
-                    Text('Workouts', style: context.text.headlineSmall),
+                    TrackerSectionTitle(
+                      'Workouts',
+                      actionLabel: 'All',
+                      onAction: () => context.pushNamed('activity-history'),
+                    ),
                     const SizedBox(height: AppDimens.cardGap),
                     if (snapshot.sessions.isEmpty)
                       const AppInfoNote(
                         message: 'No workouts tracked in this period yet.',
                       ),
                     for (final s in snapshot.sessions) ...[
-                      TrendLogTile(
-                        icon: Icons.directions_run_rounded,
+                      TrackerLogTile(
+                        id: s.startTime.millisecondsSinceEpoch,
+                        icon: _metric.icon,
                         color: AppColors.activityWorkouts,
                         title: s.activityType.label,
                         subtitle:

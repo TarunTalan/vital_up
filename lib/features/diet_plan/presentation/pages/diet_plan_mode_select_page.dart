@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -25,7 +26,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
           _ModeCard(
             title: 'Smart Mode',
             subtitle: 'Uses your health profile to calculate the perfect maintenance plan.',
-            icon: Icons.auto_awesome,
+            icon: const Icon(Icons.auto_awesome),
             onTap: () {
               context.pushNamed(
                 'diet-plan-result',
@@ -40,7 +41,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
           _ModeCard(
             title: 'Goal Mode',
             subtitle: 'Set a weight goal and timeframe. We calculate the optimal deficit/surplus.',
-            icon: Icons.track_changes,
+            icon: const Icon(Icons.track_changes),
             onTap: () {
               context.pushNamed(
                 'diet-plan-goal',
@@ -52,7 +53,15 @@ class DietPlanModeSelectPage extends StatelessWidget {
           _ModeCard(
             title: 'Manual Mode',
             subtitle: 'I know exactly what I want. Let me enter my macros directly.',
-            icon: Icons.edit_note,
+            icon: SvgPicture.asset(
+              'assets/icons/edit.svg',
+              width: AppDimens.iconMd,
+              height: AppDimens.iconMd,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).colorScheme.primary,
+                BlendMode.srcIn,
+              ),
+            ),
             onTap: () {
               context.pushNamed(
                 'diet-plan-manual',
@@ -69,7 +78,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
 class _ModeCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final IconData icon;
+  final Widget icon;
   final VoidCallback onTap;
 
   const _ModeCard({
@@ -87,7 +96,7 @@ class _ModeCard extends StatelessWidget {
       padding: AppDimens.cardPaddingCompact,
       child: Row(
         children: [
-          AppIconBadge(icon: Icon(icon), size: AppDimens.iconBadgeLarge),
+          AppIconBadge(icon: icon, size: AppDimens.iconBadgeLarge),
           const SizedBox(width: AppDimens.space16),
           Expanded(
             child: Column(

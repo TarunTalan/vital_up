@@ -2,14 +2,53 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 
 /// Ramp colour for stress level 1 (very calm) – 5 (very stressed).
 Color stressColor(num level) =>
     AppColors.stressLevels[(level.round() - 1).clamp(0, 4)];
 
-/// Emoji mood face that pops with an elastic bounce when selected.
+/// Face icon for stress level 1 (very calm) – 5 (very stressed).
+IconData moodIcon(num level) => const [
+  Icons.sentiment_very_satisfied_rounded,
+  Icons.sentiment_satisfied_rounded,
+  Icons.sentiment_neutral_rounded,
+  Icons.sentiment_dissatisfied_rounded,
+  Icons.sentiment_very_dissatisfied_rounded,
+][(level.round() - 1).clamp(0, 4)];
+
+extension StressTagIcon on StressTag {
+  IconData get icon => switch (this) {
+    StressTag.work => Icons.work_rounded,
+    StressTag.sleep => Icons.bedtime_rounded,
+    StressTag.family => Icons.home_rounded,
+    StressTag.health => Icons.health_and_safety_rounded,
+    StressTag.money => Icons.payments_rounded,
+    StressTag.social => Icons.groups_rounded,
+    StressTag.other => Icons.more_horiz_rounded,
+  };
+}
+
+/// Icon chip for a check-in tag.
+class StressTagChip extends StatelessWidget {
+  final StressTag tag;
+  final String? suffix;
+
+  const StressTagChip(this.tag, {super.key, this.suffix});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(tag.icon, size: AppDimens.iconXs),
+      label: Text(suffix == null ? tag.label : '${tag.label} · $suffix'),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// Mood face that pops with an elastic bounce when selected.
 class AnimatedMoodFace extends StatefulWidget {
-  final String emoji;
+  final IconData icon;
   final String label;
   final Color color;
   final bool selected;
@@ -17,7 +56,7 @@ class AnimatedMoodFace extends StatefulWidget {
 
   const AnimatedMoodFace({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.label,
     required this.color,
     required this.selected,
@@ -92,9 +131,12 @@ class _AnimatedMoodFaceState extends State<AnimatedMoodFace>
             child: AnimatedOpacity(
               duration: AppDurations.medium,
               opacity: widget.selected ? 1 : 0.85,
-              child: Text(
-                widget.emoji,
-                style: TextStyle(fontSize: AppDimens.moodFaceSize),
+              child: Icon(
+                widget.icon,
+                size: AppDimens.moodFaceSize,
+                color: widget.selected
+                    ? widget.color
+                    : context.vColors.grayText,
               ),
             ),
           ),
@@ -201,7 +243,8 @@ class _ConfettiPainter extends CustomPainter {
     for (final particle in particles) {
       final distance = spread * particle.speed * eased;
       // Gravity pulls pieces down as the burst fades.
-      final pos = origin +
+      final pos =
+          origin +
           Offset(
             math.cos(particle.angle) * distance,
             math.sin(particle.angle) * distance + spread * 0.6 * t * t,

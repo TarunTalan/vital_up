@@ -539,7 +539,15 @@ class _FoodScannerViewState extends State<FoodScannerView> {
               const SizedBox(height: AppDimens.space12),
               AppSecondaryButton(
                 label: 'Enter Details Manually',
-                leadingIcon: const Icon(Icons.edit_note_rounded),
+                leadingIcon: SvgPicture.asset(
+                  'assets/icons/edit.svg',
+                  width: AppDimens.iconMd,
+                  height: AppDimens.iconMd,
+                  colorFilter: ColorFilter.mode(
+                    Theme.of(context).colorScheme.primary,
+                    BlendMode.srcIn,
+                  ),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _openNutritionManualEntry(null);

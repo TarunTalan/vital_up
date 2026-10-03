@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/widgets/app_buttons.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/charts/trend_bar_chart.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
-import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
-import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 
-/// Home card: up to three goals with progress, the first goal's 7-day
-/// chart, and quick links to manage goals or start a workout.
+const _metric = TrackerMetric.activity;
+
+/// Home card: up to three activity goals with progress, and a one-tap
+/// workout start.
 class ActivityGoalsCard extends StatelessWidget {
   const ActivityGoalsCard({super.key});
 
@@ -28,85 +28,68 @@ class ActivityGoalsCard extends StatelessWidget {
     return BlocBuilder<ActivityGoalsCubit, ActivityGoalsState>(
       builder: (context, state) {
         if (state.snapshot == null) {
-          return AppCard(
-            width: double.infinity,
-            child: state.failed
-                ? DashboardCardError(
-                    title: 'Activity Goals',
-                    iconAsset: 'assets/icons/barbell.svg',
-                    onRetry: context.read<ActivityGoalsCubit>().load,
-                  )
-                : const DashboardCardLoading(),
+          return TrackerCardPlaceholder(
+            metric: _metric,
+            onRetry: state.failed
+                ? context.read<ActivityGoalsCubit>().load
+                : null,
           );
         }
         final goals = state.goals;
-        final first = goals.firstOrNull;
-        return AppCard(
-          width: double.infinity,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DashboardCardHeader(
-                title: 'Activity Goals',
-                iconAsset: 'assets/icons/barbell.svg',
-                trailing: CardLink(
-                  label: 'Manage',
-                  onTap: () => _push(context, 'activity-goals'),
+        final done = goals.where((g) => g.fraction >= 1).length;
+        return TrackerCard(
+          metric: _metric,
+          status: goals.isEmpty
+              ? TrackerStatus.noGoal
+              : done == goals.length
+              ? TrackerStatus.done
+              : TrackerStatus.of(
+                  value: goals.first.current,
+                  goal: goals.first.goal.target,
+                  paceFraction: TrackerStatus.dayPace(),
                 ),
+          statusLabel: goals.length > 1 && done < goals.length
+              ? '$done/${goals.length} done'
+              : null,
+          onOpen: () => _push(context, _metric.route),
+          actions: [
+            TrackerQuickAction(
+              label: _metric.logLabel,
+              icon: _metric.logIcon,
+              color: _metric.color,
+              filled: true,
+              onTap: () => _push(context, 'activity-tracking'),
+            ),
+            if (goals.isEmpty)
+              TrackerQuickAction(
+                label: 'Set a goal',
+                icon: Icons.flag_rounded,
+                color: _metric.color,
+                onTap: () => _push(context, _metric.route),
               ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              if (goals.isEmpty)
-                Text(
+          ],
+          child: goals.isEmpty
+              ? Text(
                   'Set a daily or weekly target for steps, distance, '
                   'calories, active minutes or workouts.',
-                  style: context.text.bodyMedium
-                      ?.copyWith(color: context.vColors.grayText),
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
                 )
-              else
-                for (final g in goals.take(_maxRows)) ...[
-                  GoalProgressRow(
-                    goal: g.goal,
-                    current: g.current,
-                    fraction: g.fraction,
-                  ),
-                  const SizedBox(height: AppDimens.space12),
-                ],
-              if (first != null) ...[
-                Text(
-                  '${first.goal.metric.label} · last 7 days',
-                  style: context.text.labelSmall
-                      ?.copyWith(color: context.vColors.grayText),
-                ),
-                const SizedBox(height: AppDimens.space8),
-                TrendBarChart(
-                  series: first.series,
-                  color: first.goal.metric.color,
-                  compact: true,
-                  valueFormatter: first.goal.metric.format,
-                ),
-              ],
-              const SizedBox(height: AppDimens.cardInnerGap),
-              Row(
-                children: [
-                  if (goals.isEmpty) ...[
-                    Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Set a goal',
-                        onTap: () => _push(context, 'activity-goals'),
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final g in goals.take(_maxRows)) ...[
+                      GoalProgressRow(
+                        goal: g.goal,
+                        current: g.current,
+                        fraction: g.fraction,
                       ),
-                    ),
-                    const SizedBox(width: AppDimens.space12),
+                      if (g != goals.take(_maxRows).last)
+                        const SizedBox(height: AppDimens.space12),
+                    ],
                   ],
-                  Expanded(
-                    child: AppPrimaryButton(
-                      label: 'Start workout',
-                      onTap: () => _push(context, 'activity-tracking'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
         );
       },
     );

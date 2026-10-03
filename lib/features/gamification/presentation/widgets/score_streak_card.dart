@@ -273,7 +273,14 @@ class CategoryPointsTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(category.icon, size: AppDimens.iconSm, color: color),
+          category.iconAsset != null
+              ? GameIcon(
+                  category.iconAsset!,
+                  fallback: category.icon,
+                  size: AppDimens.iconSm,
+                  color: color,
+                )
+              : Icon(category.icon, size: AppDimens.iconSm, color: color),
           const SizedBox(height: AppDimens.space6),
           Text(
             '${signed ? '+' : ''}${_points.format(points)}',

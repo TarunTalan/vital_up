@@ -1,35 +1,68 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/domain/entities/diet_progress.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
-import 'dashboard_card_header.dart';
-import 'trend_widgets.dart';
 
-/// Today's nutrition summary card shown on the Dashboard home tab.
-/// Requires [MealLogBloc] to be provided above this widget in the tree.
-///
-/// With an active [plan] it becomes the diet plan progress card: calories
-/// and macros against the plan, planned meals ticked off as they're logged,
-/// and a 7-day calories chart (needs a `TrendCubit<MealLogEntry>`).
+const _metric = TrackerMetric.nutrition;
+
+IconData mealTypeIcon(MealType type) => switch (type) {
+  MealType.breakfast => Icons.free_breakfast_rounded,
+  MealType.lunch => Icons.lunch_dining_rounded,
+  MealType.dinner => Icons.dinner_dining_rounded,
+  MealType.snack => Icons.bakery_dining_rounded,
+};
+
+String mealTypeLabel(MealType type) => switch (type) {
+  MealType.breakfast => 'Breakfast',
+  MealType.lunch => 'Lunch',
+  MealType.dinner => 'Dinner',
+  MealType.snack => 'Snack',
+};
+
+/// Macro targets in grams: from the plan, else split from the calorie goal
+/// (30% protein, 50% carbs, 20% fat), else general defaults.
+({double protein, double carbs, double fat}) macroTargets(
+  MealPlan? plan,
+  int? calorieGoal,
+) => (
+  protein:
+      plan?.totalProtein.toDouble() ??
+      (calorieGoal != null ? calorieGoal * 0.3 / 4 : 120),
+  carbs:
+      plan?.totalCarbs.toDouble() ??
+      (calorieGoal != null ? calorieGoal * 0.5 / 4 : 250),
+  fat:
+      plan?.totalFat.toDouble() ??
+      (calorieGoal != null ? calorieGoal * 0.2 / 9 : 65),
+);
+
+/// Home card: today's calories and macros against the plan (or calorie
+/// goal) and which meals are logged. Needs a [MealLogBloc] above it.
 class NutritionSummaryCard extends StatelessWidget {
-  /// Called when the user taps "View All" — navigate to MealLogHistoryPage.
+  /// Opens the meal history.
   final VoidCallback? onViewAll;
 
-  /// Called when a meal-type slot with no entry is tapped — open the scanner.
+  /// Opens the food scanner to log a meal.
   final VoidCallback? onScanMeal;
 
   final MealPlan? plan;
 
-  /// Opens the diet progress page (shown instead of "View All" with a plan).
+  /// Opens the nutrition detail page.
   final VoidCallback? onOpenProgress;
+
+  /// Starts the diet plan flow (shown when there's no plan).
+  final VoidCallback? onCreatePlan;
 
   const NutritionSummaryCard({
     super.key,
@@ -37,114 +70,114 @@ class NutritionSummaryCard extends StatelessWidget {
     this.onScanMeal,
     this.plan,
     this.onOpenProgress,
+    this.onCreatePlan,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MealLogBloc, MealLogState>(
       builder: (context, state) {
-        if (state is MealLogLoading) {
-          return const AppCard(
-            width: double.infinity,
-            child: DashboardCardLoading(),
-          );
-        }
-        if (state is MealLogLoaded) {
-          return _LoadedCard(
-            state: state,
-            plan: plan,
-            onViewAll: onViewAll,
-            onScanMeal: onScanMeal,
-            onOpenProgress: onOpenProgress,
-          );
-        }
-        if (state is MealLogError) {
-          return AppCard(
-            width: double.infinity,
-            child: DashboardCardError(
-              title: "Today's Nutrition",
-              iconAsset: 'assets/icons/fork_knife.svg',
-              onRetry: () =>
-                  context.read<MealLogBloc>().add(const LoadTodaysMeals()),
-            ),
-          );
-        }
-        return const SizedBox.shrink();
+        if (state is MealLogLoaded) return _loaded(context, state);
+        return TrackerCardPlaceholder(
+          metric: _metric,
+          onRetry: state is MealLogError
+              ? () => context.read<MealLogBloc>().add(const LoadTodaysMeals())
+              : null,
+        );
       },
     );
   }
-}
 
-class _LoadedCard extends StatelessWidget {
-  final MealLogLoaded state;
-  final MealPlan? plan;
-  final VoidCallback? onViewAll;
-  final VoidCallback? onScanMeal;
-  final VoidCallback? onOpenProgress;
-
-  const _LoadedCard({
-    required this.state,
-    this.plan,
-    this.onViewAll,
-    this.onScanMeal,
-    this.onOpenProgress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _loaded(BuildContext context, MealLogLoaded state) {
     final plan = this.plan;
-    final calorieGoal =
+    final goal =
         plan?.totalCalories.toDouble() ?? state.dailyCalorieGoal?.toDouble();
-    final goalCalories = state.dailyCalorieGoal;
-    return AppCard(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DashboardCardHeader(
-            title: plan != null ? "Today's Diet Plan" : "Today's Nutrition",
-            iconAsset: 'assets/icons/fork_knife.svg',
-            trailing: CardLink(
-              label: plan != null ? 'Progress' : 'Trends',
-              onTap: onOpenProgress ?? () {},
-            ),
+    final kcal = state.totalCalories;
+    final targets = macroTargets(plan, state.dailyCalorieGoal);
+    final left = goal == null ? null : goal - kcal;
+    return TrackerCard(
+      metric: _metric,
+      title: plan != null ? 'Diet plan' : null,
+      status: TrackerStatus.of(
+        value: state.entries.isEmpty ? null : kcal,
+        goal: goal,
+        direction: GoalDirection.near,
+      ),
+      onOpen: onOpenProgress,
+      actions: [
+        TrackerQuickAction(
+          label: _metric.logLabel,
+          icon: _metric.logIcon,
+          color: _metric.color,
+          filled: true,
+          onTap: onScanMeal,
+        ),
+        if (plan == null && onCreatePlan != null)
+          TrackerQuickAction(
+            label: 'Get a plan',
+            icon: Icons.auto_awesome_rounded,
+            color: _metric.color,
+            onTap: onCreatePlan,
+          )
+        else
+          TrackerQuickAction(
+            label: 'History',
+            icon: Icons.history_rounded,
+            color: _metric.color,
+            onTap: onViewAll,
           ),
-          const SizedBox(height: AppDimens.cardInnerGap),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
             children: [
-              _CalorieRing(
-                calories: state.totalCalories,
-                goal: calorieGoal,
-                progress: calorieGoal == null || calorieGoal <= 0
-                    ? null
-                    : (state.totalCalories / calorieGoal).clamp(0.0, 1.0),
+              TrackerRing(
+                size: context.w(AppDimens.calorieRing),
+                fraction: goal == null || goal <= 0 ? null : kcal / goal,
+                color: _metric.color,
+                center: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${kcal.round()}',
+                      style: context.text.titleSmall?.copyWith(
+                        color: context.colors.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'kcal',
+                      style: context.text.labelSmall?.copyWith(
+                        color: context.vColors.grayText,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: AppDimens.space20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _MacroBar(
+                    MacroBar(
                       label: 'Protein',
                       value: state.totalProteinG,
-                      maxValue: plan?.totalProtein.toDouble() ??
-                          (goalCalories != null ? goalCalories * 0.3 / 4 : 120),
+                      maxValue: targets.protein,
                       color: AppColors.protein,
                     ),
                     const SizedBox(height: AppDimens.space8),
-                    _MacroBar(
+                    MacroBar(
                       label: 'Carbs',
                       value: state.totalCarbsG,
-                      maxValue: plan?.totalCarbs.toDouble() ??
-                          (goalCalories != null ? goalCalories * 0.5 / 4 : 250),
+                      maxValue: targets.carbs,
                       color: AppColors.carbs,
                     ),
                     const SizedBox(height: AppDimens.space8),
-                    _MacroBar(
+                    MacroBar(
                       label: 'Fat',
                       value: state.totalFatG,
-                      maxValue: plan?.totalFat.toDouble() ??
-                          (goalCalories != null ? goalCalories * 0.2 / 9 : 65),
+                      maxValue: targets.fat,
                       color: AppColors.fat,
                     ),
                   ],
@@ -152,173 +185,65 @@ class _LoadedCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            left == null
+                ? 'Set a calorie goal to track against it.'
+                : left >= 0
+                ? '${left.round()} kcal left of ${goal!.round()}'
+                : '${(-left).round()} kcal over your ${goal!.round()} goal',
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
           const SizedBox(height: AppDimens.cardInnerGap),
           if (plan != null)
-            _PlannedMealSlots(
-              statuses: plannedMealStatuses(plan, state.entries),
-              onScanMeal: onScanMeal,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final s in plannedMealStatuses(plan, state.entries))
+                  Expanded(
+                    child: _MealSlot(
+                      mealType: s.type ?? MealType.snack,
+                      label: s.meal.name,
+                      caption: '${s.meal.calories} kcal',
+                      logged: s.logged,
+                      onTap: s.logged ? null : onScanMeal,
+                    ),
+                  ),
+              ],
             )
           else
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: MealType.values.map((mealType) {
-                final logged = state.loggedMealTypes.contains(mealType);
-                return Expanded(
-                  child: _MealSlot(
-                    mealType: mealType,
-                    logged: logged,
-                    onTap: logged ? null : onScanMeal,
+              children: [
+                for (final type in MealType.values)
+                  Expanded(
+                    child: _MealSlot(
+                      mealType: type,
+                      logged: state.loggedMealTypes.contains(type),
+                      onTap: state.loggedMealTypes.contains(type)
+                          ? null
+                          : onScanMeal,
+                    ),
                   ),
-                );
-              }).toList(),
+              ],
             ),
-          if (plan != null) ...[
-            const SizedBox(height: AppDimens.cardInnerGap),
-            Text(
-              'Calories · last 7 days',
-              style: context.text.labelSmall
-                  ?.copyWith(color: context.vColors.grayText),
-            ),
-            const SizedBox(height: AppDimens.space8),
-            MiniTrend<MealLogEntry>(color: context.colors.primary),
-          ],
         ],
       ),
     );
   }
 }
 
-/// One slot per planned meal (in plan order) with its planned kcal.
-class _PlannedMealSlots extends StatelessWidget {
-  final List<PlannedMealStatus> statuses;
-  final VoidCallback? onScanMeal;
-
-  const _PlannedMealSlots({required this.statuses, this.onScanMeal});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final s in statuses)
-          Expanded(
-            child: _MealSlot(
-              mealType: s.type ?? MealType.snack,
-              label: s.meal.name,
-              caption: '${s.meal.calories} kcal',
-              logged: s.logged,
-              onTap: s.logged ? null : onScanMeal,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _CalorieRing extends StatelessWidget {
-  final double calories;
-  final double? goal;
-  final double? progress;
-
-  const _CalorieRing({
-    required this.calories,
-    required this.goal,
-    required this.progress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: context.w(AppDimens.calorieRing),
-      child: CustomPaint(
-        painter: _RingPainter(
-          progress: progress ?? 0,
-          trackColor: context.vColors.track!,
-          progressColor: context.colors.primary,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimens.space12),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  calories.toInt().toString(),
-                  style: context.text.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: context.colors.onSurface,
-                    height: 1,
-                  ),
-                ),
-                Text(
-                  goal != null ? '/ ${goal!.toInt()}' : 'kcal',
-                  style: context.text.labelSmall
-                      ?.copyWith(color: context.vColors.grayText),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color trackColor;
-  final Color progressColor;
-
-  const _RingPainter({
-    required this.progress,
-    required this.trackColor,
-    required this.progressColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const strokeWidth = AppDimens.progressHeight;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-    const startAngle = -math.pi / 2;
-
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final progressPaint = Paint()
-      ..color = progressColor
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, trackPaint);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      2 * math.pi * progress,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.trackColor != trackColor ||
-      oldDelegate.progressColor != progressColor;
-}
-
-class _MacroBar extends StatelessWidget {
+/// Labelled macro progress bar ("Protein 64g").
+class MacroBar extends StatelessWidget {
   final String label;
   final double value;
   final double maxValue;
   final Color color;
 
-  const _MacroBar({
+  const MacroBar({
+    super.key,
     required this.label,
     required this.value,
     required this.maxValue,
@@ -328,7 +253,6 @@ class _MacroBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = maxValue > 0 ? (value / maxValue).clamp(0.0, 1.0) : 0.0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -339,12 +263,13 @@ class _MacroBar extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: context.text.labelSmall
-                    ?.copyWith(color: context.vColors.grayText),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.vColors.grayText,
+                ),
               ),
             ),
             Text(
-              '${value.toInt()}g',
+              '${value.round()} / ${maxValue.round()}g',
               style: context.text.labelSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: context.colors.onSurface,
@@ -356,7 +281,7 @@ class _MacroBar extends StatelessWidget {
         AppProgressBar(
           value: progress,
           color: color,
-          trackColor: color.withValues(alpha: 0.18),
+          trackColor: color.withValues(alpha: AppDimens.tintAlpha),
           height: AppDimens.space6,
         ),
       ],
@@ -364,12 +289,11 @@ class _MacroBar extends StatelessWidget {
   }
 }
 
+/// One meal slot: icon, name, optional kcal, logged tick or add.
 class _MealSlot extends StatelessWidget {
   final MealType mealType;
   final bool logged;
   final VoidCallback? onTap;
-
-  /// Overrides the meal-type name (planned meal names).
   final String? label;
   final String? caption;
 
@@ -381,81 +305,64 @@ class _MealSlot extends StatelessWidget {
     this.caption,
   });
 
-  String get _emoji {
-    switch (mealType) {
-      case MealType.breakfast: return '🌅';
-      case MealType.lunch:     return '☀️';
-      case MealType.dinner:    return '🌙';
-      case MealType.snack:     return '🍎';
-    }
-  }
-
-  String get _label {
-    switch (mealType) {
-      case MealType.breakfast: return 'Breakfast';
-      case MealType.lunch:     return 'Lunch';
-      case MealType.dinner:    return 'Dinner';
-      case MealType.snack:     return 'Snack';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final primary = context.colors.primary;
+    final accent = _metric.color;
     final v = context.vColors;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: AppDurations.fast,
-            width: AppDimens.iconBadge,
-            height: AppDimens.iconBadge,
-            decoration: BoxDecoration(
-              color: logged ? v.primaryTint : v.glassFill,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: logged ? primary : v.glassBorder!,
-                width: AppDimens.borderThin,
+    final name = label ?? mealTypeLabel(mealType);
+    return Semantics(
+      button: onTap != null,
+      label: '$name, ${logged ? 'logged' : 'not logged'}',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+          child: Column(
+            children: [
+              AnimatedContainer(
+                duration: AppDurations.fast,
+                width: AppDimens.iconBadge,
+                height: AppDimens.iconBadge,
+                decoration: BoxDecoration(
+                  color: logged ? v.primaryTint : v.glassFill,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: logged ? accent : v.glassBorder!,
+                    width: AppDimens.borderThin,
+                  ),
+                ),
+                child: Icon(
+                  logged ? Icons.check_rounded : mealTypeIcon(mealType),
+                  size: AppDimens.iconMd,
+                  color: logged ? accent : v.grayText,
+                ),
               ),
-            ),
-            child: Center(
-              child: FittedBox(
+              const SizedBox(height: AppDimens.space4),
+              FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text(_emoji, style: context.text.titleSmall),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  style: context.text.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: logged ? accent : v.grayText,
+                  ),
+                ),
               ),
-            ),
+              if (caption != null)
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    caption!,
+                    maxLines: 1,
+                    style: context.text.labelSmall?.copyWith(color: v.grayText),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: AppDimens.space4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label ?? _label,
-              maxLines: 1,
-              style: context.text.labelSmall?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: logged ? primary : v.grayText,
-              ),
-            ),
-          ),
-          if (caption != null)
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                caption!,
-                maxLines: 1,
-                style: context.text.labelSmall?.copyWith(color: v.grayText),
-              ),
-            ),
-          const SizedBox(height: AppDimens.space2),
-          Icon(
-            logged ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
-            size: AppDimens.iconXs,
-            color: logged ? primary : v.grayText,
-          ),
-        ],
+        ),
       ),
     );
   }

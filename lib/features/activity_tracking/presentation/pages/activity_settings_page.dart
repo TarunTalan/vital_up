@@ -528,7 +528,7 @@ class _OfflineMapTileState extends State<_OfflineMapTile> {
     return _SettingsTile(
       icon: Icons.download_for_offline_rounded,
       title: 'Download offline map',
-      subtitle: 'Available on the tracking screen via the ⚙ button',
+      subtitle: 'Available on the tracking screen via the settings button',
       trailing: Icon(
         Icons.info_outline_rounded,
         color: context.vColors.grayText,

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -412,10 +413,14 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                   child: Row(
                     children: [
                       AppIconBadge(
-                        icon: Icon(
-                          widget.parsedNutrition != null ? Icons.document_scanner_outlined : Icons.edit_note_rounded,
-                          color: primary,
-                        ),
+                        icon: widget.parsedNutrition != null
+                            ? Icon(Icons.document_scanner_outlined, color: primary)
+                            : SvgPicture.asset(
+                                'assets/icons/edit.svg',
+                                width: AppDimens.iconMd,
+                                height: AppDimens.iconMd,
+                                colorFilter: ColorFilter.mode(primary, BlendMode.srcIn),
+                              ),
                       ),
                       const SizedBox(width: AppDimens.space12),
                       Expanded(

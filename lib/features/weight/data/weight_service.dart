@@ -188,6 +188,32 @@ class WeightService {
     return _prefs.getDouble(_keyTargetKg);
   }
 
+  /// Saves the goal weight: cached right away (so charts update offline)
+  /// and written to the profile, queued when offline.
+  Future<void> setTargetKg(double kg) async {
+    await _prefs.setDouble(_keyTargetKg, kg);
+    final userId = _userId;
+    if (userId == null) return;
+    await _cache.write(targetCacheKey(userId), kg);
+    try {
+      await _pendingWrites.sendOrQueue(
+        _client,
+        PendingWrite.update(
+          'user_health_data',
+          values: {
+            'target_weight': double.parse(kg.toStringAsFixed(1)),
+            'target_weight_unit': WeightUnit.kg.label,
+          },
+          match: {'id': userId},
+          userId: userId,
+          key: 'health:target_weight:$userId',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Goal weight not synced: $e');
+    }
+  }
+
   /// Last weight of each day over [range] days, vs the goal weight.
   Future<TrendData<WeightLogCache>> trend(TrendRange range) async {
     final days = lastNDays(range.days);

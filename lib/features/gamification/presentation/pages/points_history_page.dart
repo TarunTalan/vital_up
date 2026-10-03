@@ -12,6 +12,7 @@ import 'package:vital_up/features/gamification/domain/entities/player_stats.dart
 import 'package:vital_up/features/gamification/domain/entities/point_event.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
 final _points = NumberFormat.decimalPattern();
@@ -245,11 +246,18 @@ class _RulesCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                category.icon,
-                color: category.color,
-                size: AppDimens.iconMd,
-              ),
+              category.iconAsset != null
+                  ? GameIcon(
+                      category.iconAsset!,
+                      fallback: category.icon,
+                      color: category.color,
+                      size: AppDimens.iconMd,
+                    )
+                  : Icon(
+                      category.icon,
+                      color: category.color,
+                      size: AppDimens.iconMd,
+                    ),
               const SizedBox(width: AppDimens.space8),
               Text(category.label, style: context.text.titleSmall),
             ],
