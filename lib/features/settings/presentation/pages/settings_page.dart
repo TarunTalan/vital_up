@@ -267,6 +267,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   _buildDivider(),
                   InkWell(
+                    onTap: () => context.pushNamed('my-goals'),
+                    child: _buildSettingRow(
+                      icon: Icons.flag_rounded,
+                      title: 'My Goals',
+                      subtitle: 'Water, sleep, weight, screen time and more',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  InkWell(
                     onTap: () => context.pushNamed('reminders'),
                     child: _buildSettingRow(
                       icon: Icons.alarm_rounded,

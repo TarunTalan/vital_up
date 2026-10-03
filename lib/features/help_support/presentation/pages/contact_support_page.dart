@@ -50,10 +50,7 @@ void openContactSupport(
 class ContactSupportPage extends StatefulWidget {
   final ContactSupportArgs args;
 
-  const ContactSupportPage({
-    super.key,
-    this.args = const ContactSupportArgs(),
-  });
+  const ContactSupportPage({super.key, this.args = const ContactSupportArgs()});
 
   @override
   State<ContactSupportPage> createState() => _ContactSupportPageState();
@@ -71,10 +68,12 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
   void initState() {
     super.initState();
     _selectedCategory = widget.args.initialCategory;
-    _subjectController =
-        TextEditingController(text: widget.args.initialSubject);
-    _descriptionController =
-        TextEditingController(text: widget.args.initialDescription);
+    _subjectController = TextEditingController(
+      text: widget.args.initialSubject,
+    );
+    _descriptionController = TextEditingController(
+      text: widget.args.initialDescription,
+    );
     _loadPackageInfo();
   }
 
@@ -98,7 +97,9 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
 
   Future<void> _submitTicket() async {
     final rawSubject = _subjectController.text.trim();
-    final subject = rawSubject.isNotEmpty ? rawSubject : _selectedCategory.label;
+    final subject = rawSubject.isNotEmpty
+        ? rawSubject
+        : _selectedCategory.label;
     final description = _descriptionController.text.trim();
 
     if (description.isEmpty) {
@@ -125,10 +126,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: _kSupportEmail,
-      queryParameters: {
-        'subject': emailSubject,
-        'body': emailBody,
-      },
+      queryParameters: {'subject': emailSubject, 'body': emailBody},
     );
 
     try {
@@ -140,7 +138,10 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       if (!launched) {
         await _fallbackCopyToClipboard(emailBody);
       } else if (mounted) {
-        showSuccessSnackBar(context, 'Support mail opened in your email client.');
+        showSuccessSnackBar(
+          context,
+          'Support mail opened in your email client.',
+        );
         context.pop();
       }
     } catch (e) {
@@ -162,10 +163,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
   }
 
   Future<void> _openDirectEmail() async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: _kSupportEmail,
-    );
+    final Uri emailUri = Uri(scheme: 'mailto', path: _kSupportEmail);
     try {
       final launched = await launchUrl(
         emailUri,
@@ -234,7 +232,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
             label: 'Issue category',
             value: _selectedCategory,
             items: SupportCategory.values,
-            itemLabel: (cat) => '${cat.icon}  ${cat.label}',
+            itemLabel: (cat) => cat.label,
             onChanged: (val) {
               if (val != null) {
                 setState(() => _selectedCategory = val);

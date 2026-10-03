@@ -45,7 +45,10 @@ class _AboutPageState extends State<AboutPage> {
     );
 
     try {
-      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
       if (!launched) {
         await launchUrl(webFallback, mode: LaunchMode.externalApplication);
       }
@@ -53,7 +56,7 @@ class _AboutPageState extends State<AboutPage> {
       if (mounted) {
         showSuccessSnackBar(
           context,
-          'Thank you for rating VitalUp $_selectedRating ⭐!',
+          'Thank you for rating VitalUp $_selectedRating stars!',
         );
       }
     }
@@ -67,7 +70,10 @@ class _AboutPageState extends State<AboutPage> {
   Future<void> _submitFeedback() async {
     final feedbackText = _feedbackController.text.trim();
     if (feedbackText.isEmpty) {
-      showErrorSnackBar(context, 'Please enter your feedback before submitting.');
+      showErrorSnackBar(
+        context,
+        'Please enter your feedback before submitting.',
+      );
       return;
     }
 
@@ -78,9 +84,12 @@ class _AboutPageState extends State<AboutPage> {
       info = await _packageInfo;
     } catch (_) {}
 
-    final ver = info != null ? '${info.version} (${info.buildNumber})' : '1.0.0 (1)';
+    final ver = info != null
+        ? '${info.version} (${info.buildNumber})'
+        : '1.0.0 (1)';
     final subject = 'VitalUp Feedback ($_selectedRating Stars)';
-    final body = '''
+    final body =
+        '''
 Rating: $_selectedRating / 5 Stars
 
 Feedback:
@@ -95,10 +104,7 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: 'support@vitalup.app',
-      queryParameters: {
-        'subject': subject,
-        'body': body,
-      },
+      queryParameters: {'subject': subject, 'body': body},
     );
 
     try {
@@ -107,7 +113,11 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
-        await Clipboard.setData(ClipboardData(text: 'To: support@vitalup.app\nSubject: $subject\n\n$body'));
+        await Clipboard.setData(
+          ClipboardData(
+            text: 'To: support@vitalup.app\nSubject: $subject\n\n$body',
+          ),
+        );
         if (mounted) {
           showSuccessSnackBar(
             context,
@@ -115,11 +125,18 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
           );
         }
       } else if (mounted) {
-        showSuccessSnackBar(context, 'Thank you! Email opened in your mail app.');
+        showSuccessSnackBar(
+          context,
+          'Thank you! Email opened in your mail app.',
+        );
         _feedbackController.clear();
       }
     } catch (_) {
-      await Clipboard.setData(ClipboardData(text: 'To: support@vitalup.app\nSubject: $subject\n\n$body'));
+      await Clipboard.setData(
+        ClipboardData(
+          text: 'To: support@vitalup.app\nSubject: $subject\n\n$body',
+        ),
+      );
       if (mounted) {
         showSuccessSnackBar(
           context,
@@ -221,7 +238,9 @@ class _HeroBanner extends StatelessWidget {
         Text(
           'Your Health, Fitness & Longevity Companion',
           textAlign: TextAlign.center,
-          style: context.text.bodyMedium?.copyWith(color: context.colors.primary),
+          style: context.text.bodyMedium?.copyWith(
+            color: context.colors.primary,
+          ),
         ),
         const SizedBox(height: AppDimens.space12),
         FutureBuilder<PackageInfo>(
@@ -382,7 +401,8 @@ class _FeatureHighlights extends StatelessWidget {
       icon: Icons.directions_run_rounded,
       color: AppColors.primary,
       title: 'Precision GPS Tracking',
-      desc: 'Mapbox vector maps, customizable live HUD, and Voice Coach intervals.',
+      desc:
+          'Mapbox vector maps, customizable live HUD, and Voice Coach intervals.',
     ),
     (
       icon: Icons.water_drop_rounded,
@@ -400,19 +420,22 @@ class _FeatureHighlights extends StatelessWidget {
       icon: Icons.camera_alt_rounded,
       color: AppColors.protein,
       title: 'AI Food Scanner & Vita',
-      desc: 'Instant offline ML Kit nutrition OCR and personalized diet planning.',
+      desc:
+          'Instant offline ML Kit nutrition OCR and personalized diet planning.',
     ),
     (
       icon: Icons.phone_android_rounded,
       color: ActivityColors.accentPurple,
       title: 'Screen Time Wellness',
-      desc: '7-day usage trends, daily averages, and nighttime digital detox nudges.',
+      desc:
+          '7-day usage trends, daily averages, and nighttime digital detox nudges.',
     ),
     (
       icon: Icons.sync_rounded,
       color: AppColors.success,
       title: 'Offline First & Health Sync',
-      desc: 'Encrypted Isar databases with Health Connect and Supabase cloud sync.',
+      desc:
+          'Encrypted Isar databases with Health Connect and Supabase cloud sync.',
     ),
   ];
 
@@ -436,7 +459,9 @@ class _FeatureHighlights extends StatelessWidget {
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       f.desc,
-                      style: context.text.bodySmall?.copyWith(color: v.grayText),
+                      style: context.text.bodySmall?.copyWith(
+                        color: v.grayText,
+                      ),
                     ),
                   ],
                 ),
@@ -483,7 +508,7 @@ class _Footer extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'Made with ❤️ for a healthier world.',
+          'Made with care for a healthier world.',
           textAlign: TextAlign.center,
           style: context.text.bodySmall?.copyWith(color: grey),
         ),
