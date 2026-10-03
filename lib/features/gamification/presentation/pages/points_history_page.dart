@@ -42,6 +42,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      onRefresh: () async => setState(() => _data = _load()),
       header: const AppPageHeader(title: 'Points'),
       body: FutureBuilder<_HistoryData>(
         future: _data,

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
@@ -33,7 +34,8 @@ class AppPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = context.vColors;
     final canPop = Navigator.of(context).canPop();
-    final hasBack = showBack && (onBack != null || canPop);
+    final isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    final hasBack = showBack && (onBack != null || canPop || !isDashboard);
 
     Widget header = Container(
       width: double.infinity,
@@ -54,7 +56,13 @@ class AppPageHeader extends StatelessWidget {
               children: [
                 if (hasBack) ...[
                   BackIcon(
-                    onClick: onBack ?? () => Navigator.of(context).maybePop(),
+                    onClick: onBack ?? () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        context.goNamed('dashboard');
+                      }
+                    },
                   ),
                   const SizedBox(width: AppDimens.space12),
                 ],
@@ -121,7 +129,8 @@ class AppTitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final hasBack = onBack != null || canPop;
+    final isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    final hasBack = onBack != null || canPop || !isDashboard;
     // Mirrors the back button so the title stays optically centred.
     const slot = SizedBox.square(dimension: AppDimens.backButtonSize);
 
@@ -137,7 +146,13 @@ class AppTitleBar extends StatelessWidget {
             children: [
               if (hasBack)
                 BackIcon(
-                  onClick: onBack ?? () => Navigator.of(context).maybePop(),
+                  onClick: onBack ?? () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      context.goNamed('dashboard');
+                    }
+                  },
                 )
               else
                 slot,

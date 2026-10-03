@@ -750,6 +750,8 @@ Future<void> initDependencies() async {
       sl<SupabaseClient>(),
       sl<WaterIntakeService>(),
       sl<GamificationRepository>(),
+      activityGoals: sl<ActivityGoalsRepository>(),
+      mealLogs: sl<GetMealLogHistory>(),
     ),
   );
 

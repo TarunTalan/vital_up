@@ -55,3 +55,22 @@ Future<int> addWaterInBackground(String userId, int ml) async {
       .findAll();
   return today.fold<int>(0, (sum, l) => sum + l.amountMl);
 }
+
+/// Reads today's water total from Isar in a background isolate.
+Future<int> getTodayWaterInBackground(String userId) async {
+  DartPluginRegistrant.ensureInitialized();
+  final isar =
+      Isar.getInstance() ??
+      await Isar.open(
+        IsarService.schemas,
+        directory: (await getApplicationDocumentsDirectory()).path,
+      );
+  final now = DateTime.now();
+  final today = await isar.waterLogCaches
+      .filter()
+      .userIdEqualTo(userId)
+      .timestampGreaterThan(DateTime(now.year, now.month, now.day))
+      .findAll();
+  return today.fold<int>(0, (sum, l) => sum + l.amountMl);
+}
+

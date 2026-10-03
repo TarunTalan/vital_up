@@ -91,6 +91,7 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
             entries?.skip(podium.length).toList() ?? const <LeaderboardEntry>[];
 
         return AppScaffold(
+          onRefresh: () async => cubit.load(),
           header: AppPageHeader(
             title: community.name,
             subtitle: community.rankedOn,

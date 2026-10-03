@@ -102,6 +102,7 @@ class _FriendsViewState extends State<_FriendsView> {
         final cubit = context.read<FriendsCubit>();
         final friends = state.friends;
         return AppScaffold(
+          onRefresh: () async => cubit.load(),
           header: const AppPageHeader(title: 'Friends'),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

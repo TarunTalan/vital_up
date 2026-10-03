@@ -19,6 +19,7 @@ class ScreenTimeTrendsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      onRefresh: () async => context.read<ScreenTimeCubit>().loadStats(),
       header: const AppPageHeader(title: 'Screen Time Trends'),
       body: BlocBuilder<ScreenTimeCubit, ScreenTimeState>(
         builder: (context, state) {

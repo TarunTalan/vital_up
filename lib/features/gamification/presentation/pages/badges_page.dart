@@ -28,6 +28,7 @@ class _BadgesPageState extends State<BadgesPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      onRefresh: () async => setState(() => _badges = _load()),
       header: const AppPageHeader(title: 'Badges'),
       body: FutureBuilder<List<GameBadge>>(
         future: _badges,

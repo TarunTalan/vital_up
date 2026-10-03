@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -123,11 +124,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// A tapped push opens the screen its notification links to.
-  /// The home screen widget was tapped (it links to the water screen).
+  /// The home screen widget was tapped (routes to water, scan, activity, vita, or login).
   void _openWidgetRoute(Uri? uri) {
     final route = HomeWidgetService.routeOf(uri);
     if (!mounted || route == null) return;
-    if (notificationLinkableRoutes.contains(route)) context.pushNamed(route);
+    HomeWidgetService.navigateWithBackstack(context, route);
   }
 
   void _openPush(PushOpen open) {
@@ -380,6 +381,27 @@ class _HomeTabState extends State<_HomeTab> {
     super.dispose();
   }
 
+  Future<void> _refreshAllData() async {
+    HapticFeedback.lightImpact();
+    if (!mounted) return;
+    context.read<WaterIntakeCubit>().reload();
+    context.read<SleepCubit>().loadSleepData();
+    context.read<TrendCubit<SleepSessionInfo>>().load();
+    context.read<ScreenTimeCubit>().loadStats();
+    context.read<ActivityGoalsCubit>().load();
+    context.read<StressCheckInCubit>().load();
+    context.read<MealLogBloc>().add(const LoadTodaysMeals());
+    context.read<DietPlanCubit>().loadActiveMealPlan();
+    context.read<GamificationCubit>().sync();
+    context.read<NotificationsCubit>().load();
+
+    await sl<HomeWidgetService>().refresh();
+
+    if (mounted) {
+      showSuccessSnackBar(context, 'Widget & health data refreshed');
+    }
+  }
+
   Future<void> _push(String route, {Object? extra}) async {
     final meals = context.read<MealLogBloc>();
     final calories = context.read<TrendCubit<MealLogEntry>>();
@@ -454,18 +476,21 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.only(
-                    top: AppDimens.sectionGap,
-                    bottom: bottomInset,
-                  ),
-                  child: ResponsiveCenter(
-                    child: Padding(
-                      padding: context.pagePadding,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const ScoreStreakCard(),
+                child: RefreshIndicator(
+                  onRefresh: _refreshAllData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      top: AppDimens.sectionGap,
+                      bottom: bottomInset,
+                    ),
+                    child: ResponsiveCenter(
+                      child: Padding(
+                        padding: context.pagePadding,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const ScoreStreakCard(),
                           const SizedBox(height: AppDimens.cardGap),
                           BlocListener<MealLogBloc, MealLogState>(
                             // A newly logged meal moves today's calories bar.
@@ -521,12 +546,13 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 }
 
 /// SVG that picks up the surrounding [IconTheme] colour and size.
