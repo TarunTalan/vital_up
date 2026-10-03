@@ -19,4 +19,5 @@
     <color name="widget_carbs">#FFFBBF24</color>
     <color name="widget_fat">#FF60A5FA</color>
     <color name="widget_action_bg">#FF253238</color>
+    <color name="widget_btn_text">#FF000000</color>
 </resources>

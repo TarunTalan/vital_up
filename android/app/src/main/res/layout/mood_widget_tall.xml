@@ -378,7 +378,7 @@
             android:paddingTop="9dp"
             android:paddingBottom="9dp"
             android:text="Check In"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/widget_btn_text"
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
