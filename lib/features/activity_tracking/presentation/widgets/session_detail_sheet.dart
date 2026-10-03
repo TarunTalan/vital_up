@@ -142,7 +142,7 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
               achieved: session.targetAchieved,
               title:
                   'Target: ${formatActivityTarget(session.targetType, targetValue)}',
-              subtitle: session.targetAchieved ? 'Achieved ✓' : 'Not achieved',
+              subtitle: session.targetAchieved ? 'Achieved' : 'Not achieved',
             ),
           ],
           if (!session.stepCountReliable) ...[

@@ -1,26 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
-import 'dashboard_card_header.dart';
 import 'mood_widgets.dart';
-import 'trend_widgets.dart';
+import 'tracker_log_sheets.dart';
 
-/// "How are you feeling?" — tap a face, add what's behind it, log it.
-/// Celebrates each log, keeps a daily streak and a 7-day mood strip.
+const _metric = TrackerMetric.mood;
+
+/// Home card: tap a face to check in right here, optionally add what's
+/// behind it. Celebrates each log, keeps a daily streak and a 7-day strip.
 class StressCheckInCard extends StatelessWidget {
   const StressCheckInCard({super.key});
 
-  Future<void> _openTrends(BuildContext context) async {
+  Future<void> _open(BuildContext context) async {
     final cubit = context.read<StressCheckInCubit>();
-    await context.pushNamed('stress-trends');
+    await context.pushNamed(_metric.route);
     cubit.load();
   }
 
@@ -29,23 +33,21 @@ class StressCheckInCard extends StatelessWidget {
     return BlocBuilder<StressCheckInCubit, StressCheckInState>(
       builder: (context, state) {
         final cubit = context.read<StressCheckInCubit>();
-        final accent = stressColor(state.selectedLevel ?? state.today?.level ?? 3);
-        return AppCard(
-          width: double.infinity,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Column(
+        final today = state.today;
+        final accent = stressColor(state.selectedLevel ?? today?.level ?? 3);
+        return Stack(
+          children: [
+            TrackerCard(
+              metric: _metric,
+              status: today == null
+                  ? TrackerStatus.notLogged
+                  : TrackerStatus.done,
+              statusLabel: today == null ? null : 'Checked in',
+              onOpen: () => _open(context),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DashboardCardHeader(
-                    title: 'How are you feeling?',
-                    icon: Icons.self_improvement_rounded,
-                    badgeColor: AppColors.stressLevels.first,
-                    trailing: CardLink(onTap: () => _openTrends(context)),
-                  ),
-                  const SizedBox(height: AppDimens.space8),
-                  _StreakPill(streak: state.streak, loggedToday: state.today != null),
+                  _StreakPill(streak: state.streak, loggedToday: today != null),
                   const SizedBox(height: AppDimens.cardInnerGap),
                   AnimatedSwitcher(
                     duration: AppDurations.medium,
@@ -61,21 +63,24 @@ class StressCheckInCard extends StatelessWidget {
                         ? _Picker(key: const ValueKey('picker'), state: state)
                         : _Logged(
                             key: const ValueKey('logged'),
-                            checkIn: state.today!,
+                            checkIn: today!,
                             onEdit: cubit.edit,
                           ),
                   ),
                   const SizedBox(height: AppDimens.cardInnerGap),
-                  Divider(height: AppDimens.borderThin, color: context.vColors.divider),
+                  Divider(
+                    height: AppDimens.borderThin,
+                    color: context.vColors.divider,
+                  ),
                   const SizedBox(height: AppDimens.space12),
                   _MoodStrip(week: state.week),
                 ],
               ),
-              Positioned.fill(
-                child: ConfettiBurst(trigger: state.celebrations, color: accent),
-              ),
-            ],
-          ),
+            ),
+            Positioned.fill(
+              child: ConfettiBurst(trigger: state.celebrations, color: accent),
+            ),
+          ],
         );
       },
     );
@@ -90,11 +95,13 @@ class _StreakPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = streak == 0
-        ? 'Log today to start a streak'
+    final active = streak > 0;
+    final color = active ? AppColors.streak : context.vColors.grayText!;
+    final text = !active
+        ? 'Check in today to start a streak'
         : loggedToday
-            ? '$streak-day streak'
-            : '$streak-day streak · log today to keep it';
+        ? '$streak-day streak'
+        : '$streak-day streak · check in to keep it';
     return Align(
       alignment: Alignment.centerLeft,
       child: AnimatedContainer(
@@ -104,15 +111,28 @@ class _StreakPill extends StatelessWidget {
           vertical: AppDimens.space4,
         ),
         decoration: BoxDecoration(
-          color: AppColors.streak.withValues(alpha: streak > 0 ? 0.18 : 0.08),
+          color: color.withValues(alpha: AppDimens.tintAlpha),
           borderRadius: BorderRadius.circular(AppDimens.radiusPill),
         ),
-        child: Text(
-          '${streak > 0 ? '🔥 ' : ''}$text',
-          style: context.text.labelSmall?.copyWith(
-            color: streak > 0 ? AppColors.streak : context.vColors.grayText,
-            fontWeight: FontWeight.w600,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              active
+                  ? Icons.local_fire_department_rounded
+                  : Icons.local_fire_department_outlined,
+              size: AppDimens.iconXs,
+              color: color,
+            ),
+            const SizedBox(width: AppDimens.space4),
+            Text(
+              text,
+              style: context.text.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -131,36 +151,7 @@ class _Picker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            for (var l = 1; l <= 5; l++)
-              AnimatedMoodFace(
-                emoji: StressCheckIn.emojis[l - 1],
-                label: StressCheckIn.labels[l - 1],
-                color: stressColor(l),
-                selected: level == l,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  cubit.selectLevel(l);
-                },
-              ),
-          ],
-        ),
-        const SizedBox(height: AppDimens.space12),
-        AnimatedSwitcher(
-          duration: AppDurations.fast,
-          child: Text(
-            level == null
-                ? 'Tap a face to check in'
-                : StressCheckIn.labels[level - 1],
-            key: ValueKey(level),
-            textAlign: TextAlign.center,
-            style: context.text.titleSmall?.copyWith(
-              color: level == null ? context.vColors.grayText : stressColor(level),
-            ),
-          ),
-        ),
+        MoodLevelPicker(selected: level, onSelected: cubit.selectLevel),
         AnimatedSize(
           duration: AppDurations.slow,
           curve: Curves.easeInOutCubic,
@@ -174,22 +165,14 @@ class _Picker extends StatelessWidget {
                     children: [
                       Text(
                         "What's on your mind? (optional)",
-                        style: context.text.bodySmall
-                            ?.copyWith(color: context.vColors.grayText),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.vColors.grayText,
+                        ),
                       ),
                       const SizedBox(height: AppDimens.space8),
-                      Wrap(
-                        spacing: AppDimens.space8,
-                        runSpacing: AppDimens.space8,
-                        children: [
-                          for (final tag in StressTag.values)
-                            FilterChip(
-                              label: Text('${tag.emoji} ${tag.label}'),
-                              selected: state.selectedTags.contains(tag),
-                              showCheckmark: false,
-                              onSelected: (_) => cubit.toggleTag(tag),
-                            ),
-                        ],
+                      StressTagPicker(
+                        selected: state.selectedTags,
+                        onToggle: cubit.toggleTag,
                       ),
                       const SizedBox(height: AppDimens.cardInnerGap),
                       Row(
@@ -205,7 +188,7 @@ class _Picker extends StatelessWidget {
                           ],
                           Expanded(
                             child: AppPrimaryButton(
-                              label: state.editing ? 'Update' : 'Log mood',
+                              label: state.editing ? 'Update' : 'Check in',
                               onTap: () {
                                 HapticFeedback.mediumImpact();
                                 cubit.submit();
@@ -251,11 +234,12 @@ class _Logged extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.25),
+              color: color.withValues(alpha: AppDimens.tintBorderAlpha),
             ),
-            child: Text(
-              checkIn.emoji,
-              style: const TextStyle(fontSize: AppDimens.moodFaceSize),
+            child: Icon(
+              moodIcon(checkIn.level),
+              size: AppDimens.moodFaceSize,
+              color: color,
             ),
           ),
         ),
@@ -272,20 +256,33 @@ class _Logged extends StatelessWidget {
               Text(
                 checkIn.tags.isEmpty
                     ? message
-                    : checkIn.tags.map((t) => '${t.emoji} ${t.label}').join('  '),
-                style: context.text.bodySmall
-                    ?.copyWith(color: context.vColors.grayText),
+                    : checkIn.tags.map((t) => t.label).join(' · '),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.vColors.grayText,
+                ),
               ),
             ],
           ),
         ),
-        TextButton(onPressed: onEdit, child: const Text('Edit')),
+        TextButton.icon(
+          onPressed: onEdit,
+          icon: SvgPicture.asset(
+            'assets/icons/edit.svg',
+            width: AppDimens.iconSm,
+            height: AppDimens.iconSm,
+            colorFilter: ColorFilter.mode(
+              Theme.of(context).colorScheme.primary,
+              BlendMode.srcIn,
+            ),
+          ),
+          label: const Text('Edit'),
+        ),
       ],
     );
   }
 }
 
-/// Last 7 days as coloured dots (grey = no check-in), today emphasised.
+/// Last 7 days as mood icons (empty ring = no check-in), today emphasised.
 class _MoodStrip extends StatelessWidget {
   final List<StressCheckIn?> week;
 
@@ -302,16 +299,14 @@ class _MoodStrip extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedContainer(
-                duration: AppDurations.medium,
-                width: AppDimens.moodStripDot,
-                height: AppDimens.moodStripDot,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: i < week.length && week[i] != null
-                      ? stressColor(week[i]!.level)
-                      : v.track,
-                ),
+              Icon(
+                i < week.length && week[i] != null
+                    ? moodIcon(week[i]!.level)
+                    : Icons.radio_button_unchecked_rounded,
+                size: AppDimens.iconMd,
+                color: i < week.length && week[i] != null
+                    ? stressColor(week[i]!.level)
+                    : v.track,
               ),
               const SizedBox(height: AppDimens.space4),
               Text(

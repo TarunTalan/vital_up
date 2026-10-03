@@ -11,12 +11,13 @@ enum ScoreCategory {
     Icons.self_improvement_rounded,
   ),
   fitness('Fitness', AppColors.scoreFitness, Icons.directions_run_rounded),
-  bonus('Bonus', AppColors.scoreBonus, Icons.auto_awesome_rounded);
+  bonus('Bonus', AppColors.scoreBonus, Icons.auto_awesome_rounded, 'assets/icons/bonus.svg');
 
   final String label;
   final Color color;
   final IconData icon;
-  const ScoreCategory(this.label, this.color, this.icon);
+  final String? iconAsset;
+  const ScoreCategory(this.label, this.color, this.icon, [this.iconAsset]);
 
   /// The three categories users earn in directly.
   static const scored = [nutrition, lifestyle, fitness];

@@ -51,19 +51,19 @@ class ScreenTimeWeeklySummary extends Equatable {
 
   String get wellnessRating {
     final hours = todayDuration.inMinutes / 60.0;
-    if (hours <= 2.5) return 'Mindful 🌿';
-    if (hours <= 4.5) return 'Balanced 📱';
-    return 'Heavy Usage ⚠️';
+    if (hours <= 2.5) return 'Mindful';
+    if (hours <= 4.5) return 'Balanced';
+    return 'Heavy usage';
   }
 
   @override
   List<Object?> get props => [
-        dailyHistory,
-        averageDuration,
-        lowestDay,
-        highestDay,
-        todayDuration,
-        changeVsYesterdayPct,
-        dailyGoalMinutes,
-      ];
+    dailyHistory,
+    averageDuration,
+    lowestDay,
+    highestDay,
+    todayDuration,
+    changeVsYesterdayPct,
+    dailyGoalMinutes,
+  ];
 }
