@@ -104,12 +104,10 @@ class _LoadedCard extends StatelessWidget {
           DashboardCardHeader(
             title: plan != null ? "Today's Diet Plan" : "Today's Nutrition",
             iconAsset: 'assets/icons/fork_knife.svg',
-            trailing: plan != null
-                ? CardLink(label: 'Progress', onTap: onOpenProgress ?? () {})
-                : TextButton(
-                    onPressed: onViewAll,
-                    child: const Text('View All →'),
-                  ),
+            trailing: CardLink(
+              label: plan != null ? 'Progress' : 'Trends',
+              onTap: onOpenProgress ?? () {},
+            ),
           ),
           const SizedBox(height: AppDimens.cardInnerGap),
           Row(
