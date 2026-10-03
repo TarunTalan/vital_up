@@ -1,16 +1,18 @@
+import 'package:flutter/material.dart';
+
 enum FaqCategory {
-  all(label: 'All', icon: '✨'),
-  gettingStarted(label: 'Getting Started', icon: '🚀'),
-  activity(label: 'Activity & Workouts', icon: '🏃'),
-  hydration(label: 'Hydration', icon: '💧'),
-  nutrition(label: 'Diet & Nutrition', icon: '🥗'),
-  sleep(label: 'Sleep & Recovery', icon: '🌙'),
-  screenTime(label: 'Screen Time', icon: '📱'),
-  sync(label: 'Health Sync', icon: '🔗'),
-  account(label: 'Account & Privacy', icon: '🔒');
+  all(label: 'All', icon: Icons.apps_rounded),
+  gettingStarted(label: 'Getting Started', icon: Icons.rocket_launch_rounded),
+  activity(label: 'Activity & Workouts', icon: Icons.directions_run_rounded),
+  hydration(label: 'Hydration', icon: Icons.water_drop_rounded),
+  nutrition(label: 'Diet & Nutrition', icon: Icons.restaurant_rounded),
+  sleep(label: 'Sleep & Recovery', icon: Icons.bedtime_rounded),
+  screenTime(label: 'Screen Time', icon: Icons.smartphone_rounded),
+  sync(label: 'Health Sync', icon: Icons.sync_rounded),
+  account(label: 'Account & Privacy', icon: Icons.lock_rounded);
 
   final String label;
-  final String icon;
+  final IconData icon;
   const FaqCategory({required this.label, required this.icon});
 }
 

@@ -88,8 +88,9 @@ class _HealthReportPageState extends State<HealthReportPage> {
                           : (v.glassBorder ?? Colors.transparent),
                     ),
                     labelStyle: context.text.bodySmall?.copyWith(
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: isSelected
                           ? AppColors.primary
                           : context.colors.onSurface,
@@ -133,8 +134,13 @@ class _HealthReportPageState extends State<HealthReportPage> {
 
               // 6. Export CTA Button
               AppPrimaryButton(
-                label: _isExporting ? 'Generating Report...' : 'Share Report with Doctor 📄',
-                leadingIcon: const Icon(Icons.share_rounded, size: AppDimens.iconSm),
+                label: _isExporting
+                    ? 'Generating Report...'
+                    : 'Share Report with Doctor',
+                leadingIcon: const Icon(
+                  Icons.share_rounded,
+                  size: AppDimens.iconSm,
+                ),
                 enabled: !_isExporting,
                 onTap: _exportReport,
               ),
@@ -184,7 +190,9 @@ class _HealthReportPageState extends State<HealthReportPage> {
                     ),
                     Text(
                       'Resting Cardiovascular Vitals',
-                      style: context.text.bodySmall?.copyWith(color: v.grayText),
+                      style: context.text.bodySmall?.copyWith(
+                        color: v.grayText,
+                      ),
                     ),
                   ],
                 ),
@@ -348,7 +356,10 @@ class _HealthReportPageState extends State<HealthReportPage> {
     );
   }
 
-  Widget _buildHydrationReportCard(BuildContext context, HealthReportSummary s) {
+  Widget _buildHydrationReportCard(
+    BuildContext context,
+    HealthReportSummary s,
+  ) {
     return AppCard(
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimens.space16),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -657,7 +658,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
         gap,
         AppHeaderAction(
-          icon: const Icon(Icons.edit_rounded),
+          icon: SvgPicture.asset('assets/icons/edit.svg', width: 24, height: 24, colorFilter: ColorFilter.mode(context.colors.primary, BlendMode.srcIn)),
           onTap: () => setState(() => _isEditing = true),
           tooltip: 'Edit Profile',
         ),

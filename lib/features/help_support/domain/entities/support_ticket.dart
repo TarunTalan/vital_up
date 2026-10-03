@@ -1,37 +1,39 @@
+import 'package:flutter/material.dart';
+
 enum SupportCategory {
   bug(
     label: 'Bug Report',
-    icon: '🐛',
+    icon: Icons.bug_report_rounded,
     description: 'Something is broken or not functioning properly.',
   ),
   feature(
     label: 'Feature Request',
-    icon: '💡',
+    icon: Icons.lightbulb_rounded,
     description: 'Suggest a new capability or improvement.',
   ),
   healthSync(
     label: 'Health Connect & Sync',
-    icon: '🔗',
+    icon: Icons.sync_rounded,
     description: 'Issues syncing with Health Connect or Apple Health.',
   ),
   tracking(
     label: 'Tracking & Metrics',
-    icon: '📊',
+    icon: Icons.insights_rounded,
     description: 'Questions about Sleep, Water, Steps, or Screen Time.',
   ),
   account(
     label: 'Account & Data Privacy',
-    icon: '🔒',
+    icon: Icons.lock_rounded,
     description: 'Profile, login, data export, or account deletion.',
   ),
   general(
     label: 'General Inquiry',
-    icon: '❓',
+    icon: Icons.help_rounded,
     description: 'General feedback, partnerships, or questions.',
   );
 
   final String label;
-  final String icon;
+  final IconData icon;
   final String description;
 
   const SupportCategory({
@@ -66,7 +68,7 @@ class SupportTicket {
 
   String toFormattedEmailBody() {
     final buffer = StringBuffer();
-    buffer.writeln('Category: ${category.icon} ${category.label}');
+    buffer.writeln('Category: ${category.label}');
     buffer.writeln('Subject: $subject');
     buffer.writeln('----------------------------------------');
     buffer.writeln('Description:');
@@ -80,7 +82,9 @@ class SupportTicket {
       if (osPlatform != null) buffer.writeln('• Platform: $osPlatform');
       if (deviceModel != null) buffer.writeln('• Device Model: $deviceModel');
       buffer.writeln('• Timestamp: ${createdAt.toIso8601String()}');
-      buffer.writeln('• Timezone: ${DateTime.now().timeZoneName} (Offset: ${DateTime.now().timeZoneOffset.inHours}h)');
+      buffer.writeln(
+        '• Timezone: ${DateTime.now().timeZoneName} (Offset: ${DateTime.now().timeZoneOffset.inHours}h)',
+      );
     }
 
     return buffer.toString();

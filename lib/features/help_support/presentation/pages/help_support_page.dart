@@ -26,7 +26,8 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   final TextEditingController _searchController = TextEditingController();
   FaqCategory _selectedCategory = FaqCategory.all;
   final Set<String> _expandedFaqIds = {};
-  final Map<String, bool?> _helpfulVotes = {}; // faqId -> true (thumbs up) / false (thumbs down)
+  final Map<String, bool?> _helpfulVotes =
+      {}; // faqId -> true (thumbs up) / false (thumbs down)
 
   @override
   void dispose() {
@@ -37,7 +38,8 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   List<FaqItem> get _filteredFaqs {
     final query = _searchController.text.trim().toLowerCase();
     return kFaqDatabase.where((item) {
-      final matchesCategory = _selectedCategory == FaqCategory.all ||
+      final matchesCategory =
+          _selectedCategory == FaqCategory.all ||
           item.category == _selectedCategory;
       if (!matchesCategory) return false;
 
@@ -45,13 +47,17 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
 
       final matchQuestion = item.question.toLowerCase().contains(query);
       final matchAnswer = item.answer.toLowerCase().contains(query);
-      final matchTags = item.tags.any((tag) => tag.toLowerCase().contains(query));
+      final matchTags = item.tags.any(
+        (tag) => tag.toLowerCase().contains(query),
+      );
 
       return matchQuestion || matchAnswer || matchTags;
     }).toList();
   }
 
-  Future<void> _sendDirectEmail({String subject = 'Support Inquiry - VitalUp'}) async {
+  Future<void> _sendDirectEmail({
+    String subject = 'Support Inquiry - VitalUp',
+  }) async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: 'support@vitalup.app',
@@ -64,7 +70,9 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
-        await Clipboard.setData(const ClipboardData(text: 'support@vitalup.app'));
+        await Clipboard.setData(
+          const ClipboardData(text: 'support@vitalup.app'),
+        );
         if (mounted) {
           showSuccessSnackBar(
             context,
@@ -104,7 +112,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     setState(() => _helpfulVotes[faq.id] = helpful);
     HapticFeedback.lightImpact();
     if (helpful) {
-      showSuccessSnackBar(context, 'Thanks for your feedback! 👍');
+      showSuccessSnackBar(context, 'Thanks for your feedback!');
     } else {
       _contactSupport(subject: 'Help Article Feedback: ${faq.question}');
     }
@@ -300,7 +308,8 @@ class _CategoryChips extends StatelessWidget {
             if (cat != FaqCategory.values.first)
               const SizedBox(width: AppDimens.space8),
             ChoiceChip(
-              label: Text('${cat.icon}  ${cat.label}'),
+              avatar: Icon(cat.icon, size: AppDimens.iconXs),
+              label: Text(cat.label),
               selected: cat == selected,
               showCheckmark: false,
               onSelected: (_) => onSelected(cat),
@@ -346,7 +355,11 @@ class _FaqCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(faq.category.icon, style: context.text.titleSmall),
+                  Icon(
+                    faq.category.icon,
+                    size: AppDimens.iconMd,
+                    color: primary,
+                  ),
                   const SizedBox(width: AppDimens.space12),
                   Expanded(
                     child: Text(
@@ -462,8 +475,9 @@ class _FaqAnswer extends StatelessWidget {
           const SizedBox(height: AppDimens.space12),
           // Wraps the feedback under the action button on narrow cards.
           Wrap(
-            alignment:
-                hasAction ? WrapAlignment.spaceBetween : WrapAlignment.end,
+            alignment: hasAction
+                ? WrapAlignment.spaceBetween
+                : WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
             runSpacing: AppDimens.space4,
             children: [
@@ -495,7 +509,11 @@ class _EmptySearchResults extends StatelessWidget {
       padding: AppDimens.cardPaddingLarge,
       child: Column(
         children: [
-          Icon(Icons.search_off_rounded, size: AppDimens.iconXxl, color: v.grayText),
+          Icon(
+            Icons.search_off_rounded,
+            size: AppDimens.iconXxl,
+            color: v.grayText,
+          ),
           const SizedBox(height: AppDimens.space12),
           Text(
             'No matching articles found',
@@ -542,7 +560,10 @@ class _StillNeedHelpCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Still have questions?', style: context.text.titleSmall),
+                    Text(
+                      'Still have questions?',
+                      style: context.text.titleSmall,
+                    ),
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       'Email our support team directly for fast assistance.',
