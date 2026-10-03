@@ -85,6 +85,7 @@ Future<int> saveMoodInBackground(
 ) async {
   DartPluginRegistrant.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
   final key = 'vita_checkins_$userId';
   final raw = prefs.getString(key);
   List<StressCheckIn> checkIns = [];
@@ -122,6 +123,7 @@ Future<int> saveMoodInBackground(
 Future<int> resetMoodInBackground(String userId) async {
   DartPluginRegistrant.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
   final key = 'vita_checkins_$userId';
   final raw = prefs.getString(key);
   List<StressCheckIn> checkIns = [];
@@ -153,6 +155,7 @@ Future<int> resetMoodInBackground(String userId) async {
 Future<StressCheckIn?> getTodayMoodInBackground(String userId) async {
   DartPluginRegistrant.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
   final key = 'vita_checkins_$userId';
   final raw = prefs.getString(key);
   if (raw == null) return null;

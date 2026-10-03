@@ -15,6 +15,8 @@ class VitaLocalDataSource {
 
   VitaLocalDataSource(this._prefs);
 
+  Future<void> reload() => _prefs.reload();
+
   String _key(String name, String userId) => 'vita_${name}_$userId';
 
   // --- Chat -----------------------------------------------------------------

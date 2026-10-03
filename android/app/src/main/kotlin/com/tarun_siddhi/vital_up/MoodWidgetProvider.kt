@@ -32,6 +32,7 @@ class MoodWidgetProvider : HomeWidgetProvider() {
                 val level = uri.getQueryParameter("level")?.toIntOrNull() ?: 2
                 prefs.edit().putInt("mood_selected_level", level).apply()
                 onUpdate(context, appWidgetManager, allWidgetIds, prefs)
+                return
             } else if (uri != null && uri.path?.contains("toggle-tag") == true) {
                 val tag = uri.getQueryParameter("tag") ?: ""
                 if (tag.isNotEmpty()) {
@@ -45,6 +46,7 @@ class MoodWidgetProvider : HomeWidgetProvider() {
                     prefs.edit().putString("mood_selected_tags", tagList.joinToString(",")).apply()
                     onUpdate(context, appWidgetManager, allWidgetIds, prefs)
                 }
+                return
             } else if (uri != null && (uri.path?.contains("submit-mood") == true || uri.path?.contains("checkin-mood") == true)) {
                 val level = prefs.getInt("mood_selected_level", 2).coerceIn(1, 5)
                 val currentTags = prefs.getString("mood_selected_tags", "") ?: ""
@@ -269,6 +271,7 @@ class MoodWidgetProvider : HomeWidgetProvider() {
                     }
 
                     // Check In Button
+                    setTextColor(R.id.widget_mood_checkin_btn, context.getColor(R.color.widget_btn_text))
                     setOnClickPendingIntent(
                         R.id.widget_mood_checkin_btn,
                         createActionPendingIntent(context, Uri.parse("vitalup://widget/submit-mood"), 3030),

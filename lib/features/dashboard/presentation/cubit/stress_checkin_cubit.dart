@@ -82,6 +82,11 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
     ));
   }
 
+  Future<void> reload() async {
+    await _repository.reload();
+    load();
+  }
+
   void selectLevel(int level) =>
       emit(state.copyWith(selectedLevel: () => level));
 

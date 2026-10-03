@@ -49,4 +49,7 @@ abstract class VitaRepository {
   /// AI headline / stress tip / diet note, fetched at most once a day and
   /// cached; returns the last cached copy (or null) when offline.
   Future<VitaDailyInsights?> getDailyInsights();
+
+  /// Reloads local cache from disk (e.g. after background widget writes).
+  Future<void> reload();
 }

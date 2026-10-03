@@ -137,6 +137,9 @@ class VitaRepositoryImpl implements VitaRepository {
     });
   }
 
+  @override
+  Future<void> reload() => _local.reload();
+
   Future<VitaDailyInsights?> _fetchInsights(VitaDailyInsights? stale) async {
     try {
       final snapshot = await _snapshots.build();

@@ -87,21 +87,8 @@ Future<void> homeWidgetCallback(Uri? uri) async {
         DateTime.now().toIso8601String(),
       );
     } else if (uri.path == '/toggle-tag') {
-      final tag = uri.queryParameters['tag'] ?? '';
-      if (tag.isNotEmpty) {
-        final currentTags = await HomeWidget.getWidgetData<String>('mood_selected_tags') ?? '';
-        final tagList = currentTags.isEmpty ? <String>[] : currentTags.split(',').toList();
-        if (tagList.contains(tag)) {
-          tagList.remove(tag);
-        } else {
-          tagList.add(tag);
-        }
-        await HomeWidget.saveWidgetData<String>('mood_selected_tags', tagList.join(','));
-        await HomeWidget.saveWidgetData<String>(
-          'last_updated',
-          DateTime.now().toIso8601String(),
-        );
-      }
+      // Handled natively in MoodWidgetProvider for instantaneous, zero-latency toggling
+      // without spawning WorkManager background tasks or causing double-toggle race conditions.
     } else if (uri.path == '/submit-mood' || uri.path == '/checkin-mood') {
       final level = (await HomeWidget.getWidgetData<int>('mood_selected_level') ?? 2).clamp(1, 5);
       final tags = await HomeWidget.getWidgetData<String>('mood_selected_tags') ?? '';
@@ -390,6 +377,7 @@ class HomeWidgetService {
         if (_vita != null) {
           futures.add(
             Future.microtask(() async {
+              await _vita!.reload();
               final checkIns = _vita!.getStressCheckIns();
               final now = DateTime.now();
               final todayCheckIn = checkIns.where((c) =>
