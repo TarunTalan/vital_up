@@ -30,6 +30,7 @@ class _WeeklySummaryPageState extends State<WeeklySummaryPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      onRefresh: () async => setState(() => _data = _load()),
       header: const AppPageHeader(title: 'Your week'),
       body: FutureBuilder<(WeeklySummary, WeightUnit)>(
         future: _data,

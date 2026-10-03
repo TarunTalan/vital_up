@@ -20,6 +20,7 @@ class AppScaffold extends StatelessWidget {
   final bool showBackground;
   final EdgeInsetsGeometry? bodyPadding;
   final Widget? floatingActionButton;
+  final Future<void> Function()? onRefresh;
 
   const AppScaffold({
     super.key,
@@ -31,6 +32,7 @@ class AppScaffold extends StatelessWidget {
     this.showBackground = true,
     this.bodyPadding,
     this.floatingActionButton,
+    this.onRefresh,
   });
 
   @override
@@ -51,7 +53,15 @@ class AppScaffold extends StatelessWidget {
 
     if (scrollable) {
       content = SingleChildScrollView(
+        physics: onRefresh != null ? const AlwaysScrollableScrollPhysics() : null,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: content,
+      );
+    }
+
+    if (onRefresh != null) {
+      content = RefreshIndicator(
+        onRefresh: onRefresh!,
         child: content,
       );
     }

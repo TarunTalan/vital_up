@@ -79,6 +79,7 @@ class _CommunityHubView extends StatelessWidget {
         final cubit = context.read<CommunityCubit>();
         final communities = state.communities;
         return AppScaffold(
+          onRefresh: () async => cubit.load(),
           header: const AppPageHeader(title: 'Community', showBack: false),
           body: communities == null
               ? Padding(

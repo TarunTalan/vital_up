@@ -56,6 +56,7 @@ class _ActivityGoalsView extends StatelessWidget {
         final selected = state.selected;
         return AppScaffold(
           header: const AppPageHeader(title: 'Activity Goals'),
+          onRefresh: () => cubit.load(),
           bottomBar: AppPrimaryButton(
             label: 'Add goal',
             enabled: state.goals.length <

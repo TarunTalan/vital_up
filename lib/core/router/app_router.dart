@@ -62,6 +62,8 @@ import 'package:vital_up/features/gamification/presentation/pages/badges_page.da
 import 'package:vital_up/features/gamification/presentation/pages/points_history_page.dart';
 import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:vital_up/features/home_widget/presentation/widgets_preview_page.dart';
+import 'package:vital_up/features/home_widget/presentation/custom_widget_builder_page.dart';
 
 class AppRouter {
   AppRouter._();
@@ -473,6 +475,22 @@ class AppRouter {
             create: (context) => sl<RemindersCubit>()..load(),
             child: const RemindersPage(),
           ),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/widgets',
+        name: 'home-widgets',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const WidgetsPreviewPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings/widgets/custom',
+        name: 'custom-widget-builder',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const CustomWidgetBuilderPage(),
         ),
       ),
       GoRoute(

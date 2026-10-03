@@ -41,66 +41,80 @@ class _MealLogHistoryView extends StatelessWidget {
       padBody: false,
       body: SafeArea(
         top: false,
-        child: BlocBuilder<MealLogBloc, MealLogState>(
-          builder: (context, state) {
-            if (state is MealLogLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        child: RefreshIndicator(
+          onRefresh: () async {
+            context.read<MealLogBloc>().add(const LoadTodaysMeals());
+          },
+          child: BlocBuilder<MealLogBloc, MealLogState>(
+            builder: (context, state) {
+              if (state is MealLogLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (state is MealLogError) {
-              return Center(
-                child: Padding(
-                  padding: context.pagePadding,
-                  child: Text(
-                    'Failed to load meals: ${state.message}',
-                    textAlign: TextAlign.center,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: colors.error,
+              if (state is MealLogError) {
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    alignment: Alignment.center,
+                    padding: context.pagePadding,
+                    child: Text(
+                      'Failed to load meals: ${state.message}',
+                      textAlign: TextAlign.center,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: colors.error,
+                      ),
                     ),
-                  ),
-                ),
-              );
-            }
-
-            if (state is MealLogLoaded) {
-              if (state.entries.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AppIconBadge(
-                        size: AppDimens.iconBadgeLarge,
-                        icon: const Icon(Icons.restaurant_menu_rounded),
-                      ),
-                      const SizedBox(height: AppDimens.space16),
-                      Text(
-                        'No meals logged today.',
-                        style: context.text.bodyLarge?.copyWith(
-                          color: context.vColors.grayText,
-                        ),
-                      ),
-                    ],
                   ),
                 );
               }
 
-              return ListView.separated(
-                padding: EdgeInsets.symmetric(
-                  horizontal: context.gutter,
-                  vertical: AppDimens.sectionGap,
-                ),
-                itemCount: state.entries.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppDimens.cardGap),
-                itemBuilder: (context, index) {
-                  final entry = state.entries[index];
-                  return _MealLogTile(entry: entry);
-                },
-              );
-            }
+              if (state is MealLogLoaded) {
+                if (state.entries.isEmpty) {
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Container(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AppIconBadge(
+                            size: AppDimens.iconBadgeLarge,
+                            icon: const Icon(Icons.restaurant_menu_rounded),
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          Text(
+                            'No meals logged today.',
+                            style: context.text.bodyLarge?.copyWith(
+                              color: context.vColors.grayText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
-            return const SizedBox.shrink();
-          },
+                return ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.gutter,
+                    vertical: AppDimens.sectionGap,
+                  ),
+                  itemCount: state.entries.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppDimens.cardGap),
+                  itemBuilder: (context, index) {
+                    final entry = state.entries[index];
+                    return _MealLogTile(entry: entry);
+                  },
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
         ),
       ),
     );

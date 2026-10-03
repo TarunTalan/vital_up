@@ -279,6 +279,19 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   _buildDivider(),
+                  InkWell(
+                    onTap: () => context.pushNamed('home-widgets'),
+                    child: _buildSettingRow(
+                      icon: Icons.widgets_rounded,
+                      title: 'Home Screen Widgets',
+                      subtitle: 'Live previews, quick actions & add to home screen',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: v.grayText,
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
                   _buildSettingRow(
                     icon: Icons.sync_rounded,
                     title: 'Health Sync',

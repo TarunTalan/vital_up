@@ -49,6 +49,7 @@ class ChallengesPage extends StatelessWidget {
         final challenges = state.challenges;
         final now = DateTime.now();
         return AppScaffold(
+          onRefresh: () async => cubit.load(),
           header: const AppPageHeader(title: 'Challenges'),
           bottomBar: AppPrimaryButton(
             label: 'New challenge',
