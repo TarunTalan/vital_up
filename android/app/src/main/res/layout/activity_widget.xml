@@ -6,7 +6,10 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="12dp">
 
     <!-- Header Row -->
     <LinearLayout
@@ -20,48 +23,40 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="sans-serif-medium"
-            android:text="🏃 Activity &amp; Steps"
+            android:text="Steps &amp; Activity" android:drawableStart="@drawable/ic_widget_steps" android:drawablePadding="6dp"
             android:textColor="@color/widget_steps"
-            android:textSize="12sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
+        <!-- Streak Pill -->
         <TextView
-            android:id="@+id/widget_activity_track_btn"
+            android:id="@+id/widget_activity_streak"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/widget_button"
+            android:layout_marginStart="8dp"
             android:fontFamily="sans-serif-medium"
-            android:paddingStart="8dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="4dp"
-            android:text="Track"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp" />
-
-        <!-- Refresh Button -->
-        <ImageView
-            android:id="@+id/widget_activity_refresh_btn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/widget_refresh_tooltip"
-            android:padding="4dp"
-            android:src="@drawable/ic_widget_refresh" />
+            android:text="3 days" android:drawableStart="@drawable/ic_widget_fire" android:drawablePadding="4dp"
+            android:textColor="@color/widget_streak"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Main Steps Counter -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="12dp" />
+
+    <!-- Main Content Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:gravity="bottom"
-            android:orientation="horizontal">
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/widget_activity_steps"
@@ -70,139 +65,46 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="7,420"
                 android:textColor="@color/widget_text"
-                android:textSize="18sp" />
+                android:textSize="24sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_activity_goal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="2dp"
                 android:fontFamily="sans-serif-medium"
-                android:text="/ 10,000 steps"
+                android:text="Goal: 10,000 steps"
                 android:textColor="@color/widget_secondary_text"
-                android:textSize="11sp" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/widget_activity_percent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="2dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="74%"
-                android:textColor="@color/widget_steps"
-                android:textSize="11sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/widget_activity_progress_bar"
-            style="@android:style/Widget.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="4dp"
-            android:max="100"
-            android:progress="74"
-            android:progressDrawable="@drawable/widget_steps_progress" />
+        <TextView
+            android:id="@+id/widget_activity_track_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_chip_steps"
+            android:fontFamily="sans-serif-medium"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="Start"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 3 Mini Stats Cards -->
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+        android:layout_height="12dp" />
 
-        <!-- Active Time -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="3dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_bg"
-            android:orientation="vertical"
-            android:padding="6dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:text="Active Time"
-                android:textColor="@color/widget_secondary_text"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/widget_activity_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="42 min"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <!-- Calories Burned -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
-            android:layout_marginEnd="3dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_bg"
-            android:orientation="vertical"
-            android:padding="6dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:text="Burned"
-                android:textColor="@color/widget_secondary_text"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/widget_activity_burned"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="380 kcal"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <!-- Distance -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_card_bg"
-            android:orientation="vertical"
-            android:padding="6dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:text="Distance"
-                android:textColor="@color/widget_secondary_text"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/widget_activity_distance"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="5.2 km"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </LinearLayout>
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/widget_activity_progress"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:max="100"
+        android:progress="74"
+        android:progressDrawable="@drawable/widget_steps_progress" />
 </LinearLayout>

@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- VitalUp Home Screen Widget with Multi-Feature Tracking, Quick Login, Refresh & Deep Links -->
+<!-- Multi-Feature Vitals Widget (Today's Activity & Nutrition) matching Preview Card -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp">
 
-    <!-- Header Row: Streak/Points & Top-Right Refresh Button -->
+    <!-- Header: Title & Refresh -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,66 +20,75 @@
         android:orientation="horizontal">
 
         <TextView
-            android:id="@+id/widget_streak"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:textColor="@color/widget_streak"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/widget_points"
+            android:id="@+id/widget_title_text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
             android:layout_weight="1"
+            android:autoSizeMaxTextSize="15sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
-            android:textColor="@color/widget_secondary_text"
-            android:textSize="11sp" />
+            android:maxLines="1"
+            android:text="Today's Activity &amp; Nutrition"
+            android:textColor="@color/widget_text"
+            android:textSize="15sp"
+            android:textStyle="bold" />
 
-        <!-- Top Right Refresh Button -->
-        <ImageView
-            android:id="@+id/widget_refresh_btn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/widget_refresh_tooltip"
-            android:padding="4dp"
-            android:src="@drawable/ic_widget_refresh" />
+        <FrameLayout
+            android:layout_width="26dp"
+            android:layout_height="26dp">
+
+            <ImageView
+                android:id="@+id/widget_refresh_btn"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/widget_refresh_tooltip"
+                android:padding="2dp"
+                android:src="@drawable/ic_widget_refresh" />
+
+            <ProgressBar
+                android:id="@+id/widget_refresh_progress"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- Signed Out / Quick Login View -->
+    <!-- Signed Out / Quick Login View (Fallback) -->
     <LinearLayout
         android:id="@+id/widget_signed_out_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="8dp"
+        android:padding="12dp"
         android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:autoSizeMaxTextSize="16sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
             android:text="Track Your Daily Vitals"
             android:textColor="@color/widget_text"
-            android:textSize="14sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="8dp"
-            android:gravity="center"
-            android:text="Water, Steps, Calories &amp; AI Coach"
-            android:textColor="@color/widget_secondary_text"
-            android:textSize="11sp" />
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_quick_login_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:background="@drawable/widget_login_btn"
             android:fontFamily="sans-serif-medium"
             android:paddingStart="16dp"
@@ -84,74 +97,25 @@
             android:paddingBottom="8dp"
             android:text="@string/widget_quick_login"
             android:textColor="#FFFFFFFF"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Signed In: Metrics & Quick Actions View -->
+    <!-- Signed In: Main Preview Layout -->
     <LinearLayout
         android:id="@+id/widget_signed_in_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
         android:orientation="vertical">
 
-        <!-- Water Section with Quick +250ml Button -->
-        <LinearLayout
-            android:id="@+id/widget_water_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_water"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="0 / 2,500 ml"
-                    android:textColor="@color/widget_text"
-                    android:textSize="13sp" />
-
-                <ProgressBar
-                    android:id="@+id/widget_water_progress"
-                    style="@android:style/Widget.ProgressBar.Horizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="6dp"
-                    android:layout_marginTop="4dp"
-                    android:max="100"
-                    android:progressDrawable="@drawable/widget_progress" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/widget_add_water"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:background="@drawable/widget_button"
-                android:fontFamily="sans-serif-medium"
-                android:paddingStart="10dp"
-                android:paddingTop="5dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_add_water"
-                android:textColor="#FFFFFFFF"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- Stats Grid: Steps & Calories -->
+        <!-- Steps & Calories Cards Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
             android:orientation="horizontal">
 
-            <!-- Steps Box -->
+            <!-- Steps Card -->
             <LinearLayout
                 android:id="@+id/widget_steps_card"
                 android:layout_width="0dp"
@@ -160,37 +124,79 @@
                 android:layout_weight="1"
                 android:background="@drawable/widget_card_bg"
                 android:orientation="vertical"
-                android:padding="6dp">
+                android:padding="8dp">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="👟 Steps"
-                    android:textColor="@color/widget_secondary_text"
-                    android:textSize="10sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/ic_widget_steps" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:autoSizeMaxTextSize="13sp"
+                        android:autoSizeMinTextSize="10sp"
+                        android:autoSizeStepGranularity="1sp"
+                        android:autoSizeTextType="uniform"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:text="Steps"
+                        android:textColor="@color/widget_secondary_text"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/widget_steps_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:autoSizeMinTextSize="14sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:ellipsize="end"
                     android:fontFamily="sans-serif-medium"
-                    android:text="0 / 10,000"
+                    android:maxLines="1"
+                    android:text="7,420"
                     android:textColor="@color/widget_text"
-                    android:textSize="11sp" />
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_steps_goal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="14sp"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="/ 10,000"
+                    android:textColor="@color/widget_secondary_text"
+                    android:textSize="13sp" />
 
                 <ProgressBar
                     android:id="@+id/widget_steps_progress"
                     style="@android:style/Widget.ProgressBar.Horizontal"
                     android:layout_width="match_parent"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="3dp"
+                    android:layout_height="5dp"
+                    android:layout_marginTop="5dp"
                     android:max="100"
+                    android:progress="74"
                     android:progressDrawable="@drawable/widget_steps_progress" />
             </LinearLayout>
 
-            <!-- Calories Box -->
+            <!-- Calories Card -->
             <LinearLayout
                 android:id="@+id/widget_calories_card"
                 android:layout_width="0dp"
@@ -199,89 +205,247 @@
                 android:layout_weight="1"
                 android:background="@drawable/widget_card_bg"
                 android:orientation="vertical"
-                android:padding="6dp">
+                android:padding="8dp">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="🔥 Calories"
-                    android:textColor="@color/widget_secondary_text"
-                    android:textSize="10sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/ic_widget_streak_3" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:autoSizeMaxTextSize="13sp"
+                        android:autoSizeMinTextSize="10sp"
+                        android:autoSizeStepGranularity="1sp"
+                        android:autoSizeTextType="uniform"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:text="Calories"
+                        android:textColor="@color/widget_secondary_text"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/widget_calories_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:autoSizeMinTextSize="14sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:ellipsize="end"
                     android:fontFamily="sans-serif-medium"
-                    android:text="0 / 2,000 kcal"
+                    android:maxLines="1"
+                    android:text="1,640"
                     android:textColor="@color/widget_text"
-                    android:textSize="11sp" />
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_calories_goal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="14sp"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="/ 2,000"
+                    android:textColor="@color/widget_secondary_text"
+                    android:textSize="13sp" />
 
                 <ProgressBar
                     android:id="@+id/widget_calories_progress"
                     style="@android:style/Widget.ProgressBar.Horizontal"
                     android:layout_width="match_parent"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="3dp"
+                    android:layout_height="5dp"
+                    android:layout_marginTop="5dp"
                     android:max="100"
+                    android:progress="82"
                     android:progressDrawable="@drawable/widget_calories_progress" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Quick Deep-Link Action Chips -->
+        <!-- Nutrition Breakdown Card (Macros) -->
         <LinearLayout
+            android:id="@+id/widget_nutrition_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:orientation="horizontal">
+            android:background="@drawable/widget_card_bg"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
 
             <TextView
-                android:id="@+id/widget_action_scan"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="3dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip_bg"
+                android:autoSizeMaxTextSize="13sp"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
                 android:fontFamily="sans-serif-medium"
-                android:gravity="center"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_scan_food"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:maxLines="1"
+                android:text="Nutrition Breakdown"
+                android:textColor="@color/widget_secondary_text"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/widget_action_activity"
-                android:layout_width="0dp"
+            <!-- Protein Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="3dp"
-                android:layout_marginEnd="3dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip_bg"
-                android:fontFamily="sans-serif-medium"
-                android:gravity="center"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_track_activity"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/widget_action_vita"
-                android:layout_width="0dp"
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="Protein"
+                    android:textColor="@color/widget_secondary_text"
+                    android:textSize="13sp" />
+
+                <ProgressBar
+                    android:id="@+id/widget_protein_progress"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="5dp"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="84"
+                    android:progressDrawable="@drawable/widget_protein_progress" />
+
+                <TextView
+                    android:id="@+id/widget_protein_text"
+                    android:layout_width="46dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:text="110g"
+                    android:textColor="@color/widget_text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Carbs Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="3dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip_bg"
-                android:fontFamily="sans-serif-medium"
-                android:gravity="center"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_vita_ai"
-                android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:layout_marginTop="5dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="Carbs"
+                    android:textColor="@color/widget_secondary_text"
+                    android:textSize="13sp" />
+
+                <ProgressBar
+                    android:id="@+id/widget_carbs_progress"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="5dp"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="92"
+                    android:progressDrawable="@drawable/widget_carbs_progress" />
+
+                <TextView
+                    android:id="@+id/widget_carbs_text"
+                    android:layout_width="46dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:text="185g"
+                    android:textColor="@color/widget_text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Fat Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="Fat"
+                    android:textColor="@color/widget_secondary_text"
+                    android:textSize="13sp" />
+
+                <ProgressBar
+                    android:id="@+id/widget_fat_progress"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="5dp"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="86"
+                    android:progressDrawable="@drawable/widget_fat_progress" />
+
+                <TextView
+                    android:id="@+id/widget_fat_text"
+                    android:layout_width="46dp"
+                    android:layout_height="wrap_content"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:text="52g"
+                    android:textColor="@color/widget_text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

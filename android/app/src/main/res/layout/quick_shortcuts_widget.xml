@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Quick Shortcuts Home Screen Widget -->
+<!-- Quick Shortcuts Home Screen Widget matching ShortcutsPreview Card -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_shortcuts_root"
     android:layout_width="match_parent"
@@ -7,119 +7,158 @@
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="8dp">
 
-    <!-- 1. Water Shortcut -->
-    <LinearLayout
-        android:id="@+id/widget_shortcut_water"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginEnd="3dp"
-        android:layout_weight="1"
-        android:background="@drawable/widget_card_bg"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="4dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="💧"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="Water"
-            android:textColor="@color/widget_text"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- 2. Activity Shortcut -->
-    <LinearLayout
-        android:id="@+id/widget_shortcut_activity"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginStart="3dp"
-        android:layout_marginEnd="3dp"
-        android:layout_weight="1"
-        android:background="@drawable/widget_card_bg"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="4dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🏃"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="Activity"
-            android:textColor="@color/widget_text"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- 3. Food Scan Shortcut -->
+    <!-- 1. Food / Scan Shortcut -->
     <LinearLayout
         android:id="@+id/widget_shortcut_food"
         android:layout_width="0dp"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="3dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_card_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="3dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="3dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_widget_scan" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:autoSizeMaxTextSize="12sp"
+            android:autoSizeMinTextSize="8sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="Scan"
+            android:textColor="@color/widget_steps"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 2. Workout / Activity Shortcut -->
+    <LinearLayout
+        android:id="@+id/widget_shortcut_activity"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="3dp"
         android:layout_marginEnd="3dp"
         android:layout_weight="1"
         android:background="@drawable/widget_card_bg"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="4dp">
+        android:paddingStart="3dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="3dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_widget_steps" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📷"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
+            android:autoSizeMaxTextSize="12sp"
+            android:autoSizeMinTextSize="8sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
-            android:text="Scan"
-            android:textColor="@color/widget_text"
-            android:textSize="10sp" />
+            android:maxLines="1"
+            android:text="Workout"
+            android:textColor="@color/widget_calories"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 4. Vita AI Shortcut -->
+    <!-- 3. Vita AI Shortcut -->
     <LinearLayout
         android:id="@+id/widget_shortcut_vita"
         android:layout_width="0dp"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="3dp"
+        android:layout_marginEnd="3dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_card_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="3dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="3dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_widget_ai" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:autoSizeMaxTextSize="12sp"
+            android:autoSizeMinTextSize="8sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="Vita AI"
+            android:textColor="@color/widget_sleep"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 4. +250ml Water Shortcut -->
+    <LinearLayout
+        android:id="@+id/widget_shortcut_water"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="3dp"
         android:layout_weight="1"
         android:background="@drawable/widget_card_bg"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="4dp">
+        android:paddingStart="3dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="3dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_widget_water" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🤖"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
+            android:autoSizeMaxTextSize="12sp"
+            android:autoSizeMinTextSize="8sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
-            android:text="Vita AI"
-            android:textColor="@color/widget_text"
-            android:textSize="10sp" />
+            android:maxLines="1"
+            android:text="+250ml"
+            android:textColor="@color/widget_water"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
