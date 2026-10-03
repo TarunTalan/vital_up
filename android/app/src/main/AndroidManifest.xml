@@ -114,9 +114,16 @@
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
             </intent-filter>
+            <!-- Deep linking for vitalup:// custom scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vitalup" />
+            </intent-filter>
         </activity>
 
-        <!-- Home screen widget (today's water, streak, points). -->
+        <!-- 1. Multi-Feature Vitals Widget -->
         <receiver android:name=".VitalUpWidgetProvider"
             android:exported="true"
             android:label="@string/widget_title">
@@ -125,6 +132,83 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/vitalup_widget_info" />
+        </receiver>
+
+        <!-- 2. Sleep & Recovery Widget -->
+        <receiver android:name=".SleepWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_sleep_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/sleep_widget_info" />
+        </receiver>
+
+        <!-- 3. Food Log & Macros Widget -->
+        <receiver android:name=".FoodLogWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_food_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/food_log_widget_info" />
+        </receiver>
+
+        <!-- 4. Mood & Mindfulness Widget -->
+        <receiver android:name=".MoodWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_mood_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/mood_widget_info" />
+        </receiver>
+
+        <!-- 5. Stats & Daily Progress Widget -->
+        <receiver android:name=".StatsProgressWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_stats_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/stats_progress_widget_info" />
+        </receiver>
+
+        <!-- 6. Hydration Tracker Widget -->
+        <receiver android:name=".HydrationWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_hydration_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/hydration_widget_info" />
+        </receiver>
+
+        <!-- 7. Activity & Steps Widget -->
+        <receiver android:name=".ActivityWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_activity_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/activity_widget_info" />
+        </receiver>
+
+        <!-- 8. Quick Shortcuts Widget -->
+        <receiver android:name=".QuickShortcutsWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_shortcuts_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/quick_shortcuts_widget_info" />
         </receiver>
         <!-- Widget "+250 ml" button runs Dart in the background. -->
         <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"

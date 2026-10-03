@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_shortcuts_description"
+    android:initialLayout="@layout/quick_shortcuts_widget"
+    android:minWidth="140dp"
+    android:minHeight="60dp"
+    android:previewLayout="@layout/quick_shortcuts_widget"
+    android:resizeMode="horizontal"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

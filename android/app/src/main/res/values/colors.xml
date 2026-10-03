@@ -2,12 +2,23 @@
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
 
-    <!-- Home screen widget; mirrors AppColors in lib/core/theme/app_colors.dart -->
+    <!-- Home screen widget light theme; mirrors AppColors in lib/core/theme/app_colors.dart -->
     <color name="widget_background">#FFFFFFFF</color>
-    <color name="widget_text">#FF1C1C1C</color>
-    <color name="widget_secondary_text">#FF757575</color>
-    <color name="widget_track">#1F757575</color>
+    <color name="widget_card_background">#FFF8FAFC</color>
+    <color name="widget_card_border">#FFE2E8F0</color>
+    <color name="widget_text">#FF0F172A</color>
+    <color name="widget_secondary_text">#FF64748B</color>
+    <color name="widget_track">#1F64748B</color>
     <color name="widget_primary">#FF19C3E0</color>
-    <color name="widget_water">#FF42A5F5</color>
+    <color name="widget_water">#FF38BDF8</color>
+    <color name="widget_steps">#FF10B981</color>
+    <color name="widget_calories">#FFF97316</color>
     <color name="widget_streak">#FFFF7A3D</color>
+    <color name="widget_sleep">#FF8B5CF6</color>
+    <color name="widget_mood">#FF06B6D4</color>
+    <color name="widget_gold">#FFEAB308</color>
+    <color name="widget_protein">#FFEC4899</color>
+    <color name="widget_carbs">#FFF59E0B</color>
+    <color name="widget_fat">#FF3B82F6</color>
+    <color name="widget_action_bg">#FFF1F5F9</color>
 </resources>
