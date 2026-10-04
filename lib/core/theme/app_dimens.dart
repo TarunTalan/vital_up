@@ -132,12 +132,11 @@ class AppDimens {
   // ---------------------------------------------------------------------------
   // Card padding (Figma card/big: px-12 py-20, card/small: px-20 py-16)
   // ---------------------------------------------------------------------------
-  static const EdgeInsets cardPadding =
-      EdgeInsets.symmetric(horizontal: 12.0, vertical: 20.0);
+  static const EdgeInsets cardPadding = EdgeInsets.all(16.0);
   static const EdgeInsets cardPaddingCompact =
-      EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0);
-  static const EdgeInsets cardPaddingLarge = EdgeInsets.all(24.0);
-  static const double cardInnerGap = 16.0;
+      EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0);
+  static const EdgeInsets cardPaddingLarge = EdgeInsets.all(20.0);
+  static const double cardInnerGap = 12.0;
 
   /// Figma toast/info.
   static const EdgeInsets toastPadding =
@@ -202,8 +201,8 @@ class AppDimens {
   static const double completedOpacity = 0.85;
 
   /// Stress check-in: emoji faces, mood strip dots, confetti.
-  static const double moodFaceSize = 30.0;
-  static const double moodFaceBox = 52.0;
+  static const double moodFaceSize = 24.0;
+  static const double moodFaceBox = 44.0;
   static const double moodFaceSelectedScale = 1.25;
   static const double moodStripDot = 14.0;
   static const double confettiParticle = 6.0;

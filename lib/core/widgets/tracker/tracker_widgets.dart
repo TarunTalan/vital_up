@@ -69,33 +69,38 @@ class TrackerCardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        TrackerBadge(metric),
-        const SizedBox(width: AppDimens.space12),
-        Expanded(
-          child: Text(
-            title ?? metric.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.titleSmall?.copyWith(
-              color: context.colors.onSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 200;
+        return Row(
+          children: [
+            TrackerBadge(metric),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Text(
+                title ?? metric.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.titleSmall?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
             ),
-          ),
-        ),
-        if (status != null) ...[
-          const SizedBox(width: AppDimens.space8),
-          TrackerStatusChip(status!, label: statusLabel, color: statusColor),
-        ],
-        if (showChevron) ...[
-          const SizedBox(width: AppDimens.space4),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: context.vColors.grayText,
-          ),
-        ],
-      ],
+            if (status != null && !isCompact) ...[
+              const SizedBox(width: AppDimens.space8),
+              TrackerStatusChip(status!, label: statusLabel, color: statusColor),
+            ],
+            if (showChevron && !isCompact) ...[
+              const SizedBox(width: AppDimens.space4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: AppDimens.iconMd,
+                color: context.vColors.grayText,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -139,9 +144,6 @@ class TrackerCard extends StatelessWidget {
         child: AppCard(
           width: double.infinity,
           onTap: onOpen,
-          borderColor: done
-              ? metric.color.withValues(alpha: AppDimens.tintBorderAlpha)
-              : null,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -192,8 +194,9 @@ class TrackerActionRow extends StatelessWidget {
 /// ("+250 ml", "Log sleep"). [filled] marks the card's main action.
 class TrackerQuickAction extends StatelessWidget {
   final String label;
-  final IconData icon;
-  final Color color;
+  final IconData? icon;
+  final String? svgAsset;
+  final Color color; // We will keep the property for compatibility, but override it visually if we want.
   final VoidCallback? onTap;
   final bool filled;
   final String? semanticLabel;
@@ -201,7 +204,8 @@ class TrackerQuickAction extends StatelessWidget {
   const TrackerQuickAction({
     super.key,
     required this.label,
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.color,
     required this.onTap,
     this.filled = false,
@@ -211,17 +215,18 @@ class TrackerQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppDimens.radiusButton);
-    final fg = filled ? context.vColors.buttonText! : color;
+    final actionColor = context.colors.primary; // Always use primary for actions
+    final fg = filled ? context.vColors.buttonText! : actionColor;
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
       excludeSemantics: true,
       child: Material(
-        color: filled ? color : color.withValues(alpha: AppDimens.tintAlpha),
+        color: filled ? actionColor : actionColor.withValues(alpha: AppDimens.tintAlpha),
         shape: RoundedRectangleBorder(
           borderRadius: radius,
           side: BorderSide(
-            color: color.withValues(
+            color: actionColor.withValues(
               alpha: filled ? 1 : AppDimens.tintBorderAlpha,
             ),
           ),
@@ -241,7 +246,15 @@ class TrackerQuickAction extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: AppDimens.iconSm, color: fg),
+                  if (svgAsset != null)
+                    SvgPicture.asset(
+                      svgAsset!,
+                      width: AppDimens.iconSm,
+                      height: AppDimens.iconSm,
+                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                    )
+                  else if (icon != null)
+                    Icon(icon, size: AppDimens.iconSm, color: fg),
                   const SizedBox(width: AppDimens.space6),
                   Flexible(
                     child: FittedBox(
