@@ -244,32 +244,30 @@ class WeightCard extends StatelessWidget {
                     if (await showWeightEntrySheet(context)) cubit.load();
                   },
                 ),
-                if (goal == null)
-                  TrackerQuickAction(
-                    label: 'Set goal',
-                    icon: Icons.flag_rounded,
-                    color: _metric.color,
-                    onTap: () async {
-                      if (await editWeightGoal(context)) cubit.load();
-                    },
-                  ),
               ],
-              child: latest == null
-                  ? TrackerPrompt(
-                      title: 'No weight logged',
-                      message: 'Log your weight to track your goal and see your trend.',
-                      color: _metric.color,
-                    )
-                  : TrackerProgress(
-                      value: unit.format(latest.weightKg),
-                      goal: goal == null ? null : unit.format(goal),
-                      color: _metric.color,
-                      fraction: WeightTrendsPage._progress(data.logs, goal),
-                      caption: [
-                        ?_toGoal(unit, latest.weightKg, goal),
-                        'Last logged ${DateFormat('d MMM').format(latest.timestamp)}',
-                      ].join(' · '),
-                    ),
+              child: Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    latest == null
+                        ? TrackerPrompt(
+                            title: 'No weight logged',
+                            message: 'Log weight to see trend.',
+                            color: _metric.color,
+                          )
+                        : TrackerProgress(
+                            value: unit.format(latest.weightKg),
+                            goal: goal == null ? null : unit.format(goal),
+                            color: _metric.color,
+                            fraction: WeightTrendsPage._progress(data.logs, goal),
+                            caption: [
+                              ?_toGoal(unit, latest.weightKg, goal),
+                              DateFormat('d MMM').format(latest.timestamp),
+                            ].join(' · '),
+                          ),
+                  ],
+                ),
+              ),
             );
           },
         );
