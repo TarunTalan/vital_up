@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/widgets/tracker/quick_log_hub.dart';
@@ -13,7 +12,6 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_she
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
 import 'package:vital_up/core/di/injection_container.dart';
-import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:home_widget/home_widget.dart';
@@ -57,8 +55,8 @@ import 'package:vital_up/features/notifications/presentation/cubit/notifications
 import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
-import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import 'package:vital_up/features/profile/data/services/username_service.dart';
+import 'package:vital_up/features/profile/presentation/widgets/top_bar_player_identity.dart';
 import 'package:vital_up/features/profile/presentation/widgets/username_input.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
@@ -159,8 +157,7 @@ class _DashboardPageState extends State<DashboardPage> {
     AppBottomNavItem('Home', 'assets/icons/home.svg'),
     AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
     AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
-    AppBottomNavItem('Community', GamificationIcons.community),
-    AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
+    AppBottomNavItem('Arena', GamificationIcons.community),
   ];
 
   void _selectTab(int index) {
@@ -206,6 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
       },
       child: MultiBlocProvider(
         providers: [
+          BlocProvider<ProfileCubit>.value(value: _profileCubit),
           BlocProvider<DietPlanCubit>.value(value: _dietPlanCubit),
           BlocProvider<WaterIntakeCubit>(
             create: (context) =>
@@ -304,77 +302,8 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       1 => FoodScannerPage(onBack: _handlePop),
       2 => VitaHomePage(onBack: _handlePop),
-      3 => const CommunityHubPage(),
-      _ => BlocProvider.value(
-        value: _profileCubit,
-        child: ProfilePage(onLogout: () => _showLogoutDialog(context)),
-      ),
+      _ => const CommunityHubPage(),
     };
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    final errorColor = context.colors.error;
-    final cubit = context.read<AuthCubit>();
-
-    showSmoothDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: errorColor),
-            onPressed: () {
-              Navigator.of(context).pop();
-              _logoutAfterBackup(cubit);
-            },
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Logging out removes this account's logs from the device, so make sure
-  /// they're backed up first, and warn if some can't be (offline).
-  Future<void> _logoutAfterBackup(AuthCubit cubit) async {
-    final sync = sl<SyncService>();
-    await sync.sync();
-    final pending = await sync.pendingCount();
-    if (!mounted) return;
-    if (pending > 0) {
-      final errorColor = context.colors.error;
-      final proceed = await showSmoothDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Not backed up yet'),
-          content: Text(
-            pending == 1
-                ? "1 entry hasn't been backed up because you're offline. "
-                      'If you log out now, it will be lost.'
-                : "$pending entries haven't been backed up because you're "
-                      'offline. If you log out now, they will be lost.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Stay logged in'),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: errorColor),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Log out anyway'),
-            ),
-          ],
-        ),
-      );
-      if (proceed != true) return;
-    }
-    cubit.logout();
   }
 }
 
@@ -530,11 +459,16 @@ class _HomeTabState extends State<_HomeTab> {
             children: [
               AppPageHeader(
                 showBack: false,
-                title: _greeting(DateTime.now()),
-                subtitle: DateFormat('EEEE, MMMM d').format(DateTime.now()),
+                titleWidget: const TopBarPlayerIdentity(),
                 action: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    AppHeaderAction(
+                      tooltip: 'Activity Calendar',
+                      icon: const Icon(Icons.calendar_month_rounded),
+                      onTap: () => context.pushNamed('activity-calendar'),
+                    ),
+                    const SizedBox(width: AppDimens.space8),
                     AppHeaderAction(
                       tooltip: 'Log something',
                       icon: const Icon(Icons.add_rounded),
@@ -621,9 +555,3 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-String _greeting(DateTime now) {
-  final hour = now.hour;
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}

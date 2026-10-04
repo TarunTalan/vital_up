@@ -13,6 +13,8 @@ import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/presentation/widgets/friend_gamer_tile.dart';
+import 'package:vital_up/features/community/presentation/widgets/invite_share_card.dart';
 
 /// Add friends by username, answer requests, and manage the friends list.
 class FriendsPage extends StatelessWidget {
@@ -52,16 +54,6 @@ class _FriendsViewState extends State<_FriendsView> {
     FocusScope.of(context).unfocus();
     final sent = await context.read<FriendsCubit>().send(_username.text);
     if (sent) _username.clear();
-  }
-
-  Future<void> _copyUsername(String username) async {
-    final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: '@$username'));
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('Copied @$username — share it so friends can add you'),
-      ),
-    );
   }
 
   Future<void> _confirmRemove(Friend friend) async {
@@ -107,6 +99,7 @@ class _FriendsViewState extends State<_FriendsView> {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              InviteShareCard(myUsername: me),
               AppCard(
                 width: double.infinity,
                 child: Column(
@@ -137,17 +130,6 @@ class _FriendsViewState extends State<_FriendsView> {
                       isLoading: state.sending,
                       onTap: _send,
                     ),
-                    if (me != null && me.isNotEmpty) ...[
-                      const SizedBox(height: AppDimens.space8),
-                      AppSecondaryButton(
-                        label: 'Copy my username (@$me)',
-                        leadingIcon: const Icon(
-                          Icons.copy_rounded,
-                          size: AppDimens.iconSm,
-                        ),
-                        onTap: () => _copyUsername(me),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -189,14 +171,10 @@ class _FriendsViewState extends State<_FriendsView> {
                         'compete on your friends leaderboard.',
                   ),
                 for (final f in state.accepted)
-                  _FriendRow(
+                  FriendGamerTile(
                     friend: f,
                     busy: state.busy.contains(f.userId),
-                    trailing: IconButton(
-                      tooltip: 'Remove friend',
-                      icon: const Icon(Icons.person_remove_outlined),
-                      onPressed: () => _confirmRemove(f),
-                    ),
+                    onRemove: () => _confirmRemove(f),
                   ),
                 if (state.outgoing.isNotEmpty) ...[
                   const SizedBox(height: AppDimens.space12),
