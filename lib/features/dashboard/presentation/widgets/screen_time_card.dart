@@ -12,6 +12,7 @@ import '../../domain/entities/app_usage_info.dart';
 import '../cubit/screen_time_cubit.dart';
 import '../cubit/screen_time_state.dart';
 import 'dashboard_card_header.dart';
+import 'tracker_goal_editors.dart';
 
 const _metric = TrackerMetric.screenTime;
 
@@ -47,10 +48,8 @@ class ScreenTimeCard extends StatelessWidget {
               ),
             ],
             child: const TrackerPrompt(
-              title: 'Track screen time automatically',
-              message:
-                  'Grant Usage Access so VitalUp can total your '
-                  'daily screen time. Nothing leaves your phone.',
+              title: 'Track screen time',
+              message: 'Grant Usage Access to total your screen time.',
               color: AppColors.trackScreenTime,
             ),
           ),
@@ -76,21 +75,35 @@ class ScreenTimeCard extends StatelessWidget {
         direction: _metric.direction,
       ),
       onOpen: () => _open(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TrackerProgress(
-            value: formatDashboardDuration(state.totalDuration),
-            goal: '${formatDashboardDuration(Duration(minutes: limit))} limit',
-            fraction: limit > 0 ? minutes / limit : null,
-            color: left >= 0 ? _metric.color : context.colors.error,
-            caption: left >= 0
-                ? '${formatDashboardDuration(Duration(minutes: left))} left today'
-                : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TopAppsList(apps: state.usageStats.take(_topApps).toList()),
-        ],
+      actions: [
+        TrackerQuickAction(
+          label: 'Edit Goal',
+          svgAsset: 'assets/icons/edit.svg',
+          color: _metric.color,
+          filled: true,
+          onTap: () async {
+            if (await editScreenTimeGoal(context)) {
+              if (context.mounted) context.read<ScreenTimeCubit>().loadStats();
+            }
+          },
+        ),
+      ],
+      child: Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TrackerProgress(
+              value: formatDashboardDuration(state.totalDuration),
+              goal: '${formatDashboardDuration(Duration(minutes: limit))} limit',
+              fraction: limit > 0 ? minutes / limit : null,
+              color: left >= 0 ? _metric.color : context.colors.error,
+              caption: left >= 0
+                  ? '${formatDashboardDuration(Duration(minutes: left))} left today'
+                  : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
+            ),
+          ],
+        ),
       ),
     );
   }
