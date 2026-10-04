@@ -238,7 +238,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
 
   /// Custom top app bar matching the user design with Month Year and [<] [📅] [>]
   Widget _buildHeader(BuildContext context, ActivityCalendarState state) {
-    final monthTitle = DateFormat('MMM yyyy').format(state.focusedMonth);
+    final monthTitle = DateFormat('MMM yy').format(state.focusedMonth);
 
     return AppPageHeader(
       title: monthTitle,
@@ -377,13 +377,28 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
                     ),
                     if (status >= 0) ...[
                       const SizedBox(height: 3),
-                      Container(
-                        width: 14,
-                        height: 2.5,
-                        decoration: BoxDecoration(
-                          color: barColor,
-                          borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                        ),
+                      Stack(
+                        children: [
+                          // Background track (empty progress)
+                          Container(
+                            width: 24,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: context.colors.onSurface.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                            ),
+                          ),
+                          // Filled progress based on status (0 to 3)
+                          if (status > 0)
+                            Container(
+                              width: 24 * (status / 3.0),
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: barColor,
+                                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ],

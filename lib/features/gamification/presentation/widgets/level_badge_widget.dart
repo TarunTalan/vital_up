@@ -566,9 +566,9 @@ class LevelTagPill extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: tier.glowColor.withValues(alpha: 0.3),
-            blurRadius: AppDimens.space8,
-            offset: const Offset(0, 2),
+            color: tier.glowColor.withValues(alpha: 0.1),
+            blurRadius: AppDimens.space4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -578,7 +578,7 @@ class LevelTagPill extends StatelessWidget {
           Icon(tier.icon, size: AppDimens.iconXs - 2, color: tier.borderColor),
           const SizedBox(width: AppDimens.space4),
           Text(
-            'LVL $level • ${tier.tag}',
+            'LVL $level • ${tier.tierName.toUpperCase()}',
             style: context.text.labelSmall?.copyWith(
               color: AppColors.white,
               fontWeight: FontWeight.w800,
