@@ -15,6 +15,7 @@ import 'package:vital_up/features/community/domain/entities/leaderboard_entry.da
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/cubit/leaderboard_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 final _points = NumberFormat.decimalPattern();
@@ -268,10 +269,21 @@ class _PodiumPlace extends StatelessWidget {
     final e = entry;
     if (e == null) return const SizedBox.shrink();
     final color = _rankColor(e.rank ?? 3);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (first)
+    return GestureDetector(
+      onTap: () {
+        if (!e.isMe) {
+          PublicProfileSheet.show(
+            context,
+            username: e.username,
+            level: e.level,
+            avatarUrl: e.avatarUrl,
+          );
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (first)
           GameIcon(
             GamificationIcons.crown,
             fallback: Icons.workspace_premium_rounded,
@@ -318,6 +330,7 @@ class _PodiumPlace extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -332,13 +345,24 @@ class _RankRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = entry;
     final onSurface = context.colors.onSurface;
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      highlighted: e.isMe,
-      child: Row(
-        children: [
-          SizedBox(
+    return GestureDetector(
+      onTap: () {
+        if (!e.isMe) {
+          PublicProfileSheet.show(
+            context,
+            username: e.username,
+            level: e.level,
+            avatarUrl: e.avatarUrl,
+          );
+        }
+      },
+      child: AppCard(
+        width: double.infinity,
+        padding: AppDimens.cardPaddingCompact,
+        highlighted: e.isMe,
+        child: Row(
+          children: [
+            SizedBox(
             width: AppDimens.rankColumnWidth,
             child: Text(
               e.rank == null ? '–' : '${e.rank}',
@@ -375,6 +399,7 @@ class _RankRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
