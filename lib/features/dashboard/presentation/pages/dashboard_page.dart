@@ -23,6 +23,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_bottom_nav.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/community/presentation/pages/community_hub_page.dart';
@@ -61,6 +62,7 @@ import 'package:vital_up/features/profile/presentation/widgets/username_input.da
 import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
+import '../widgets/smart_overview_card.dart';
 import '../widgets/water_intake_card.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -158,6 +160,7 @@ class _DashboardPageState extends State<DashboardPage> {
     AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
     AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
     AppBottomNavItem('Arena', GamificationIcons.community),
+    AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
   ];
 
   void _selectTab(int index) {
@@ -302,7 +305,11 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       1 => FoodScannerPage(onBack: _handlePop),
       2 => VitaHomePage(onBack: _handlePop),
-      _ => const CommunityHubPage(),
+      3 => const CommunityHubPage(),
+      _ => BlocProvider.value(
+        value: _profileCubit,
+        child: const ProfilePage(),
+      ),
     };
   }
 }
@@ -420,6 +427,20 @@ class _HomeTabState extends State<_HomeTab> {
     plan.loadActiveMealPlan();
   }
 
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimens.space12, left: AppDimens.space4, top: AppDimens.space8),
+      child: Text(
+        title.toUpperCase(),
+        style: context.text.labelMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+          color: context.vColors.grayText,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final onScanMeal = widget.onScanMeal;
@@ -504,8 +525,13 @@ class _HomeTabState extends State<_HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const ScoreStreakCard(),
+                            _buildSectionTitle(context, 'Overview'),
+                            const SmartOverviewCard(),
                             const SizedBox(height: AppDimens.cardGap),
+                            const ActivityGoalsCard(),
+                            const SizedBox(height: AppDimens.sectionGap),
+
+                            _buildSectionTitle(context, 'Body & Nutrition'),
                             BlocListener<MealLogBloc, MealLogState>(
                               // A newly logged meal moves today's calories bar.
                               listenWhen: (_, state) => state is MealLogLoaded,
@@ -529,17 +555,33 @@ class _HomeTabState extends State<_HomeTab> {
                               ),
                             ),
                             const SizedBox(height: AppDimens.cardGap),
-                            const ActivityGoalsCard(),
-                            const SizedBox(height: AppDimens.cardGap),
+                            SizedBox(
+                              height: 240,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Expanded(child: WaterIntakeCard()),
+                                  const SizedBox(width: AppDimens.cardGap),
+                                  const Expanded(child: WeightCard()),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppDimens.sectionGap),
+
+                            _buildSectionTitle(context, 'Mind & Rest'),
                             const StressCheckInCard(),
                             const SizedBox(height: AppDimens.cardGap),
-                            const WaterIntakeCard(),
-                            const SizedBox(height: AppDimens.cardGap),
-                            const SleepCard(),
-                            const SizedBox(height: AppDimens.cardGap),
-                            const WeightCard(),
-                            const SizedBox(height: AppDimens.cardGap),
-                            const ScreenTimeCard(),
+                            SizedBox(
+                              height: 240,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Expanded(child: SleepCard()),
+                                  const SizedBox(width: AppDimens.cardGap),
+                                  const Expanded(child: ScreenTimeCard()),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
