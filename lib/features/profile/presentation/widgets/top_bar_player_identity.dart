@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
@@ -65,36 +64,38 @@ class TopBarPlayerIdentity extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // 1. Avatar with tier glowing frame & mini level badge
-                        Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                              ),
-                              child: UserAvatar(
-                                username: avatarInitial,
-                                url: avatarUrl,
-                                size: AppDimens.iconBadge,
-                                ringColor: tier.borderColor,
-                              ),
+                        // 1. Avatar with tier colored frame
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: tier.borderColor,
+                              width: AppDimens.borderThin,
                             ),
-                            Positioned(
-                              bottom: -AppDimens.space2,
-                              right: -AppDimens.space4,
-                              child: LevelBadgeWidget(
-                                level: level,
-                                size: AppDimens.iconXs,
-                                showGlow: false,
+                            boxShadow: [
+                              BoxShadow(
+                                color: tier.glowColor.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                                spreadRadius: 0.5,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: avatarUrl != null
+                                ? Image.network(
+                                    avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => _FallbackAvatar(avatarInitial),
+                                  )
+                                : _FallbackAvatar(avatarInitial),
+                          ),
                         ),
                         const SizedBox(width: AppDimens.space10),
-
-                        // 2. Name + Level Pill & Points Row
+                        
+                        // 2. Name + Level Pill
                         Flexible(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,14 +123,10 @@ class TopBarPlayerIdentity extends StatelessWidget {
                                       vertical: AppDimens.space2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: tier.glowColor.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(
-                                        AppDimens.radiusPill,
-                                      ),
+                                      color: tier.glowColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(AppDimens.radiusPill),
                                       border: Border.all(
-                                        color: tier.borderColor.withValues(
-                                          alpha: 0.5,
-                                        ),
+                                        color: tier.borderColor.withValues(alpha: 0.5),
                                         width: AppDimens.borderThin,
                                       ),
                                     ),
@@ -138,13 +135,12 @@ class TopBarPlayerIdentity extends StatelessWidget {
                                       style: context.text.labelSmall?.copyWith(
                                         color: tier.borderColor,
                                         fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.1,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: AppDimens.space2),
+                              const SizedBox(height: 2),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -161,25 +157,6 @@ class TopBarPlayerIdentity extends StatelessWidget {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(width: AppDimens.space4),
-                                  Text(
-                                    '•',
-                                    style: TextStyle(
-                                      color: context.vColors.grayText,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppDimens.space4),
-                                  Flexible(
-                                    child: Text(
-                                      tier.tierName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: context.text.labelSmall?.copyWith(
-                                        color: tier.borderColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
                                 ],
                               ),
                             ],
@@ -194,6 +171,26 @@ class TopBarPlayerIdentity extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _FallbackAvatar extends StatelessWidget {
+  final String initial;
+  const _FallbackAvatar(this.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: context.colors.primary.withValues(alpha: 0.15),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: context.text.titleSmall?.copyWith(
+          color: context.colors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

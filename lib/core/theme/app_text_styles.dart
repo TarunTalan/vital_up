@@ -36,21 +36,21 @@ class AppTextStyles {
   static const TextStyle heading1 = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w600,
-    fontSize: 32,
+    fontSize: 28,
     height: 1.15,
   );
 
   static const TextStyle heading2 = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w500,
-    fontSize: 26,
+    fontSize: 22,
     height: 1.2,
   );
 
   static const TextStyle heading3 = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w500,
-    fontSize: 20,
+    fontSize: 18,
     height: 1.25,
   );
 
@@ -87,7 +87,7 @@ class AppTextStyles {
   static const TextStyle metric = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w300,
-    fontSize: 36,
+    fontSize: 28,
     height: 1.1,
   );
 
@@ -95,7 +95,7 @@ class AppTextStyles {
   static const TextStyle metricLarge = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w400,
-    fontSize: 48,
+    fontSize: 40,
     height: 1.0,
   );
 
