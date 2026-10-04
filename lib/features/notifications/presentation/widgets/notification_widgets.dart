@@ -7,12 +7,6 @@ import 'package:vital_up/features/community/presentation/widgets/community_widge
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 
-/// Asset paths for notification icons. These SVGs are supplied by design;
-/// until a file exists, [GameIcon] falls back to a Material icon.
-abstract final class NotificationIcons {
-  static const bell = 'assets/icons/bell.svg';
-  static const announcement = 'assets/icons/megaphone.svg';
-}
 
 /// Routes an announcement's `data.route` may open.
 const notificationLinkableRoutes = {
@@ -70,10 +64,10 @@ class NotificationBellButton extends StatelessWidget {
               ? 'Notifications'
               : 'Notifications ($unread unread)',
           onTap: onTap,
-          icon: const GameIcon(
-            NotificationIcons.bell,
-            fallback: Icons.notifications_none_rounded,
+          icon: Icon(
+            Icons.notifications_none_rounded,
             size: AppDimens.iconLg,
+            color: context.colors.onSurface,
           ),
         ),
         if (unread > 0)
@@ -334,13 +328,15 @@ class _NotificationLeading extends StatelessWidget {
       ),
       _ => (
         context.colors.primary,
-        NotificationIcons.announcement,
+        '',
         Icons.campaign_rounded,
       ),
     };
     return AppIconBadge(
       color: color,
-      icon: GameIcon(asset, fallback: fallback, size: AppDimens.iconMd),
+      icon: asset.isEmpty
+          ? Icon(fallback, color: context.colors.onSurface, size: AppDimens.iconMd)
+          : GameIcon(asset, fallback: fallback, size: AppDimens.iconMd),
     );
   }
 }
