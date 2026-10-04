@@ -59,6 +59,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import 'package:vital_up/features/profile/presentation/pages/health_details_page.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
 import 'package:vital_up/features/gamification/presentation/pages/badges_page.dart';
@@ -309,6 +310,17 @@ class AppRouter {
               ),
             ],
             child: const ProfilePage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/profile/health-details',
+        name: 'health-details',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: BlocProvider<ProfileCubit>.value(
+            value: sl<ProfileCubit>(), // Since sl returns the same singleton
+            child: const HealthDetailsPage(),
           ),
         ),
       ),

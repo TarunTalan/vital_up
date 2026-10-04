@@ -568,20 +568,24 @@ Future<void> initDependencies() async {
   sl.registerFactory(() => ActivityGoalsCubit(sl<ActivityGoalsRepository>()));
 
   // 14. Gamification: points, levels, badges, streaks
+  sl.registerLazySingleton<DailyMetricsCollector>(
+    () => DailyMetricsCollector(
+      goals: sl<ActivityGoalsRepository>(),
+      history: sl<GetActivityHistory>(),
+      health: sl<HealthVitalsService>(),
+      meals: sl<GetMealLogHistory>(),
+      activePlan: sl<GetActiveMealPlan>(),
+      water: sl<WaterIntakeService>(),
+      sleep: sl<SleepService>(),
+      vita: VitaLocalDataSource(sl<SharedPreferences>()),
+      isar: sl<IsarService>(),
+    ),
+  );
+
   sl.registerLazySingleton<GamificationRepository>(
     () => GamificationRepositoryImpl(
       remote: GamificationRemoteDataSource(sl<SupabaseClient>()),
-      collector: DailyMetricsCollector(
-        goals: sl<ActivityGoalsRepository>(),
-        history: sl<GetActivityHistory>(),
-        health: sl<HealthVitalsService>(),
-        meals: sl<GetMealLogHistory>(),
-        activePlan: sl<GetActiveMealPlan>(),
-        water: sl<WaterIntakeService>(),
-        sleep: sl<SleepService>(),
-        vita: VitaLocalDataSource(sl<SharedPreferences>()),
-        isar: sl<IsarService>(),
-      ),
+      collector: sl<DailyMetricsCollector>(),
       prefs: sl<SharedPreferences>(),
       cache: sl<CacheStore>(),
     ),
