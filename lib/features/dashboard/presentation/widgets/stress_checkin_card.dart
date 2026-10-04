@@ -163,18 +163,7 @@ class _Picker extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        "What's on your mind? (optional)",
-                        style: context.text.bodySmall?.copyWith(
-                          color: context.vColors.grayText,
-                        ),
-                      ),
-                      const SizedBox(height: AppDimens.space8),
-                      StressTagPicker(
-                        selected: state.selectedTags,
-                        onToggle: cubit.toggleTag,
-                      ),
-                      const SizedBox(height: AppDimens.cardInnerGap),
+                      const SizedBox(height: AppDimens.space4),
                       Row(
                         children: [
                           if (state.editing) ...[

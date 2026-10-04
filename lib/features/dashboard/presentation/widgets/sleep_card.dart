@@ -65,7 +65,7 @@ class SleepCard extends StatelessWidget {
             actions: [_logAction(context, filled: true)],
             child: const TrackerPrompt(
               title: 'How did you sleep?',
-              message: 'Log last night to track your rest against your goal.',
+              message: 'Log sleep to track your rest.',
               color: AppColors.trackSleep,
             ),
           ),
@@ -84,10 +84,8 @@ class SleepCard extends StatelessWidget {
             ],
             child: const TrackerPrompt(
               icon: Icons.health_and_safety_rounded,
-              title: 'Sync sleep automatically',
-              message:
-                  'Install or update Health Connect to sync nights '
-                  'from your watch, or log them yourself.',
+              title: 'Sync sleep',
+              message: 'Install Health Connect to sync your watch.',
               color: AppColors.trackSleep,
             ),
           ),
@@ -123,40 +121,20 @@ class SleepCard extends StatelessWidget {
       ),
       onOpen: () => _open(context),
       actions: [_logAction(context)],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TrackerProgress(
-            value: formatDashboardDuration(session.duration),
-            goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
-            fraction: minutes / goalMinutes,
-            color: _metric.color,
-            caption:
-                'Score ${session.sleepScore} · ${session.scoreCategory}'
-                ' · ${isAuto ? 'Synced' : 'Logged manually'}',
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TrackerFigureRow(
-            figures: [
-              TrackerFigure(
-                label: 'Bedtime',
-                value: time.format(session.bedTime),
-                icon: Icons.nightlight_round,
-                color: AppColors.trackSleep,
-              ),
-              TrackerFigure(
-                label: 'Wake up',
-                value: time.format(session.wakeTime),
-                icon: Icons.wb_sunny_rounded,
-                color: AppColors.warning,
-              ),
-            ],
-          ),
-          if (session.hasStages) ...[
-            const SizedBox(height: AppDimens.cardInnerGap),
-            SleepStagesBar(session: session),
+      child: Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TrackerProgress(
+              value: formatDashboardDuration(session.duration),
+              goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
+              fraction: minutes / goalMinutes,
+              color: _metric.color,
+              caption: 'Score ${session.sleepScore} · ${session.scoreCategory}',
+            ),
           ],
-        ],
+        ),
       ),
     );
   }

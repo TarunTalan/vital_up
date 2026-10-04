@@ -82,35 +82,34 @@ class WaterIntakeCard extends StatelessWidget {
             ),
             onOpen: () => _open(context),
             actions: [
-              for (final p in waterPresets.take(2))
-                TrackerQuickAction(
-                  label: '+${p.ml} ml',
-                  icon: p.icon,
-                  color: _metric.color,
-                  semanticLabel: 'Add ${p.ml} millilitres of water',
-                  onTap: () => _add(context, p.ml),
-                ),
               TrackerQuickAction(
-                label: 'More',
-                icon: Icons.add_rounded,
+                label: 'Log water',
+                icon: Icons.water_drop_rounded,
                 color: _metric.color,
                 filled: true,
-                semanticLabel: 'Log another amount of water',
+                semanticLabel: 'Log water',
                 onTap: () => showWaterLogSheet(
                   context,
                   onAdd: (ml) => cubit.addWater(ml),
                 ),
               ),
             ],
-            child: TrackerProgress(
-              value: WaterTrendsPage.formatMl(current.toDouble()),
-              goal: WaterTrendsPage.formatMl(goal.toDouble()),
-              fraction: goal > 0 ? current / goal : null,
-              color: _metric.color,
-              caption: left > 0
-                  ? '${WaterTrendsPage.formatMl(left.toDouble())} to go · '
-                        'about ${(left / 250).ceil()} glasses'
-                  : 'Goal met — nicely hydrated today.',
+            child: Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TrackerProgress(
+                    value: WaterTrendsPage.formatMl(current.toDouble()),
+                    goal: WaterTrendsPage.formatMl(goal.toDouble()),
+                    fraction: goal > 0 ? current / goal : null,
+                    color: _metric.color,
+                    caption: left > 0
+                        ? '${WaterTrendsPage.formatMl(left.toDouble())} to go · '
+                              'about ${(left / 250).ceil()} glasses'
+                        : 'Goal met — nicely hydrated today.',
+                  ),
+                ],
+              ),
             ),
           );
         },
