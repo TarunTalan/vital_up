@@ -13,7 +13,8 @@ import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 ///
 /// Includes the top safe-area inset, so place it at the top of a page body.
 class AppPageHeader extends StatelessWidget {
-  final String title;
+  final String? title;
+  final Widget? titleWidget;
   final String? subtitle;
   final VoidCallback? onBack;
   final Widget? action;
@@ -22,13 +23,17 @@ class AppPageHeader extends StatelessWidget {
 
   const AppPageHeader({
     super.key,
-    required this.title,
+    this.title,
+    this.titleWidget,
     this.subtitle,
     this.onBack,
     this.action,
     this.showBack = true,
     this.blur = true,
-  });
+  }) : assert(
+         title != null || titleWidget != null,
+         'Either title or titleWidget must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
@@ -67,26 +72,28 @@ class AppPageHeader extends StatelessWidget {
                   const SizedBox(width: AppDimens.space12),
                 ],
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.headlineMedium,
+                  child: titleWidget ??
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (title != null)
+                            Text(
+                              title!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.text.headlineMedium,
+                            ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: AppDimens.space4),
+                            Text(
+                              subtitle!,
+                              style: context.text.bodyMedium
+                                  ?.copyWith(color: v.grayText),
+                            ),
+                          ],
+                        ],
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: AppDimens.space4),
-                        Text(
-                          subtitle!,
-                          style: context.text.bodyMedium
-                              ?.copyWith(color: v.grayText),
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
                 if (action != null) ...[
                   const SizedBox(width: AppDimens.space12),
@@ -193,7 +200,7 @@ class AppHeaderAction extends StatelessWidget {
     this.onTap,
     this.tooltip,
     this.size = AppDimens.headerActionSize,
-    this.rounded = false,
+    this.rounded = true,
   });
 
   @override

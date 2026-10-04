@@ -58,14 +58,21 @@ import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
+import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
 import 'package:vital_up/features/gamification/presentation/pages/badges_page.dart';
 import 'package:vital_up/features/gamification/presentation/pages/points_history_page.dart';
+import 'package:vital_up/features/gamification/presentation/pages/activity_calendar_page.dart';
 import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:vital_up/features/home_widget/presentation/widgets_preview_page.dart';
 import 'package:vital_up/features/home_widget/presentation/custom_widget_builder_page.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/activity_calendar_cubit.dart';
+import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppRouter {
   AppRouter._();
@@ -258,6 +265,21 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/activity-calendar',
+        name: 'activity-calendar',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: BlocProvider(
+            create: (context) => ActivityCalendarCubit(
+              sl<DailyMetricsCollector>(),
+              sl<SupabaseClient>(),
+              DateTime.now(),
+            ),
+            child: const ActivityCalendarPage(),
+          ),
+        ),
+      ),
+      GoRoute(
         path: '/notifications',
         name: 'notifications',
         // Opened from the home bell, which passes its cubit so the unread
@@ -269,6 +291,24 @@ class AppRouter {
           child: BlocProvider.value(
             value: state.extra! as NotificationsCubit,
             child: const NotificationsPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider<ProfileCubit>(
+                create: (_) => sl<ProfileCubit>()..loadProfile(),
+              ),
+              BlocProvider<GamificationCubit>(
+                create: (_) => sl<GamificationCubit>()..load(),
+              ),
+            ],
+            child: const ProfilePage(),
           ),
         ),
       ),
