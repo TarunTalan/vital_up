@@ -14,17 +14,22 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
+import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
+import 'package:vital_up/features/profile/presentation/widgets/gamer_profile_card.dart';
 
 class ProfilePage extends StatefulWidget {
-  final VoidCallback onLogout;
+  final VoidCallback? onLogout;
 
   const ProfilePage({
     super.key,
-    required this.onLogout,
+    this.onLogout,
   });
 
   @override
@@ -297,6 +302,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         surfaceTintColor: Colors.transparent,
                         elevation: 0,
                         automaticallyImplyLeading: false,
+                        leading: Navigator.of(context).canPop()
+                            ? Padding(
+                                padding: const EdgeInsets.only(left: AppDimens.space12),
+                                child: Center(
+                                  child: AppHeaderAction(
+                                    icon: const Icon(Icons.arrow_back_rounded),
+                                    onTap: () => context.pop(),
+                                    tooltip: 'Back',
+                                  ),
+                                ),
+                              )
+                            : null,
                         flexibleSpace: LayoutBuilder(
                           builder: (BuildContext context, BoxConstraints constraints) {
                             final topPadding = context.safePadding.top;
@@ -541,65 +558,97 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   child: Center(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
+                      child: BlocBuilder<GamificationCubit, GamificationState>(
+                        builder: (context, gameState) {
+                          final stats = gameState.stats ?? PlayerStats.empty;
+                          final currentLevel = stats.level.level;
+                          final tier = LevelTierConfig.forLevel(currentLevel, title: stats.level.title);
+
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: avatarSize,
-                                height: avatarSize,
-                                padding: const EdgeInsets.all(AppDimens.borderThick),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: context.colors.primary,
-                                    width: AppDimens.borderThick,
-                                  ),
-                                  boxShadow: AppShadows.inputFocus,
-                                ),
-                                child: _buildAvatar(
-                                  profile,
-                                  avatarSize,
-                                  context.text.headlineMedium,
-                                ),
-                              ),
-                              if (_isEditing)
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: GestureDetector(
-                                    onTap: () => _showPhotoOptions(profile),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(AppDimens.space6),
-                                      decoration: BoxDecoration(
-                                        color: context.colors.primary,
-                                        shape: BoxShape.circle,
-                                        boxShadow: AppShadows.shadowY,
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: avatarSize,
+                                    height: avatarSize,
+                                    padding: const EdgeInsets.all(AppDimens.borderThick),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: tier.borderColor,
+                                        width: AppDimens.borderThick + 0.5,
                                       ),
-                                      child: Icon(
-                                        Icons.camera_alt_rounded,
-                                        size: AppDimens.iconXs,
-                                        color: v.buttonText,
-                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: tier.glowColor.withValues(alpha: 0.4),
+                                          blurRadius: 14,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                    child: _buildAvatar(
+                                      profile,
+                                      avatarSize,
+                                      context.text.headlineMedium,
                                     ),
                                   ),
+                                  if (_isEditing)
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: GestureDetector(
+                                        onTap: () => _showPhotoOptions(profile),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(AppDimens.space6),
+                                          decoration: BoxDecoration(
+                                            color: context.colors.primary,
+                                            shape: BoxShape.circle,
+                                            boxShadow: AppShadows.shadowY,
+                                          ),
+                                          child: Icon(
+                                            Icons.camera_alt_rounded,
+                                            size: AppDimens.iconXs,
+                                            color: v.buttonText,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Positioned(
+                                      bottom: -2,
+                                      right: -2,
+                                      child: LevelBadgeWidget(
+                                        level: currentLevel,
+                                        title: stats.level.title,
+                                        size: 28,
+                                        showGlow: false,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: AppDimens.space12),
+                              Text(
+                                profile.fullName.isNotEmpty ? profile.fullName : 'VitalUp User',
+                                textAlign: TextAlign.center,
+                                style: context.text.headlineMedium,
+                              ),
+                              const SizedBox(height: AppDimens.space4),
+                              Text(
+                                '@${profile.username}',
+                                style: context.text.bodyMedium?.copyWith(color: v.grayText),
+                              ),
+                              if (!_isEditing) ...[
+                                const SizedBox(height: AppDimens.space8),
+                                LevelTagPill(
+                                  level: currentLevel,
+                                  title: stats.level.title,
                                 ),
+                              ],
                             ],
-                          ),
-                          const SizedBox(height: AppDimens.space12),
-                          Text(
-                            profile.fullName.isNotEmpty ? profile.fullName : 'VitalUp User',
-                            textAlign: TextAlign.center,
-                            style: context.text.headlineMedium,
-                          ),
-                          const SizedBox(height: AppDimens.space4),
-                          Text(
-                            '@${profile.username}',
-                            style: context.text.bodyMedium?.copyWith(color: v.grayText),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -777,6 +826,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!_isEditing) const GamerProfileCard(),
           _buildSection(
             'Identity',
             !_isEditing
@@ -884,7 +934,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           if (!_isEditing)
             AppSecondaryButton(
               label: 'Logout Account',
-              onTap: widget.onLogout,
+              onTap: () => _handleLogout(context),
               leadingIcon: const Icon(Icons.logout_rounded),
               contentColor: context.colors.error,
               borderColor: context.colors.error.withValues(alpha: 0.5),
@@ -1312,6 +1362,41 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         items: items,
         itemLabel: (item) => item,
         onChanged: onChanged,
+      ),
+    );
+  }
+
+  void _handleLogout(BuildContext context) {
+    if (widget.onLogout != null) {
+      widget.onLogout!();
+      return;
+    }
+    _showLogoutDialog(context);
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    final errorColor = context.colors.error;
+    final cubit = context.read<AuthCubit>();
+
+    showSmoothDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: errorColor),
+            onPressed: () {
+              Navigator.of(context).pop();
+              cubit.logout();
+            },
+            child: const Text('Logout'),
+          ),
+        ],
       ),
     );
   }

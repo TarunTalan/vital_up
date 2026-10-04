@@ -172,7 +172,7 @@ class ActivitySettingsPage extends StatelessWidget {
                     ),
 
                     _SettingsTile(
-                      icon: Icons.calendar_today_rounded,
+                      icon: Icons.calendar_month_rounded,
                       title: 'Daily target',
                       subtitle: prefs.dailyTargetEnabled
                           ? (() {

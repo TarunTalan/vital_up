@@ -62,13 +62,15 @@ class UserAvatar extends StatelessWidget {
             : Border.all(color: ringColor!, width: AppDimens.borderThick),
       ),
       clipBehavior: Clip.antiAlias,
-      child: url == null || url!.isEmpty
-          ? fallback
-          : Image.network(
-              url!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => fallback,
-            ),
+      child: ClipOval(
+        child: url == null || url!.isEmpty
+            ? fallback
+            : Image.network(
+                url!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => fallback,
+              ),
+      ),
     );
   }
 }
