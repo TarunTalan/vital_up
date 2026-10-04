@@ -15,6 +15,7 @@ import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dar
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/friend_gamer_tile.dart';
 import 'package:vital_up/features/community/presentation/widgets/invite_share_card.dart';
+import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 
 /// Add friends by username, answer requests, and manage the friends list.
 class FriendsPage extends StatelessWidget {
@@ -226,13 +227,22 @@ class _FriendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.space8),
-      child: AppCard(
-        width: double.infinity,
-        padding: AppDimens.cardPaddingCompact,
-        child: Row(
-          children: [
+    return GestureDetector(
+      onTap: () {
+        PublicProfileSheet.show(
+          context,
+          username: friend.username,
+          level: friend.level,
+          avatarUrl: friend.avatarUrl,
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppDimens.space8),
+        child: AppCard(
+          width: double.infinity,
+          padding: AppDimens.cardPaddingCompact,
+          child: Row(
+            children: [
             UserAvatar(username: friend.username, url: friend.avatarUrl),
             const SizedBox(width: AppDimens.space12),
             Expanded(
@@ -266,6 +276,7 @@ class _FriendRow extends StatelessWidget {
             else
               trailing,
           ],
+        ),
         ),
       ),
     );

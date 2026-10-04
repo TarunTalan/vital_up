@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -32,9 +33,12 @@ class PlayerInspectSheet extends StatelessWidget {
   }) {
     return showAppBottomSheet<void>(
       context: context,
-      builder: (ctx) => PlayerInspectSheet(
-        friend: friend,
-        onRemove: onRemove,
+      builder: (ctx) => BlocProvider<GamificationCubit>.value(
+        value: sl<GamificationCubit>()..load(),
+        child: PlayerInspectSheet(
+          friend: friend,
+          onRemove: onRemove,
+        ),
       ),
     );
   }
