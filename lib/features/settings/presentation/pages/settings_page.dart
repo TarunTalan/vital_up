@@ -2,23 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/services/biometric_auth_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
-import 'package:vital_up/core/di/injection_container.dart';
-import 'package:vital_up/features/account/data/data_export_service.dart';
-import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
+import 'package:vital_up/features/community/presentation/cubit/community_cubit.dart';
+import 'package:vital_up/features/community/presentation/widgets/community_leaderboards_section.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
-import 'package:vital_up/core/services/biometric_auth_service.dart';
-import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
-import 'package:vital_up/features/help_support/presentation/pages/contact_support_page.dart';
+import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
 
+/// How the app behaves: appearance, units, notifications, connected apps,
+/// privacy and about. Account and health items live under Profile.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -28,6 +31,9 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _packageInfo = PackageInfo.fromPlatform();
+  bool _openingLeaderboards = false;
+
+  static const _themes = ['system', 'light', 'dark'];
 
   @override
   void initState() {
@@ -37,459 +43,232 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Widget _buildSection(String title, List<Widget> children) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.sectionGap),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppCaption(title),
-          const SizedBox(height: AppDimens.space8),
-          AppCard(
-            width: double.infinity,
-            padding: AppDimens.cardPaddingCompact,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
-      ),
-    );
+  void _update(SettingsEntity settings) =>
+      context.read<SettingsCubit>().updateSettings(settings);
+
+  Future<void> _setHealthSync(SettingsEntity settings, bool on) async {
+    if (on && !await sl<HealthImportService>().connect()) {
+      if (mounted) {
+        showErrorSnackBar(
+          context,
+          'Allow VitalUp to read weight and workouts in '
+          'Health Connect / Apple Health to turn this on.',
+        );
+      }
+      return;
+    }
+    _update(settings.copyWith(healthSyncEnabled: on));
   }
 
-  Widget _buildDivider() {
-    return Divider(
-      color: context.vColors.divider,
-      height: AppDimens.borderThin,
-      thickness: AppDimens.borderThin,
-      indent: AppDimens.iconBadge + AppDimens.space12,
-    );
+  Future<void> _setAppLock(bool on) async {
+    final success = await sl<BiometricAuthService>().setBiometricEnabled(on);
+    if (!mounted) return;
+    setState(() {});
+    if (success) {
+      showSuccessSnackBar(context, on ? 'App lock on' : 'App lock off');
+    } else if (on) {
+      showErrorSnackBar(
+        context,
+        "Couldn't turn on app lock. Check that this device has a "
+        'fingerprint, face or PIN set up.',
+      );
+    }
   }
 
-  Widget _buildSettingRow({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Color? iconColor,
-    Widget? trailing,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
-      child: Row(
-        children: [
-          AppIconBadge(icon: Icon(icon), color: iconColor),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.text.titleSmall),
-                const SizedBox(height: AppDimens.space2),
-                Text(
-                  subtitle,
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppDimens.space8),
-            trailing,
-          ],
-        ],
-      ),
-    );
+  /// Leaderboard visibility and city, the same sheet as in Arena.
+  Future<void> _openLeaderboards() async {
+    if (_openingLeaderboards) return;
+    setState(() => _openingLeaderboards = true);
+    final cubit = sl<CommunityCubit>();
+    await cubit.load();
+    if (!mounted) {
+      await cubit.close();
+      return;
+    }
+    setState(() => _openingLeaderboards = false);
+    if (cubit.state.failed) {
+      showErrorSnackBar(context, "Couldn't load your leaderboard settings.");
+    } else {
+      await CommunitySettingsSheet.show(context, cubit: cubit);
+    }
+    await cubit.close();
   }
 
-  Widget _buildUnitToggle({
-    required List<String> labels,
-    required List<bool> isSelected,
-    required ValueChanged<int> onPressed,
-  }) {
-    final colors = context.colors;
-    final v = context.vColors;
-    return ToggleButtons(
-      borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-      constraints: const BoxConstraints(
-        minHeight: AppDimens.space32,
-        minWidth: AppDimens.space40,
-      ),
-      textStyle: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-      color: v.grayText,
-      selectedColor: v.buttonText,
-      fillColor: colors.primary,
-      borderColor: v.glassBorder,
-      selectedBorderColor: colors.primary,
-      isSelected: isSelected,
-      onPressed: onPressed,
-      children: [
-        for (final label in labels)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppDimens.space12),
-            child: Text(label),
-          ),
-      ],
-    );
-  }
+  static String _themeLabel(String mode) => switch (mode) {
+    'light' => 'Light',
+    'dark' => 'Dark',
+    _ => 'System',
+  };
+
+  Widget _chevronSpinner() => SizedBox.square(
+    dimension: AppDimens.iconMd,
+    child: CircularProgressIndicator(
+      strokeWidth: AppDimens.borderThick,
+      color: context.colors.primary,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
+    const header = AppPageHeader(title: 'Settings');
 
-    return AppScaffold(
-      header: const AppPageHeader(title: 'Settings'),
-      scrollable: false,
-      padBody: false,
-      body: BlocConsumer<SettingsCubit, SettingsState>(
-        listener: (context, state) {
-          if (state is SettingsError) {
-            showErrorSnackBar(context, state.message);
-          }
-        },
-        builder: (context, state) {
-          if (state is SettingsLoading || state is SettingsInitial) {
-            return const Center(child: VitalUpLoader());
-          }
-
-          if (state is SettingsLoaded) {
-            final settings = state.settings;
-
-            return ListView(
-              physics: const ClampingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                context.gutter,
-                AppDimens.sectionGap,
-                context.gutter,
-                AppDimens.sectionGap + context.safePadding.bottom,
-              ),
-              children: [
-                _buildSection('Preferences', [
-                  _buildSettingRow(
-                    icon: Icons.palette_rounded,
-                    title: 'Theme Mode',
-                    subtitle: 'System, Light, or Dark theme',
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space8,
-                        vertical: AppDimens.space4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: v.primaryFill,
-                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                        border: Border.all(color: v.primaryBorder!),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: settings.themeMode,
-                          isDense: true,
-                          borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: AppDimens.iconSm,
-                          ),
-                          style: context.text.bodySmall?.copyWith(
-                            color: context.colors.onSurface,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'system', child: Text('System')),
-                            DropdownMenuItem(value: 'light', child: Text('Light')),
-                            DropdownMenuItem(value: 'dark', child: Text('Dark')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              context.read<SettingsCubit>().updateSettings(
-                                    settings.copyWith(themeMode: val),
-                                  );
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  _buildSettingRow(
-                    icon: Icons.straighten_rounded,
-                    title: 'Height Unit',
-                    subtitle: 'Centimeters or Inches',
-                    trailing: _buildUnitToggle(
-                      labels: const ['cm', 'in'],
-                      isSelected: [
-                        settings.heightUnit == 'cm',
-                        settings.heightUnit == 'in',
-                      ],
-                      onPressed: (index) {
-                        context.read<SettingsCubit>().updateSettings(
-                              settings.copyWith(
-                                heightUnit: index == 0 ? 'cm' : 'in',
-                              ),
-                            );
-                      },
-                    ),
-                  ),
-                  _buildDivider(),
-                  _buildSettingRow(
-                    icon: Icons.monitor_weight_rounded,
-                    title: 'Weight Unit',
-                    subtitle: 'Kilograms or Pounds',
-                    trailing: _buildUnitToggle(
-                      labels: const ['kg', 'lbs'],
-                      isSelected: [
-                        settings.weightUnit == 'kg',
-                        settings.weightUnit == 'lbs',
-                      ],
-                      onPressed: (index) {
-                        context.read<SettingsCubit>().updateSettings(
-                              settings.copyWith(
-                                weightUnit: index == 0 ? 'kg' : 'lbs',
-                              ),
-                            );
-                      },
-                    ),
-                  ),
-                ]),
-                _buildSection('Alerts & Integrations', [
-                  _buildSettingRow(
-                    icon: Icons.notifications_active_rounded,
-                    title: 'Notifications',
-                    subtitle: 'Pushes and reminders',
-                    trailing: Switch(
-                      value: settings.notificationsEnabled,
-                      onChanged: (val) {
-                        context.read<SettingsCubit>().updateSettings(
-                              settings.copyWith(notificationsEnabled: val),
-                            );
-                      },
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => context.pushNamed('my-goals'),
-                    child: _buildSettingRow(
-                      icon: Icons.flag_rounded,
-                      title: 'My Goals',
-                      subtitle: 'Water, sleep, weight, screen time and more',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => context.pushNamed('reminders'),
-                    child: _buildSettingRow(
-                      icon: Icons.alarm_rounded,
-                      title: 'Reminders',
-                      subtitle: 'Activity, meals, water, sleep',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => context.pushNamed('home-widgets'),
-                    child: _buildSettingRow(
-                      icon: Icons.widgets_rounded,
-                      title: 'Home Screen Widgets',
-                      subtitle: 'Live previews, quick actions & add to home screen',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  _buildSettingRow(
-                    icon: Icons.sync_rounded,
-                    title: 'Health Sync',
-                    subtitle: 'Import weight and workouts from Health Connect / Apple Health',
-                    trailing: Switch(
-                      value: settings.healthSyncEnabled,
-                      onChanged: (val) async {
-                        final cubit = context.read<SettingsCubit>();
-                        if (val && !await sl<HealthImportService>().connect()) {
-                          if (context.mounted) {
-                            showErrorSnackBar(
-                              context,
-                              'Allow VitalUp to read weight and workouts in '
-                              'Health Connect / Apple Health to turn this on.',
-                            );
-                          }
-                          return;
-                        }
-                        cubit.updateSettings(
-                          settings.copyWith(healthSyncEnabled: val),
-                        );
-                      },
-                    ),
-                  ),
-                ]),
-                _buildSection('Privacy & Security', [
-                  _buildSettingRow(
-                    icon: Icons.fingerprint_rounded,
-                    iconColor: AppColors.primary,
-                    title: 'Biometric App Lock',
-                    subtitle: 'Protect health records with Fingerprint / Face ID / PIN',
-                    trailing: Switch(
-                      value: sl<BiometricAuthService>().isBiometricEnabled(),
-                      onChanged: (val) async {
-                        final success = await sl<BiometricAuthService>().setBiometricEnabled(val);
-                        if (mounted) {
-                          setState(() {});
-                          if (success) {
-                            showSuccessSnackBar(
-                              context,
-                              val ? 'Biometric App Lock enabled 🔒' : 'Biometric App Lock disabled',
-                            );
-                          } else if (val) {
-                            showErrorSnackBar(
-                              context,
-                              'Biometric authentication failed or not supported on this device',
-                            );
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => context.pushNamed('health-report'),
-                    child: _buildSettingRow(
-                      icon: Icons.medical_services_outlined,
-                      iconColor: AppColors.teal,
-                      title: 'Doctor Health Report',
-                      subtitle: 'Generate clinical summary for your physician',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                ]),
-                _buildSection('Account', [
-                  InkWell(
-                    onTap: () async {
-                      final error =
-                          await sl<DataExportService>().exportAndShare();
-                      if (error != null && context.mounted) {
-                        showErrorSnackBar(context, error);
-                      }
-                    },
-                    child: _buildSettingRow(
-                      icon: Icons.download_rounded,
-                      title: 'Export my data',
-                      subtitle: 'Logs, workouts and profile as CSV / JSON',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => showDeleteAccountSheet(context),
-                    child: _buildSettingRow(
-                      icon: Icons.delete_forever_rounded,
-                      iconColor: context.colors.error,
-                      title: 'Delete account',
-                      subtitle: 'Permanently remove your account and data',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                ]),
-                _buildSection('Help & Support', [
-                  InkWell(
-                    onTap: () => context.pushNamed('help-support'),
-                    child: _buildSettingRow(
-                      icon: Icons.help_outline_rounded,
-                      iconColor: AppColors.primary,
-                      title: 'Help Center & FAQs',
-                      subtitle: 'Answers, guides, and troubleshooting',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => context.pushNamed('support-chat'),
-                    child: _buildSettingRow(
-                      icon: Icons.smart_toy_outlined,
-                      iconColor: AppColors.primary,
-                      title: 'Vital Assistant',
-                      subtitle: 'Instant AI support & diagnostics',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  InkWell(
-                    onTap: () => openContactSupport(
-                      context,
-                      initialCategory: SupportCategory.general,
-                    ),
-                    child: _buildSettingRow(
-                      icon: Icons.mail_outline_rounded,
-                      title: 'Contact Support Team',
-                      subtitle: 'Email support with category & diagnostics',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                ]),
-                _buildSection('Info & About', [
-                  InkWell(
-                    onTap: () => context.pushNamed('about'),
-                    child: _buildSettingRow(
-                      icon: Icons.info_outline_rounded,
-                      iconColor: AppColors.primary,
-                      title: 'About VitalUp',
-                      subtitle: 'Mission, rating, features & creators',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: v.grayText,
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  FutureBuilder<PackageInfo>(
-                    future: _packageInfo,
-                    builder: (context, snap) => _buildSettingRow(
-                      icon: Icons.code_rounded,
-                      title: 'Version',
-                      subtitle: snap.hasData
-                          ? 'VitalUp ${snap.data!.version} '
-                                '(${snap.data!.buildNumber})'
-                          : 'VitalUp',
-                    ),
-                  ),
-                ]),
-              ],
-            );
-          }
-
-          return Center(
-            child: Text(
-              'Settings not found',
-              style: context.text.bodyMedium?.copyWith(color: v.grayText),
+    return BlocConsumer<SettingsCubit, SettingsState>(
+      listener: (context, state) {
+        if (state is SettingsError) showErrorSnackBar(context, state.message);
+      },
+      builder: (context, state) {
+        if (state is! SettingsLoaded) {
+          return AppScaffold(
+            header: header,
+            body: Padding(
+              padding: const EdgeInsets.only(top: AppDimens.space48),
+              child: state is SettingsError
+                  ? LoadErrorView(
+                      onRetry: context.read<SettingsCubit>().loadSettings,
+                    )
+                  : const Center(child: VitalUpLoader()),
             ),
           );
-        },
-      ),
+        }
+        final s = state.settings;
+        final v = context.vColors;
+
+        return AppScaffold(
+          header: header,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const AppSectionHeader('Appearance'),
+              AppSegmentedControl<String>(
+                values: _themes,
+                selected: _themes.contains(s.themeMode) ? s.themeMode : 'system',
+                label: _themeLabel,
+                onChanged: (mode) => _update(s.copyWith(themeMode: mode)),
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppListGroup(
+                title: 'Units',
+                children: [
+                  AppListTile(
+                    icon: Icons.straighten_rounded,
+                    title: 'Height',
+                    trailing: AppSegmentedControl<String>(
+                      compact: true,
+                      values: const ['cm', 'in'],
+                      selected: s.heightUnit,
+                      label: (unit) => unit == 'in' ? 'ft / in' : unit,
+                      onChanged: (unit) =>
+                          _update(s.copyWith(heightUnit: unit)),
+                    ),
+                  ),
+                  AppListTile(
+                    icon: Icons.monitor_weight_rounded,
+                    title: 'Weight',
+                    trailing: AppSegmentedControl<String>(
+                      compact: true,
+                      values: const ['kg', 'lbs'],
+                      selected: s.weightUnit,
+                      label: (unit) => unit,
+                      onChanged: (unit) =>
+                          _update(s.copyWith(weightUnit: unit)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppListGroup(
+                title: 'Notifications',
+                children: [
+                  AppListTile(
+                    icon: Icons.notifications_active_rounded,
+                    title: 'Push notifications',
+                    subtitle: 'Insights, friends and challenges',
+                    trailing: Switch(
+                      value: s.notificationsEnabled,
+                      onChanged: (on) =>
+                          _update(s.copyWith(notificationsEnabled: on)),
+                    ),
+                  ),
+                  AppListTile(
+                    icon: Icons.alarm_rounded,
+                    iconColor: v.warning,
+                    title: 'Reminders',
+                    subtitle: 'Meals, water, sleep, activity',
+                    onTap: () => context.pushNamed('reminders'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppListGroup(
+                title: 'Connected',
+                children: [
+                  AppListTile(
+                    icon: Icons.sync_rounded,
+                    iconColor: v.success,
+                    title: 'Health sync',
+                    subtitle: 'Health Connect / Apple Health',
+                    trailing: Switch(
+                      value: s.healthSyncEnabled,
+                      onChanged: (on) => _setHealthSync(s, on),
+                    ),
+                  ),
+                  AppListTile(
+                    icon: Icons.widgets_rounded,
+                    title: 'Home screen widgets',
+                    subtitle: 'Live previews and quick actions',
+                    onTap: () => context.pushNamed('home-widgets'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppListGroup(
+                title: 'Privacy & security',
+                children: [
+                  AppListTile(
+                    icon: Icons.fingerprint_rounded,
+                    title: 'App lock',
+                    subtitle: 'Fingerprint, Face ID or PIN',
+                    trailing: Switch(
+                      value: sl<BiometricAuthService>().isBiometricEnabled(),
+                      onChanged: _setAppLock,
+                    ),
+                  ),
+                  AppListTile(
+                    icon: Icons.leaderboard_rounded,
+                    iconColor: AppColors.scoreBonus,
+                    title: 'Leaderboards',
+                    subtitle: 'Who sees you, and your city',
+                    trailing: _openingLeaderboards ? _chevronSpinner() : null,
+                    onTap: _openLeaderboards,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppListGroup(
+                title: 'About',
+                children: [
+                  FutureBuilder<PackageInfo>(
+                    future: _packageInfo,
+                    builder: (context, snap) => AppListTile(
+                      icon: Icons.info_outline_rounded,
+                      title: 'About VitalUp',
+                      value: snap.hasData
+                          ? '${snap.data!.version} (${snap.data!.buildNumber})'
+                          : null,
+                      onTap: () => context.pushNamed('about'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
