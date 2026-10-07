@@ -14,7 +14,6 @@ import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
-import 'package:home_widget/home_widget.dart';
 import 'package:vital_up/core/events/habit_events.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
@@ -76,7 +75,6 @@ class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
   late final ProfileCubit _profileCubit;
   StreamSubscription<PushOpen>? _pushOpens;
-  StreamSubscription<Uri?>? _widgetClicks;
   int _selectedIndex = 0;
   final List<int> _navigationQueue = [0];
 
@@ -98,17 +96,12 @@ class _DashboardPageState extends State<DashboardPage> {
     _pushOpens = push.opens.listen(_openPush);
 
     sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
-    _widgetClicks = HomeWidget.widgetClicked.listen(_openWidgetRoute);
+    // Opens a widget link that arrived while the app was starting.
+    HomeWidgetService.markReady();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final launch = push.takePendingOpen();
       if (launch != null) _openPush(launch);
-      final pendingWidgetRoute = HomeWidgetService.consumePendingRoute();
-      if (pendingWidgetRoute != null) {
-        HomeWidgetService.navigateWithBackstack(context, pendingWidgetRoute);
-      } else {
-        HomeWidget.initiallyLaunchedFromHomeWidget().then(_openWidgetRoute);
-      }
       _askForUsernameIfNeeded();
     });
   }
@@ -133,13 +126,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// A tapped push opens the screen its notification links to.
-  /// The home screen widget was tapped (routes to water, scan, activity, vita, or login).
-  void _openWidgetRoute(Uri? uri) {
-    final route = HomeWidgetService.routeOf(uri);
-    if (!mounted || route == null) return;
-    HomeWidgetService.navigateWithBackstack(context, route);
-  }
-
   void _openPush(PushOpen open) {
     if (!mounted) return;
     final route = notificationRoute(open.type, open.route);
@@ -149,7 +135,8 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _pushOpens?.cancel();
-    _widgetClicks?.cancel();
+    // Sign-out leaves Home; links wait until it shows again.
+    HomeWidgetService.markNotReady();
     _dietPlanCubit.close();
     _profileCubit.close();
     super.dispose();

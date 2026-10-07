@@ -245,11 +245,13 @@ class SleepService {
      }
   }
 
-  Future<bool> hasPermission() async {
+  /// Whether sleep can be read; asks for access unless [request] is false.
+  Future<bool> hasPermission({bool request = true}) async {
     final permissions = List.filled(_allSleepTypes.length, HealthDataAccess.READ);
     bool? hasPermissions = await _health
         .hasPermissions(_allSleepTypes, permissions: permissions)
         .orFallback(null);
+    if (!request) return hasPermissions ?? false;
     if (hasPermissions == null || !hasPermissions) {
       try {
         hasPermissions = await _health.requestAuthorization(_allSleepTypes, permissions: permissions);
@@ -260,9 +262,14 @@ class SleepService {
     return hasPermissions;
   }
 
-  Future<SleepSessionInfo?> getSleepDataForLastNight() async {
+  /// Last night from Health Connect / HealthKit, else a manual entry.
+  /// Pass [requestPermission] false where a permission screen would be
+  /// unexpected (e.g. home screen widget refreshes).
+  Future<SleepSessionInfo?> getSleepDataForLastNight({
+    bool requestPermission = true,
+  }) async {
     try {
-      if (await hasPermission()) {
+      if (await hasPermission(request: requestPermission)) {
         final now = DateTime.now();
         // Query last 24 hours
         final yesterday = now.subtract(const Duration(hours: 24));

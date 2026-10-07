@@ -645,31 +645,15 @@ class AppRouter {
           child: const VitaStressGuidePage(),
         ),
       ),
+      // Home screen widget taps (vitalup://widget/open?route=...). Flutter
+      // passes the link as /open?...; HomeWidgetService decides where it goes.
       GoRoute(
         path: '/open',
-        redirect: (context, state) {
-          final target = state.uri.queryParameters['route'] ??
-              state.uri.queryParameters['feature'] ??
-              'dashboard';
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final route = HomeWidgetService.normalizeFeatureRoute(target);
-            HomeWidgetService.navigateWithBackstack(null, route);
-          });
-          return '/dashboard';
-        },
+        redirect: (context, state) => HomeWidgetService.handleLink(state.uri),
       ),
       GoRoute(
         path: '/widget/open',
-        redirect: (context, state) {
-          final target = state.uri.queryParameters['route'] ??
-              state.uri.queryParameters['feature'] ??
-              'dashboard';
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final route = HomeWidgetService.normalizeFeatureRoute(target);
-            HomeWidgetService.navigateWithBackstack(null, route);
-          });
-          return '/dashboard';
-        },
+        redirect: (context, state) => HomeWidgetService.handleLink(state.uri),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

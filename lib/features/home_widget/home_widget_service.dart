@@ -2,250 +2,72 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
-import 'package:go_router/go_router.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:isar_community/isar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/database/collections/user_profile_cache.dart';
+import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/events/habit_events.dart';
 import 'package:vital_up/core/router/app_router.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
+import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
-import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
-import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
-import 'package:vital_up/features/reminders/data/reminder_actions.dart';
+import 'package:vital_up/features/home_widget/data/widget_background.dart';
+import 'package:vital_up/features/home_widget/data/widget_data.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 
-/// Android provider classes for all 8 widget types
-const providerMultiFeature = 'com.tarun_siddhi.vital_up.VitalUpWidgetProvider';
-const providerSleep = 'com.tarun_siddhi.vital_up.SleepWidgetProvider';
-const providerFoodLog = 'com.tarun_siddhi.vital_up.FoodLogWidgetProvider';
-const providerMood = 'com.tarun_siddhi.vital_up.MoodWidgetProvider';
-const providerStats = 'com.tarun_siddhi.vital_up.StatsProgressWidgetProvider';
-const providerHydration = 'com.tarun_siddhi.vital_up.HydrationWidgetProvider';
-const providerActivity = 'com.tarun_siddhi.vital_up.ActivityWidgetProvider';
-const providerShortcuts = 'com.tarun_siddhi.vital_up.QuickShortcutsWidgetProvider';
+export 'package:vital_up/features/home_widget/data/widget_background.dart'
+    show homeWidgetCallback;
 
-const allWidgetProviders = [
-  providerMultiFeature,
-  providerSleep,
-  providerFoodLog,
-  providerMood,
-  providerStats,
-  providerHydration,
-  providerActivity,
-  providerShortcuts,
-];
-
-/// Helper to parse stress tags from raw string
-StressTag? parseStressTag(String raw) {
-  final clean = raw.trim().toLowerCase();
-  for (final t in StressTag.values) {
-    if (t.name.toLowerCase() == clean || t.label.toLowerCase() == clean) {
-      return t;
-    }
-  }
-  return null;
-}
-
-/// Background callback triggered from Home Screen Widget interactive buttons.
-@pragma('vm:entry-point')
-Future<void> homeWidgetCallback(Uri? uri) async {
-  if (uri == null || uri.host != 'widget') return;
-  try {
-    final rawUserId = await HomeWidget.getWidgetData<String>('user_id')
-        .timeout(const Duration(seconds: 4), onTimeout: () => null);
-    final userId = (rawUserId != null && rawUserId.isNotEmpty) ? rawUserId : 'guest';
-
-    if (uri.path.startsWith('/add-water')) {
-      int amount = HomeWidgetService.addMl;
-      if (uri.path == '/add-water-100') {
-        amount = 100;
-      } else if (uri.path == '/add-water-500') {
-        amount = 500;
-      } else if (uri.path == '/add-water-1000') {
-        amount = 1000;
-      } else if (uri.queryParameters['amount'] != null) {
-        amount = int.tryParse(uri.queryParameters['amount']!) ?? 250;
-      }
-
-      final total = await addWaterInBackground(userId, amount)
-          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-      if (total > 0) {
-        await HomeWidget.saveWidgetData<int>('water_ml', total);
-      } else {
-        final current = await HomeWidget.getWidgetData<int>('water_ml') ?? 0;
-        await HomeWidget.saveWidgetData<int>('water_ml', current + amount);
-      }
-    } else if (uri.path == '/select-mood' || uri.path == '/log-mood') {
-      final level = int.tryParse(uri.queryParameters['level'] ?? '2') ?? 2;
-      await HomeWidget.saveWidgetData<int>('mood_selected_level', level);
-      await HomeWidget.saveWidgetData<String>(
-        'last_updated',
-        DateTime.now().toIso8601String(),
-      );
-    } else if (uri.path == '/toggle-tag') {
-      // Handled natively in MoodWidgetProvider for instantaneous, zero-latency toggling
-      // without spawning WorkManager background tasks or causing double-toggle race conditions.
-    } else if (uri.path == '/submit-mood' || uri.path == '/checkin-mood') {
-      final level = (await HomeWidget.getWidgetData<int>('mood_selected_level') ?? 2).clamp(1, 5);
-      final tags = await HomeWidget.getWidgetData<String>('mood_selected_tags') ?? '';
-      const moodLabels = ['Very calm', 'Calm', 'Okay', 'Stressed', 'Very stressed'];
-      const moodSubtitles = [
-        'Nice — keep that calm going.',
-        'Nice — keep that calm going.',
-        'Steady day. A short walk can lift it.',
-        'Tough one. Try a 2-minute breathing break.',
-        'Tough one. Try a 2-minute breathing break.',
-      ];
-      final label = moodLabels[(level - 1).clamp(0, 4)];
-      final defaultSubtitle = moodSubtitles[(level - 1).clamp(0, 4)];
-      final subtitle = tags.isNotEmpty ? tags.split(',').join(' · ') : defaultSubtitle;
-
-      // Save directly into local database (SharedPreferences/VitaLocalDataSource)
-      final parsedTags = tags.isNotEmpty
-          ? tags
-              .split(',')
-              .map((t) => parseStressTag(t))
-              .whereType<StressTag>()
-              .toList()
-          : <StressTag>[];
-      final streak = await saveMoodInBackground(userId, level, parsedTags)
-          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-      if (streak > 0) {
-        await HomeWidget.saveWidgetData<int>('streak', streak);
-      }
-
-      await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
-      await HomeWidget.saveWidgetData<int>('mood_level', level);
-      await HomeWidget.saveWidgetData<String>('mood_state', label);
-      await HomeWidget.saveWidgetData<String>('mood_subtitle', subtitle);
-      await HomeWidget.saveWidgetData<String>(
-        'last_updated',
-        DateTime.now().toIso8601String(),
-      );
-    } else if (uri.path == '/reset-mood' || uri.path == '/edit-mood') {
-      // Remove today's check-in from database
-      final streak = await resetMoodInBackground(userId)
-          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-      if (streak >= 0) {
-        await HomeWidget.saveWidgetData<int>('streak', streak);
-      }
-
-      await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
-      await HomeWidget.saveWidgetData<String>('mood_selected_tags', '');
-      await HomeWidget.saveWidgetData<String>(
-        'last_updated',
-        DateTime.now().toIso8601String(),
-      );
-    } else if (uri.path == '/refresh') {
-      // Read latest water from database
-      final total = await getTodayWaterInBackground(userId)
-          .timeout(const Duration(seconds: 5), onTimeout: () => 0);
-      if (total > 0) {
-        await HomeWidget.saveWidgetData<int>('water_ml', total);
-      }
-
-      // Read latest mood from database
-      final todayCheckIn = await getTodayMoodInBackground(userId)
-          .timeout(const Duration(seconds: 5), onTimeout: () => null);
-      if (todayCheckIn != null) {
-        final message = switch (todayCheckIn.level) {
-          1 || 2 => 'Nice — keep that calm going.',
-          3 => 'Steady day. A short walk can lift it.',
-          _ => 'Tough one. Try a 2-minute breathing break.',
-        };
-        final subtitle = todayCheckIn.tags.isNotEmpty
-            ? todayCheckIn.tags.map((t) => t.label).join(' · ')
-            : message;
-        await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
-        await HomeWidget.saveWidgetData<int>('mood_level', todayCheckIn.level);
-        await HomeWidget.saveWidgetData<String>('mood_state', todayCheckIn.label);
-        await HomeWidget.saveWidgetData<String>('mood_subtitle', subtitle);
-      } else {
-        await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
-      }
-      await HomeWidget.saveWidgetData<String>(
-        'last_updated',
-        DateTime.now().toIso8601String(),
-      );
-    }
-  } catch (e) {
-    debugPrint('Background widget action error: $e');
-  } finally {
-    // ALWAYS trigger widget updates so native loading spinners are dismissed cleanly
-    for (final p in allWidgetProviders) {
-      await HomeWidget.updateWidget(qualifiedAndroidName: p);
-    }
-  }
-}
-
-/// Keeps all 8 Android home screen widgets synchronized with user data.
+/// Keeps the Android home screen widgets current and routes their taps.
+///
+/// The app does the full refresh (repositories, so server data and goals
+/// are included) when it starts, after anything is logged, on sign-in or
+/// out, and when it is resumed or backgrounded. Widget buttons and stale
+/// widgets refresh from on-device data in the background
+/// ([homeWidgetCallback]).
 class HomeWidgetService {
   final SupabaseClient _client;
   final WaterIntakeService _water;
-  final GamificationRepository _game;
-  final ActivityGoalsRepository? _activityGoals;
-  final GetMealLogHistory? _mealLogs;
-  final VitaRepository? _vita;
+  final SleepService _sleep;
+  final WeightService _weight;
+  final ActivityGoalsRepository _activityGoals;
+  final GetMealLogHistory _mealLogs;
+  final GetActiveMealPlan _activePlan;
+  final IsarService _isar;
+  final VitaRepository _vita;
 
   HomeWidgetService(
     this._client,
     this._water,
-    this._game, {
-    ActivityGoalsRepository? activityGoals,
-    GetMealLogHistory? mealLogs,
-    VitaRepository? vita,
-  })  : _activityGoals = activityGoals,
-        _mealLogs = mealLogs,
-        _vita = vita;
+    this._sleep,
+    this._weight,
+    this._activityGoals,
+    this._mealLogs,
+    this._activePlan,
+    this._isar,
+    this._vita,
+  );
 
-  static const addMl = 250;
-
-  static String? _pendingRoute;
-
-  /// Consumes and clears any pending launch route received during cold start.
-  static String? consumePendingRoute() {
-    final route = _pendingRoute;
-    _pendingRoute = null;
-    return route;
-  }
+  static bool get supported => Platform.isAndroid;
 
   AppLifecycleListener? _lifecycle;
   StreamSubscription<HabitLogged>? _habits;
   StreamSubscription<AuthState>? _auth;
-  StreamSubscription<Uri?>? _widgetClicks;
 
-  bool get _supported => Platform.isAndroid;
-
-  /// Refreshes now, after habits are logged, on auth change, when app backgrounds,
-  /// and listens continuously for widget click deep links.
+  /// Refreshes now and whenever the data behind the widgets may change.
   void start(Stream<HabitLogged> habits) {
-    if (!_supported || _lifecycle != null) return;
+    if (!supported || _lifecycle != null) return;
     HomeWidget.registerInteractivityCallback(homeWidgetCallback);
-    _lifecycle = AppLifecycleListener(onHide: refresh);
+    _lifecycle = AppLifecycleListener(onHide: refresh, onResume: refresh);
     _habits = habits.listen((_) => refresh());
     _auth = _client.auth.onAuthStateChange.listen((_) => refresh());
-
-    // Check initial cold-start launch URI from home widget
-    HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
-      final route = routeOf(uri);
-      if (route != null) {
-        _pendingRoute = route;
-        navigateWithBackstack(null, route);
-      }
-    });
-
-    // Listen continuously for widget clicks while app is open or in background
-    _widgetClicks = HomeWidget.widgetClicked.listen((uri) {
-      final route = routeOf(uri);
-      if (route != null) {
-        navigateWithBackstack(null, route);
-      }
-    });
-
     refresh();
   }
 
@@ -253,441 +75,222 @@ class HomeWidgetService {
     _lifecycle?.dispose();
     _habits?.cancel();
     _auth?.cancel();
-    _widgetClicks?.cancel();
   }
 
-  /// Refreshes all metrics for all home widgets with global timeout and guaranteed UI release.
+  Future<void>? _running;
+  bool _again = false;
+
+  /// Collects today's figures and redraws every widget. Calls made while
+  /// one is running are folded into a single follow-up refresh.
   Future<void> refresh() async {
-    if (!_supported) return;
+    if (!supported) return;
+    if (_running != null) {
+      _again = true;
+      return _running;
+    }
+    _running = _refresh();
     try {
-      final rawUserId = _client.auth.currentUser?.id;
-      final userId = (rawUserId != null && rawUserId.isNotEmpty) ? rawUserId : 'guest';
-      final isSignedIn = rawUserId != null && rawUserId.isNotEmpty;
-      await HomeWidget.saveWidgetData<bool>('signed_in', isSignedIn);
-      await HomeWidget.saveWidgetData<String>('user_id', userId);
-
-      final futures = <Future<void>>[
-        // 1. Water logs & goal
-        _water
-            .getTodayLogs(userId)
-            .then((todayLogs) async {
-              final waterTotal = todayLogs.fold<int>(0, (sum, l) => sum + l.amountMl);
-              final waterGoal = _water.getDailyGoal();
-              await HomeWidget.saveWidgetData<int>('water_ml', waterTotal);
-              await HomeWidget.saveWidgetData<int>('water_goal_ml', waterGoal);
-            })
-            .catchError((_) {}),
-
-          // 2. Gamification: streak & daily points
-          _game
-              .getStats()
-              .then((stats) async {
-                await HomeWidget.saveWidgetData<int>('streak', stats.streak);
-                await HomeWidget.saveWidgetData<String>(
-                  'stats_rank_tag',
-                  'Level ${stats.streak > 0 ? (stats.streak ~/ 2 + 1) : 1} • Rank #4',
-                );
-              })
-              .catchError((_) {}),
-
-          _game
-              .getPointsForDay(DateTime.now())
-              .then((points) async {
-                final ptsToday = points.values.fold<int>(0, (sum, p) => sum + p);
-                await HomeWidget.saveWidgetData<int>('points_today', ptsToday);
-              })
-              .catchError((_) {}),
-        ];
-
-        // 3. Activity / Steps progress
-        if (_activityGoals != null) {
-          futures.add(
-            _activityGoals!
-                .getProgress(TrendRange.week)
-                .then((snapshot) async {
-                  final stepProgress = snapshot.goals
-                      .where((g) => g.goal.metric == GoalMetric.steps)
-                      .firstOrNull;
-                  if (stepProgress != null) {
-                    await HomeWidget.saveWidgetData<int>(
-                      'steps',
-                      stepProgress.current.toInt(),
-                    );
-                    await HomeWidget.saveWidgetData<int>(
-                      'steps_goal',
-                      stepProgress.goal.target.toInt(),
-                    );
-                  }
-                  final activeGoal = snapshot.goals
-                      .where((g) => g.goal.metric == GoalMetric.activeMinutes)
-                      .firstOrNull;
-                  if (activeGoal != null) {
-                    await HomeWidget.saveWidgetData<int>(
-                      'active_minutes',
-                      activeGoal.current.toInt(),
-                    );
-                  }
-                  final calGoal = snapshot.goals
-                      .where((g) => g.goal.metric == GoalMetric.calories)
-                      .firstOrNull;
-                  if (calGoal != null) {
-                    await HomeWidget.saveWidgetData<int>(
-                      'calories_burned',
-                      calGoal.current.toInt(),
-                    );
-                  }
-                  final completedCount = snapshot.goals.where((g) => g.achieved).length;
-                  await HomeWidget.saveWidgetData<int>('goals_completed', completedCount);
-                  await HomeWidget.saveWidgetData<int>('goals_total', snapshot.goals.length);
-                })
-                .catchError((_) {}),
-          );
-        }
-
-        // 4. Meal / Calories & Macros progress
-        if (_mealLogs != null) {
-          futures.add(
-            _mealLogs!(DateTime.now())
-                .then((result) async {
-                  result.fold((_) {}, (meals) async {
-                    int totalCals = 0;
-                    int totalP = 0;
-                    int totalC = 0;
-                    int totalF = 0;
-                    for (final m in meals) {
-                      totalCals += m.totalCalories.toInt();
-                      for (final n in m.nutrition) {
-                        totalP += n.proteinG.toInt();
-                        totalC += n.carbsG.toInt();
-                        totalF += n.fatG.toInt();
-                      }
-                    }
-                    await HomeWidget.saveWidgetData<int>('calories_consumed', totalCals);
-                    await HomeWidget.saveWidgetData<int>('calories_goal', 2000);
-                    await HomeWidget.saveWidgetData<int>('protein_g', totalP > 0 ? totalP : 110);
-                    await HomeWidget.saveWidgetData<int>('carbs_g', totalC > 0 ? totalC : 185);
-                    await HomeWidget.saveWidgetData<int>('fat_g', totalF > 0 ? totalF : 52);
-                  });
-                })
-                .catchError((_) {}),
-          );
-        }
-
-        // 5. Mood / Stress check-in progress
-        if (_vita != null) {
-          futures.add(
-            Future.microtask(() async {
-              await _vita!.reload();
-              final checkIns = _vita!.getStressCheckIns();
-              final now = DateTime.now();
-              final todayCheckIn = checkIns.where((c) =>
-                  c.date.year == now.year &&
-                  c.date.month == now.month &&
-                  c.date.day == now.day).firstOrNull;
-
-              final currentStreak = stressStreak(checkIns, now: now);
-              if (currentStreak > 0) {
-                await HomeWidget.saveWidgetData<int>('streak', currentStreak);
-              }
-
-              if (todayCheckIn != null) {
-                final message = switch (todayCheckIn.level) {
-                  1 || 2 => 'Nice — keep that calm going.',
-                  3 => 'Steady day. A short walk can lift it.',
-                  _ => 'Tough one. Try a 2-minute breathing break.',
-                };
-                final subtitle = todayCheckIn.tags.isNotEmpty
-                    ? todayCheckIn.tags.map((t) => t.label).join(' · ')
-                    : message;
-
-                await HomeWidget.saveWidgetData<bool>('mood_logged_today', true);
-                await HomeWidget.saveWidgetData<int>('mood_level', todayCheckIn.level);
-                await HomeWidget.saveWidgetData<String>('mood_state', todayCheckIn.label);
-                await HomeWidget.saveWidgetData<String>('mood_subtitle', subtitle);
-              } else {
-                await HomeWidget.saveWidgetData<bool>('mood_logged_today', false);
-              }
-            }).catchError((_) {}),
-          );
-        }
-
-        // Global timeout of 6 seconds for all concurrent API updates
-        await Future.wait(futures).timeout(const Duration(seconds: 6), onTimeout: () => []);
-    } catch (e) {
-      debugPrint('Home widget update failed: $e');
+      await _running;
     } finally {
-      await HomeWidget.saveWidgetData<String>(
-        'last_updated',
-        DateTime.now().toIso8601String(),
+      _running = null;
+    }
+    if (_again) {
+      _again = false;
+      await refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    final now = DateTime.now();
+    final today = WidgetInputs.dayOf(now);
+    final user = _client.auth.currentUser;
+    try {
+      await HomeWidget.saveWidgetData<String>('user_id', user?.id);
+      if (user == null) {
+        await publishWidgets(WidgetInputs(signedIn: false, day: today));
+        return;
+      }
+      await startWidgetRefresh();
+      // Anything that fails or times out keeps its last saved value.
+      final last = (await WidgetInputs.load())?.forDay(today);
+      const timeout = Duration(seconds: 6);
+      Future<T?> safe<T>(Future<T> f) =>
+          f.timeout(timeout).then<T?>((v) => v).catchError((Object e) {
+            debugPrint('Home widget value failed: $e');
+            return null;
+          });
+
+      final (
+        activity,
+        meals,
+        calorieGoal,
+        water,
+        sleep,
+        mood,
+        weight,
+        unit,
+      ) = await (
+        safe(_activityGoals.getProgress(TrendRange.week)),
+        safe(_mealLogs(now)),
+        safe(_calorieGoal()),
+        safe(_water.getTodayLogs(user.id)),
+        safe(_sleep.getSleepDataForLastNight(requestPermission: false)),
+        safe(_todayMood()),
+        safe(_weight.latest()),
+        safe(_weight.unit()),
+      ).wait;
+
+      // Home's Today card: today's step goal, else the first goal.
+      final goals = activity?.goals ?? const <GoalProgress>[];
+      final headline =
+          goals
+              .where(
+                (g) =>
+                    g.goal.metric == GoalMetric.steps &&
+                    g.goal.period == GoalPeriod.daily,
+              )
+              .firstOrNull ??
+          goals.firstOrNull;
+      final calories = meals
+          ?.fold<double?>(
+            (_) => null,
+            (entries) => entries.fold<double>(0, (s, e) => s + e.totalCalories),
+          )
+          ?.round();
+
+      await publishWidgets(
+        WidgetInputs(
+          signedIn: true,
+          day: today,
+          activityMetric: activity == null
+              ? last?.activityMetric
+              : headline?.goal.metric.name,
+          activityCurrent: activity == null
+              ? last?.activityCurrent
+              : headline?.current,
+          activityTarget: activity == null
+              ? last?.activityTarget
+              : headline?.goal.target,
+          caloriesEaten: calories ?? last?.caloriesEaten,
+          caloriesGoal: calorieGoal ?? last?.caloriesGoal,
+          waterMl: water == null
+              ? last?.waterMl
+              : water.fold<int>(0, (s, l) => s + l.amountMl),
+          waterGoalMl: _water.getDailyGoal(),
+          sleepMinutes: sleep?.duration.inMinutes ?? last?.sleepMinutes,
+          sleepGoalMinutes: _sleep.getGoalMinutes(),
+          moodLevel: mood?.level,
+          moodAt: mood?.date,
+          weightKg: weight?.weightKg ?? last?.weightKg,
+          weightAt: weight?.timestamp ?? last?.weightAt,
+          weightUnit: unit?.label ?? last?.weightUnit ?? 'kg',
+        ),
+        now: now,
       );
-
-      for (final p in allWidgetProviders) {
-        await HomeWidget.updateWidget(qualifiedAndroidName: p);
-      }
+    } catch (e) {
+      debugPrint('Home widget refresh failed: $e');
+      await endWidgetRefresh();
     }
   }
 
-  /// Normalizes deep link route names or feature aliases to registered app routes.
-  /// If the target represents multiple features or is not specified, defaults to 'dashboard'.
-  static String normalizeFeatureRoute(String? raw) {
-    if (raw == null || raw.isEmpty) return 'dashboard';
-    final cleaned = raw.toLowerCase().trim().replaceAll('/', '');
-    switch (cleaned) {
-      // Multi-feature or dashboard
-      case 'dashboard':
-      case 'main':
-      case 'home':
-      case 'multi':
-      case 'multiple':
-      case 'multi-feature':
-      case 'overview':
-      case 'summary':
-        return 'dashboard';
-
-      // Hydration / Water
-      case 'water':
-      case 'water-trends':
-      case 'hydration':
-      case 'water-intake':
-      case 'water-log':
-        return 'water-trends';
-
-      // Activity / Steps / Workout
-      case 'activity':
-      case 'activity-tracking':
-      case 'steps':
-      case 'workout':
-      case 'run':
-      case 'fitness':
-        return 'activity-tracking';
-      case 'activity-goals':
-        return 'activity-goals';
-      case 'activity-history':
-      case 'workout-history':
-        return 'activity-history';
-
-      // Food / Nutrition / Meals
-      case 'scan':
-      case 'food-scan':
-      case 'camera-scan':
-        return 'food-scan';
-      case 'food':
-      case 'nutrition':
-      case 'meals':
-      case 'meal':
-      case 'diet':
-      case 'calorie':
-      case 'calories':
-      case 'diet-progress':
-      case 'macros':
-        return 'diet-progress';
-      case 'meal-log-history':
-      case 'meal-history':
-      case 'food-history':
-        return 'meal-log-history';
-
-      // Sleep & Recovery
-      case 'sleep':
-      case 'sleep-trends':
-      case 'rest':
-      case 'recovery':
-        return 'sleep-trends';
-
-      // Mood / Mindfulness / Stress
-      case 'mood':
-      case 'mindfulness':
-      case 'stress':
-      case 'stress-trends':
-      case 'check-in':
-      case 'mood-log':
-        return 'stress-trends';
-      case 'vita-stress':
-        return 'vita-stress';
-
-      // Vita AI
-      case 'vita':
-      case 'vita-chat':
-      case 'ai':
-      case 'coach':
-      case 'vita-ai':
-        return 'vita-chat';
-      case 'vita-analysis':
-      case 'analysis':
-        return 'vita-analysis';
-      case 'vita-diet-plan':
-        return 'vita-diet-plan';
-
-      // Gamification / Points / Badges / Goals
-      case 'leaderboard':
-      case 'rank':
-      case 'ranking':
-      case 'xp':
-      case 'stats':
-      case 'gamification':
-      case 'score':
-      case 'points-history':
-      case 'points':
-      case 'streak':
-        return 'points-history';
-      case 'badges':
-      case 'achievements':
-        return 'badges';
-      case 'challenges':
-      case 'quests':
-        return 'challenges';
-      case 'my-goals':
-      case 'goals':
-        return 'my-goals';
-
-      // Weight & Screen Time
-      case 'weight':
-      case 'weight-trends':
-        return 'weight-trends';
-      case 'screen-time':
-      case 'screen-time-trends':
-        return 'screen-time-trends';
-
-      // Health Report
-      case 'health-report':
-      case 'report':
-        return 'health-report';
-
-      // Settings & Reminders & Widgets
-      case 'settings':
-        return 'settings';
-      case 'reminders':
-        return 'reminders';
-      case 'home-widgets':
-      case 'widgets':
-        return 'home-widgets';
-      case 'custom-widget-builder':
-      case 'custom-widget':
-        return 'custom-widget-builder';
-
-      // Auth
-      case 'login':
-      case 'quick-login':
-      case 'signin':
-        return 'login';
-
-      default:
-        return raw;
-    }
+  /// Same goal Home shows: the active meal plan, else the profile's goal.
+  Future<int?> _calorieGoal() async {
+    final plan = await _activePlan();
+    if (plan != null) return plan.totalCalories.round();
+    final profile = await _isar.isar.userProfileCaches.where().findFirst();
+    return profile?.dailyCalorieGoal;
   }
 
-  /// Parses in-app route from deep link URI.
-  /// Handles `vitalup://widget/open?route=...`, `vitalup://<route>`, `vitalup://widget/quick-login`.
-  /// If multiple features or unspecified, returns 'dashboard'.
-  static String? routeOf(Uri? uri) {
-    if (uri == null) return null;
-    if (uri.scheme == 'vitalup') {
-      if (uri.host == 'widget') {
-        if (uri.path == '/open') {
-          final target = uri.queryParameters['route'] ?? uri.queryParameters['feature'];
-          return normalizeFeatureRoute(target);
-        } else if (uri.path == '/quick-login') {
-          return 'login';
-        } else if (uri.path.isNotEmpty && uri.path != '/') {
-          return normalizeFeatureRoute(uri.path.replaceAll('/', ''));
-        }
-        return 'dashboard';
-      } else if (uri.host.isNotEmpty) {
-        // e.g. vitalup://food-scan or vitalup://water-trends or vitalup://dashboard
-        return normalizeFeatureRoute(uri.host);
-      }
-    }
-    return null;
+  Future<StressCheckIn?> _todayMood() async {
+    await _vita.reload();
+    final now = DateTime.now();
+    return _vita
+        .getStressCheckIns()
+        .where(
+          (c) =>
+              c.date.year == now.year &&
+              c.date.month == now.month &&
+              c.date.day == now.day,
+        )
+        .firstOrNull;
   }
 
-  /// Navigates to the given route with proper backstack management.
-  /// Ensures individual features push onto the stack while multiple features / home open Dashboard.
-  static void navigateWithBackstack(BuildContext? context, String route) {
-    final isSignedIn = Supabase.instance.client.auth.currentUser != null;
+  // -------------------------------------------------------------------------
+  // Deep links: vitalup://widget/open?route=<name>
+  //
+  // Flutter hands these to GoRouter as /open?route=... (see app_router.dart),
+  // the only place widget taps are handled. Before the app has signed in and
+  // reached Home (cold start), the route waits; Home then opens it on top of
+  // itself so Back returns Home.
+  // -------------------------------------------------------------------------
 
-    if (route == 'login' || route == 'quick-login') {
-      if (!isSignedIn) {
-        if (context != null && context.mounted) {
-          context.pushNamed('login');
-        } else {
-          AppRouter.router.pushNamed('login');
-        }
-      } else {
-        if (context != null && context.mounted) {
-          context.goNamed('dashboard');
-        } else {
-          AppRouter.router.goNamed('dashboard');
-        }
-      }
+  static String? _pending;
+  static DateTime? _pendingAt;
+  static bool _ready = false;
+
+  /// Routes a widget may open, plus aliases from older widget versions.
+  static const _routes = <String, String>{
+    'dashboard': 'dashboard',
+    'home': 'dashboard',
+    'login': 'login',
+    'activity-goals': 'activity-goals',
+    'activity-tracking': 'activity-tracking',
+    'diet-progress': 'diet-progress',
+    'food-scan': 'food-scan',
+    'water-trends': 'water-trends',
+    'water-log': 'water-trends',
+    'water': 'water-trends',
+    'sleep-trends': 'sleep-trends',
+    'stress-trends': 'stress-trends',
+    'weight-trends': 'weight-trends',
+    'vita-chat': 'vita-chat',
+    'home-widgets': 'home-widgets',
+  };
+
+  /// The app route a widget link opens; unknown targets open Home.
+  static String routeOf(Uri uri) {
+    final target =
+        uri.queryParameters['route'] ?? uri.queryParameters['feature'];
+    return _routes[target?.toLowerCase().trim()] ?? 'dashboard';
+  }
+
+  /// GoRouter redirect for /open and /widget/open.
+  static String handleLink(Uri uri) {
+    final route = routeOf(uri);
+    if (!_ready) {
+      _pending = route;
+      _pendingAt = DateTime.now();
+      return '/splash';
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => open(route));
+    return '/dashboard';
+  }
+
+  /// Home is showing: open a route that arrived during start-up.
+  static void markReady() {
+    _ready = true;
+    final route = _pending;
+    final at = _pendingAt;
+    _pending = null;
+    _pendingAt = null;
+    if (route == null || at == null) return;
+    // A tap from minutes ago (e.g. before signing in) is no longer wanted.
+    if (DateTime.now().difference(at) > const Duration(minutes: 2)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => open(route));
+  }
+
+  /// Leaving Home for sign-in: links wait for the next time it shows.
+  static void markNotReady() => _ready = false;
+
+  /// Opens [route] above Home; signed-out users go to sign-in.
+  static void open(String route) {
+    final router = AppRouter.router;
+    final signedIn = Supabase.instance.client.auth.currentUser != null;
+    if (!signedIn) {
+      router.goNamed('login');
       return;
     }
-
-    if (route == 'dashboard') {
-      if (context != null && context.mounted) {
-        context.goNamed('dashboard');
-      } else {
-        AppRouter.router.goNamed('dashboard');
-      }
-      return;
-    }
-
-    // List of known routes that should be pushed on top of Dashboard
-    final validRoutes = <String>{
-      ...notificationLinkableRoutes,
-      'dashboard',
-      'login',
-      'water-trends',
-      'sleep-trends',
-      'stress-trends',
-      'weight-trends',
-      'screen-time-trends',
-      'activity-tracking',
-      'activity-goals',
-      'activity-history',
-      'food-scan',
-      'meal-log-history',
-      'diet-progress',
-      'my-goals',
-      'points-history',
-      'badges',
-      'challenges',
-      'friends',
-      'vita-chat',
-      'vita-analysis',
-      'vita-diet-plan',
-      'vita-stress',
-      'health-report',
-      'weekly-summary',
-      'reminders',
-      'home-widgets',
-      'custom-widget-builder',
-      'settings',
-      'help-support',
-      'about',
-    };
-
-    if (validRoutes.contains(route)) {
-      try {
-        if (context != null && context.mounted) {
-          context.goNamed('dashboard');
-          context.pushNamed(route);
-        } else {
-          AppRouter.router.goNamed('dashboard');
-          AppRouter.router.pushNamed(route);
-        }
-      } catch (e) {
-        debugPrint('Navigation error for route $route: $e');
-        if (context != null && context.mounted) {
-          context.goNamed('dashboard');
-        } else {
-          AppRouter.router.goNamed('dashboard');
-        }
-      }
-    } else {
-      if (context != null && context.mounted) {
-        context.goNamed('dashboard');
-      } else {
-        AppRouter.router.goNamed('dashboard');
-      }
-    }
+    router.goNamed('dashboard');
+    if (route != 'dashboard' && route != 'login') router.pushNamed(route);
   }
 }
