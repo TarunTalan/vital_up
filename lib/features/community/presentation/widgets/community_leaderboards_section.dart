@@ -173,13 +173,15 @@ class _SetCityTile extends StatelessWidget {
 class CommunitySettingsSheet extends StatelessWidget {
   const CommunitySettingsSheet({super.key});
 
-  static void show(BuildContext context) {
-    showModalBottomSheet(
+  /// Uses the [CommunityCubit] above [context], or [cubit] when opened from
+  /// outside Arena (Settings).
+  static Future<void> show(BuildContext context, {CommunityCubit? cubit}) {
+    return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
-        value: context.read<CommunityCubit>(),
+        value: cubit ?? context.read<CommunityCubit>(),
         child: const CommunitySettingsSheet(),
       ),
     );

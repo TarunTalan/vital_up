@@ -9,6 +9,8 @@ import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
+export 'package:vital_up/core/widgets/user_avatar.dart';
+
 final _count = NumberFormat.compact();
 
 IconData communityFallbackIcon(Community c) => switch (c.type) {
@@ -24,56 +26,6 @@ IconData communityFallbackIcon(Community c) => switch (c.type) {
     _ => Icons.groups_rounded,
   },
 };
-
-/// Round avatar from a URL, falling back to the username's initial.
-class UserAvatar extends StatelessWidget {
-  final String username;
-  final String? url;
-  final double size;
-  final Color? ringColor;
-
-  const UserAvatar({
-    super.key,
-    required this.username,
-    this.url,
-    this.size = AppDimens.avatarSmall,
-    this.ringColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = username.isEmpty
-        ? '?'
-        : username.characters.first.toUpperCase();
-    final fallback = Center(
-      child: Text(
-        initial,
-        style: context.text.titleSmall?.copyWith(color: context.colors.primary),
-      ),
-    );
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: context.colors.primary.withValues(alpha: 0.15),
-        border: ringColor == null
-            ? null
-            : Border.all(color: ringColor!, width: AppDimens.borderThick),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ClipOval(
-        child: url == null || url!.isEmpty
-            ? fallback
-            : Image.network(
-                url!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => fallback,
-              ),
-      ),
-    );
-  }
-}
 
 /// A community row: icon, name, what it ranks on and member count, with an
 /// optional trailing action.
