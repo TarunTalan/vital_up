@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
@@ -130,71 +129,50 @@ class NutritionSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          TrackerProgress(
+            value: '${kcal.round()} kcal',
+            goal: goal == null ? null : '${goal.round()} kcal',
+            fraction: goal == null || goal <= 0 ? null : kcal / goal,
+            color: _metric.color,
+            caption: left == null
+                ? 'Set a calorie goal to track against it.'
+                : left >= 0
+                ? '${left.round()} kcal left today'
+                : '${(-left).round()} kcal over your goal',
+          ),
+          const SizedBox(height: AppDimens.cardInnerGap),
           Row(
             children: [
-              TrackerRing(
-                size: context.w(AppDimens.calorieRing),
-                fraction: goal == null || goal <= 0 ? null : kcal / goal,
-                color: _metric.color,
-                center: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${kcal.round()}',
-                      style: context.text.titleSmall?.copyWith(
-                        color: context.colors.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      'kcal',
-                      style: context.text.labelSmall?.copyWith(
-                        color: context.vColors.grayText,
-                      ),
-                    ),
-                  ],
+              Expanded(
+                child: MacroBar(
+                  label: 'Protein',
+                  value: state.totalProteinG,
+                  maxValue: targets.protein,
+                  color: AppColors.protein,
+                  compact: true,
                 ),
               ),
-              const SizedBox(width: AppDimens.space20),
+              const SizedBox(width: AppDimens.space12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MacroBar(
-                      label: 'Protein',
-                      value: state.totalProteinG,
-                      maxValue: targets.protein,
-                      color: AppColors.protein,
-                    ),
-                    const SizedBox(height: AppDimens.space8),
-                    MacroBar(
-                      label: 'Carbs',
-                      value: state.totalCarbsG,
-                      maxValue: targets.carbs,
-                      color: AppColors.carbs,
-                    ),
-                    const SizedBox(height: AppDimens.space8),
-                    MacroBar(
-                      label: 'Fat',
-                      value: state.totalFatG,
-                      maxValue: targets.fat,
-                      color: AppColors.fat,
-                    ),
-                  ],
+                child: MacroBar(
+                  label: 'Carbs',
+                  value: state.totalCarbsG,
+                  maxValue: targets.carbs,
+                  color: AppColors.carbs,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: MacroBar(
+                  label: 'Fat',
+                  value: state.totalFatG,
+                  maxValue: targets.fat,
+                  color: AppColors.fat,
+                  compact: true,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: AppDimens.space8),
-          Text(
-            left == null
-                ? 'Set a calorie goal to track against it.'
-                : left >= 0
-                ? '${left.round()} kcal left of ${goal!.round()}'
-                : '${(-left).round()} kcal over your ${goal!.round()} goal',
-            style: context.text.bodySmall?.copyWith(
-              color: context.vColors.grayText,
-            ),
           ),
           const SizedBox(height: AppDimens.cardInnerGap),
           if (plan != null)
@@ -242,41 +220,53 @@ class MacroBar extends StatelessWidget {
   final double maxValue;
   final Color color;
 
+  /// Stacks the figure under the label, for narrow side-by-side columns.
+  final bool compact;
+
   const MacroBar({
     super.key,
     required this.label,
     required this.value,
     required this.maxValue,
     required this.color,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final progress = maxValue > 0 ? (value / maxValue).clamp(0.0, 1.0) : 0.0;
+    final name = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: context.text.labelSmall?.copyWith(color: context.vColors.grayText),
+    );
+    final figure = Text(
+      '${value.round()} / ${maxValue.round()}g',
+      maxLines: 1,
+      style: context.text.labelSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: context.colors.onSurface,
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.labelSmall?.copyWith(
-                  color: context.vColors.grayText,
-                ),
-              ),
-            ),
-            Text(
-              '${value.round()} / ${maxValue.round()}g',
-              style: context.text.labelSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colors.onSurface,
-              ),
-            ),
-          ],
-        ),
+        if (compact) ...[
+          name,
+          const SizedBox(height: AppDimens.space2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: figure,
+          ),
+        ] else
+          Row(
+            children: [
+              Expanded(child: name),
+              figure,
+            ],
+          ),
         const SizedBox(height: AppDimens.space4),
         AppProgressBar(
           value: progress,

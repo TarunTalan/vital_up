@@ -47,10 +47,18 @@ class ScreenTimeCard extends StatelessWidget {
                 onTap: cubit.openSettings,
               ),
             ],
-            child: const TrackerPrompt(
-              title: 'Track screen time',
-              message: 'Grant Usage Access to total your screen time.',
-              color: AppColors.trackScreenTime,
+            child: Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  TrackerPrompt(
+                    title: 'Track screen time',
+                    message: 'Grant Usage Access to total your screen time.',
+                    color: AppColors.trackScreenTime,
+                  ),
+                ],
+              ),
             ),
           ),
           ScreenTimeError() => TrackerCardPlaceholder(
@@ -95,7 +103,8 @@ class ScreenTimeCard extends StatelessWidget {
           children: [
             TrackerProgress(
               value: formatDashboardDuration(state.totalDuration),
-              goal: '${formatDashboardDuration(Duration(minutes: limit))} limit',
+              goal:
+                  '${formatDashboardDuration(Duration(minutes: limit))} limit',
               fraction: limit > 0 ? minutes / limit : null,
               color: left >= 0 ? _metric.color : context.colors.error,
               caption: left >= 0
@@ -105,6 +114,100 @@ class ScreenTimeCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Compact home row: today's screen time against the limit on one line.
+/// Tracked automatically, so the only action is granting access.
+class ScreenTimeSummaryRow extends StatelessWidget {
+  const ScreenTimeSummaryRow({super.key});
+
+  Future<void> _open(BuildContext context) async {
+    final cubit = context.read<ScreenTimeCubit>();
+    await context.pushNamed(_metric.route);
+    cubit.loadStats();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ScreenTimeCubit, ScreenTimeState>(
+      builder: (context, state) {
+        final cubit = context.read<ScreenTimeCubit>();
+        final grey = context.vColors.grayText;
+        String? value;
+        Color? valueColor;
+        final String caption;
+        VoidCallback onTap = () => _open(context);
+        switch (state) {
+          case ScreenTimeLoaded():
+            final limit = sl<ScreenTimeService>().getDailyLimitMinutes();
+            final left = limit - state.totalDuration.inMinutes;
+            value = formatDashboardDuration(state.totalDuration);
+            valueColor = left >= 0 ? null : context.colors.error;
+            caption = left >= 0
+                ? '${formatDashboardDuration(Duration(minutes: left))} left of '
+                      '${formatDashboardDuration(Duration(minutes: limit))} limit'
+                : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}';
+          case ScreenTimePermissionDenied():
+            caption = 'Allow usage access to track it';
+            onTap = cubit.openSettings;
+          case ScreenTimeError():
+            caption = "Couldn't load. Tap to retry";
+            onTap = cubit.loadStats;
+          default:
+            caption = 'Loading…';
+        }
+        return AppCard(
+          width: double.infinity,
+          onTap: onTap,
+          padding: AppDimens.cardPaddingCompact,
+          child: Row(
+            children: [
+              const TrackerBadge(_metric),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _metric.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.titleSmall?.copyWith(
+                        color: context.colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimens.space2),
+                    Text(
+                      caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodySmall?.copyWith(color: grey),
+                    ),
+                  ],
+                ),
+              ),
+              if (value != null) ...[
+                const SizedBox(width: AppDimens.space8),
+                Text(
+                  value,
+                  style: context.text.titleMedium?.copyWith(
+                    color: valueColor ?? context.colors.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              const SizedBox(width: AppDimens.space4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: AppDimens.iconMd,
+                color: grey,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
