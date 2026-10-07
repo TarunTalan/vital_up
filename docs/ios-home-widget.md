@@ -1,111 +1,90 @@
-# iOS home screen widget
+# Home screen widgets
 
-The Android widget (today's water, streak, points and a "+250 ml" button) is
-built in. iOS widgets need a WidgetKit extension target, which has to be
-created in Xcode on a Mac. The Dart side is ready: `HomeWidgetService`
-(`lib/features/home_widget/home_widget_service.dart`) already writes the
-values below whenever water is logged and when the app goes to the background.
+## Android (built in)
 
-| Key             | Type   | Meaning                         |
-|-----------------|--------|---------------------------------|
-| `signed_in`     | Bool   | Someone is signed in            |
-| `user_id`       | String | Signed-in user id               |
-| `water_ml`      | Int    | Water logged today              |
-| `water_goal_ml` | Int    | Daily water goal                |
-| `streak`        | Int    | Current activity streak (days)  |
-| `points_today`  | Int    | Points earned today             |
+Five widgets, all resizable:
 
-## Steps
+| Widget        | Provider class                 | Shows                                             |
+|---------------|--------------------------------|---------------------------------------------------|
+| Today         | `VitalUpWidgetProvider`        | Activity, calories, water and sleep vs goals      |
+| My metrics    | `CustomWidgetProvider`         | 1-4 metrics chosen in Settings > Widgets          |
+| Water         | `HydrationWidgetProvider`      | Water vs goal, +150 / +250 / +500 ml buttons      |
+| Mood check-in | `MoodWidgetProvider`           | Five faces to check in, then today's mood         |
+| Shortcuts     | `QuickShortcutsWidgetProvider` | Scan, Water, Workout, Vita                        |
 
-1. **Add an App Group** (shared storage between the app and the widget).
-   In Xcode, select the *Runner* target → *Signing & Capabilities* →
-   *+ Capability* → *App Groups* → add `group.com.tarunsiddhi.vitalup`.
+Each size the app offers is its own provider (Android can only pin a widget
+at its provider's default size, so the Widgets page pins the provider for the
+selected size tab): Today and My metrics come in 2×2, 4×2, 4×3 and 4×4; Water
+in 2×2 and 4×2; Mood in 4×1 and 4×2; Shortcuts in 2×1 and 4×1. The extra
+sizes are subclasses in `WidgetSizes.kt` with their own `res/xml/*_info.xml`
+and manifest receiver; every size stays freely resizable once placed.
 
-2. **Create the widget extension.** *File → New → Target → Widget Extension*,
-   name it `VitalUpWidget`, untick *Include Configuration App Intent*. Add the
-   same App Group to the new target. Set its deployment target to the
-   Runner's.
+How it fits together:
 
-3. **Tell the plugin about the group** — in `HomeWidgetService.start`, before
-   the first refresh:
+- **Dart formats, Kotlin lays out.** `lib/features/home_widget/data/widget_data.dart`
+  turns raw numbers (`WidgetInputs`) into display text (`buildTiles`) and saves
+  it with `home_widget`. The Kotlin providers
+  (`android/app/src/main/kotlin/.../VitalWidget.kt`, `MetricsWidget.kt`, ...)
+  only place that text. The in-app previews
+  (`presentation/widget_previews.dart`) draw the same text with Flutter copies
+  of the layouts, so previews and home screen match. Keep the size thresholds
+  in the previews in step with the providers.
+- **Refresh.** The app refreshes from its repositories (server data included)
+  on start, resume, background, sign-in/out and after anything is logged
+  (`HomeWidgetService.refresh`). Widget buttons, and widgets whose data is from
+  an earlier day or over 30 minutes old, run `homeWidgetCallback` in a
+  background isolate, which re-reads on-device data (water, meals, mood,
+  weight) and keeps the rest from the last app refresh.
+- **Taps.** Widgets open `vitalup://widget/open?route=<name>`. Flutter passes it
+  to GoRouter as `/open?route=...`; `HomeWidgetService.handleLink` opens the
+  route on top of Home (Back returns Home), or holds it until Home shows on a
+  cold start.
+- **Theme.** Colours come from `res/values/colors.xml` and
+  `res/values-night/colors.xml` (VitalUp tokens), so widgets follow the
+  phone's light or dark setting. Text uses SF Pro Rounded from `res/font`.
 
-   ```dart
-   await HomeWidget.setAppGroupId('group.com.tarunsiddhi.vitalup');
-   ```
+### Saved keys
 
-   and remove the `Platform.isAndroid` guard (`_supported`) so iOS gets
-   updates too. Pass `iOSName: 'VitalUpWidget'` to `HomeWidget.updateWidget`.
+| Key                         | Type   | Meaning                                         |
+|-----------------------------|--------|-------------------------------------------------|
+| `signed_in`                 | Bool   | Someone is signed in                            |
+| `user_id`                   | String | Signed-in user id (background actions)          |
+| `snapshot_day`              | String | yyyy-MM-dd the figures belong to                |
+| `updated_at_ms`             | String | Last refresh, epoch milliseconds                |
+| `m_<metric>_label`          | String | e.g. "Steps"                                    |
+| `m_<metric>_value`          | String | e.g. "6,240"                                    |
+| `m_<metric>_detail`         | String | e.g. "of 8,000 steps"                           |
+| `m_<metric>_progress`       | Int    | 0-100, or -1 when there is no goal              |
+| `m_<metric>_color`          | String | Accent, "#AARRGGBB"                             |
+| `m_<metric>_route`          | String | Route opened when tapped                        |
+| `mood_level`                | Int    | Today's check-in 1-5, or 0                      |
+| `today_metrics`             | String | Metric ids for Today                            |
+| `custom_metrics`            | String | Metric ids for My metrics, in order             |
+| `custom_title`              | String | My metrics title                                |
+| `in_*`                      | String | Raw inputs for background rebuilds              |
+| `refreshing_since_ms`       | String | Refresh running: headers show a spinner (20 s max) |
 
-4. **Read the values in Swift** (`VitalUpWidget.swift`):
+`<metric>` is one of `activity`, `calories`, `water`, `sleep`, `mood`,
+`weight`.
 
-   ```swift
-   import WidgetKit
-   import SwiftUI
+## iOS (not built yet)
 
-   struct Entry: TimelineEntry {
-     let date: Date
-     let waterMl: Int
-     let goalMl: Int
-     let streak: Int
-     let points: Int
-   }
+iOS widgets need a WidgetKit extension target, which has to be created in
+Xcode on a Mac:
 
-   struct Provider: TimelineProvider {
-     let defaults = UserDefaults(suiteName: "group.com.tarunsiddhi.vitalup")
-
-     func entry() -> Entry {
-       Entry(date: .now,
-             waterMl: defaults?.integer(forKey: "water_ml") ?? 0,
-             goalMl: max(defaults?.integer(forKey: "water_goal_ml") ?? 2500, 1),
-             streak: defaults?.integer(forKey: "streak") ?? 0,
-             points: defaults?.integer(forKey: "points_today") ?? 0)
-     }
-     func placeholder(in context: Context) -> Entry { entry() }
-     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
-       completion(entry())
-     }
-     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-       completion(Timeline(entries: [entry()], policy: .after(.now.addingTimeInterval(1800))))
-     }
-   }
-
-   struct VitalUpWidgetView: View {
-     let entry: Entry
-     var body: some View {
-       VStack(alignment: .leading, spacing: 8) {
-         HStack {
-           Text("VitalUp today").font(.headline)
-           Spacer()
-           if entry.streak > 0 { Text("🔥 \(entry.streak)") }
-         }
-         Text("\(entry.waterMl) / \(entry.goalMl) ml").font(.title3)
-         ProgressView(value: Double(min(entry.waterMl, entry.goalMl)),
-                      total: Double(entry.goalMl))
-           .tint(Color(red: 0x42/255, green: 0xA5/255, blue: 0xF5/255))
-         Text("+\(entry.points) pts today").font(.caption).foregroundStyle(.secondary)
-       }
-       .widgetURL(URL(string: "vitalup://widget/open?route=water-trends"))
-       .containerBackground(.background, for: .widget)
-     }
-   }
-
-   @main
-   struct VitalUpWidget: Widget {
-     var body: some WidgetConfiguration {
-       StaticConfiguration(kind: "VitalUpWidget", provider: Provider()) {
-         VitalUpWidgetView(entry: $0)
-       }
-       .configurationDisplayName("VitalUp today")
-       .description("Today's water, streak and points.")
-       .supportedFamilies([.systemSmall, .systemMedium])
-     }
-   }
-   ```
-
-5. **"+250 ml" button (iOS 17+, optional).** Interactive iOS widgets use an
-   `AppIntent` that calls the plugin's background callback; follow the
-   *Interactive Widgets* section of the `home_widget` README. The Dart callback
-   (`homeWidgetCallback`) already handles `vitalup://widget/add-water`.
-
-6. Build and run on a device, long-press the home screen, and add
-   *VitalUp today*.
+1. **Add an App Group.** Runner target > *Signing & Capabilities* >
+   *App Groups* > add `group.com.tarunsiddhi.vitalup`.
+2. **Create the extension.** *File > New > Target > Widget Extension*, name it
+   `VitalUpWidget`, untick *Include Configuration App Intent*, and add the same
+   App Group to it.
+3. **Point the plugin at the group.** In `HomeWidgetService.start`, call
+   `HomeWidget.setAppGroupId('group.com.tarunsiddhi.vitalup')`, make
+   `HomeWidgetService.supported` true on iOS, and pass `iOSName:` to
+   `HomeWidget.updateWidget` in `updateAllWidgets`.
+4. **Read the saved keys** above from
+   `UserDefaults(suiteName: "group.com.tarunsiddhi.vitalup")` and lay them out
+   in SwiftUI, opening `vitalup://widget/open?route=...` with `.widgetURL`.
+5. **Buttons (iOS 17+).** Interactive widgets use an `AppIntent` that calls
+   the plugin's background callback (see the *Interactive Widgets* section of
+   the `home_widget` README). `homeWidgetCallback` already handles
+   `/add-water?ml=`, `/mood?level=`, `/mood-reset` and `/refresh`.
