@@ -10,6 +10,9 @@ enum NotificationType {
   /// A friend challenged the user (route: challenges).
   challenge('challenge'),
 
+  /// A friend cheered the user on (route: friends).
+  cheer('cheer'),
+
   /// Sent by the VitalUp team (app news, tips, reminders).
   announcement('announcement');
 
@@ -21,7 +24,10 @@ enum NotificationType {
 
   /// Sent because of a friend (shows their avatar, "Friends" filter).
   bool get isFriend =>
-      this == friendRequest || this == friendAccepted || this == challenge;
+      this == friendRequest ||
+      this == friendAccepted ||
+      this == challenge ||
+      this == cheer;
   bool get isAchievement => this == badge || this == levelUp || this == streak;
 }
 
