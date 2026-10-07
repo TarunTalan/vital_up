@@ -86,4 +86,22 @@ class ChallengesCubit extends Cubit<ChallengesState> {
       }
     }
   }
+
+  /// Quits a running challenge. Returns true once left.
+  Future<bool> leave(Challenge challenge) async {
+    emit(state.copyWith(busy: {...state.busy, challenge.id}));
+    try {
+      await _repository.leave(challenge);
+      await load();
+      if (!isClosed) emit(state.copyWith(message: 'You left the challenge'));
+      return true;
+    } on ChallengeException catch (e) {
+      if (!isClosed) emit(state.copyWith(message: e.message));
+      return false;
+    } finally {
+      if (!isClosed) {
+        emit(state.copyWith(busy: {...state.busy}..remove(challenge.id)));
+      }
+    }
+  }
 }
