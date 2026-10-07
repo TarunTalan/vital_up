@@ -80,3 +80,16 @@ class ProfileError extends ProfileState {
   @override
   List<Object?> get props => [message];
 }
+
+extension ProfileStateProfile on ProfileState {
+  /// The profile this state carries, if any.
+  ProfileEntity? get shownProfile => switch (this) {
+    ProfileLoaded(:final profile) => profile,
+    ProfileSaveSuccess(:final updatedProfile) => updatedProfile,
+    ProfileSaving(:final currentProfile) => currentProfile,
+    ProfilePhotoUpdating(:final profile) => profile,
+    ProfilePhotoUpdated(:final profile) => profile,
+    ProfilePhotoFailed(:final profile) => profile,
+    _ => null,
+  };
+}

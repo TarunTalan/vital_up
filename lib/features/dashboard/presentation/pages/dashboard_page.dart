@@ -327,7 +327,10 @@ class _DashboardPageState extends State<DashboardPage> {
       1 => FoodScannerPage(onBack: _handlePop),
       2 => VitaHomePage(onBack: _handlePop),
       3 => const CommunityHubPage(),
-      _ => BlocProvider.value(value: _profileCubit, child: const ProfilePage()),
+      _ => BlocProvider.value(
+        value: _profileCubit,
+        child: ProfilePage(onOpenArena: () => _selectTab(_arenaTab)),
+      ),
     };
   }
 }
