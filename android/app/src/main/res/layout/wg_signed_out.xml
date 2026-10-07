@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/wg_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal" android:gravity="center_vertical">
+    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@mipmap/ic_launcher"
+        android:importantForAccessibility="no"/>
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:layout_marginStart="10dp" android:orientation="vertical">
+        <TextView android:id="@+id/wg_so_title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="14dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="VitalUp" />
+        <TextView android:id="@+id/wg_so_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="12dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Sign in to see your day" android:layout_marginTop="2dp"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/wg_so_button" android:layout_width="wrap_content" android:layout_height="32dp"
+        android:background="@drawable/wg_btn_primary" android:gravity="center"
+        android:paddingStart="12dp" android:paddingEnd="12dp">
+        <TextView android:id="@+id/wg_so_button_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="12dp" android:textColor="@color/wg_on_primary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Sign in" />
+    </LinearLayout>
+</LinearLayout>
+</LinearLayout>

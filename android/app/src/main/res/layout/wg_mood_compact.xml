@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/wg_bg"
+    android:orientation="vertical"
+    android:padding="8dp">
+<LinearLayout android:id="@+id/wg_mood_pick" android:layout_width="match_parent"
+    android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical">
+<FrameLayout android:id="@+id/wg_face1" android:layout_width="0dp" android:layout_height="34dp"
+    android:layout_weight="1">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood_1" android:alpha="0.18" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_mood_1" android:tint="@color/wg_mood_1" android:importantForAccessibility="no"/>
+    </FrameLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/wg_face2" android:layout_width="0dp" android:layout_height="34dp"
+    android:layout_weight="1">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood_2" android:alpha="0.18" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_mood_2" android:tint="@color/wg_mood_2" android:importantForAccessibility="no"/>
+    </FrameLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/wg_face3" android:layout_width="0dp" android:layout_height="34dp"
+    android:layout_weight="1">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood_3" android:alpha="0.18" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_mood_3" android:tint="@color/wg_mood_3" android:importantForAccessibility="no"/>
+    </FrameLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/wg_face4" android:layout_width="0dp" android:layout_height="34dp"
+    android:layout_weight="1">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood_4" android:alpha="0.18" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_mood_4" android:tint="@color/wg_mood_4" android:importantForAccessibility="no"/>
+    </FrameLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/wg_face5" android:layout_width="0dp" android:layout_height="34dp"
+    android:layout_weight="1">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood_5" android:alpha="0.18" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_mood_5" android:tint="@color/wg_mood_5" android:importantForAccessibility="no"/>
+    </FrameLayout>
+</FrameLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_mood_done" android:layout_width="match_parent" android:layout_height="0dp"
+    android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical" android:visibility="gone">
+    <FrameLayout android:layout_width="34dp" android:layout_height="34dp">
+    <ImageView android:id="@+id/wg_mood_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_mood_icon" android:layout_width="22dp" android:layout_height="22dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_mood_2" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:layout_marginStart="10dp" android:orientation="vertical">
+        <TextView android:id="@+id/wg_mood_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Calm" />
+        <TextView android:id="@+id/wg_mood_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="12dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_marginTop="2dp"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/wg_mood_change" android:layout_width="wrap_content" android:layout_height="32dp"
+        android:background="@drawable/wg_btn_soft" android:gravity="center" android:paddingStart="12dp" android:paddingEnd="12dp">
+        <TextView android:id="@+id/wg_mood_change_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="12dp" android:textColor="@color/wg_primary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Change" />
+    </LinearLayout>
+</LinearLayout>
+</LinearLayout>

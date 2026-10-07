@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/wg_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+<include layout="@layout/wg_header" />
+<LinearLayout android:id="@+id/wg_slot1" android:layout_width="match_parent" android:layout_height="0dp"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical" android:layout_marginTop="6dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <FrameLayout android:layout_width="24dp" android:layout_height="24dp">
+    <ImageView android:id="@+id/wg_slot1_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_slot1_icon" android:layout_width="14dp" android:layout_height="14dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_activity" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:orientation="vertical">
+            <TextView android:id="@+id/wg_slot1_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Steps" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
+                <TextView android:id="@+id/wg_slot1_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="—" />
+                <TextView android:id="@+id/wg_slot1_detail" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <ImageView android:id="@+id/wg_slot1_bar" android:layout_width="match_parent" android:layout_height="6dp"
+    android:layout_marginTop="4dp" android:background="@drawable/wg_bar_track" android:src="@drawable/wg_bar_fill"
+    android:scaleType="fitXY" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_slot2" android:layout_width="match_parent" android:layout_height="0dp"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical" android:layout_marginTop="6dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <FrameLayout android:layout_width="24dp" android:layout_height="24dp">
+    <ImageView android:id="@+id/wg_slot2_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_slot2_icon" android:layout_width="14dp" android:layout_height="14dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_activity" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:orientation="vertical">
+            <TextView android:id="@+id/wg_slot2_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Steps" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
+                <TextView android:id="@+id/wg_slot2_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="—" />
+                <TextView android:id="@+id/wg_slot2_detail" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <ImageView android:id="@+id/wg_slot2_bar" android:layout_width="match_parent" android:layout_height="6dp"
+    android:layout_marginTop="4dp" android:background="@drawable/wg_bar_track" android:src="@drawable/wg_bar_fill"
+    android:scaleType="fitXY" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_slot3" android:layout_width="match_parent" android:layout_height="0dp"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical" android:layout_marginTop="6dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <FrameLayout android:layout_width="24dp" android:layout_height="24dp">
+    <ImageView android:id="@+id/wg_slot3_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_slot3_icon" android:layout_width="14dp" android:layout_height="14dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_activity" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:orientation="vertical">
+            <TextView android:id="@+id/wg_slot3_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Steps" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
+                <TextView android:id="@+id/wg_slot3_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="—" />
+                <TextView android:id="@+id/wg_slot3_detail" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <ImageView android:id="@+id/wg_slot3_bar" android:layout_width="match_parent" android:layout_height="6dp"
+    android:layout_marginTop="4dp" android:background="@drawable/wg_bar_track" android:src="@drawable/wg_bar_fill"
+    android:scaleType="fitXY" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_slot4" android:layout_width="match_parent" android:layout_height="0dp"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical" android:layout_marginTop="6dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <FrameLayout android:layout_width="24dp" android:layout_height="24dp">
+    <ImageView android:id="@+id/wg_slot4_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_slot4_icon" android:layout_width="14dp" android:layout_height="14dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_activity" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:orientation="vertical">
+            <TextView android:id="@+id/wg_slot4_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Steps" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
+                <TextView android:id="@+id/wg_slot4_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="—" />
+                <TextView android:id="@+id/wg_slot4_detail" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <ImageView android:id="@+id/wg_slot4_bar" android:layout_width="match_parent" android:layout_height="6dp"
+    android:layout_marginTop="4dp" android:background="@drawable/wg_bar_track" android:src="@drawable/wg_bar_fill"
+    android:scaleType="fitXY" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+</LinearLayout>
+</LinearLayout>

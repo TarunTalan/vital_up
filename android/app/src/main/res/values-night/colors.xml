@@ -1,23 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Home screen widget dark theme; mirrors Dark AppColors in lib/core/theme/app_colors.dart -->
-    <color name="widget_background">#FF181F23</color>
-    <color name="widget_card_background">#FF1F292E</color>
-    <color name="widget_card_border">#FF2E3D45</color>
-    <color name="widget_text">#FFF8FAFC</color>
-    <color name="widget_secondary_text">#FF94A3B8</color>
-    <color name="widget_track">#26FFFFFF</color>
-    <color name="widget_primary">#FF19C3E0</color>
-    <color name="widget_water">#FF38BDF8</color>
-    <color name="widget_steps">#FF10B981</color>
-    <color name="widget_calories">#FFF97316</color>
-    <color name="widget_streak">#FFFF7A3D</color>
-    <color name="widget_sleep">#FFA78BFA</color>
-    <color name="widget_mood">#FF22D3EE</color>
-    <color name="widget_gold">#FFFACC15</color>
-    <color name="widget_protein">#FFF472B6</color>
-    <color name="widget_carbs">#FFFBBF24</color>
-    <color name="widget_fat">#FF60A5FA</color>
-    <color name="widget_action_bg">#FF253238</color>
-    <color name="widget_btn_text">#FF000000</color>
+    <!-- Home screen widgets, dark theme: VitalUp dark tokens. -->
+    <color name="wg_surface">#FF1C1C1C</color>
+    <color name="wg_tile">#14FFFFFF</color>
+    <color name="wg_border">#26FFFFFF</color>
+    <color name="wg_text">#FFFEFEFE</color>
+    <color name="wg_text_secondary">#FF9E9E9E</color>
+    <color name="wg_track">#26FFFFFF</color>
+    <color name="wg_primary_fill">#2919C3E0</color>
+    <color name="wg_primary_border">#5219C3E0</color>
 </resources>

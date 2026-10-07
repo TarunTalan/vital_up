@@ -2,24 +2,26 @@
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
 
-    <!-- Home screen widget light theme; mirrors AppColors in lib/core/theme/app_colors.dart -->
-    <color name="widget_background">#FFFFFFFF</color>
-    <color name="widget_card_background">#FFF8FAFC</color>
-    <color name="widget_card_border">#FFE2E8F0</color>
-    <color name="widget_text">#FF0F172A</color>
-    <color name="widget_secondary_text">#FF64748B</color>
-    <color name="widget_track">#1F64748B</color>
-    <color name="widget_primary">#FF19C3E0</color>
-    <color name="widget_water">#FF38BDF8</color>
-    <color name="widget_steps">#FF10B981</color>
-    <color name="widget_calories">#FFF97316</color>
-    <color name="widget_streak">#FFFF7A3D</color>
-    <color name="widget_sleep">#FF8B5CF6</color>
-    <color name="widget_mood">#FF06B6D4</color>
-    <color name="widget_gold">#FFEAB308</color>
-    <color name="widget_protein">#FFEC4899</color>
-    <color name="widget_carbs">#FFF59E0B</color>
-    <color name="widget_fat">#FF3B82F6</color>
-    <color name="widget_action_bg">#FFF1F5F9</color>
-    <color name="widget_btn_text">#FFFFFFFF</color>
+    <!-- Home screen widgets: VitalUp tokens from lib/core/theme/app_colors.dart.
+         Dark values live in values-night/colors.xml. -->
+    <color name="wg_surface">#FFFEFEFE</color>
+    <color name="wg_tile">#21BABABA</color>
+    <color name="wg_border">#45BABABA</color>
+    <color name="wg_text">#FF1C1C1C</color>
+    <color name="wg_text_secondary">#FF757575</color>
+    <color name="wg_track">#33BABABA</color>
+    <color name="wg_primary">#FF19C3E0</color>
+    <color name="wg_primary_fill">#2119C3E0</color>
+    <color name="wg_primary_border">#4519C3E0</color>
+    <color name="wg_on_primary">#FF0C0C0C</color>
+    <color name="wg_activity">#FFFF7043</color>
+    <color name="wg_water">#FF42A5F5</color>
+    <color name="wg_sleep">#FF7C83FD</color>
+    <color name="wg_mood">#FF26C6A6</color>
+    <color name="wg_weight">#FF0F7586</color>
+    <color name="wg_mood_1">#FF26C6A6</color>
+    <color name="wg_mood_2">#FF8BD46E</color>
+    <color name="wg_mood_3">#FFFFC54D</color>
+    <color name="wg_mood_4">#FFFF9248</color>
+    <color name="wg_mood_5">#FFF25F5C</color>
 </resources>

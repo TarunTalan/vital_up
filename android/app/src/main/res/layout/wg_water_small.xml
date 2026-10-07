@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/wg_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+<include layout="@layout/wg_header" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginTop="6dp" android:orientation="horizontal" android:gravity="center_vertical">
+    <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
+    <ImageView android:id="@+id/wg_water_badge_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/wg_circle" android:tint="@color/wg_primary" android:alpha="0.2"
+        android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/wg_water_icon" android:layout_width="18dp" android:layout_height="18dp"
+        android:layout_gravity="center" android:src="@drawable/wg_ic_water" android:tint="@color/wg_primary"
+        android:importantForAccessibility="no"/>
+</FrameLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+        android:layout_marginStart="10dp" android:orientation="vertical">
+        <TextView android:id="@+id/wg_water_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="20dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="—" />
+        <TextView android:id="@+id/wg_water_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="" android:layout_marginTop="2dp"/>
+    </LinearLayout>
+</LinearLayout>
+<ImageView android:id="@+id/wg_water_bar" android:layout_width="match_parent" android:layout_height="6dp"
+    android:layout_marginTop="8dp" android:background="@drawable/wg_bar_track" android:src="@drawable/wg_bar_fill"
+    android:scaleType="fitXY" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+<FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+<FrameLayout android:layout_width="match_parent" android:layout_height="12dp"/>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+<LinearLayout android:id="@+id/wg_add2" android:layout_width="0dp" android:layout_height="32dp"
+    android:layout_weight="1" android:background="@drawable/wg_btn_primary" android:gravity="center" android:orientation="horizontal"
+    android:layout_marginStart="0dp" android:paddingStart="6dp" android:paddingEnd="6dp">
+    <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/wg_ic_add" android:tint="@color/wg_on_primary"
+        android:importantForAccessibility="no"/>
+    <TextView android:id="@+id/wg_add2_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="12dp" android:textColor="@color/wg_on_primary"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="250 ml" android:layout_marginStart="4dp"/>
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
