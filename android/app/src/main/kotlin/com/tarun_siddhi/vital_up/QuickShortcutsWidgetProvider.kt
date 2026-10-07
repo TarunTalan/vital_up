@@ -1,63 +1,32 @@
 package com.tarun_siddhi.vital_up
 
-import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
-import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
-import es.antonborri.home_widget.HomeWidgetLaunchIntent
-import es.antonborri.home_widget.HomeWidgetProvider
 
-class QuickShortcutsWidgetProvider : HomeWidgetProvider() {
-    override fun onUpdate(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        appWidgetIds: IntArray,
-        widgetData: SharedPreferences,
-    ) {
-        for (id in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.quick_shortcuts_widget).apply {
-                // Water Shortcut -> Water Trends
-                setOnClickPendingIntent(
-                    R.id.widget_shortcut_water,
-                    HomeWidgetLaunchIntent.getActivity(
-                        context,
-                        MainActivity::class.java,
-                        Uri.parse("vitalup://widget/open?route=water-trends"),
-                    ),
-                )
+/** Scan a meal, log water, start a workout, ask Vita; fewer when narrow. */
+open class QuickShortcutsWidgetProvider : VitalWidgetProvider() {
+    override val breakpoints = listOf(110 to 50, 180 to 50, 250 to 50)
 
-                // Activity Shortcut -> Activity Tracking
-                setOnClickPendingIntent(
-                    R.id.widget_shortcut_activity,
-                    HomeWidgetLaunchIntent.getActivity(
-                        context,
-                        MainActivity::class.java,
-                        Uri.parse("vitalup://widget/open?route=activity-tracking"),
-                    ),
-                )
-
-                // Food Shortcut -> Food Scanner
-                setOnClickPendingIntent(
-                    R.id.widget_shortcut_food,
-                    HomeWidgetLaunchIntent.getActivity(
-                        context,
-                        MainActivity::class.java,
-                        Uri.parse("vitalup://widget/open?route=food-scan"),
-                    ),
-                )
-
-                // Vita AI Shortcut -> Vita Chat
-                setOnClickPendingIntent(
-                    R.id.widget_shortcut_vita,
-                    HomeWidgetLaunchIntent.getActivity(
-                        context,
-                        MainActivity::class.java,
-                        Uri.parse("vitalup://widget/open?route=vita-chat"),
-                    ),
-                )
-            }
-            appWidgetManager.updateAppWidget(id, views)
+    override fun build(context: Context, data: SharedPreferences, widthDp: Int, heightDp: Int): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.wg_shortcuts)
+        val count = when {
+            widthDp < 180 -> 2
+            widthDp < 250 -> 3
+            else -> 4
         }
+        val shortcuts = listOf(
+            R.id.wg_sc1 to "food-scan",
+            R.id.wg_sc2 to "water-log",
+            R.id.wg_sc3 to "activity-tracking",
+            R.id.wg_sc4 to "vita-chat",
+        )
+        val signedIn = Wg.signedIn(data)
+        shortcuts.forEachIndexed { i, (id, route) ->
+            views.setViewVisibility(id, if (i < count) View.VISIBLE else View.GONE)
+            views.setOnClickPendingIntent(id, Wg.open(context, if (signedIn) route else "login"))
+        }
+        return views
     }
 }

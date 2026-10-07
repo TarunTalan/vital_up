@@ -1,28 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_title">VitalUp Multi-Feature</string>
-    <string name="widget_description">Today\'s water, steps, calories, streak, quick login &amp; fast actions.</string>
-    <string name="widget_sleep_title">VitalUp Sleep &amp; Recovery</string>
-    <string name="widget_sleep_description">Track sleep duration, bedtime, wake time, and rest quality score.</string>
-    <string name="widget_food_title">VitalUp Food &amp; Macros</string>
-    <string name="widget_food_description">Track daily calories and protein, carbs, and fat macros breakdown.</string>
-    <string name="widget_mood_title">VitalUp Mood &amp; Mind</string>
-    <string name="widget_mood_description">Monitor mood state, stress levels, mindfulness, and HRV.</string>
-    <string name="widget_stats_title">VitalUp Stats &amp; Progress</string>
-    <string name="widget_stats_description">Track streak, daily XP points, and habit goal completion.</string>
-    <string name="widget_hydration_title">VitalUp Hydration</string>
-    <string name="widget_hydration_description">Quick water intake logging (+250ml) and daily hydration goal.</string>
-    <string name="widget_activity_title">VitalUp Activity &amp; Steps</string>
-    <string name="widget_activity_description">Daily step counter, active minutes, calories burned, and distance.</string>
-    <string name="widget_shortcuts_title">VitalUp Quick Shortcuts</string>
-    <string name="widget_shortcuts_description">Fast 1-tap shortcuts for Water, Activity, Scan, and Vita AI.</string>
-    <string name="widget_add_water">+250 ml</string>
-    <string name="widget_quick_login">⚡ Quick Sign In</string>
-    <string name="widget_scan_food">📷 Scan</string>
-    <string name="widget_track_activity">🏃 Track</string>
-    <string name="widget_vita_ai">🤖 Vita</string>
-    <string name="widget_water_label">Water</string>
-    <string name="widget_steps_label">Steps</string>
-    <string name="widget_calories_label">Calories</string>
-    <string name="widget_refresh_tooltip">Refresh</string>
+
+    <!-- Home screen widgets -->
+    <string name="wg_today_title">Today</string>
+    <string name="wg_today_description">Activity, calories, water and sleep against your goals.</string>
+    <string name="wg_water_title">Water</string>
+    <string name="wg_water_description">Your water today, with one-tap logging.</string>
+    <string name="wg_mood_title">Mood check-in</string>
+    <string name="wg_mood_description">Check in with one tap and see how you feel today.</string>
+    <string name="wg_shortcuts_title">Shortcuts</string>
+    <string name="wg_shortcuts_description">Scan a meal, log water, start a workout or ask Vita.</string>
+    <string name="wg_custom_title">My metrics</string>
+    <string name="wg_custom_description">The metrics you choose in VitalUp, in the order you set.</string>
+    <string name="wg_refresh">Refresh</string>
+    <!-- Widget picker labels -->
+    <string name="wg_label_today_small">Today (2 × 2)</string>
+    <string name="wg_label_vital_up">Today (4 × 2)</string>
+    <string name="wg_label_today_large">Today (4 × 3)</string>
+    <string name="wg_label_today_x_large">Today (4 × 4)</string>
+    <string name="wg_label_custom_small">My metrics (2 × 2)</string>
+    <string name="wg_label_custom">My metrics (4 × 2)</string>
+    <string name="wg_label_custom_large">My metrics (4 × 3)</string>
+    <string name="wg_label_custom_x_large">My metrics (4 × 4)</string>
+    <string name="wg_label_hydration">Water (2 × 2)</string>
+    <string name="wg_label_water_wide">Water (4 × 2)</string>
+    <string name="wg_label_mood_bar">Mood check-in (4 × 1)</string>
+    <string name="wg_label_mood">Mood check-in (4 × 2)</string>
+    <string name="wg_label_shortcuts_small">Shortcuts (2 × 1)</string>
+    <string name="wg_label_quick_shortcuts">Shortcuts (4 × 1)</string>
 </resources>

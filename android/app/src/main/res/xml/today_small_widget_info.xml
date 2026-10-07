@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:description="@string/wg_water_description"
-    android:initialLayout="@layout/wg_water_small"
-    android:previewLayout="@layout/wg_water_small"
+    android:description="@string/wg_today_description"
+    android:initialLayout="@layout/wg_metrics_list"
+    android:previewLayout="@layout/wg_metrics_list"
     android:minWidth="110dp"
     android:minHeight="110dp"
     android:minResizeWidth="110dp"

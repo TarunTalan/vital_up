@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/wg_bg"
+    android:orientation="vertical"
+    android:padding="8dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal">
+<LinearLayout android:id="@+id/wg_sc1" android:layout_width="0dp" android:layout_height="match_parent"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+    <FrameLayout android:layout_width="36dp" android:layout_height="36dp">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_primary" android:alpha="0.2" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_scan" android:tint="@color/wg_primary" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <TextView android:id="@+id/wg_sc1_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="11dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Scan" android:layout_marginTop="4dp"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_sc2" android:layout_width="0dp" android:layout_height="match_parent"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+    <FrameLayout android:layout_width="36dp" android:layout_height="36dp">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_water" android:alpha="0.2" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_water" android:tint="@color/wg_water" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <TextView android:id="@+id/wg_sc2_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="11dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Water" android:layout_marginTop="4dp"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_sc3" android:layout_width="0dp" android:layout_height="match_parent"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+    <FrameLayout android:layout_width="36dp" android:layout_height="36dp">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_activity" android:alpha="0.2" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_workout" android:tint="@color/wg_activity" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <TextView android:id="@+id/wg_sc3_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="11dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Workout" android:layout_marginTop="4dp"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/wg_sc4" android:layout_width="0dp" android:layout_height="match_parent"
+    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+    <FrameLayout android:layout_width="36dp" android:layout_height="36dp">
+        <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/wg_circle"
+            android:tint="@color/wg_mood" android:alpha="0.2" android:importantForAccessibility="no"/>
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center"
+            android:src="@drawable/wg_ic_vita" android:tint="@color/wg_mood" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <TextView android:id="@+id/wg_sc4_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="11dp" android:textColor="@color/wg_text"
+    android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
+    android:text="Vita" android:layout_marginTop="4dp"/>
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
