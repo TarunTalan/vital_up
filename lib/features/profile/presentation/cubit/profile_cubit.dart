@@ -37,15 +37,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   }
 
   /// The profile currently on screen, whatever state carries it.
-  ProfileEntity? get currentProfile => switch (state) {
-        ProfileLoaded(:final profile) => profile,
-        ProfileSaveSuccess(:final updatedProfile) => updatedProfile,
-        ProfileSaving(:final currentProfile) => currentProfile,
-        ProfilePhotoUpdating(:final profile) => profile,
-        ProfilePhotoUpdated(:final profile) => profile,
-        ProfilePhotoFailed(:final profile) => profile,
-        _ => null,
-      };
+  ProfileEntity? get currentProfile => state.shownProfile;
 
   Future<void> uploadPhoto(File imageFile) async {
     final profile = currentProfile;
@@ -75,11 +67,16 @@ class ProfileCubit extends Cubit<ProfileState> {
   }
 
   Future<void> updateProfile(ProfileEntity profile) async {
-    emit(ProfileSaving(currentProfile ?? profile));
+    final previous = currentProfile ?? profile;
+    emit(ProfileSaving(previous));
     final result = await _profileRepository.updateProfile(profile);
 
     result.fold(
-      (failure) => emit(ProfileError(failure.message)),
+      (failure) {
+        // Report the error, then keep showing the unsaved profile.
+        emit(ProfileError(failure.message));
+        emit(ProfileLoaded(previous));
+      },
       (_) => emit(ProfileSaveSuccess(profile)),
     );
   }

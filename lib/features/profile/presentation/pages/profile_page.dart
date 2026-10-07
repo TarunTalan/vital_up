@@ -1,47 +1,49 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
-import 'package:vital_up/core/widgets/app_text_field.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
+import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
-import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
-import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
-import 'package:vital_up/features/gamification/domain/entities/game_badge.dart';
-import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
-import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
-import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
+import 'package:vital_up/features/profile/presentation/widgets/health_snapshot_card.dart';
+import 'package:vital_up/features/profile/presentation/widgets/profile_photo_sheet.dart';
 
+final _points = NumberFormat.decimalPattern();
+
+/// The Profile tab: who you are, your body data, and your account.
+/// Points, streaks and badges live in Arena; [onOpenArena] switches to it.
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onLogout;
+  final VoidCallback? onOpenArena;
 
-  const ProfilePage({
-    super.key,
-    this.onLogout,
-  });
+  const ProfilePage({super.key, this.onLogout, this.onOpenArena});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-enum _PhotoAction { camera, gallery, remove }
-
 class _ProfilePageState extends State<ProfilePage> {
+  final _packageInfo = PackageInfo.fromPlatform();
+
+  /// Kept through a pull-to-refresh so the page doesn't flash a loader.
+  ProfileEntity? _lastProfile;
+
   @override
   void initState() {
     super.initState();
@@ -53,695 +55,372 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  void _handleLogout(BuildContext context) {
+  /// Pages under Profile share this cubit, so edits show here on return.
+  Future<void> _open(String route) =>
+      context.pushNamed(route, extra: context.read<ProfileCubit>());
+
+  void _handleLogout() {
     if (widget.onLogout != null) {
       widget.onLogout!();
       return;
     }
-    _showLogoutDialog(context);
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    final errorColor = context.colors.error;
-    final cubit = context.read<AuthCubit>();
-
+    final auth = context.read<AuthCubit>();
     showSmoothDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text('You can sign back in at any time.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: errorColor),
+            style: TextButton.styleFrom(foregroundColor: context.colors.error),
             onPressed: () {
-              Navigator.of(context).pop();
-              cubit.logout();
+              Navigator.of(dialogContext).pop();
+              auth.logout();
             },
-            child: const Text('Logout'),
+            child: const Text('Sign out'),
           ),
         ],
       ),
     );
   }
 
-  String _initial(ProfileEntity profile) {
-    if (profile.fullName.isNotEmpty) return profile.fullName.substring(0, 1).toUpperCase();
-    if (profile.username.isNotEmpty) return profile.username.substring(0, 1).toUpperCase();
-    return 'U';
-  }
-
-  Widget _buildAvatar(ProfileEntity profile, double size, TextStyle? initialStyle) {
-    final photoUrl = profile.photoUrl;
-    final uploading = context.read<ProfileCubit>().state is ProfilePhotoUpdating;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-      child: Container(
-        width: size,
-        height: size,
-        color: context.vColors.primaryTint,
-        child: uploading
-            ? Center(
-                child: SizedBox.square(
-                  dimension: size / 3,
-                  child: CircularProgressIndicator(
-                    strokeWidth: AppDimens.borderThick,
-                    color: context.colors.primary,
-                  ),
-                ),
-              )
-            : photoUrl != null
-                ? Image.network(
-                    photoUrl,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Center(
-                      child: Text(
-                        _initial(profile),
-                        style: initialStyle?.copyWith(color: context.colors.primary),
-                      ),
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      _initial(profile),
-                      style: initialStyle?.copyWith(color: context.colors.primary),
-                    ),
-                  ),
-      ),
-    );
-  }
-
-  Future<void> _showPhotoOptions(ProfileEntity profile) async {
-    final cubit = context.read<ProfileCubit>();
-    if (cubit.state is ProfilePhotoUpdating) return;
-
-    final choice = await showAppBottomSheet<_PhotoAction>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: AppDimens.space16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('Take photo'),
-                onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Choose from gallery'),
-                onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.gallery),
-              ),
-              if (profile.photoUrl != null)
-                ListTile(
-                  leading: Icon(Icons.delete_outline_rounded, color: context.colors.error),
-                  title: Text(
-                    'Remove photo',
-                    style: TextStyle(color: context.colors.error),
-                  ),
-                  onTap: () => Navigator.of(sheetContext).pop(_PhotoAction.remove),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || choice == null) return;
-
-    if (choice == _PhotoAction.remove) {
-      final confirmed = await showSmoothDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Remove photo?'),
-          content: const Text('Your profile will show your initial instead.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: context.colors.error),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Remove'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed == true) await cubit.removePhoto();
-      return;
-    }
-
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: choice == _PhotoAction.camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-        preferredCameraDevice: CameraDevice.front,
-      );
-      if (picked == null) return;
-      await cubit.uploadPhoto(File(picked.path));
-    } catch (e) {
-      if (!mounted) return;
-      showErrorSnackBar(
-        context,
-        choice == _PhotoAction.camera
-            ? 'Camera access is needed to take a photo. You can allow it in Settings.'
-            : 'Photo access is needed to choose a picture. You can allow it in Settings.',
-      );
-    }
-  }
-
-  void _showEditIdentitySheet(BuildContext context, ProfileEntity profile) {
-    final formKey = GlobalKey<FormState>();
-    final fullNameController = TextEditingController(text: profile.fullName);
-    final usernameController = TextEditingController(text: profile.username);
-    
-    // Formatting DOB
-    String dobDisplay = profile.dob;
-    if (dobDisplay.length == 8) {
-      dobDisplay = '${dobDisplay.substring(0, 2)}/${dobDisplay.substring(2, 4)}/${dobDisplay.substring(4, 8)}';
-    }
-    final dobController = TextEditingController(text: dobDisplay);
-    
-    showAppBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + AppDimens.space16,
-          left: context.gutter,
-          right: context.gutter,
-          top: AppDimens.space16,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Edit Profile', style: context.text.titleLarge),
-              const SizedBox(height: AppDimens.space24),
-              AppTextField(
-                controller: fullNameController,
-                label: 'Full Name',
-                prefixIcon: Icons.badge_rounded,
-                validator: (val) {
-                  if (val.trim().isEmpty) return 'Full name is required';
-                  if (val.trim().length < 2) return 'Must be at least 2 characters';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppDimens.space16),
-              AppTextField(
-                controller: usernameController,
-                label: 'Username',
-                prefixIcon: Icons.alternate_email_rounded,
-                validator: (val) {
-                  if (val.trim().isEmpty) return 'Username is required';
-                  if (val.trim().length < 3) return 'Must be at least 3 characters';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppDimens.space16),
-              AppTextField(
-                controller: dobController,
-                label: 'Date of Birth',
-                prefixIcon: Icons.calendar_month_rounded,
-                readOnly: true,
-                onTap: () async {
-                  DateTime initialDate = DateTime(2000, 1, 1);
-                  if (dobController.text.isNotEmpty) {
-                    try {
-                      final parts = dobController.text.split('/');
-                      if (parts.length == 3) {
-                        initialDate = DateTime(
-                          int.parse(parts[2]),
-                          int.parse(parts[1]),
-                          int.parse(parts[0]),
-                        );
-                      }
-                    } catch (_) {}
-                  }
-
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: initialDate,
-                    firstDate: DateTime(1900),
-                    lastDate: DateTime.now(),
-                  );
-
-                  if (picked != null) {
-                    dobController.text = DateFormat('dd/MM/yyyy').format(picked);
-                  }
-                },
-                suffix: const Icon(Icons.arrow_drop_down_rounded),
-                validator: (val) {
-                  if (val.trim().isEmpty) return 'Date of birth is required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppDimens.space24),
-              AppPrimaryButton(
-                label: 'Save Changes',
-                onTap: () {
-                  if (formKey.currentState?.validate() ?? false) {
-                    final rawDob = dobController.text.trim().replaceAll('/', '');
-                    final updated = profile.copyWith(
-                      fullName: fullNameController.text.trim(),
-                      username: usernameController.text.trim(),
-                      dob: rawDob,
-                    );
-                    context.read<ProfileCubit>().updateProfile(updated);
-                    Navigator.pop(sheetContext);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final header = AppPageHeader(
+      title: 'Profile',
+      showBack: false,
+      action: AppHeaderAction(
+        tooltip: 'Settings',
+        icon: const Icon(Icons.settings_rounded),
+        onTap: () => context.pushNamed('settings'),
+      ),
+    );
+
     return BlocConsumer<ProfileCubit, ProfileState>(
+      // A failed save is reported, then the profile comes straight back.
+      buildWhen: (prev, next) =>
+          next is! ProfileError || prev.shownProfile == null,
       listener: (context, state) {
-        if (state is ProfileSaveSuccess) {
-          showSuccessSnackBar(context, 'Profile updated successfully!');
-        } else if (state is ProfilePhotoUpdated) {
+        // Account details shares this cubit and reports its own saves.
+        if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+        if (state is ProfilePhotoUpdated) {
           showSuccessSnackBar(
             context,
             state.removed ? 'Profile photo removed' : 'Profile photo updated',
           );
         } else if (state is ProfilePhotoFailed) {
           showErrorSnackBar(context, state.message);
-        } else if (state is ProfileError) {
-          showErrorSnackBar(context, state.message);
         }
       },
       builder: (context, state) {
-        if (state is ProfileLoading || state is ProfileInitial) {
-          return const Scaffold(
-            backgroundColor: Colors.transparent,
-            body: AuthBackground(child: Center(child: VitalUpLoader())),
-          );
-        }
-
-        ProfileEntity? profile;
-        if (state is ProfileLoaded) {
-          profile = state.profile;
-        } else if (state is ProfileSaveSuccess) {
-          profile = state.updatedProfile;
-        } else if (state is ProfileSaving) {
-          profile = state.currentProfile;
-        } else if (state is ProfilePhotoUpdating || state is ProfilePhotoUpdated || state is ProfilePhotoFailed) {
-          profile = (state as dynamic).profile;
-        } else if (state is ProfileError) {
-          return _buildErrorView();
-        }
+        final cubit = context.read<ProfileCubit>();
+        final profile = cubit.currentProfile ??
+            (state is ProfileLoading ? _lastProfile : null);
+        _lastProfile = profile;
 
         if (profile == null) {
-          return Scaffold(
-            backgroundColor: Colors.transparent,
-            body: AuthBackground(
-              child: Center(
-                child: Text(
-                  'Profile not initialized.',
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ),
+          return AppScaffold(
+            header: header,
+            body: Padding(
+              padding: const EdgeInsets.only(top: AppDimens.space48),
+              child: state is ProfileError
+                  ? LoadErrorView(
+                      onRetry: () => cubit.loadProfile(forceRefresh: true),
+                    )
+                  : const Center(child: VitalUpLoader()),
             ),
           );
         }
 
         return AppScaffold(
-          header: const AppPageHeader(title: 'Profile'),
+          header: header,
+          onRefresh: () async {
+            await Future.wait([
+              cubit.loadProfile(forceRefresh: true),
+              context.read<GamificationCubit>().load(),
+            ]);
+          },
           body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeaderCard(profile),
-              const SizedBox(height: AppDimens.space24),
-              _buildNavigationMenu(),
-              SizedBox(height: context.h(80)), // Padding for nav bar
-            ],
-          ),
-        );
-      },
-    );
-  }
+              _IdentityCard(
+                profile: profile,
+                uploading: state is ProfilePhotoUpdating,
+                onOpen: () => _open('account-details'),
+                onPhoto: () =>
+                    showProfilePhotoOptions(context, cubit, profile),
+                onOpenArena: widget.onOpenArena,
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
 
-  Widget _buildHeaderCard(ProfileEntity profile) {
-    final v = context.vColors;
-    final avatarSize = context.w(AppDimens.avatarLarge);
+              AppSectionHeader(
+                'Health snapshot',
+                actionLabel: 'Edit',
+                onAction: () => _open('health-details'),
+              ),
+              HealthSnapshotCard(
+                profile: profile,
+                onTap: () => _open('health-details'),
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space24),
-      decoration: BoxDecoration(
-        color: v.glassFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(color: v.glassBorder!),
-        boxShadow: AppShadows.soft,
-      ),
-      child: BlocBuilder<GamificationCubit, GamificationState>(
-        builder: (context, gameState) {
-          final stats = gameState.stats ?? PlayerStats.empty;
-          final currentLevel = stats.level.level;
-          final tier = LevelTierConfig.forLevel(currentLevel, title: stats.level.title);
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              AppListGroup(
+                title: 'Health',
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showPhotoOptions(profile),
-                        child: Container(
-                          width: avatarSize,
-                          height: avatarSize,
-                          padding: const EdgeInsets.all(AppDimens.borderThick),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                            border: Border.all(
-                              color: tier.borderColor,
-                              width: AppDimens.borderThick + 0.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: tier.glowColor.withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                spreadRadius: 0.5,
-                              ),
-                            ],
-                          ),
-                          child: _buildAvatar(
-                            profile,
-                            avatarSize,
-                            context.text.headlineMedium,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: -2,
-                        right: -2,
-                        child: LevelBadgeWidget(
-                          level: currentLevel,
-                          title: stats.level.title,
-                          size: context.w(28),
-                          showGlow: false,
-                        ),
-                      ),
-                    ],
+                  AppListTile(
+                    icon: Icons.monitor_heart_outlined,
+                    iconColor: context.colors.error,
+                    title: 'Health & body',
+                    subtitle: 'Body, vitals, medical history',
+                    onTap: () => _open('health-details'),
                   ),
-                  const SizedBox(width: AppDimens.space16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    profile.fullName.isNotEmpty ? profile.fullName : 'VitalUp User',
-                                    style: context.text.titleMedium,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: AppDimens.space4),
-                                  Text(
-                                    '@${profile.username}',
-                                    style: context.text.bodySmall?.copyWith(color: v.grayText),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AppDimens.space8),
-                            GestureDetector(
-                              onTap: () => _showEditIdentitySheet(context, profile),
-                              child: SvgPicture.asset(
-                                'assets/icons/edit.svg',
-                                width: AppDimens.iconSm,
-                                height: AppDimens.iconSm,
-                                colorFilter: ColorFilter.mode(context.colors.primary, BlendMode.srcIn),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppDimens.space8),
-                        LevelTagPill(
-                          level: currentLevel,
-                          title: stats.level.title,
-                        ),
-                      ],
-                    ),
+                  AppListTile(
+                    icon: Icons.flag_rounded,
+                    iconColor: context.vColors.success,
+                    title: 'My goals',
+                    subtitle: 'Water, sleep, weight and more',
+                    onTap: () => context.pushNamed('my-goals'),
+                  ),
+                  AppListTile(
+                    icon: Icons.alarm_rounded,
+                    iconColor: context.vColors.warning,
+                    title: 'Reminders',
+                    subtitle: 'Meals, water, sleep, activity',
+                    onTap: () => context.pushNamed('reminders'),
+                  ),
+                  AppListTile(
+                    icon: Icons.medical_services_outlined,
+                    iconColor: AppColors.teal,
+                    title: 'Doctor health report',
+                    subtitle: 'A summary to share with your doctor',
+                    onTap: () => context.pushNamed('health-report'),
                   ),
                 ],
               ),
-              const SizedBox(height: AppDimens.space24),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildStatItem('Points', stats.totalPoints.toString(), 'assets/icons/flash.svg', context.vColors.warning ?? Colors.orange),
-                    const SizedBox(width: AppDimens.space24),
-                    _buildStatItem('Streak', '${stats.streak}d', 'assets/icons/streak.svg', context.colors.error),
-                    const SizedBox(width: AppDimens.space24),
-                    _buildStatItem('Best Streak', '${stats.longestStreak}d', 'assets/icons/streak_1.svg', context.colors.error),
-                    const SizedBox(width: AppDimens.space24),
-                    _buildStatItem('Fitness XP', stats.pointsIn(ScoreCategory.fitness).toString(), 'assets/icons/barbell.svg', AppColors.scoreFitness),
-                    const SizedBox(width: AppDimens.space24),
-                    _buildStatItem('Diet XP', stats.pointsIn(ScoreCategory.nutrition).toString(), 'assets/icons/fork_knife.svg', AppColors.scoreNutrition),
-                  ],
-                ),
-              ),
-              _buildBadgesRow(),
-            ],
-          );
-        },
-      ),
-    );
-  }
+              const SizedBox(height: AppDimens.sectionGap),
 
-  Widget _buildBadgesRow() {
-    return FutureBuilder<List<GameBadge>>(
-      future: sl<GamificationRepository>().getBadges(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-        final earned = snapshot.data!.where((b) => b.earned).take(3).toList();
-        if (earned.isEmpty) return const SizedBox.shrink();
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: AppDimens.space24),
-            Text('Achievements', style: context.text.titleSmall?.copyWith(color: context.vColors.grayText)),
-            const SizedBox(height: AppDimens.space12),
-            Row(
-              children: earned.map((b) => Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Tooltip(
-                  message: b.name,
-                  child: Container(
-                    padding: EdgeInsets.all(context.w(AppDimens.space8)),
-                    decoration: BoxDecoration(
-                      color: context.vColors.glassFill,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: context.vColors.glassBorder!),
-                    ),
-                    child: SvgPicture.asset(
-                      'assets/icons/${b.iconKey}.svg',
-                      width: context.w(24),
-                      height: context.w(24),
-                      colorFilter: ColorFilter.mode(context.colors.primary, BlendMode.srcIn),
-                    ),
+              AppListGroup(
+                title: 'Account',
+                children: [
+                  AppListTile(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Account details',
+                    subtitle: 'Name, username, email',
+                    onTap: () => _open('account-details'),
+                  ),
+                  AppListTile(
+                    svgAsset: 'assets/icons/settings.svg',
+                    title: 'Settings',
+                    subtitle: 'Theme, units, privacy',
+                    onTap: () => context.pushNamed('settings'),
+                  ),
+                  AppListTile(
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & support',
+                    subtitle: 'FAQs, Vital Assistant, contact us',
+                    onTap: () => context.pushNamed('help-support'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+
+              AppSecondaryButton(
+                label: 'Sign out',
+                contentColor: context.colors.error,
+                borderColor: context.colors.error.withValues(
+                  alpha: AppDimens.tintBorderAlpha,
+                ),
+                leadingIcon: Icon(
+                  Icons.logout_rounded,
+                  size: AppDimens.iconMd,
+                  color: context.colors.error,
+                ),
+                onTap: _handleLogout,
+              ),
+              const SizedBox(height: AppDimens.space12),
+              FutureBuilder<PackageInfo>(
+                future: _packageInfo,
+                builder: (context, snap) => Center(
+                  child: AppCaption(
+                    snap.hasData
+                        ? 'VitalUp ${snap.data!.version} (${snap.data!.buildNumber})'
+                        : 'VitalUp',
                   ),
                 ),
-              )).toList(),
-            ),
-          ],
+              ),
+
+              // Clears the floating bottom navigation bar.
+              SizedBox(height: context.safePadding.bottom + AppDimens.space16),
+            ],
+          ),
         );
       },
     );
   }
+}
 
-  Widget _buildStatItem(String label, String value, String iconAsset, Color iconColor) {
-    return Column(
-      children: [
-        SvgPicture.asset(
-          iconAsset,
-          width: context.w(20),
-          height: context.w(20),
-          colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-        ),
-        const SizedBox(height: AppDimens.space4),
-        Text(value, style: context.text.titleSmall),
-        Text(label, style: context.text.labelSmall?.copyWith(color: context.vColors.grayText)),
-      ],
-    );
-  }
+/// Photo, name, username, age and gender; tap for Account details. A single
+/// Arena line underneath keeps level and points one tap away.
+class _IdentityCard extends StatelessWidget {
+  final ProfileEntity profile;
+  final bool uploading;
+  final VoidCallback onOpen;
+  final VoidCallback onPhoto;
+  final VoidCallback? onOpenArena;
 
-  Widget _buildNavigationMenu() {
-    return Column(
-      children: [
-        _buildNavTile(
-          title: 'Health & Body Metrics',
-          subtitle: 'Weight, Vitals, Medical History',
-          icon: 'assets/icons/weight.svg',
-          onTap: () => context.pushNamed('health-details'),
-        ),
-        _buildNavTile(
-          title: 'App Settings',
-          subtitle: 'Theme, Notifications, Preferences',
-          icon: 'assets/icons/settings.svg',
-          onTap: () => context.pushNamed('settings'),
-        ),
-        _buildNavTile(
-          title: 'Help & Support',
-          subtitle: 'FAQs, Contact Support',
-          icon: 'assets/icons/Info.svg',
-          onTap: () => context.pushNamed('help-support'),
-        ),
-        const SizedBox(height: AppDimens.space16),
-        _buildNavTile(
-          title: 'Logout',
-          subtitle: 'Sign out of your account',
-          icon: Icons.logout_rounded,
-          isDestructive: true,
-          onTap: () => _handleLogout(context),
-        ),
-      ],
-    );
-  }
+  const _IdentityCard({
+    required this.profile,
+    required this.uploading,
+    required this.onOpen,
+    required this.onPhoto,
+    this.onOpenArena,
+  });
 
-  Widget _buildNavTile({
-    required String title,
-    required String subtitle,
-    required dynamic icon,
-    required VoidCallback onTap,
-    bool isDestructive = false,
-  }) {
+  @override
+  Widget build(BuildContext context) {
     final v = context.vColors;
-    final color = isDestructive ? context.colors.error : context.colors.onSurface;
-    final iconColor = isDestructive ? context.colors.error : context.colors.primary;
+    final age = profileAge(profile);
+    final gender = displayGender(profile.gender);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.space12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-          child: Ink(
-            padding: const EdgeInsets.all(AppDimens.space16),
-            decoration: BoxDecoration(
-              color: v.glassFill,
-              borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-              border: Border.all(color: v.glassBorder!),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppDimens.space12),
-                  decoration: BoxDecoration(
-                    color: isDestructive ? context.colors.error.withValues(alpha: 0.1) : context.vColors.primaryTint,
-                    borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                  ),
-                  child: icon is String
-                      ? SvgPicture.asset(
-                          icon,
-                          width: context.w(24),
-                          height: context.w(24),
-                          colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                        )
-                      : Icon(icon as IconData, color: iconColor),
-                ),
-                const SizedBox(width: AppDimens.space16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: context.text.titleSmall?.copyWith(color: color),
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPaddingLarge,
+      onTap: onOpen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              ProfileAvatar(
+                profile: profile,
+                uploading: uploading,
+                onTap: onPhoto,
+              ),
+              const SizedBox(width: AppDimens.space16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.fullName.isNotEmpty
+                          ? profile.fullName
+                          : 'VitalUp user',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.headlineSmall?.copyWith(
+                        color: context.colors.onSurface,
                       ),
-                      const SizedBox(height: AppDimens.space2),
-                      Text(
-                        subtitle,
-                        style: context.text.labelSmall?.copyWith(color: v.grayText),
+                    ),
+                    const SizedBox(height: AppDimens.space2),
+                    Text(
+                      '@${profile.username}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodySmall?.copyWith(
+                        color: v.grayText,
+                      ),
+                    ),
+                    if (age != null || gender.isNotEmpty) ...[
+                      const SizedBox(height: AppDimens.space8),
+                      Wrap(
+                        spacing: AppDimens.space6,
+                        runSpacing: AppDimens.space6,
+                        children: [
+                          if (age != null) _MetaChip('$age yrs'),
+                          if (gender.isNotEmpty) _MetaChip(gender),
+                        ],
                       ),
                     ],
-                  ),
+                  ],
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: isDestructive ? context.colors.error.withValues(alpha: 0.5) : v.grayText,
-                ),
-              ],
-            ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: v.grayText),
+            ],
           ),
-        ),
+          _ArenaStrip(onOpen: onOpenArena),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildErrorView() {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AuthBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(context.gutter),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIconBadge(
-                  icon: const Icon(Icons.error_outline_rounded),
-                  color: context.colors.error,
-                  size: AppDimens.iconXxl,
-                ),
-                const SizedBox(height: AppDimens.space16),
-                Text(
-                  'Failed to load profile',
-                  textAlign: TextAlign.center,
-                  style: context.text.headlineSmall,
-                ),
-                const SizedBox(height: AppDimens.space8),
-                Text(
-                  'Please check your connection and try again.',
-                  textAlign: TextAlign.center,
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-                const SizedBox(height: AppDimens.sectionGap),
-                AppPrimaryButton(
-                  label: 'Retry',
-                  expand: false,
-                  onTap: () => context
-                      .read<ProfileCubit>()
-                      .loadProfile(forceRefresh: true),
-                ),
-              ],
+class _ArenaStrip extends StatelessWidget {
+  final VoidCallback? onOpen;
+
+  const _ArenaStrip({this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = context.select((GamificationCubit c) => c.state.stats);
+    if (stats == null) return const SizedBox.shrink();
+    final grey = context.vColors.grayText;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: AppDimens.space16),
+        Divider(color: context.vColors.divider),
+        const SizedBox(height: AppDimens.space12),
+        Row(
+          children: [
+            const AppIconBadge(
+              icon: Icon(Icons.emoji_events_rounded),
+              color: AppColors.scoreBonus,
+              size: AppDimens.avatarSmall,
             ),
-          ),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  text: 'Level ${stats.level.level}',
+                  children: [
+                    TextSpan(
+                      text: ' · ${_points.format(stats.totalPoints)} pts',
+                      style: TextStyle(color: grey),
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+            ),
+            if (onOpen != null) CardLink(label: 'Arena', onTap: onOpen!),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  final String label;
+
+  const _MetaChip(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space10,
+        vertical: AppDimens.space2,
+      ),
+      decoration: BoxDecoration(
+        color: v.glassFill,
+        borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+        border: Border.all(color: v.glassBorder!),
+      ),
+      child: Text(
+        label,
+        style: context.text.labelSmall?.copyWith(
+          color: context.colors.onSurface,
         ),
       ),
     );

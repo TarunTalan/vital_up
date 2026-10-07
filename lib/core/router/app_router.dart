@@ -59,6 +59,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
+import 'package:vital_up/features/profile/presentation/pages/account_details_page.dart';
 import 'package:vital_up/features/profile/presentation/pages/health_details_page.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
@@ -318,10 +319,15 @@ class AppRouter {
         name: 'health-details',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: BlocProvider<ProfileCubit>.value(
-            value: sl<ProfileCubit>(), // Since sl returns the same singleton
-            child: const HealthDetailsPage(),
-          ),
+          child: _withProfileCubit(state, const HealthDetailsPage()),
+        ),
+      ),
+      GoRoute(
+        path: '/profile/account',
+        name: 'account-details',
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: _withProfileCubit(state, const AccountDetailsPage()),
         ),
       ),
       GoRoute(
@@ -671,5 +677,18 @@ class AppRouter {
         child: Text('No route defined for ${state.uri.toString()}'),
       ),
     ),
+  );
+}
+
+/// Pages under Profile get the Profile tab's cubit as `extra`, so edits show
+/// there on return; opened directly (deep link) they load their own.
+Widget _withProfileCubit(GoRouterState state, Widget child) {
+  final cubit = state.extra;
+  if (cubit is ProfileCubit) {
+    return BlocProvider<ProfileCubit>.value(value: cubit, child: child);
+  }
+  return BlocProvider<ProfileCubit>(
+    create: (_) => sl<ProfileCubit>()..loadProfile(),
+    child: child,
   );
 }

@@ -112,12 +112,14 @@ void main() {
       expect(fakeRepository.lastUpdatedProfile, equals(tProfile));
     });
 
-    test('should emit [ProfileSaving, ProfileError] when updating profile fails', () async {
+    test('should emit [ProfileSaving, ProfileError, ProfileLoaded] when updating profile fails', () async {
       fakeRepository.updateProfileResult = const Left(ServerFailure('Database error'));
 
+      // The error is reported, then the unsaved profile stays on screen.
       final expectedStates = [
         const ProfileSaving(tProfile),
         const ProfileError('Database error'),
+        const ProfileLoaded(tProfile),
       ];
 
       expectLater(cubit.stream, emitsInOrder(expectedStates));
