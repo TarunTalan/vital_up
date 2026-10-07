@@ -1,41 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter/services.dart';
-import 'package:home_widget/home_widget.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/home_widget/data/widget_data.dart';
+import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/features/home_widget/presentation/widget_previews.dart';
+import 'package:vital_up/features/home_widget/presentation/widgets_preview_page.dart';
 
-const _androidProvider = 'com.tarun_siddhi.vital_up.VitalUpWidgetProvider';
-
-enum WidgetSizeOption {
-  compact('2 × 1', 'Compact Quick Bar', Icons.view_headline_rounded),
-  medium('3 × 2', 'Balanced Daily View', Icons.dashboard_rounded),
-  large('4 × 2', 'Full Dashboard', Icons.grid_view_rounded),
-  extraLarge('4 × 3', 'Comprehensive View', Icons.grid_on_rounded);
-
-  final String sizeLabel;
-  final String description;
-  final IconData icon;
-  const WidgetSizeOption(this.sizeLabel, this.description, this.icon);
-}
-
-enum WidgetColorTheme {
-  vitalCyan('Vital Cyan', AppColors.primary),
-  hydrationBlue('Aqua Wave', AppColors.water),
-  emeraldEnergy('Emerald', AppColors.success),
-  sunsetOrange('Sunset', AppColors.warning),
-  vitaPurple('Vita Aura', AppColors.blobPurple);
-
-  final String name;
-  final Color primaryColor;
-  const WidgetColorTheme(this.name, this.primaryColor);
-}
-
+/// Builds the "My metrics" widget: a title and up to four metrics, in the
+/// order they are picked. The preview is the widget as it will appear.
 class CustomWidgetBuilderPage extends StatefulWidget {
   const CustomWidgetBuilderPage({super.key});
 
@@ -45,829 +26,273 @@ class CustomWidgetBuilderPage extends StatefulWidget {
 }
 
 class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
-  WidgetSizeOption _selectedSize = WidgetSizeOption.medium;
-  WidgetColorTheme _selectedTheme = WidgetColorTheme.vitalCyan;
+  final _title = TextEditingController();
+  WidgetPreviewData? _data;
+  CustomWidgetConfig? _saved;
+  List<WidgetMetric> _metrics = [];
+  WidgetSize _size = WidgetSize.wide;
+  bool _saving = false;
 
-  bool _showWater = true;
-  bool _showSteps = true;
-  bool _showCalories = true;
-  bool _showSleep = true;
-  bool _showMood = true;
-  final bool _showStreak = true;
-  bool _showShortcuts = true;
+  static const _sizes = [
+    WidgetSize.small,
+    WidgetSize.wide,
+    WidgetSize.large,
+    WidgetSize.xLarge,
+  ];
 
-  Future<void> _pinCustomWidget() async {
-    HapticFeedback.mediumImpact();
-    try {
-      await HomeWidget.requestPinWidget(qualifiedAndroidName: _androidProvider);
-      if (mounted) {
-        showSuccessSnackBar(context, 'Widget added to your home screen!');
+  @override
+  void initState() {
+    super.initState();
+    _title.addListener(() => setState(() {}));
+    WidgetPreviewData.load().then((data) {
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _saved = data.custom;
+        _metrics = [...data.custom.metrics];
+        _title.text = data.custom.title;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  CustomWidgetConfig get _config => CustomWidgetConfig(
+    title: _title.text.trim().isEmpty
+        ? CustomWidgetConfig.defaultTitle
+        : _title.text.trim(),
+    metrics: _metrics,
+  );
+
+  bool get _dirty =>
+      _saved != null &&
+      (_config.title != _saved!.title ||
+          !_sameOrder(_metrics, _saved!.metrics));
+
+  static bool _sameOrder(List<WidgetMetric> a, List<WidgetMetric> b) =>
+      a.length == b.length &&
+      [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
+  void _toggle(WidgetMetric metric) {
+    setState(() {
+      if (_metrics.contains(metric)) {
+        if (_metrics.length > 1) _metrics.remove(metric);
+      } else if (_metrics.length < CustomWidgetConfig.maxMetrics) {
+        _metrics.add(metric);
       }
+    });
+  }
+
+  Future<bool> _save() async {
+    if (_metrics.isEmpty) return false;
+    setState(() => _saving = true);
+    try {
+      final config = _config;
+      await config.save();
+      if (!mounted) return true;
+      setState(() => _saved = config);
+      showSuccessSnackBar(context, 'Widget saved');
+      return true;
     } catch (_) {
       if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Configuration saved! Long press your home screen to place the widget.',
-        );
+        showErrorSnackBar(context, "Couldn't save the widget. Try again.");
       }
+      return false;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveAndPin() async {
+    if (_dirty && !await _save()) return;
+    // Pin at the size being previewed.
+    if (mounted) {
+      await pinWidget(context, WidgetSizeProviders.custom[_size]!);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const header = AppPageHeader(
+      title: 'My metrics widget',
+      subtitle: 'Pick what it shows',
+    );
+    final data = _data;
+    if (data == null) {
+      return const AppScaffold(
+        header: header,
+        body: Padding(
+          padding: EdgeInsets.only(top: AppDimens.space48),
+          child: Center(child: VitalUpLoader()),
+        ),
+      );
+    }
+    final full = _metrics.length >= CustomWidgetConfig.maxMetrics;
+    final android = HomeWidgetService.supported;
+
     return AppScaffold(
-      header: const AppPageHeader(
-        title: 'Custom Widget',
-        subtitle: 'Build your personalized widget',
-      ),
-      scrollable: true,
-      padBody: false,
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(
-          context.gutter,
-          AppDimens.sectionGap,
-          context.gutter,
-          AppDimens.sectionGap + context.safePadding.bottom,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section 1: Live Interactive Preview
-            AppCaption('LIVE PREVIEW (${_selectedSize.sizeLabel})'),
-            const SizedBox(height: AppDimens.space8),
-            _buildLivePreviewCard(),
-
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // Section 2: Choose Widget Layout / Size
-            AppCaption('1. SELECT WIDGET SIZE'),
-            const SizedBox(height: AppDimens.space8),
-            _buildSizeSelector(),
-
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // Section 3: Accent Theme
-            AppCaption('2. SELECT COLOR ACCENT'),
-            const SizedBox(height: AppDimens.space8),
-            _buildThemeSelector(),
-
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // Section 4: Visible Metrics
-            AppCaption('3. VISIBLE METRICS & MODULES'),
-            const SizedBox(height: AppDimens.space8),
-            _buildMetricsToggles(),
-
-            const SizedBox(height: AppDimens.sectionGap),
-
-            // Add / Pin Button
-            AppPrimaryButton(
-              label: 'Save & Add Widget',
-              leadingIcon: const Icon(
-                Icons.check_circle_rounded,
-                size: AppDimens.iconMd,
+      header: header,
+      bottomBar: Row(
+        children: [
+          if (android) ...[
+            Expanded(
+              child: AppSecondaryButton(
+                label: 'Add ${_size.label}',
+                onTap: _saveAndPin,
               ),
-              containerColor: _selectedTheme.primaryColor,
-              contentColor: AppColors.buttonText,
-              onTap: _pinCustomWidget,
             ),
+            const SizedBox(width: AppDimens.buttonGap),
           ],
-        ),
+          Expanded(
+            child: AppPrimaryButton(
+              label: _dirty ? 'Save' : 'Saved',
+              enabled: _dirty,
+              isLoading: _saving,
+              onTap: _save,
+            ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildLivePreviewCard() {
-    final v = context.vColors;
-    final accent = _selectedTheme.primaryColor;
-
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPadding,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Widget Mockup Frame
-          Container(
+          AppCard(
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: context.colors.surface,
-              borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-              border: Border.all(color: accent.withValues(alpha: 0.35)),
-              boxShadow: AppShadows.shadowY,
-            ),
-            padding: const EdgeInsets.all(AppDimens.space12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Header
-                Row(
-                  children: [
-                    if (_showStreak) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space8,
-                          vertical: AppDimens.space4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.streak.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(
-                            AppDimens.radiusSm,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/streak.svg',
-                              width: 12,
-                              height: 12,
-                              colorFilter: const ColorFilter.mode(
-                                AppColors.streak,
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            Text(
-                              '  5-Day Streak',
-                              style: context.text.labelSmall?.copyWith(
-                                color: AppColors.streak,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else ...[
-                      Container(
-                        width: AppDimens.space8,
-                        height: AppDimens.space8,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space6,
-                        vertical: AppDimens.space2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: v.glassFill,
-                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                        border: Border.all(color: v.glassBorder!),
-                      ),
-                      child: Text(
-                        _selectedSize.sizeLabel,
-                        style: context.text.labelSmall?.copyWith(
-                          color: v.grayText,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (_selectedSize != WidgetSizeOption.compact) ...[
-                  const SizedBox(height: AppDimens.space10),
-
-                  // Water Metric
-                  if (_showWater) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space10,
-                        vertical: AppDimens.space6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.water.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                        border: Border.all(
-                          color: AppColors.water.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/icons/drop.svg',
-                                  width: 14,
-                                  height: 14,
-                                  colorFilter: const ColorFilter.mode(
-                                    AppColors.water,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '1,750 / 2,500 ml',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.text.labelSmall?.copyWith(
-                                    color: AppColors.water,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppDimens.space6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppDimens.space6,
-                              vertical: AppDimens.space2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.water,
-                              borderRadius: BorderRadius.circular(
-                                AppDimens.radiusSm,
-                              ),
-                            ),
-                            child: Text(
-                              '+250 ml',
-                              style: context.text.labelSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space6),
-                  ],
-
-                  // Activity Metrics Row
-                  if (_showSteps || _showCalories) ...[
-                    Row(
-                      children: [
-                        if (_showSteps)
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(AppDimens.space6),
-                              decoration: BoxDecoration(
-                                color: v.glassFill,
-                                borderRadius: BorderRadius.circular(
-                                  AppDimens.radiusSm,
-                                ),
-                                border: Border.all(color: v.glassBorder!),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      SvgPicture.asset(
-                                        'assets/icons/steps.svg',
-                                        width: 14,
-                                        height: 14,
-                                        colorFilter: const ColorFilter.mode(
-                                          AppColors.success,
-                                          BlendMode.srcIn,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Steps',
-                                        style: context.text.labelSmall
-                                            ?.copyWith(
-                                              color: v.grayText,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '7,840 / 10k',
-                                    style: context.text.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        if (_showSteps && _showCalories)
-                          const SizedBox(width: AppDimens.space6),
-                        if (_showCalories)
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(AppDimens.space6),
-                              decoration: BoxDecoration(
-                                color: v.glassFill,
-                                borderRadius: BorderRadius.circular(
-                                  AppDimens.radiusSm,
-                                ),
-                                border: Border.all(color: v.glassBorder!),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      SvgPicture.asset(
-                                        'assets/icons/streak_3.svg',
-                                        width: 14,
-                                        height: 14,
-                                        colorFilter: const ColorFilter.mode(
-                                          AppColors.warning,
-                                          BlendMode.srcIn,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Calories',
-                                        style: context.text.labelSmall
-                                            ?.copyWith(
-                                              color: v.grayText,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '1,620 kcal',
-                                    style: context.text.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: AppDimens.space6),
-                  ],
-
-                  // Sleep & Mood Row (For Large or medium widgets)
-                  if (_showSleep || _showMood) ...[
-                    Row(
-                      children: [
-                        if (_showSleep)
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(AppDimens.space6),
-                              decoration: BoxDecoration(
-                                color: AppColors.sleep.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(
-                                  AppDimens.radiusSm,
-                                ),
-                                border: Border.all(
-                                  color: AppColors.sleep.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Row(
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/moon_stars.svg',
-                                      width: 14,
-                                      height: 14,
-                                      colorFilter: const ColorFilter.mode(
-                                        AppColors.sleep,
-                                        BlendMode.srcIn,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '7h 45m Sleep',
-                                      style: context.text.labelSmall?.copyWith(
-                                        color: AppColors.sleep,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (_showSleep && _showMood)
-                          const SizedBox(width: AppDimens.space6),
-                        if (_showMood)
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(AppDimens.space6),
-                              decoration: BoxDecoration(
-                                color: AppColors.stressLevels[0].withValues(
-                                  alpha: 0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  AppDimens.radiusSm,
-                                ),
-                                border: Border.all(
-                                  color: AppColors.stressLevels[0].withValues(
-                                    alpha: 0.25,
-                                  ),
-                                ),
-                              ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Row(
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/mood.svg',
-                                      width: 14,
-                                      height: 14,
-                                      colorFilter: ColorFilter.mode(
-                                        AppColors.stressLevels[0],
-                                        BlendMode.srcIn,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Calm & Good',
-                                      style: context.text.labelSmall?.copyWith(
-                                        color: AppColors.stressLevels[0],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: AppDimens.space6),
-                  ],
-                ],
-
-                // Quick Shortcuts Row
-                if (_showShortcuts) ...[
-                  const SizedBox(height: AppDimens.space4),
-                  Row(
-                    children: [
-                      _buildMiniShortcut(
-                        'assets/icons/scanner.svg',
-                        'Scan',
-                        accent,
-                      ),
-                      const SizedBox(width: AppDimens.space4),
-                      _buildMiniShortcut(
-                        'assets/icons/person_run.svg',
-                        'Run',
-                        accent,
-                      ),
-                      const SizedBox(width: AppDimens.space4),
-                      _buildMiniShortcut(
-                        'assets/icons/vita.svg',
-                        'Vita',
-                        accent,
-                      ),
-                      if (_selectedSize == WidgetSizeOption.large) ...[
-                        const SizedBox(width: AppDimens.space4),
-                        _buildMiniShortcut(
-                          'assets/icons/drop.svg',
-                          '+250ml',
-                          AppColors.water,
-                        ),
-                      ],
-                    ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: AppSegmentedControl<WidgetSize>(
+                    compact: true,
+                    values: _sizes,
+                    selected: _size,
+                    label: (s) => s.label,
+                    onChanged: (s) => setState(() => _size = s),
                   ),
-                ],
+                ),
+                const SizedBox(height: AppDimens.space16),
+                Center(
+                  child: MetricsWidgetPreview(
+                    title: _config.title,
+                    metrics: _metrics,
+                    inputs: data.inputs,
+                    updatedAt: data.updatedAt,
+                    size: _size,
+                  ),
+                ),
               ],
             ),
+          ),
+          const SizedBox(height: AppDimens.space8),
+          AppInfoNote(
+            message: _size == WidgetSize.small
+                ? 'At 2 × 2 the widget shows the first two metrics.'
+                : _size == WidgetSize.wide
+                ? 'At 4 × 2 it shows up to four metrics side by side.'
+                : _size == WidgetSize.large
+                ? 'At 4 × 3 it shows four metrics in a grid.'
+                : 'At 4 × 4 and larger it adds Scan, Water and Vita buttons.',
+          ),
+          const SizedBox(height: AppDimens.sectionGap),
+
+          const AppSectionHeader('Title'),
+          AppTextField(
+            controller: _title,
+            hint: CustomWidgetConfig.defaultTitle,
+            maxLength: 20,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+          const SizedBox(height: AppDimens.sectionGap),
+
+          AppListGroup(
+            title:
+                'Metrics (${_metrics.length} of ${CustomWidgetConfig.maxMetrics})',
+            children: [
+              for (final metric in WidgetMetric.values)
+                _MetricOption(
+                  metric: metric,
+                  position: _metrics.indexOf(metric),
+                  enabled: _metrics.contains(metric)
+                      ? _metrics.length > 1
+                      : !full,
+                  onTap: () => _toggle(metric),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space8),
+          const AppInfoNote(
+            message:
+                'Metrics appear in the order you pick them. '
+                'Tap a picked metric to remove it, then pick it again to move it to the end.',
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildMiniShortcut(String iconAsset, String label, Color color) {
-    final v = context.vColors;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.space2,
-          vertical: AppDimens.space4,
-        ),
-        decoration: BoxDecoration(
-          color: v.glassFill,
-          borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-          border: Border.all(color: v.glassBorder!),
-        ),
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                iconAsset,
-                width: 14,
-                height: 14,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              ),
-              const SizedBox(width: AppDimens.space4),
-              Text(
-                label,
-                style: context.text.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+class _MetricOption extends StatelessWidget {
+  final WidgetMetric metric;
+
+  /// Order in the widget, or -1 when not picked.
+  final int position;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _MetricOption({
+    required this.metric,
+    required this.position,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  String get _subtitle => switch (metric) {
+    WidgetMetric.activity => 'Steps or your main activity goal',
+    WidgetMetric.calories => 'Eaten today against your goal',
+    WidgetMetric.water => 'Today against your goal',
+    WidgetMetric.sleep => 'Last night against your goal',
+    WidgetMetric.mood => "Today's check-in",
+    WidgetMetric.weight => 'Your latest weigh-in',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = position >= 0;
+    return Opacity(
+      opacity: enabled || picked ? 1 : AppDimens.disabledOpacity,
+      child: AppListTile(
+        icon: metric.icon,
+        iconColor: metric.color,
+        title: metric.title,
+        subtitle: _subtitle,
+        onTap: enabled ? onTap : null,
+        trailing: Container(
+          width: AppDimens.numberBadge,
+          height: AppDimens.numberBadge,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: picked ? context.colors.primary : Colors.transparent,
+            border: picked
+                ? null
+                : Border.all(color: context.vColors.secondaryButtonBorder!),
           ),
+          child: picked
+              ? Text(
+                  '${position + 1}',
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.vColors.buttonText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : null,
         ),
       ),
-    );
-  }
-
-  Widget _buildSizeSelector() {
-    return Column(
-      children: WidgetSizeOption.values.map((size) {
-        final isSelected = _selectedSize == size;
-        final color = _selectedTheme.primaryColor;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppDimens.space8),
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _selectedSize = size);
-            },
-            borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-            child: Container(
-              padding: const EdgeInsets.all(AppDimens.space12),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? color.withValues(alpha: 0.1)
-                    : context.vColors.glassFill,
-                borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                border: Border.all(
-                  color: isSelected ? color : context.vColors.glassBorder!,
-                  width: isSelected
-                      ? AppDimens.borderThick
-                      : AppDimens.borderThin,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    size.icon,
-                    color: isSelected ? color : context.vColors.grayText,
-                  ),
-                  const SizedBox(width: AppDimens.space12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          size.sizeLabel,
-                          style: context.text.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? color : null,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          size.description,
-                          style: context.text.bodySmall?.copyWith(
-                            color: context.vColors.grayText,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isSelected)
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: color,
-                      size: AppDimens.iconMd,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildThemeSelector() {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: WidgetColorTheme.values.map((theme) {
-            final isSelected = _selectedTheme == theme;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppDimens.space6),
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selectedTheme = theme);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: theme.primaryColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? context.colors.onSurface
-                              : Colors.transparent,
-                          width: 2.5,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: theme.primaryColor.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: isSelected
-                          ? const Icon(
-                              Icons.check_rounded,
-                              color: Colors.white,
-                              size: AppDimens.iconSm,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: AppDimens.space4),
-                    Text(
-                      theme.name,
-                      style: context.text.labelSmall?.copyWith(
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        color: isSelected
-                            ? theme.primaryColor
-                            : context.vColors.grayText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricsToggles() {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        children: [
-          _buildToggleRow(
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/drop.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    context.colors.onSurface,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text('Hydration (Water Tracker)'),
-              ],
-            ),
-            'Quick-add logs & progress',
-            _showWater,
-            (val) => setState(() => _showWater = val),
-          ),
-          const Divider(height: AppDimens.space12),
-          _buildToggleRow(
-            const Row(
-              children: [
-                Icon(Icons.directions_walk_rounded, size: 16),
-                SizedBox(width: 8),
-                Text('Daily Steps'),
-              ],
-            ),
-            'Step counter & progress toward goal',
-            _showSteps,
-            (val) => setState(() => _showSteps = val),
-          ),
-          const Divider(height: AppDimens.space12),
-          _buildToggleRow(
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/streak_3.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    context.colors.onSurface,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text('Calories & Nutrition'),
-              ],
-            ),
-            'Daily calorie intake breakdown',
-            _showCalories,
-            (val) => setState(() => _showCalories = val),
-          ),
-          const Divider(height: AppDimens.space12),
-          _buildToggleRow(
-            const Row(
-              children: [
-                Icon(Icons.bedtime_rounded, size: 16),
-                SizedBox(width: 8),
-                Text('Sleep Duration'),
-              ],
-            ),
-            'Last night rest & sleep goal',
-            _showSleep,
-            (val) => setState(() => _showSleep = val),
-          ),
-          const Divider(height: AppDimens.space12),
-          _buildToggleRow(
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/mood.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    context.colors.onSurface,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text('Mood & Stress Check-in'),
-              ],
-            ),
-            'Current state & daily streak',
-            _showMood,
-            (val) => setState(() => _showMood = val),
-          ),
-          const Divider(height: AppDimens.space12),
-          _buildToggleRow(
-            const Row(
-              children: [
-                Icon(Icons.bolt_rounded, size: 16),
-                SizedBox(width: 8),
-                Text('Quick Action Shortcuts'),
-              ],
-            ),
-            'Scan food, start workout, chat with AI',
-            _showShortcuts,
-            (val) => setState(() => _showShortcuts = val),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleRow(
-    Widget title,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DefaultTextStyle(style: context.text.titleSmall!, child: title),
-              const SizedBox(height: AppDimens.space2),
-              Text(
-                subtitle,
-                style: context.text.bodySmall?.copyWith(
-                  color: context.vColors.grayText,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Switch.adaptive(
-          value: value,
-          activeTrackColor: _selectedTheme.primaryColor,
-          onChanged: onChanged,
-        ),
-      ],
     );
   }
 }
