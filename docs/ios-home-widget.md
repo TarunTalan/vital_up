@@ -33,8 +33,11 @@ How it fits together:
   on start, resume, background, sign-in/out and after anything is logged
   (`HomeWidgetService.refresh`). Widget buttons, and widgets whose data is from
   an earlier day or over 30 minutes old, run `homeWidgetCallback` in a
-  background isolate, which re-reads on-device data (water, meals, mood,
-  weight) and keeps the rest from the last app refresh.
+  background isolate. Refresh starts the app's services there (Supabase +
+  `initDependencies`, about 10 s from cold) and runs the same full refresh;
+  add-water and mood re-read on-device data (water, meals, mood, weight)
+  instantly. If the full refresh can't run (no restored session, error, 25 s
+  timeout) the on-device refresh is used instead.
 - **Taps.** Widgets open `vitalup://widget/open?route=<name>`. Flutter passes it
   to GoRouter as `/open?route=...`; `HomeWidgetService.handleLink` opens the
   route on top of Home (Back returns Home), or holds it until Home shows on a
