@@ -7,7 +7,8 @@ import 'package:vital_up/core/network/offline_errors.dart';
 enum ChallengeMetric {
   activeMinutes('active_minutes', 'Active minutes', 'min'),
   distanceKm('distance_km', 'Distance', 'km'),
-  workouts('workouts', 'Workouts', '');
+  workouts('workouts', 'Workouts', ''),
+  xp('xp', 'XP Earned', 'XP');
 
   final String code;
   final String label;
@@ -23,13 +24,17 @@ enum ChallengeMetric {
     ChallengeMetric.workouts =>
       '${score.toInt()} ${score == 1 ? 'workout' : 'workouts'}',
     ChallengeMetric.activeMinutes => '${score.toInt()} min',
+    ChallengeMetric.xp => '${score.toInt()} XP',
   };
 }
 
 enum ParticipantStatus {
   invited,
   joined,
-  declined;
+  declined,
+
+  /// Quit a running challenge; kept for history, off the standings.
+  left;
 
   static ParticipantStatus fromName(String? name) =>
       values.where((s) => s.name == name).firstOrNull ?? invited;
@@ -133,6 +138,7 @@ class ChallengeException implements Exception {
           "You've started 5 challenges today. Try again tomorrow.",
       'invite_not_found': 'That challenge has ended or was already answered.',
       'challenge_not_found': "That challenge isn't available.",
+      'challenge_not_active': 'That challenge has already ended.',
     };
     for (final e in messages.entries) {
       if (serverMessage.contains(e.key)) return ChallengeException(e.value);
@@ -169,7 +175,8 @@ class ChallengesRepository {
   }
 
   String get _listKey => 'challenges:list:$_user';
-  String _boardKey(String challengeId) => 'challenges:board:$_user:$challengeId';
+  String _boardKey(String challengeId) =>
+      'challenges:board:$_user:$challengeId';
 
   Future<List<Map<String, dynamic>>> _rows(
     String key,
@@ -230,6 +237,16 @@ class ChallengesRepository {
         'respond_to_challenge',
         params: {'p_challenge': challenge.id, 'p_accept': accept},
       ),
+    );
+    await _cache.remove(_listKey);
+    await _cache.remove(_boardKey(challenge.id));
+  }
+
+  /// Quits a running challenge you joined. Online only, like [respond].
+  Future<void> leave(Challenge challenge) async {
+    await _call(
+      () =>
+          _client.rpc('leave_challenge', params: {'p_challenge': challenge.id}),
     );
     await _cache.remove(_listKey);
     await _cache.remove(_boardKey(challenge.id));
