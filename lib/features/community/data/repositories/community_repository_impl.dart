@@ -5,6 +5,7 @@ import 'package:vital_up/features/community/data/datasources/community_remote_da
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
+import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 
@@ -54,8 +55,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
   /// Applies [change] to the cached rows under [key], if any.
   Future<void> _patchRows(
     String key,
-    List<Map<String, dynamic>> Function(List<Map<String, dynamic>> rows)
-    change,
+    List<Map<String, dynamic>> Function(List<Map<String, dynamic>> rows) change,
   ) => _cache.update(key, (data) => change(_decodeRows(data)));
 
   /// Friend changes reshape every friends leaderboard.
@@ -127,10 +127,8 @@ class CommunityRepositoryImpl implements CommunityRepository {
     );
   }
 
-  Future<void> _patchSettings(Map<String, dynamic> values) => _cache.update(
-    _settingsKey,
-    (data) => {...?_decodeRow(data), ...values},
-  );
+  Future<void> _patchSettings(Map<String, dynamic> values) =>
+      _cache.update(_settingsKey, (data) => {...?_decodeRow(data), ...values});
 
   @override
   Future<void> setCity(String city, String countryCode) async {
@@ -282,6 +280,35 @@ class CommunityRepositoryImpl implements CommunityRepository {
       rethrow;
     }
     await _invalidateFriends();
+  }
+
+  @override
+  Future<PlayerProfile> getPlayerProfile(String userId) => _profileCall(
+    () async => PlayerProfile.fromJson(
+      await _remote.fetchPlayerProfile(userId).timeout(_requestTimeout),
+    ),
+  );
+
+  @override
+  Future<PlayerProfile> getMyProfile() =>
+      getPlayerProfile(_remote.requireUser());
+
+  @override
+  Future<void> sendCheer(String userId) =>
+      _profileCall(() => _remote.sendCheer(userId));
+
+  /// Maps server and network failures to [PlayerProfileException].
+  Future<T> _profileCall<T>(Future<T> Function() run) async {
+    try {
+      return await run();
+    } on PostgrestException catch (e) {
+      throw PlayerProfileException.fromServer(e.message);
+    } catch (e) {
+      if (isOfflineError(e)) {
+        throw const PlayerProfileException(CommunityRepository.offlineMessage);
+      }
+      rethrow;
+    }
   }
 
   @override

@@ -90,6 +90,15 @@ class CommunityRemoteDataSource {
   Future<List<Map<String, dynamic>>> fetchFriends() async =>
       _rows(await _client.rpc('get_friends'));
 
+  Future<Map<String, dynamic>> fetchPlayerProfile(String userId) async =>
+      Map<String, dynamic>.from(
+        await _client.rpc('get_player_profile', params: {'p_user': userId})
+            as Map,
+      );
+
+  Future<void> sendCheer(String userId) =>
+      _client.rpc('send_cheer', params: {'p_friend': userId});
+
   Future<String> sendFriendRequest(String username) async =>
       await _client.rpc('send_friend_request', params: {'p_username': username})
           as String;

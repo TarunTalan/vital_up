@@ -8,13 +8,16 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/challenges/presentation/widgets/quick_challenge_sheet.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
-import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
-import 'package:vital_up/features/community/presentation/widgets/friend_gamer_tile.dart';
+import 'package:vital_up/features/community/presentation/widgets/friend_tile.dart';
 import 'package:vital_up/features/community/presentation/widgets/invite_share_card.dart';
+import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 
 /// Add friends by username, answer requests, and manage the friends list.
@@ -83,9 +86,15 @@ class _FriendsViewState extends State<_FriendsView> {
     if (ok == true) await cubit.remove(friend);
   }
 
+  void _showProfile(Friend f) => PublicProfileSheet.show(
+    context,
+    username: f.username,
+    level: f.level,
+    avatarUrl: f.avatarUrl,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final me = widget.myUsername;
     return BlocConsumer<FriendsCubit, FriendsState>(
       listenWhen: (prev, next) => next.messageId != prev.messageId,
       listener: (context, s) => ScaffoldMessenger.of(context)
@@ -94,58 +103,31 @@ class _FriendsViewState extends State<_FriendsView> {
       builder: (context, state) {
         final cubit = context.read<FriendsCubit>();
         final friends = state.friends;
+        Widget gap() => const SizedBox(height: AppDimens.cardGap);
         return AppScaffold(
           onRefresh: () async => cubit.load(),
           header: const AppPageHeader(title: 'Friends'),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              InviteShareCard(myUsername: me),
-              AppCard(
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('Add a friend', style: context.text.titleSmall),
-                    const SizedBox(height: AppDimens.space4),
-                    Text(
-                      'Send a request with their VitalUp username.',
-                      style: context.text.bodySmall?.copyWith(
-                        color: context.vColors.grayText,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.space12),
-                    AppTextField(
-                      controller: _username,
-                      hint: '@username',
-                      prefixIcon: Icons.person_search_rounded,
-                      textInputAction: TextInputAction.send,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                      ],
-                      onSubmitted: (_) => _send(),
-                    ),
-                    const SizedBox(height: AppDimens.space12),
-                    AppPrimaryButton(
-                      label: 'Send request',
-                      isLoading: state.sending,
-                      onTap: _send,
-                    ),
-                  ],
-                ),
+              _AddFriendCard(
+                controller: _username,
+                sending: state.sending,
+                onSend: _send,
               ),
               const SizedBox(height: AppDimens.sectionGap),
               if (friends == null)
                 state.failed
                     ? LoadErrorView(onRetry: cubit.load)
-                    : const Center(child: CircularProgressIndicator())
+                    : const Center(child: VitalUpLoader())
               else ...[
                 if (state.incoming.isNotEmpty) ...[
-                  _SectionTitle('Requests (${state.incoming.length})'),
-                  for (final f in state.incoming)
-                    _FriendRow(
+                  AppSectionHeader('Requests', count: state.incoming.length),
+                  for (final f in state.incoming) ...[
+                    FriendTile(
                       friend: f,
                       busy: state.busy.contains(f.userId),
+                      onTap: () => _showProfile(f),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -162,36 +144,54 @@ class _FriendsViewState extends State<_FriendsView> {
                         ],
                       ),
                     ),
+                    gap(),
+                  ],
                   const SizedBox(height: AppDimens.space12),
                 ],
-                _SectionTitle('Friends (${state.accepted.length})'),
+                AppSectionHeader('Friends', count: state.accepted.length),
                 if (state.accepted.isEmpty)
                   const AppInfoNote(
                     message:
-                        'No friends yet. Add someone by username to '
-                        'compete on your friends leaderboard.',
+                        'No friends yet. Add someone by username to compare '
+                        'progress and start challenges.',
                   ),
-                for (final f in state.accepted)
-                  FriendGamerTile(
+                for (final f in state.accepted) ...[
+                  FriendTile(
                     friend: f,
                     busy: state.busy.contains(f.userId),
-                    onRemove: () => _confirmRemove(f),
+                    onTap: () => PlayerInspectSheet.show(
+                      context,
+                      friend: f,
+                      onRemove: () => _confirmRemove(f),
+                    ),
+                    trailing: TextButton(
+                      onPressed: () =>
+                          QuickChallengeSheet.show(context, friend: f),
+                      child: const Text('Challenge'),
+                    ),
                   ),
+                  gap(),
+                ],
                 if (state.outgoing.isNotEmpty) ...[
                   const SizedBox(height: AppDimens.space12),
-                  const _SectionTitle('Sent'),
-                  for (final f in state.outgoing)
-                    _FriendRow(
+                  AppSectionHeader('Sent', count: state.outgoing.length),
+                  for (final f in state.outgoing) ...[
+                    FriendTile(
                       friend: f,
                       subtitle: 'Waiting for them to accept',
                       busy: state.busy.contains(f.userId),
+                      onTap: () => _showProfile(f),
                       trailing: TextButton(
                         onPressed: () => cubit.remove(f),
                         child: const Text('Cancel'),
                       ),
                     ),
+                    gap(),
+                  ],
                 ],
               ],
+              const SizedBox(height: AppDimens.sectionGap),
+              InviteShareCard(myUsername: widget.myUsername),
             ],
           ),
         );
@@ -200,84 +200,53 @@ class _FriendsViewState extends State<_FriendsView> {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String text;
+class _AddFriendCard extends StatelessWidget {
+  final TextEditingController controller;
+  final bool sending;
+  final VoidCallback onSend;
 
-  const _SectionTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: AppDimens.space12),
-    child: Text(text, style: context.text.titleMedium),
-  );
-}
-
-class _FriendRow extends StatelessWidget {
-  final Friend friend;
-  final Widget trailing;
-  final String? subtitle;
-  final bool busy;
-
-  const _FriendRow({
-    required this.friend,
-    required this.trailing,
-    this.subtitle,
-    this.busy = false,
+  const _AddFriendCard({
+    required this.controller,
+    required this.sending,
+    required this.onSend,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        PublicProfileSheet.show(
-          context,
-          username: friend.username,
-          level: friend.level,
-          avatarUrl: friend.avatarUrl,
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: AppDimens.space8),
-        child: AppCard(
-          width: double.infinity,
-          padding: AppDimens.cardPaddingCompact,
-          child: Row(
-            children: [
-            UserAvatar(username: friend.username, url: friend.avatarUrl),
-            const SizedBox(width: AppDimens.space12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '@${friend.username}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.titleSmall?.copyWith(
-                      color: context.colors.onSurface,
-                    ),
-                  ),
-                  Text(
-                    subtitle ?? 'Level ${friend.level}',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
-                  ),
-                ],
-              ),
+    return AppCard(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Add a friend',
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
-            if (busy)
-              const SizedBox.square(
-                dimension: AppDimens.iconLg,
-                child: CircularProgressIndicator(
-                  strokeWidth: AppDimens.borderThick,
-                ),
-              )
-            else
-              trailing,
-          ],
-        ),
-        ),
+          ),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            'Send a request with their VitalUp username.',
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          AppTextField(
+            controller: controller,
+            hint: '@username',
+            prefixIcon: Icons.person_search_rounded,
+            textInputAction: TextInputAction.send,
+            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+            onSubmitted: (_) => onSend(),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          AppPrimaryButton(
+            label: 'Send request',
+            isLoading: sending,
+            onTap: onSend,
+          ),
+        ],
       ),
     );
   }
