@@ -39,7 +39,10 @@ class AppPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = context.vColors;
     final canPop = Navigator.of(context).canPop();
-    final isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    bool isDashboard = false;
+    try {
+      isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    } catch (_) {}
     final hasBack = showBack && (onBack != null || canPop || !isDashboard);
 
     Widget header = Container(
@@ -136,7 +139,10 @@ class AppTitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    bool isDashboard = false;
+    try {
+      isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
+    } catch (_) {}
     final hasBack = onBack != null || canPop || !isDashboard;
     // Mirrors the back button so the title stays optically centred.
     const slot = SizedBox.square(dimension: AppDimens.backButtonSize);

@@ -174,6 +174,9 @@ class AppDimens {
   static const double calorieRingStroke = 8.0;
   static const double waterWaveHeight = 120.0;
 
+  /// Dashboard: height of a half-width tracker tile at 1x text scale.
+  static const double dashboardTileHeight = 240.0;
+
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.
   static const double miniChartHeight = 64.0;
