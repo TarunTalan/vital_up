@@ -4,16 +4,26 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/features/home_widget/data/widget_data.dart';
+import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 
-/// Runs when a widget button is tapped (or a widget asks for a refresh),
-/// in a background isolate without the app's services. It applies the
-/// action, re-reads what is stored on the device (water, meals, mood,
-/// weight) and redraws every widget. Server data is refreshed by the app.
+/// Runs when a widget button is tapped (or a widget asks for a refresh), in
+/// a background isolate.
+///
+/// - Refresh (the header button, and stale widgets) starts the app's
+///   services and runs the same full refresh as the app
+///   ([HomeWidgetService.refresh]: Health Connect, the server, goals).
+/// - Add water and mood apply the action, then re-read on-device data
+///   (water, meals, mood, weight), which is instant.
+///
+/// Either way, if the full refresh can't run, the on-device refresh does.
 ///
 /// URIs: vitalup://widget/refresh, /add-water?ml=250, /mood?level=1..5,
 /// /mood-reset.
@@ -41,11 +51,44 @@ Future<void> homeWidgetCallback(Uri? uri) async {
       case '/mood-reset':
         await resetMoodInBackground(userId).timeout(timeout);
     }
+    if (uri.path == '/refresh' &&
+        await _refreshWithAppServices().timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => false,
+        )) {
+      return;
+    }
     await refreshFromDevice(userId).timeout(timeout);
   } catch (e) {
     debugPrint('Home widget background action failed: $e');
     // Always redraw so the spinner clears.
     await endWidgetRefresh();
+  }
+}
+
+/// The app's services in this isolate (one background engine can run many
+/// widget actions, so they are set up once).
+bool _appServicesReady = false;
+
+/// Full refresh, as the app does it. False if it couldn't run (e.g. the
+/// session didn't restore), so the caller falls back to on-device data and
+/// the widgets never flip to "signed out" by mistake.
+Future<bool> _refreshWithAppServices() async {
+  try {
+    if (!_appServicesReady) {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+      await di.initDependencies();
+      _appServicesReady = true;
+    }
+    if (Supabase.instance.client.auth.currentUser == null) return false;
+    await di.sl<HomeWidgetService>().refresh();
+    return true;
+  } catch (e) {
+    debugPrint('Full widget refresh unavailable, using device data: $e');
+    return false;
   }
 }
 

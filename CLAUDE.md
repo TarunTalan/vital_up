@@ -118,7 +118,9 @@ diet plan, profile) and shows award snackbars outside Arena.
   `presentation/widget_previews.dart` mirrors the layouts in Flutter. Keep
   size thresholds and dimensions identical on both sides. Full refresh in
   `HomeWidgetService.refresh`; widget buttons run `homeWidgetCallback`
-  (`data/widget_background.dart`, on-device data only). Widget taps go
+  (`data/widget_background.dart`): the refresh button boots the app's
+  services in the background isolate and runs the full refresh, other
+  buttons re-read on-device data; both fall back to on-device data. Widget taps go
   through GoRouter `/open?route=` → `HomeWidgetService.handleLink`
   (Home underneath, Back returns Home; held until Home shows on cold start).
   Android pins at a provider's default size, so each offered size is its own
