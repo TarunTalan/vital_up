@@ -577,12 +577,16 @@ class LevelTagPill extends StatelessWidget {
         children: [
           Icon(tier.icon, size: AppDimens.iconXs - 2, color: tier.borderColor),
           const SizedBox(width: AppDimens.space4),
-          Text(
-            'LVL $level • ${tier.tierName.toUpperCase()}',
-            style: context.text.labelSmall?.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
+          Flexible(
+            child: Text(
+              'LVL $level • ${tier.tierName.toUpperCase()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.labelSmall?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
             ),
           ),
         ],
