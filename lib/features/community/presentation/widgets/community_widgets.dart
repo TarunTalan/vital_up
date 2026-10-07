@@ -135,10 +135,78 @@ class CommunityTile extends StatelessWidget {
           const SizedBox(width: AppDimens.space8),
           trailing ??
               Icon(
-                Icons.arrow_forward_ios,
-                color: context.colors.onSurface,
-                size: AppDimens.iconXs,
+                Icons.chevron_right_rounded,
+                color: context.vColors.grayText,
+                size: AppDimens.iconMd,
               ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A grid-style card for a community.
+class CommunityGridCard extends StatelessWidget {
+  final Community community;
+  final VoidCallback onTap;
+  final Widget? action;
+
+  const CommunityGridCard({
+    super.key,
+    required this.community,
+    required this.onTap,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final members = community.memberCount;
+    return AppCard(
+      padding: const EdgeInsets.all(AppDimens.space12),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconBadge(
+                color: context.colors.primary,
+                icon: GameIcon(
+                  GamificationIcons.communityIcon(community.iconKey),
+                  fallback: communityFallbackIcon(community),
+                  size: AppDimens.iconSm,
+                ),
+              ),
+              const Spacer(),
+              ?action,
+            ],
+          ),
+          const SizedBox(height: AppDimens.space12),
+          Text(
+            community.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            '${_count.format(members)} members',
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            community.rankedOn,
+            style: context.text.labelSmall?.copyWith(
+              color: context.colors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -186,12 +254,12 @@ class _CitySheetState extends State<CitySheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Padding(
+      child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           context.gutter,
           0,
           context.gutter,
-          AppDimens.space16 + MediaQuery.viewInsetsOf(context).bottom,
+          AppDimens.space16,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

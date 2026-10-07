@@ -16,6 +16,7 @@ enum FriendStatus {
 class Friend extends Equatable {
   final String userId;
   final String username;
+  final String? fullName;
   final String? avatarUrl;
   final int level;
   final FriendStatus status;
@@ -25,19 +26,28 @@ class Friend extends Equatable {
     required this.username,
     required this.level,
     required this.status,
+    this.fullName,
     this.avatarUrl,
   });
 
   factory Friend.fromJson(Map<String, dynamic> json) => Friend(
     userId: json['user_id'] as String,
     username: json['username'] as String? ?? 'VitalUp user',
+    fullName: json['full_name'] as String?,
     avatarUrl: json['avatar_url'] as String?,
     level: (json['level'] as num?)?.toInt() ?? 1,
     status: FriendStatus.fromName(json['status'] as String?),
   );
 
   @override
-  List<Object?> get props => [userId, username, avatarUrl, level, status];
+  List<Object?> get props => [
+    userId,
+    username,
+    fullName,
+    avatarUrl,
+    level,
+    status,
+  ];
 }
 
 /// A friend request the server refused, with a message for the user.

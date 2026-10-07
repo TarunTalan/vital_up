@@ -1,6 +1,7 @@
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
+import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 
 /// The caller's leaderboard settings from their profile.
@@ -56,6 +57,17 @@ abstract class CommunityRepository {
 
   /// Unfriends, or cancels a request.
   Future<void> removeFriend(Friend friend);
+
+  /// Profile of [userId]: the caller or an accepted friend. Online only.
+  /// Throws [PlayerProfileException] with a user-facing message.
+  Future<PlayerProfile> getPlayerProfile(String userId);
+
+  /// The caller's own profile, in the same shape as a friend's.
+  Future<PlayerProfile> getMyProfile();
+
+  /// Cheers a friend (once per day). Online only.
+  /// Throws [PlayerProfileException] with a user-facing message.
+  Future<void> sendCheer(String userId);
 
   Future<LeaderboardEntry?> getMyRank(
     Community community, {
