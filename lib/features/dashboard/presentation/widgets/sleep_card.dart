@@ -63,10 +63,18 @@ class SleepCard extends StatelessWidget {
             status: TrackerStatus.notLogged,
             onOpen: () => _open(context),
             actions: [_logAction(context, filled: true)],
-            child: const TrackerPrompt(
-              title: 'How did you sleep?',
-              message: 'Log sleep to track your rest.',
-              color: AppColors.trackSleep,
+            child: Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  TrackerPrompt(
+                    title: 'How did you sleep?',
+                    message: 'Log sleep to track your rest.',
+                    color: AppColors.trackSleep,
+                  ),
+                ],
+              ),
             ),
           ),
           SleepNeedsHealthConnectInstall() => TrackerCard(
@@ -82,11 +90,19 @@ class SleepCard extends StatelessWidget {
               ),
               _logAction(context),
             ],
-            child: const TrackerPrompt(
-              icon: Icons.health_and_safety_rounded,
-              title: 'Sync sleep',
-              message: 'Install Health Connect to sync your watch.',
-              color: AppColors.trackSleep,
+            child: Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  TrackerPrompt(
+                    icon: Icons.health_and_safety_rounded,
+                    title: 'Sync sleep',
+                    message: 'Install Health Connect to sync your watch.',
+                    color: AppColors.trackSleep,
+                  ),
+                ],
+              ),
             ),
           ),
           SleepError() => TrackerCardPlaceholder(
