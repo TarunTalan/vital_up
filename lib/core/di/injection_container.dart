@@ -753,10 +753,13 @@ Future<void> initDependencies() async {
     () => HomeWidgetService(
       sl<SupabaseClient>(),
       sl<WaterIntakeService>(),
-      sl<GamificationRepository>(),
-      activityGoals: sl<ActivityGoalsRepository>(),
-      mealLogs: sl<GetMealLogHistory>(),
-      vita: sl<VitaRepository>(),
+      sl<SleepService>(),
+      sl<WeightService>(),
+      sl<ActivityGoalsRepository>(),
+      sl<GetMealLogHistory>(),
+      sl<GetActiveMealPlan>(),
+      sl<IsarService>(),
+      sl<VitaRepository>(),
     ),
   );
 
