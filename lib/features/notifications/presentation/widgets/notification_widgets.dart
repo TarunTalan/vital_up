@@ -34,7 +34,8 @@ const notificationLinkableRoutes = {
 String? notificationRoute(NotificationType type, String? route) =>
     switch (type) {
       NotificationType.friendRequest ||
-      NotificationType.friendAccepted => 'friends',
+      NotificationType.friendAccepted ||
+      NotificationType.cheer => 'friends',
       NotificationType.badge => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
       NotificationType.challenge => 'challenges',
