@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
@@ -13,8 +14,9 @@ import 'package:vital_up/features/gamification/presentation/widgets/game_icon.da
 
 final _points = NumberFormat.decimalPattern();
 
-/// Home card: level ring with progress to the next level, lifetime points,
-/// the activity streak and today's points per category.
+/// Arena card: level and title, points with progress to the next level,
+/// and streak, best streak and today's points. Tap for points history;
+/// "Badges" opens the badge collection.
 class ScoreStreakCard extends StatelessWidget {
   const ScoreStreakCard({super.key});
 
@@ -34,13 +36,16 @@ class ScoreStreakCard extends StatelessWidget {
             width: double.infinity,
             child: state.failed
                 ? DashboardCardError(
-                    title: 'Your Score',
+                    title: 'Your level',
                     icon: Icons.emoji_events_rounded,
                     onRetry: context.read<GamificationCubit>().load,
                   )
                 : const DashboardCardLoading(),
           );
         }
+        final next = stats.nextLevel;
+        final grey = context.vColors.grayText;
+        String days(int n) => '$n ${n == 1 ? 'day' : 'days'}';
         return AppCard(
           width: double.infinity,
           onTap: () => _push(context, 'points-history'),
@@ -48,7 +53,7 @@ class ScoreStreakCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DashboardCardHeader(
-                title: 'Your Score',
+                title: 'Level ${stats.level.level} · ${stats.level.title}',
                 icon: Icons.emoji_events_rounded,
                 badgeColor: AppColors.scoreBonus,
                 trailing: CardLink(
@@ -58,41 +63,62 @@ class ScoreStreakCard extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.cardInnerGap),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  LevelRing(stats: stats),
-                  const SizedBox(width: AppDimens.space16),
-                  Expanded(child: _LevelSummary(stats: stats)),
+                  Text(
+                    '${_points.format(stats.totalPoints)} pts',
+                    style: context.text.titleMedium?.copyWith(
+                      color: context.colors.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.space8),
+                  Expanded(
+                    child: Text(
+                      next == null
+                          ? 'Top level reached'
+                          : '${_points.format(stats.pointsToNextLevel)} to '
+                                'Level ${next.level}',
+                      textAlign: TextAlign.end,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodySmall?.copyWith(color: grey),
+                    ),
+                  ),
                 ],
+              ),
+              const SizedBox(height: AppDimens.space8),
+              AppProgressBar(
+                value: stats.levelProgress,
+                color: context.colors.primary,
               ),
               const SizedBox(height: AppDimens.cardInnerGap),
-              Wrap(
-                spacing: AppDimens.space8,
-                runSpacing: AppDimens.space8,
-                children: [
-                  StreakPill(streak: stats.streak),
-                  _Pill(
-                    color: context.colors.primary,
-                    text: '+${_points.format(state.todayTotal)} today',
-                  ),
-                  CardLink(
-                    label: 'Your week',
-                    onTap: () => _push(context, 'weekly-summary'),
-                  ),
-                ],
+              Divider(
+                height: AppDimens.borderThin,
+                color: context.vColors.divider,
               ),
-              const SizedBox(height: AppDimens.space12),
-              Row(
-                children: [
-                  for (final c in ScoreCategory.scored) ...[
-                    if (c != ScoreCategory.scored.first)
-                      const SizedBox(width: AppDimens.space8),
-                    Expanded(
-                      child: CategoryPointsTile(
-                        category: c,
-                        points: state.today[c] ?? 0,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: AppDimens.cardInnerGap),
+              TrackerFigureRow(
+                figures: [
+                  TrackerFigure(
+                    label: 'Streak',
+                    value: days(stats.streak),
+                    icon: Icons.local_fire_department_rounded,
+                    color: stats.streak > 0 ? AppColors.streak : grey,
+                  ),
+                  TrackerFigure(
+                    label: 'Best',
+                    value: days(stats.longestStreak),
+                    icon: Icons.emoji_events_outlined,
+                    color: grey,
+                  ),
+                  TrackerFigure(
+                    label: 'Today',
+                    value: '+${_points.format(state.todayTotal)}',
+                    icon: Icons.add_circle_outline_rounded,
+                    color: context.colors.primary,
+                  ),
                 ],
               ),
             ],
@@ -152,39 +178,7 @@ class LevelRing extends StatelessWidget {
   }
 }
 
-class _LevelSummary extends StatelessWidget {
-  final PlayerStats stats;
-
-  const _LevelSummary({required this.stats});
-
-  @override
-  Widget build(BuildContext context) {
-    final next = stats.nextLevel;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DashboardMetric('${_points.format(stats.totalPoints)} pts'),
-        Text(
-          stats.level.title,
-          style: context.text.titleSmall?.copyWith(
-            color: context.colors.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppDimens.space4),
-        Text(
-          next == null
-              ? 'Top level reached'
-              : '${_points.format(stats.pointsToNextLevel)} pts to Level ${next.level}',
-          style: context.text.bodySmall?.copyWith(
-            color: context.vColors.grayText,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// "🔥 5-day streak" pill in the streak colour.
+/// "5-day streak" pill in the streak colour.
 class StreakPill extends StatelessWidget {
   final int streak;
 
