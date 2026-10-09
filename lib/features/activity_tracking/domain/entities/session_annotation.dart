@@ -1,5 +1,11 @@
 import 'package:equatable/equatable.dart';
 
+/// Longest tag and note a workout keeps.
+abstract final class SessionAnnotationLimits {
+  static const tag = 40;
+  static const note = 500;
+}
+
 /// A user-editable annotation attached to a saved [ActivitySession].
 ///
 /// Kept as a separate entity (rather than adding fields directly to

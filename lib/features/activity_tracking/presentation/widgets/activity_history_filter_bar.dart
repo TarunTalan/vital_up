@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -56,10 +57,14 @@ class ActivityHistoryFilterBar extends StatelessWidget {
           padding: context.pagePadding,
           child: TextField(
             onChanged: onSearchChanged,
+            maxLength: InputLimits.search,
+            inputFormatters: InputFormatters.text(InputLimits.search),
+            textInputAction: TextInputAction.search,
             style: context.text.bodyMedium?.copyWith(
               color: context.colors.onSurface,
             ),
             decoration: InputDecoration(
+              counterText: '',
               hintText: 'Search by tag or note…',
               prefixIcon: Icon(
                 Icons.search_rounded,

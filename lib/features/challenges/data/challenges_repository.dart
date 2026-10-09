@@ -1,7 +1,9 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 
 /// What a challenge ranks on; scores come from synced workouts.
 enum ChallengeMetric {
@@ -134,17 +136,21 @@ class ChallengeException implements Exception {
     const messages = {
       'no_friends_selected': 'Pick at least one friend.',
       'too_many_friends': 'You can challenge up to 9 friends at once.',
-      'too_many_challenges':
-          "You've started 5 challenges today. Try again tomorrow.",
-      'invite_not_found': 'That challenge has ended or was already answered.',
+      'too_many_challenges': 'Daily challenge limit reached. Try tomorrow.',
+      'invite_not_found': 'That invite has ended or was already answered.',
       'challenge_not_found': "That challenge isn't available.",
       'challenge_not_active': 'That challenge has already ended.',
+      'invalid_metric': "That challenge type isn't available.",
+      'invalid_duration': "That challenge length isn't available.",
+      'not_authenticated': 'Please sign in again.',
     };
     for (final e in messages.entries) {
       if (serverMessage.contains(e.key)) return ChallengeException(e.value);
     }
-    return const ChallengeException("Couldn't reach the server. Try again.");
+    return const ChallengeException(_genericMessage);
   }
+
+  static const _genericMessage = 'Something went wrong. Try again.';
 
   @override
   String toString() => message;
@@ -211,11 +217,49 @@ class ChallengesRepository {
       ChallengeStanding.fromJson(r),
   ];
 
+  /// Metrics and lengths `create_challenge` accepts.
+  static const creatableMetrics = [
+    ChallengeMetric.activeMinutes,
+    ChallengeMetric.distanceKm,
+    ChallengeMetric.workouts,
+  ];
+  static const durations = [3, 7, 14];
+
+  /// Friends per challenge (server limit).
+  static const maxFriends = 9;
+
+  /// Why [create] would be refused, checked before asking the server.
+  static String? validateCreate({
+    required ChallengeMetric metric,
+    required int days,
+    required List<String> friendIds,
+  }) {
+    if (!creatableMetrics.contains(metric)) {
+      return "That challenge type isn't available.";
+    }
+    if (!durations.contains(days)) {
+      return "That challenge length isn't available.";
+    }
+    final friends = friendIds.toSet();
+    if (friends.isEmpty) return 'Pick at least one friend.';
+    if (friends.length > maxFriends) {
+      return 'You can challenge up to $maxFriends friends at once.';
+    }
+    return null;
+  }
+
   Future<void> create({
     required ChallengeMetric metric,
     required int days,
     required List<String> friendIds,
   }) async {
+    final error = validateCreate(
+      metric: metric,
+      days: days,
+      friendIds: friendIds,
+    );
+    if (error != null) throw ChallengeException(error);
+    friendIds = friendIds.toSet().toList();
     await _call(
       () => _client.rpc(
         'create_challenge',
@@ -260,8 +304,11 @@ class ChallengesRepository {
     } on PostgrestException catch (e) {
       throw ChallengeException.fromServer(e.message);
     } catch (e) {
+      debugPrint('Challenge request failed: $e');
       if (isOfflineError(e)) throw _offline;
-      throw const ChallengeException("Couldn't reach the server. Try again.");
+      throw ChallengeException(
+        userMessage(e, fallback: ChallengeException._genericMessage),
+      );
     }
   }
 }

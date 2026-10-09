@@ -48,10 +48,18 @@ class _ActivityGoalsView extends StatelessWidget {
       builder: (_) => GoalEditorSheet(
         initial: goal,
         taken: {for (final g in cubit.state.goals) g.goal.id},
-        onDelete: goal == null ? null : () => cubit.delete(goal),
+        onDelete: goal == null
+            ? null
+            : () async {
+                if (!await cubit.delete(goal) && context.mounted) {
+                  showErrorSnackBar(context, "Couldn't delete this goal. Try again.");
+                }
+              },
       ),
     );
-    if (saved != null) await cubit.save(saved);
+    if (saved != null && !await cubit.save(saved) && context.mounted) {
+      showErrorSnackBar(context, "Couldn't save this goal. Try again.");
+    }
   }
 
   @override

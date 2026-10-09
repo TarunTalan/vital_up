@@ -32,11 +32,18 @@ class ActivityHistoryLoaded extends ActivityHistoryState {
   final ActivityType? activityTypeFilter;
   final String searchQuery;
 
+  /// Message for the last failed save or delete, shown once as a snackbar.
+  /// [actionErrorId] changes with every failure so repeats still show.
+  final String? actionError;
+  final int actionErrorId;
+
   const ActivityHistoryLoaded({
     required this.allEntries,
     required this.visibleEntries,
     this.activityTypeFilter,
     this.searchQuery = '',
+    this.actionError,
+    this.actionErrorId = 0,
   });
 
   /// Aggregate totals across all (unfiltered) entries, handy for a summary
@@ -58,6 +65,7 @@ class ActivityHistoryLoaded extends ActivityHistoryState {
     ActivityType? activityTypeFilter,
     bool clearActivityTypeFilter = false,
     String? searchQuery,
+    String? actionError,
   }) {
     return ActivityHistoryLoaded(
       allEntries: allEntries ?? this.allEntries,
@@ -66,6 +74,8 @@ class ActivityHistoryLoaded extends ActivityHistoryState {
           ? null
           : (activityTypeFilter ?? this.activityTypeFilter),
       searchQuery: searchQuery ?? this.searchQuery,
+      actionError: actionError ?? this.actionError,
+      actionErrorId: actionError != null ? actionErrorId + 1 : actionErrorId,
     );
   }
 
@@ -75,5 +85,7 @@ class ActivityHistoryLoaded extends ActivityHistoryState {
     visibleEntries,
     activityTypeFilter,
     searchQuery,
+    actionError,
+    actionErrorId,
   ];
 }

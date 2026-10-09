@@ -12,9 +12,36 @@ const _kHeartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
 /// UUID for the Heart Rate Measurement characteristic.
 const _kHrmCharacteristicUuid = '00002a37-0000-1000-8000-00805f9b34fb';
 
+/// Lowest and highest heart rate accepted from a monitor. Readings outside
+/// this band are contact or sensor glitches (0 when the strap is loose).
+const int kMinValidBpm = 25;
+const int kMaxValidBpm = 250;
+
+/// Parses a Heart Rate Measurement characteristic value (Bluetooth spec:
+/// first byte flags, bit 0 picks an 8 or 16 bit value). Returns null for
+/// short packets or readings outside [kMinValidBpm]..[kMaxValidBpm].
+int? parseHeartRateMeasurement(List<int> data) {
+  if (data.length < 2) return null;
+  final int bpm;
+  if ((data[0] & 0x01) == 0) {
+    bpm = data[1];
+  } else {
+    if (data.length < 3) return null;
+    bpm = data[1] | (data[2] << 8);
+  }
+  if (bpm < kMinValidBpm || bpm > kMaxValidBpm) return null;
+  return bpm;
+}
+
+/// Thrown when a device connects but does not expose heart rate.
+class NoHeartRateServiceException implements Exception {
+  const NoHeartRateServiceException();
+}
+
 /// Manages a BLE connection to a heart rate monitor and exposes a live BPM stream.
 class HeartRateManager {
   BluetoothDevice? _device;
+  bool _connected = false;
   StreamSubscription<List<int>>? _valueSubscription;
   StreamSubscription<BluetoothConnectionState>? _stateSubscription;
 
@@ -24,38 +51,60 @@ class HeartRateManager {
   Stream<int?> get bpmStream => _bpmController.stream;
   BluetoothDevice? get connectedDevice => _device;
 
+  /// False once the monitor drops the link (out of range, battery).
+  bool get isConnected => _connected;
+
+  void _emit(int? bpm) {
+    if (!_bpmController.isClosed) _bpmController.add(bpm);
+  }
+
   Future<void> connect(BluetoothDevice device) async {
     await disconnect();
     _device = device;
-    await device.connect(
-      autoConnect: false,
-      timeout: const Duration(seconds: 10),
-    );
+    try {
+      await device.connect(
+        autoConnect: false,
+        timeout: const Duration(seconds: 10),
+      );
+      _connected = true;
 
-    _stateSubscription = device.connectionState.listen((state) {
-      if (state == BluetoothConnectionState.disconnected) {
-        _bpmController.add(null);
-      }
-    });
+      _stateSubscription = device.connectionState.listen((state) {
+        if (state == BluetoothConnectionState.disconnected) {
+          _connected = false;
+          _emit(null);
+        } else if (state == BluetoothConnectionState.connected) {
+          _connected = true;
+        }
+      });
 
-    final services = await device.discoverServices();
-    for (final service in services) {
-      if (service.uuid.toString().toLowerCase() == _kHeartRateServiceUuid) {
+      final services = await device
+          .discoverServices()
+          .timeout(const Duration(seconds: 15));
+      BluetoothCharacteristic? hrm;
+      for (final service in services) {
+        if (service.uuid.toString().toLowerCase() != _kHeartRateServiceUuid) {
+          continue;
+        }
         for (final char in service.characteristics) {
           if (char.uuid.toString().toLowerCase() == _kHrmCharacteristicUuid) {
-            await char.setNotifyValue(true);
-            _valueSubscription = char.lastValueStream.listen((data) {
-              if (data.isNotEmpty) {
-                // Parse HRM per Bluetooth spec — first byte flags, BPM follows.
-                final bpm = (data[0] & 0x01) == 0
-                    ? data[1]
-                    : data[1] | (data[2] << 8);
-                _bpmController.add(bpm);
-              }
-            });
+            hrm = char;
           }
         }
       }
+      if (hrm == null) throw const NoHeartRateServiceException();
+
+      await hrm.setNotifyValue(true);
+      _valueSubscription = hrm.lastValueStream.listen(
+        (data) {
+          final bpm = parseHeartRateMeasurement(data);
+          if (bpm != null) _emit(bpm);
+        },
+        onError: (Object e) => debugPrint('Heart rate stream error: $e'),
+      );
+    } catch (_) {
+      // Leave nothing half-connected behind a failed attempt.
+      await disconnect();
+      rethrow;
     }
   }
 
@@ -64,18 +113,21 @@ class HeartRateManager {
     await _stateSubscription?.cancel();
     _valueSubscription = null;
     _stateSubscription = null;
-    if (_device != null) {
+    _connected = false;
+    final device = _device;
+    _device = null;
+    if (device != null) {
       try {
-        await _device!.disconnect();
-      } catch (_) {}
-      _device = null;
+        await device.disconnect();
+      } catch (e) {
+        debugPrint('Heart rate monitor disconnect failed: $e');
+      }
     }
-    _bpmController.add(null);
+    _emit(null);
   }
 
   void dispose() {
-    disconnect();
-    _bpmController.close();
+    disconnect().whenComplete(_bpmController.close);
   }
 }
 
@@ -112,45 +164,97 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
     _startScan();
   }
 
-  void _startScan() {
+  /// Shown in place of the device list when scanning can't run.
+  String? _scanError;
+
+  Future<void> _startScan() async {
+    await _scanSub?.cancel();
+    _scanSub = null;
+    if (!mounted) return;
     setState(() {
       _results.clear();
+      _scanError = null;
       _isScanning = true;
     });
 
-    // Filter to devices advertising the Heart Rate Service
-    FlutterBluePlus.startScan(
-      withServices: [Guid(_kHeartRateServiceUuid)],
-      timeout: const Duration(seconds: 10),
-    );
-
-    _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      if (mounted) {
-        setState(() {
-          for (final r in results) {
-            if (!_results.any((e) => e.device.remoteId == r.device.remoteId)) {
-              _results.add(r);
-            }
-          }
-        });
+    try {
+      if (!await FlutterBluePlus.isSupported) {
+        _stopWithError("This phone doesn't support Bluetooth monitors.");
+        return;
       }
-    });
+      final adapter = await FlutterBluePlus.adapterState
+          .where((s) => s != BluetoothAdapterState.unknown)
+          .first
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => BluetoothAdapterState.unknown,
+          );
+      if (adapter == BluetoothAdapterState.unauthorized) {
+        _stopWithError('Allow Bluetooth access in Settings to pair.');
+        return;
+      }
+      if (adapter != BluetoothAdapterState.on &&
+          adapter != BluetoothAdapterState.unknown) {
+        _stopWithError('Turn on Bluetooth to find heart rate monitors.');
+        return;
+      }
 
-    FlutterBluePlus.isScanning.where((s) => !s).first.then((_) {
+      _scanSub = FlutterBluePlus.scanResults.listen(
+        (results) {
+          if (!mounted) return;
+          setState(() {
+            for (final r in results) {
+              if (!_results.any((e) => e.device.remoteId == r.device.remoteId)) {
+                _results.add(r);
+              }
+            }
+          });
+        },
+        onError: (Object e) => debugPrint('Heart rate scan error: $e'),
+      );
+
+      // Filter to devices advertising the Heart Rate Service
+      await FlutterBluePlus.startScan(
+        withServices: [Guid(_kHeartRateServiceUuid)],
+        timeout: const Duration(seconds: 10),
+      );
+      await FlutterBluePlus.isScanning.where((s) => !s).first;
       if (mounted) setState(() => _isScanning = false);
+    } catch (e) {
+      debugPrint('Heart rate scan failed: $e');
+      _stopWithError("Couldn't search for devices. Check Bluetooth access.");
+    }
+  }
+
+  void _stopWithError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _isScanning = false;
+      _scanError = message;
     });
   }
 
   Future<void> _connect(ScanResult result) async {
-    await FlutterBluePlus.stopScan();
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (e) {
+      debugPrint('Stopping heart rate scan failed: $e');
+    }
+    if (!mounted) return;
     setState(() => _connectingId = result.device.remoteId.str);
     try {
       await widget.manager.connect(result.device);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
+      debugPrint('Heart rate monitor connection failed: $e');
       if (mounted) {
         setState(() => _connectingId = null);
-        showErrorSnackBar(context, 'Connection failed: $e');
+        showErrorSnackBar(
+          context,
+          e is NoHeartRateServiceException
+              ? "This device doesn't share heart rate."
+              : "Couldn't connect. Keep the monitor close and try again.",
+        );
       }
     }
   }
@@ -158,7 +262,9 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
   @override
   void dispose() {
     _scanSub?.cancel();
-    FlutterBluePlus.stopScan();
+    FlutterBluePlus.stopScan().catchError(
+      (Object e) => debugPrint('Stopping heart rate scan failed: $e'),
+    );
     super.dispose();
   }
 
@@ -254,9 +360,11 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                     style: titleStyle,
                   ),
                   subtitle: Text(
-                    'Connected',
+                    widget.manager.isConnected ? 'Connected' : 'Disconnected',
                     style: context.text.bodyMedium?.copyWith(
-                      color: v.success,
+                      color: widget.manager.isConnected
+                          ? v.success
+                          : v.grayText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -282,9 +390,10 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                 child: _results.isEmpty
                     ? Center(
                         child: Text(
-                          _isScanning
-                              ? 'Scanning for heart rate monitors…'
-                              : 'No devices found.\nMake sure your device is in pairing mode.',
+                          _scanError ??
+                              (_isScanning
+                                  ? 'Scanning for heart rate monitors…'
+                                  : 'No devices found.\nPut your monitor in pairing mode.'),
                           textAlign: TextAlign.center,
                           style: context.text.bodyMedium?.copyWith(
                             color: v.grayText,

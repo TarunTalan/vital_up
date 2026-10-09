@@ -155,7 +155,7 @@ class _CompletionStats extends StatelessWidget {
           ActivityTargetResultCard(
             achieved: achieved,
             icon: achieved ? Icons.emoji_events_rounded : Icons.flag_rounded,
-            title: achieved ? 'Target achieved!' : 'Target not reached',
+            title: achieved ? 'Target achieved' : 'Target not reached',
             subtitle:
                 'Target: ${formatActivityTarget(targetType, targetValue)}',
           ),

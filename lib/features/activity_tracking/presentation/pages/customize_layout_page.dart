@@ -39,14 +39,14 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
     setState(() {
       if (isSelected) {
         if (_selected.length >= 6) {
-          showErrorSnackBar(context, 'Maximum of 6 metrics can be displayed');
+          showErrorSnackBar(context, 'You can show up to 6 metrics.');
           return;
         }
         _unselected.remove(metric);
         _selected.add(metric);
       } else {
         if (_selected.length <= 1) {
-          showErrorSnackBar(context, 'At least 1 metric must be displayed');
+          showErrorSnackBar(context, 'Keep at least 1 metric on screen.');
           return;
         }
         _selected.remove(metric);

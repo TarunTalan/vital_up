@@ -64,6 +64,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   bool _isCountingDown = false;
   bool _hasCenteredCamera = false;
 
+  /// Whether the "GPS signal lost" message is showing for this outage, so
+  /// it is shown once per outage rather than on every tick.
+  bool _gpsLostNotified = false;
+
   final DistanceUnitNotifier _unitNotifier = DistanceUnitNotifier();
   final WorkoutPrefsNotifier _prefsNotifier = WorkoutPrefsNotifier();
   final VoiceCoachService _voiceCoach = sl<VoiceCoachService>();
@@ -123,10 +127,16 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   Future<void> _checkIfCurrentTrackFavorited() async {
     final track = _prefsNotifier.value.backgroundAudioTrack;
     final isar = sl<IsarService>().isar;
-    final existing = await isar.favoriteAudios
-        .filter()
-        .trackIdEqualTo(track)
-        .findFirst();
+    final FavoriteAudio? existing;
+    try {
+      existing = await isar.favoriteAudios
+          .filter()
+          .trackIdEqualTo(track)
+          .findFirst();
+    } catch (e) {
+      debugPrint('Reading favourite tracks failed: $e');
+      return;
+    }
     if (mounted) {
       setState(() {
         _isCurrentTrackFavorited = existing != null;
@@ -138,12 +148,24 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     'com.example.vital_up/audio_intent',
   );
 
+  /// Opens the user's chosen music app. The app may have been uninstalled
+  /// since it was picked, so failures are logged rather than thrown.
+  void _launchExternalPlayer(String packageName) {
+    _audioChannel
+        .invokeMethod('launchAudioApp', {'packageName': packageName})
+        .catchError((Object e) {
+          debugPrint('Launching music app failed: $e');
+          if (mounted) {
+            showErrorSnackBar(context, "Couldn't open your music app.");
+          }
+          return null;
+        });
+  }
+
   void _playWorkoutAudio({bool play = true}) {
     final prefs = _prefsNotifier.value;
     if (prefs.preferredPlayerPackage != 'builtIn') {
-      _audioChannel.invokeMethod('launchAudioApp', {
-        'packageName': prefs.preferredPlayerPackage,
-      });
+      _launchExternalPlayer(prefs.preferredPlayerPackage);
     } else {
       sl<IsarService>().isar.downloadedTracks
           .filter()
@@ -162,6 +184,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
               localPath: localPath,
               play: play,
             );
+          })
+          .catchError((Object e) {
+            debugPrint('Starting workout audio failed: $e');
           });
     }
   }
@@ -177,9 +202,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _resumeWorkoutAudio() {
     final prefs = _prefsNotifier.value;
     if (prefs.preferredPlayerPackage != 'builtIn') {
-      _audioChannel.invokeMethod('launchAudioApp', {
-        'packageName': prefs.preferredPlayerPackage,
-      });
+      _launchExternalPlayer(prefs.preferredPlayerPackage);
     } else {
       sl<WorkoutAudioService>().resume();
     }
@@ -272,12 +295,19 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   Future<void> _startLocationUpdates() async {
     if (_positionSubscription != null) return;
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+    LocationPermission permission;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+    } catch (e) {
+      // e.g. a permission request already in progress from the workout.
+      debugPrint('Map preview location unavailable: $e');
+      return;
     }
     if (permission != LocationPermission.always &&
         permission != LocationPermission.whileInUse) {
@@ -419,8 +449,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
         ),
       );
+      if (!mounted) return;
       _initialCenterCamera(position.latitude, position.longitude);
 
       // Update initial position puck
@@ -524,8 +556,20 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     return BlocConsumer<ActivityTrackingBloc, ActivityTrackingState>(
       listener: (context, state) {
         if (state is TrackingPermissionDenied) {
+          // Audio and the start announcement began with the tap on Start.
+          _stopWorkoutAudio();
+          _voiceCoach.stop();
           showErrorSnackBar(context, state.message);
         } else if (state is TrackingInProgress) {
+          if (state.gpsSignalLost && !_gpsLostNotified) {
+            _gpsLostNotified = true;
+            showErrorSnackBar(
+              context,
+              'GPS signal lost. Check location is on.',
+            );
+          } else if (!state.gpsSignalLost) {
+            _gpsLostNotified = false;
+          }
           // Voice coach updates
           if (_prefsNotifier.value.voiceCoachEnabled) {
             _voiceCoach.checkMilestone(
@@ -565,7 +609,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           if (state.routePoints.isNotEmpty) {
             _updatePuck(state.routePoints.last);
           }
+        } else if (state is TrackingCompleted && state.discarded) {
+          _gpsLostNotified = false;
+          showErrorSnackBar(context, 'Workout too short to save.');
+          context.read<ActivityTrackingBloc>().add(ResetTracking());
         } else if (state is TrackingCompleted) {
+          _gpsLostNotified = false;
           if (!state.saved) {
             showErrorSnackBar(
               context,
@@ -643,7 +692,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           canPop: state is TrackingIdle || state is TrackingCompleted,
           onPopInvokedWithResult: (didPop, result) {
             if (!didPop) {
-              showErrorSnackBar(context, 'Stop the activity to exit');
+              showErrorSnackBar(context, 'Stop the workout before leaving.');
             }
           },
           child: Scaffold(
@@ -879,59 +928,71 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                               onFavoriteToggle: isExternal
                                                   ? () {}
                                                   : () async {
-                                                      final track = prefs
-                                                          .backgroundAudioTrack;
-                                                      final isar =
-                                                          sl<IsarService>()
-                                                              .isar;
-                                                      final existing =
-                                                          await isar
-                                                              .favoriteAudios
-                                                              .filter()
-                                                              .trackIdEqualTo(
-                                                                track,
-                                                              )
-                                                              .findFirst();
-                                                      await isar.writeTxn(() async {
-                                                        if (existing != null) {
-                                                          await isar
-                                                              .favoriteAudios
-                                                              .delete(
-                                                                existing.id,
-                                                              );
-                                                        } else {
-                                                          final title = track
-                                                              .replaceFirst(
-                                                                'Story: ',
-                                                                '',
-                                                              )
-                                                              .replaceFirst(
-                                                                'Music: ',
-                                                                '',
-                                                              );
-                                                          final source =
-                                                              track.startsWith(
-                                                                'Local:',
-                                                              )
-                                                              ? 'local'
-                                                              : 'preset';
-                                                          final fav = FavoriteAudio()
-                                                            ..trackId = track
-                                                            ..title = title
-                                                            ..subtitle =
-                                                                source ==
-                                                                    'local'
-                                                                ? 'Local Track'
-                                                                : 'Curated Audio'
-                                                            ..audioSource =
-                                                                source
-                                                            ..favoritedAt =
-                                                                DateTime.now();
-                                                          await isar
-                                                              .favoriteAudios
-                                                              .put(fav);
+                                                      try {
+                                                        final track = prefs
+                                                            .backgroundAudioTrack;
+                                                        final isar =
+                                                            sl<IsarService>()
+                                                                .isar;
+                                                        final existing =
+                                                            await isar
+                                                                .favoriteAudios
+                                                                .filter()
+                                                                .trackIdEqualTo(
+                                                                  track,
+                                                                )
+                                                                .findFirst();
+                                                        await isar.writeTxn(() async {
+                                                          if (existing != null) {
+                                                            await isar
+                                                                .favoriteAudios
+                                                                .delete(
+                                                                  existing.id,
+                                                                );
+                                                          } else {
+                                                            final title = track
+                                                                .replaceFirst(
+                                                                  'Story: ',
+                                                                  '',
+                                                                )
+                                                                .replaceFirst(
+                                                                  'Music: ',
+                                                                  '',
+                                                                );
+                                                            final source =
+                                                                track.startsWith(
+                                                                  'Local:',
+                                                                )
+                                                                ? 'local'
+                                                                : 'preset';
+                                                            final fav = FavoriteAudio()
+                                                              ..trackId = track
+                                                              ..title = title
+                                                              ..subtitle =
+                                                                  source ==
+                                                                      'local'
+                                                                  ? 'Local Track'
+                                                                  : 'Curated Audio'
+                                                              ..audioSource =
+                                                                  source
+                                                              ..favoritedAt =
+                                                                  DateTime.now();
+                                                            await isar
+                                                                .favoriteAudios
+                                                                .put(fav);
+                                                          }
+                                                        });
+                                                      } catch (e) {
+                                                        debugPrint(
+                                                          'Updating favourites failed: $e',
+                                                        );
+                                                        if (context.mounted) {
+                                                          showErrorSnackBar(
+                                                            context,
+                                                            "Couldn't update favourites. Try again.",
+                                                          );
                                                         }
-                                                      });
+                                                      }
                                                       _checkIfCurrentTrackFavorited();
                                                     },
                                             );

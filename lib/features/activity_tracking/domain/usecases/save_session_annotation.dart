@@ -1,3 +1,4 @@
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_history_repository.dart';
 
@@ -15,8 +16,13 @@ class SaveSessionAnnotation {
     return repository.saveAnnotation(
       SessionAnnotation(
         sessionId: sessionId,
-        tag: tag,
-        note: note,
+        // Notes are backed up to the server: never store raw input.
+        tag: sanitizeOptional(tag, maxLength: SessionAnnotationLimits.tag),
+        note: sanitizeOptional(
+          note,
+          maxLength: SessionAnnotationLimits.note,
+          multiline: true,
+        ),
         updatedAt: DateTime.now(),
       ),
     );
