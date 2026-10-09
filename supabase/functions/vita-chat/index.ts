@@ -15,15 +15,39 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
 import { type AiFeature, consumeDailyQuota, dailyLimit, refundDailyQuota } from "../_shared/quota.ts";
+import {
+  bearerToken,
+  boundedJson,
+  cleanText,
+  handleError,
+  HttpError,
+  isObject,
+  KB,
+  LIMITS,
+  optionalArray,
+  readJsonBody,
+  requireEnum,
+  requireMethod,
+} from "../_shared/validate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Turns accepted as context (the app sends at most 12). */
 const MAX_HISTORY = 12;
-const MAX_MESSAGE_CHARS = 1500;
+/** Longest single turn accepted (the app clips every turn to this). */
+const MAX_TURN_CHARS = 2000;
+/** Vita's own earlier replies (text + bullets) can run longer than a user message. */
+const MAX_VITA_TURN_CHARS = MAX_TURN_CHARS;
+/** Raw snapshot JSON accepted before bounding (the app's is a few KB). */
+const MAX_RAW_SNAPSHOT_CHARS = 100_000;
+/** Whole conversation in the prompt; oldest turns are dropped to fit. */
+const MAX_TRANSCRIPT_CHARS = 12000;
 const MAX_SNAPSHOT_CHARS = 12000;
+const MAX_BODY_BYTES = 256 * KB;
+const SNAPSHOT_BOUNDS = { maxDepth: 6, maxKeys: 60, maxItems: 60, maxString: 500 };
 const ACTIONS = new Set(["view_diet_plan", "update_diet_plan", "view_analysis", "view_stress_guide"]);
 
 const json = (body: unknown, status = 200) =>
@@ -40,13 +64,50 @@ using ONLY the health snapshot provided. Rules:
 - Respect allergies, dietary preference and health conditions from the profile.
 - Stay on health and wellbeing topics; politely steer back if asked about unrelated things.`;
 
-function clip(text: unknown, max: number): string {
-  return String(text ?? "").slice(0, max);
+interface Turn {
+  role: "user" | "vita";
+  text: string;
 }
 
-function chatPrompt(messages: { role: string; text: string }[], snapshot: string): string {
+/**
+ * Validated, sanitised chat history. Oversized or malformed input is
+ * rejected (400 / 413) rather than processed: at most [MAX_HISTORY] turns,
+ * each an object with a known role and text of at most [MAX_TURN_CHARS].
+ * User turns are then cut to the app's chat message limit, and the oldest
+ * turns dropped until the transcript fits [MAX_TRANSCRIPT_CHARS].
+ */
+function parseHistory(value: unknown): Turn[] {
+  const raw = optionalArray(value, "messages", MAX_HISTORY) ?? [];
+  const turns: Turn[] = [];
+  for (const m of raw) {
+    if (!isObject(m)) throw new HttpError(400, "Each message must be an object.");
+    const role = m.role === "user" ? "user" : m.role === "vita" || m.role === "assistant" ? "vita" : null;
+    if (!role) throw new HttpError(400, "Message role is not supported.");
+    if (typeof m.text !== "string") throw new HttpError(400, "Message text must be text.");
+    if (m.text.length > MAX_TURN_CHARS) throw new HttpError(413, "Message is too long.");
+    const text = cleanText(m.text, role === "user" ? LIMITS.chatMessage : MAX_VITA_TURN_CHARS, { multiline: true });
+    if (text) turns.push({ role, text });
+  }
+  let total = turns.reduce((sum, t) => sum + t.text.length, 0);
+  while (turns.length > 1 && total > MAX_TRANSCRIPT_CHARS) total -= turns.shift()!.text.length;
+  return turns;
+}
+
+/** The app's health snapshot, bounded in depth/size and with every string sanitised. */
+function snapshotJson(value: unknown): string {
+  if (value !== undefined && value !== null && !isObject(value)) {
+    throw new HttpError(400, "snapshot must be an object.");
+  }
+  if (value !== undefined && value !== null && JSON.stringify(value).length > MAX_RAW_SNAPSHOT_CHARS) {
+    throw new HttpError(413, "Health summary is too large.");
+  }
+  const text = JSON.stringify(boundedJson(value ?? {}, SNAPSHOT_BOUNDS));
+  return text.length <= MAX_SNAPSHOT_CHARS ? text : text.slice(0, MAX_SNAPSHOT_CHARS);
+}
+
+function chatPrompt(messages: Turn[], snapshot: string): string {
   const transcript = messages
-    .map((m) => `${m.role === "user" ? "User" : "Vita"}: ${clip(m.text, MAX_MESSAGE_CHARS)}`)
+    .map((m) => `${m.role === "user" ? "User" : "Vita"}: ${m.text}`)
     .join("\n");
   return `${PERSONA}
 
@@ -91,24 +152,34 @@ Write today's personalised insights. Respond with ONLY valid JSON:
 }`;
 }
 
+let serviceClient: ReturnType<typeof createClient> | null = null;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    requireMethod(req, "POST");
+
+    const url = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !serviceKey) {
+      console.error("vita-chat: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set");
+      return json({ error: "Vita is not available right now." }, 500);
+    }
     // Service-role client, used both to validate the caller's JWT and for the
     // quota RPCs. Passing the token to getUser() explicitly (same as
     // scan-food) is reliable; relying on a global Authorization header with
     // an argument-less getUser() is not.
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    serviceClient ??= createClient(url, serviceKey);
+    const client = serviceClient;
 
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
+    const token = bearerToken(req);
     if (!token) return json({ error: "Unauthorized", code: "missing_token" }, 401);
 
-    const [authResult, bodyResult] = await Promise.allSettled([serviceClient.auth.getUser(token), req.json()]);
+    const [authResult, bodyResult] = await Promise.allSettled([
+      client.auth.getUser(token),
+      readJsonBody(req, MAX_BODY_BYTES),
+    ]);
     const user = authResult.status === "fulfilled" ? authResult.value.data.user : null;
     if (!user) {
       const reason = authResult.status === "fulfilled"
@@ -117,17 +188,12 @@ serve(async (req) => {
       console.warn(`vita-chat auth rejected: ${reason ?? "no user"}`);
       return json({ error: "Unauthorized", code: "invalid_session" }, 401);
     }
-    if (bodyResult.status === "rejected") return json({ error: "Invalid JSON body" }, 400);
+    if (bodyResult.status === "rejected") throw bodyResult.reason;
+    const body = bodyResult.value;
 
-    const { mode, messages, snapshot } = bodyResult.value ?? {};
-    if (mode !== "chat" && mode !== "insights") return json({ error: "mode must be chat or insights" }, 400);
-
-    const snapshotText = clip(JSON.stringify(snapshot ?? {}), MAX_SNAPSHOT_CHARS);
-    const history: { role: string; text: string }[] = Array.isArray(messages)
-      ? messages
-        .filter((m) => m && typeof m.text === "string" && m.text.trim().length > 0)
-        .slice(-MAX_HISTORY)
-      : [];
+    const mode = requireEnum(body.mode, "mode", ["chat", "insights"] as const);
+    const snapshotText = snapshotJson(body.snapshot);
+    const history = mode === "chat" ? parseHistory(body.messages) : [];
     if (mode === "chat" && (history.length === 0 || history[history.length - 1].role !== "user")) {
       return json({ error: "messages must end with a user message" }, 400);
     }
@@ -137,9 +203,9 @@ serve(async (req) => {
     const limit = mode === "chat"
       ? dailyLimit("VITA_CHAT_DAILY_LIMIT", 40)
       : dailyLimit("VITA_INSIGHTS_DAILY_LIMIT", 6);
-    const quota = await consumeDailyQuota(serviceClient, user.id, feature, limit);
+    const quota = await consumeDailyQuota(client, user.id, feature, limit);
     if (!quota.allowed) return json({ error: "Daily Vita limit reached", code: "daily_limit", limit }, 429);
-    const refund = () => refundDailyQuota(serviceClient, user.id, feature);
+    const refund = () => refundDailyQuota(client, user.id, feature);
 
     const prompt = mode === "chat" ? chatPrompt(history, snapshotText) : insightsPrompt(snapshotText);
     const geminiKey = Deno.env.get("VITA_GEMINI_API_KEY") ?? Deno.env.get("FOOD_RECOMMEND_GEMINI_API_KEY");
@@ -171,24 +237,24 @@ serve(async (req) => {
         });
       }
 
-      // deno-lint-ignore no-explicit-any
-      const parsed = extractJson(raw) as any;
+      const parsed = extractJson(raw);
+      if (!isObject(parsed)) throw new Error("Model output is not a JSON object");
       if (mode === "chat") {
-        const text = clip(parsed?.text, 1200).trim();
+        const text = cleanText(parsed.text, 1200, { multiline: true });
         if (!text) throw new Error("Empty reply");
-        const bullets = Array.isArray(parsed?.bullets)
-          ? parsed.bullets.map((b: unknown) => clip(b, 200).trim()).filter(Boolean).slice(0, 4)
+        const bullets = Array.isArray(parsed.bullets)
+          ? parsed.bullets.map((b: unknown) => cleanText(b, 200)).filter(Boolean).slice(0, 4)
           : [];
-        let action = ACTIONS.has(parsed?.action) ? parsed.action : null;
-        const planInstructions = action === "update_diet_plan" ? clip(parsed?.planInstructions, 600).trim() : "";
+        let action = typeof parsed.action === "string" && ACTIONS.has(parsed.action) ? parsed.action : null;
+        const planInstructions = action === "update_diet_plan" ? cleanText(parsed.planInstructions, LIMITS.note) : "";
         // An update without instructions would only regenerate at random.
         if (action === "update_diet_plan" && !planInstructions) action = "view_diet_plan";
         return json({ text, bullets, action, planInstructions: planInstructions || null });
       }
 
-      const headline = clip(parsed?.headline, 200).trim();
-      const stressTip = clip(parsed?.stressTip, 400).trim();
-      const dietNote = clip(parsed?.dietNote, 400).trim();
+      const headline = cleanText(parsed.headline, 200);
+      const stressTip = cleanText(parsed.stressTip, 400);
+      const dietNote = cleanText(parsed.dietNote, 400);
       if (!headline && !stressTip && !dietNote) throw new Error("Empty insights");
       return json({ headline, stressTip, dietNote });
     } catch (e) {
@@ -197,6 +263,6 @@ serve(async (req) => {
       return json({ error: "Vita couldn't respond right now." }, 502);
     }
   } catch (error) {
-    return json({ error: (error as Error).message }, 400);
+    return handleError(error, "vita-chat", corsHeaders);
   }
 });

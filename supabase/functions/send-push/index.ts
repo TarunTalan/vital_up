@@ -13,6 +13,19 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  cleanText,
+  errorResponse,
+  handleError,
+  HttpError,
+  isObject,
+  jsonResponse,
+  KB,
+  readJsonBody,
+  requireMethod,
+  timingSafeEqual,
+  UUID_RE,
+} from "../_shared/validate.ts";
 
 interface NotificationRow {
   id: number;
@@ -30,18 +43,58 @@ interface ServiceAccount {
 }
 
 const WEBHOOK_SECRET = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
-const serviceAccount: ServiceAccount = JSON.parse(Deno.env.get("FIREBASE_SERVICE_ACCOUNT") ?? "{}");
+const serviceAccount = parseServiceAccount(Deno.env.get("FIREBASE_SERVICE_ACCOUNT"));
+
+/** A malformed secret must not crash the function at boot. */
+function parseServiceAccount(raw: string | undefined): ServiceAccount | null {
+  try {
+    const sa = JSON.parse(raw ?? "");
+    if (
+      typeof sa?.project_id === "string" && /^[a-z0-9-]{1,64}$/.test(sa.project_id) &&
+      typeof sa.client_email === "string" && typeof sa.private_key === "string"
+    ) {
+      return sa as ServiceAccount;
+    }
+  } catch { /* handled below */ }
+  console.error("send-push: FIREBASE_SERVICE_ACCOUNT is missing or invalid");
+  return null;
+}
+
+const MAX_BODY = 32 * KB;
+const FETCH_TIMEOUT_MS = 10_000;
+/** A user rarely has more than a handful of devices; cap fan-out anyway. */
+const MAX_TOKENS = 20;
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return result === 0;
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
+/** The webhook body's `record`, validated and trimmed to FCM-safe sizes. */
+function parseRecord(body: Record<string, unknown>): NotificationRow {
+  const r = body.record;
+  if (!isObject(r)) throw new HttpError(400, "Missing record.");
+  const id = r.id;
+  if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 0) {
+    throw new HttpError(400, "Invalid record.");
+  }
+  if (typeof r.user_id !== "string" || !UUID_RE.test(r.user_id)) {
+    throw new HttpError(400, "Invalid record.");
+  }
+  const title = cleanText(r.title, 120);
+  if (!title) throw new HttpError(400, "Invalid record.");
+  return {
+    id,
+    user_id: r.user_id,
+    type: cleanText(r.type, 40),
+    title,
+    body: cleanText(r.body, 500, { multiline: true }) || null,
+    data: isObject(r.data) ? r.data : null,
+  };
 }
 
 function base64Url(bytes: Uint8Array | string): string {
@@ -52,7 +105,7 @@ function base64Url(bytes: Uint8Array | string): string {
 // Google access tokens last an hour; reuse one while the instance is warm.
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-async function googleAccessToken(): Promise<string> {
+async function googleAccessToken(serviceAccount: ServiceAccount): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.expiresAt - 60 > now) return cachedToken.value;
 
@@ -81,7 +134,7 @@ async function googleAccessToken(): Promise<string> {
     await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned)),
   );
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetchWithTimeout("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -91,14 +144,25 @@ async function googleAccessToken(): Promise<string> {
   });
   if (!res.ok) throw new Error(`Google token request failed: ${res.status} ${await res.text()}`);
   const json = await res.json();
-  cachedToken = { value: json.access_token, expiresAt: now + (json.expires_in ?? 3600) };
+  if (typeof json?.access_token !== "string") throw new Error("Google token response had no token");
+  const lifetime = typeof json.expires_in === "number" ? json.expires_in : 3600;
+  cachedToken = { value: json.access_token, expiresAt: now + lifetime };
   return cachedToken.value;
 }
 
 /** Sends to one device. Returns false when FCM says the token is dead. */
-async function sendToToken(accessToken: string, token: string, n: NotificationRow): Promise<boolean> {
-  const route = typeof n.data?.route === "string" ? n.data.route : "";
-  const res = await fetch(
+async function sendToToken(
+  serviceAccount: ServiceAccount,
+  accessToken: string,
+  token: string,
+  n: NotificationRow,
+): Promise<boolean> {
+  // Routes are app route names; anything else is dropped.
+  const rawRoute = n.data?.route;
+  const route = typeof rawRoute === "string" && /^[a-z0-9-]{1,40}$/.test(rawRoute) ? rawRoute : "";
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
     `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
     {
       method: "POST",
@@ -117,6 +181,10 @@ async function sendToToken(accessToken: string, token: string, n: NotificationRo
       }),
     },
   );
+  } catch (e) {
+    console.error("FCM send failed (network):", e);
+    return true; // Keep the token; it may be fine next time.
+  }
   if (res.ok) return true;
 
   const text = await res.text();
@@ -128,36 +196,39 @@ async function sendToToken(accessToken: string, token: string, n: NotificationRo
 }
 
 serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  if (!WEBHOOK_SECRET || !timingSafeEqual(req.headers.get("x-push-secret") ?? "", WEBHOOK_SECRET)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  if (!serviceAccount.project_id) {
-    return new Response("FIREBASE_SERVICE_ACCOUNT is not set", { status: 500 });
-  }
-
   try {
-    const { record } = await req.json() as { record?: NotificationRow };
-    if (!record?.user_id) return new Response("Missing record", { status: 400 });
+    requireMethod(req, "POST");
+    if (!WEBHOOK_SECRET || !timingSafeEqual(req.headers.get("x-push-secret") ?? "", WEBHOOK_SECRET)) {
+      return errorResponse(401, "Unauthorized.");
+    }
+    if (!serviceAccount) return errorResponse(503, "Push is not configured.");
+
+    const record = parseRecord(await readJsonBody(req, MAX_BODY));
 
     const { data: tokens, error } = await supabase
       .from("push_tokens")
       .select("token")
-      .eq("user_id", record.user_id);
+      .eq("user_id", record.user_id)
+      .limit(MAX_TOKENS);
     if (error) throw error;
-    if (!tokens?.length) return Response.json({ sent: 0 });
+    const valid = (tokens ?? [])
+      .map((t: { token?: unknown }) => t.token)
+      .filter((t: unknown): t is string => typeof t === "string" && t.length > 0 && t.length <= 4096);
+    if (!valid.length) return jsonResponse({ sent: 0 });
 
-    const accessToken = await googleAccessToken();
+    const accessToken = await googleAccessToken(serviceAccount);
     const results = await Promise.all(
-      tokens.map(async ({ token }) => ({ token, alive: await sendToToken(accessToken, token, record) })),
+      valid.map(async (token: string) => ({
+        token,
+        alive: await sendToToken(serviceAccount, accessToken, token, record),
+      })),
     );
 
     const dead = results.filter((r) => !r.alive).map((r) => r.token);
     if (dead.length) await supabase.from("push_tokens").delete().in("token", dead);
 
-    return Response.json({ sent: results.length - dead.length, removed: dead.length });
+    return jsonResponse({ sent: results.length - dead.length, removed: dead.length });
   } catch (e) {
-    console.error("send-push error:", e);
-    return new Response("Internal error", { status: 500 });
+    return handleError(e, "send-push");
   }
 });

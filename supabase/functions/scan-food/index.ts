@@ -11,12 +11,29 @@ import {
 import { geminiGenerate } from '../_shared/llm.ts';
 import { consumeDailyQuota, dailyLimit, refundDailyQuota } from '../_shared/quota.ts';
 import {
+  bearerToken,
+  clampNumber,
+  cleanText,
+  HttpError,
+  KB,
+  LIMITS,
+  MB,
+  optionalText,
+  RANGES,
+  readJsonBody,
+  requireMethod,
+  requireText,
+} from '../_shared/validate.ts';
+import {
   estimateNutritionPer100g,
   GeminiVisionProvider,
   GroqVisionProvider,
   recognizeHedged,
   type VisionProvider,
 } from './vision.ts';
+
+/** Lookup names can be USDA descriptions the app got from a search, which run long. */
+const LOOKUP_NAME_MAX = 200;
 
 // Request modes (all POST, JSON body, authenticated):
 //   { image, mime_type? }                       -> photo recognition with inline nutrition
@@ -574,10 +591,16 @@ async function handleSearch(env: Env, query: string): Promise<Response> {
   return jsonResponse({ items }, 200);
 }
 
-async function handleGetNutrition(env: Env, body: any): Promise<Response> {
-  const idStr = String(body.fdc_id).trim();
-  const foodName = String(body.food_name ?? '').trim() || idStr;
-  const grams = parsePortionGrams(body.serving_description) ?? 100;
+interface NutritionRequest {
+  fdcId: string;
+  foodName: string;
+  servingDescription: string;
+}
+
+async function handleGetNutrition(env: Env, request: NutritionRequest): Promise<Response> {
+  const idStr = request.fdcId;
+  const foodName = request.foodName || idStr;
+  const grams = clampNumber(parsePortionGrams(request.servingDescription) ?? 100, 1, RANGES.grams.max, 100);
   const respond = (per100g: NutritionData) => jsonResponse(scaleNutritionData(per100g, grams), 200);
 
   // 1. Proprietary DB exact hit by barcode or name. Two eq() filters rather
@@ -630,6 +653,26 @@ async function handleGetNutrition(env: Env, body: any): Promise<Response> {
 
   // Zeros tell the client to fall back to its offline estimate.
   return jsonResponse(ZERO_NUTRITION, 200);
+}
+
+/** Sanitised barcode response from upstream / model data; null without a name. */
+function barcodePayload(productName: unknown, servingSize: unknown, n: Record<string, unknown>) {
+  const name = cleanText(productName, 120);
+  if (!name) return null;
+  const grams = (v: unknown) => clampNumber(v, 0, RANGES.grams.max);
+  return {
+    productName: name,
+    servingSize: cleanText(servingSize, 60) || '100g',
+    nutriments: {
+      calories: clampNumber(n.calories, 0, RANGES.calories.max),
+      protein: grams(n.protein),
+      carbs: grams(n.carbs),
+      fat: grams(n.fat),
+      fiber: grams(n.fiber),
+      sugar: grams(n.sugar),
+      sodium: clampNumber(n.sodium, 0, 100000),
+    },
+  };
 }
 
 async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
@@ -695,21 +738,17 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
         const calories = val('energy-kcal') || val('energy') / 4.184;
         const sodiumG = val('sodium') || val('salt') / 2.5;
 
-        if (productName && (calories || val('proteins') || val('carbohydrates') || val('fat'))) {
-          console.log(`Open Food Facts hit for barcode "${barcodeStr}" -> "${productName}"`);
-          const payload = {
-            productName,
-            servingSize: perServing ? product.serving_size : '100g',
-            nutriments: {
-              calories,
-              protein: val('proteins'),
-              carbs: val('carbohydrates'),
-              fat: val('fat'),
-              fiber: val('fiber'),
-              sugar: val('sugars'),
-              sodium: sodiumG * 1000,
-            },
-          };
+        const payload = barcodePayload(productName, perServing ? product.serving_size : '100g', {
+          calories,
+          protein: val('proteins'),
+          carbs: val('carbohydrates'),
+          fat: val('fat'),
+          fiber: val('fiber'),
+          sugar: val('sugars'),
+          sodium: sodiumG * 1000,
+        });
+        if (payload && (calories || val('proteins') || val('carbohydrates') || val('fat'))) {
+          console.log(`Open Food Facts hit for barcode "${barcodeStr}" -> "${payload.productName}"`);
           saveToProprietary(payload.productName, payload.servingSize, payload.nutriments, 'off');
           return jsonResponse(payload, 200);
         }
@@ -736,22 +775,12 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
         json: true,
         signal: AbortSignal.timeout(20000),
       });
-      const parsed = extractJson(text) as any;
-      if (parsed?.productName) {
-        console.log(`Gemini grounding hit for barcode "${barcodeStr}" -> "${parsed.productName}"`);
-        const payload = {
-          productName: String(parsed.productName),
-          servingSize: parsed.servingSize || '100g',
-          nutriments: {
-            calories: Number(parsed.calories ?? 0),
-            protein: Number(parsed.protein ?? 0),
-            carbs: Number(parsed.carbs ?? 0),
-            fat: Number(parsed.fat ?? 0),
-            fiber: Number(parsed.fiber ?? 0),
-            sugar: Number(parsed.sugar ?? 0),
-            sodium: Number(parsed.sodium ?? 0),
-          },
-        };
+      const parsed = extractJson(text);
+      const payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? barcodePayload((parsed as any).productName, (parsed as any).servingSize, parsed as Record<string, unknown>)
+        : null;
+      if (payload) {
+        console.log(`Gemini grounding hit for barcode "${barcodeStr}" -> "${payload.productName}"`);
         saveToProprietary(payload.productName, payload.servingSize, payload.nutriments, 'gemini_grounding');
         return jsonResponse(payload, 200);
       }
@@ -767,9 +796,46 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
 // Entry point
 // ---------------------------------------------------------------------------
 
+/** Largest photo accepted, decoded. The app sends JPEGs well under this. */
+const MAX_IMAGE_BYTES = 6 * MB;
+/** Base64 inflates by 4/3; leave room for the other JSON fields. */
+const MAX_BODY_BYTES = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 16 * KB;
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+const BARCODE_RE = /^[0-9A-Za-z]{4,32}$/;
+
+/** Validates the photo payload; returns clean base64 or throws 400/413. */
+function validateImage(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0) throw new HttpError(400, 'Image required');
+  const base64 = value.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '').replace(/\s+/g, '');
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  const decodedBytes = Math.floor((base64.length * 3) / 4) - padding;
+  if (decodedBytes > MAX_IMAGE_BYTES) throw new HttpError(413, 'Image is too large.');
+  if (base64.length % 4 !== 0 || !BASE64_RE.test(base64)) throw new HttpError(400, 'Image is not valid base64.');
+  if (decodedBytes < 100) throw new HttpError(400, 'Image is too small.');
+  return base64;
+}
+
+/** fdc_id is a USDA id, a barcode, a product name or a client UUID. */
+function validateLookupId(value: unknown): string {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
+  return requireText(value, 'fdc_id', { max: LOOKUP_NAME_MAX });
+}
+
+let serviceClient: SupabaseClient | null = null;
+
 Deno.serve(async (req) => {
   try {
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    requireMethod(req, 'POST');
+
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !serviceKey) {
+      console.error('scan-food: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set');
+      return jsonResponse({ error: 'Service is not configured.' }, 500);
+    }
+    serviceClient ??= createClient(url, serviceKey);
+    const supabase = serviceClient;
     const env: Env = {
       supabase,
       geminiKey: Deno.env.get('GEMINI_API_KEY_FOOD_SCANNER') || undefined,
@@ -777,46 +843,65 @@ Deno.serve(async (req) => {
       usdaKey: Deno.env.get('USDA_FDC_API_KEY') || 'DEMO_KEY',
     };
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
-    }
+    const token = bearerToken(req);
+    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401);
 
-    // Verify the user while the (possibly multi-MB) body is being parsed.
-    const [{ data: { user }, error: authError }, body] = await Promise.all([
-      supabase.auth.getUser(authHeader.slice('Bearer '.length)),
-      req.json().catch(() => null),
+    // Verify the user while the (possibly multi-MB) body is being read.
+    const [authResult, bodyResult] = await Promise.allSettled([
+      supabase.auth.getUser(token),
+      readJsonBody(req, MAX_BODY_BYTES),
     ]);
-    if (authError || !user) {
-      console.error('JWT verification failed:', authError);
+    const user = authResult.status === 'fulfilled' ? authResult.value.data.user : null;
+    if (!user) {
+      console.error(
+        'JWT verification failed:',
+        authResult.status === 'fulfilled' ? authResult.value.error?.message : authResult.reason,
+      );
       return jsonResponse({ error: 'Invalid token' }, 401);
     }
-    if (!body || typeof body !== 'object') {
-      return jsonResponse({ error: 'Invalid JSON body' }, 400);
+    if (bodyResult.status === 'rejected') throw bodyResult.reason;
+    const body = bodyResult.value;
+
+    if (body.barcode !== undefined && body.barcode !== null && body.barcode !== '') {
+      const barcode = typeof body.barcode === 'number' ? String(body.barcode) : body.barcode;
+      if (typeof barcode !== 'string' || !BARCODE_RE.test(barcode.trim())) {
+        return jsonResponse({ error: 'Barcode is not valid.' }, 400);
+      }
+      return await handleBarcode(env, barcode.trim());
+    }
+    if (body.search_query !== undefined && body.search_query !== null && body.search_query !== '') {
+      // Over-long queries are cut rather than refused: only the start matters.
+      const query = requireText(body.search_query, 'search_query', { max: LIMITS.search, clip: true });
+      return await handleSearch(env, query);
+    }
+    if (body.get_nutrition && body.fdc_id !== undefined && body.fdc_id !== null && body.fdc_id !== '') {
+      return await handleGetNutrition(env, {
+        fdcId: validateLookupId(body.fdc_id),
+        foodName: optionalText(body.food_name, 'food_name', { max: LOOKUP_NAME_MAX, clip: true }) ?? '',
+        servingDescription: optionalText(body.serving_description, 'serving_description', {
+          max: LIMITS.shortText,
+          clip: true,
+        }) ?? '',
+      });
     }
 
-    if (body.barcode) return await handleBarcode(env, body.barcode.toString().trim());
-    if (body.search_query) return await handleSearch(env, body.search_query.toString().trim());
-    if (body.get_nutrition && body.fdc_id) return await handleGetNutrition(env, body);
-
-    if (!body.image || typeof body.image !== 'string') {
-      return jsonResponse({ error: 'Image required' }, 400);
-    }
-    const mimeType = typeof body.mime_type === 'string' && body.mime_type.startsWith('image/')
-      ? body.mime_type
+    const image = validateImage(body.image);
+    const mimeType = typeof body.mime_type === 'string' && IMAGE_MIME_TYPES.includes(body.mime_type.toLowerCase())
+      ? body.mime_type.toLowerCase()
       : 'image/jpeg';
-    return await handleImage(env, user.id, body.image, mimeType);
+    return await handleImage(env, user.id, image, mimeType);
   } catch (error) {
+    if (error instanceof HttpError) return jsonResponse({ error: error.message }, error.status);
     console.error('Error in scan-food function:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    // `details` is for logs/debugging only; clients show `error`.
+    // Details stay in the logs; clients only see `error` (and match on status).
     if (errorMessage.startsWith('All vision providers failed')) {
-      return jsonResponse({ error: 'Recognition temporarily unavailable', details: errorMessage }, 503);
+      return jsonResponse({ error: 'Recognition temporarily unavailable' }, 503);
     }
     if (errorMessage.includes('USDA API error')) {
-      return jsonResponse({ error: 'USDA API lookup failed', details: errorMessage }, 500);
+      return jsonResponse({ error: 'Food lookup failed' }, 502);
     }
-    return jsonResponse({ error: 'Internal server error', details: errorMessage }, 500);
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
