@@ -64,11 +64,17 @@ class _BiometricLockGuardState extends State<BiometricLockGuard>
     if (_isAuthenticating) return;
     _isAuthenticating = true;
 
-    final authenticated = await _bioService.authenticate(
-      reason: 'Unlock VitalUp to access your health and fitness records',
-    );
-
-    _isAuthenticating = false;
+    var authenticated = false;
+    try {
+      // No screen lock on the device any more: nothing can confirm the
+      // user, so don't lock them out of their own data.
+      authenticated = !await _bioService.canConfirmUser() ||
+          await _bioService.authenticate(
+            reason: 'Unlock VitalUp to see your health data',
+          );
+    } finally {
+      _isAuthenticating = false;
+    }
     if (mounted && authenticated) {
       HapticFeedback.mediumImpact();
       setState(() => _isLocked = false);

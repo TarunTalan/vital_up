@@ -6,6 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/network/dio_client.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
@@ -182,8 +183,9 @@ Future<void> initDependencies() async {
   final isarService = IsarService();
   try {
     await isarService.init();
-  } catch (e) {
+  } catch (e, stack) {
     logger.e('Failed to initialize Isar database: $e');
+    CrashReporter.report(e, stack, reason: 'Isar init failed');
   }
   sl.registerLazySingleton<IsarService>(() => isarService);
 
@@ -235,10 +237,22 @@ Future<void> initDependencies() async {
     () => AuthCubit(
       authRepository: sl<AuthRepository>(),
       beforeSignOut: () async {
-        await sl<PushService>().unregister();
+        // Neither step may block signing out (offline, slow server): the
+        // push token expires server-side and unsynced logs stay queued.
+        try {
+          await sl<PushService>().unregister().timeout(
+            const Duration(seconds: 5),
+          );
+        } catch (e) {
+          logger.w('Push unregister before sign-out failed: $e');
+        }
         // Back up what's left, then remove this account's data from the
         // device; it comes back from the cloud on the next sign-in.
-        await sl<SyncService>().sync();
+        try {
+          await sl<SyncService>().sync().timeout(const Duration(seconds: 20));
+        } catch (e) {
+          logger.w('Sync before sign-out did not finish: $e');
+        }
         await sl<AccountService>().clearLocalUserData();
       },
     ),
@@ -505,7 +519,15 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()));
   sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
 
-  sl.registerLazySingleton<SleepService>(() => SleepService(sl<IsarService>(), sl<SharedPreferences>(), sl<SyncService>()));
+  sl.registerLazySingleton<SleepService>(
+    () => SleepService(
+      sl<IsarService>(),
+      sl<SharedPreferences>(),
+      sl<SyncService>(),
+      sl<FlutterLocalNotificationsPlugin>(),
+      sl<HabitEvents>(),
+    ),
+  );
   sl.registerFactory(() => SleepCubit(sl<SleepService>()));
 
   sl.registerLazySingleton<WaterIntakeService>(
@@ -625,14 +647,19 @@ Future<void> initDependencies() async {
       sl<FlutterLocalNotificationsPlugin>(),
       sl<SharedPreferences>(),
       (response) async {
-        // "+250 ml" on a water reminder while the app is open.
+        // Notification actions tapped while the app is open.
         final userId = reminderUserId(response);
-        if (response.actionId == ReminderScheduler.logWaterAction &&
-            userId != null) {
-          await sl<WaterIntakeService>().addWaterLog(
-            userId,
-            ReminderScheduler.logWaterMl,
-          );
+        if (userId == null) return;
+        switch (response.actionId) {
+          case ReminderScheduler.logWaterAction:
+            await sl<WaterIntakeService>().addWaterLog(
+              userId,
+              ReminderScheduler.logWaterMl,
+            );
+          case ReminderScheduler.bedtimeAction:
+            await sl<SleepService>().markBedtime();
+          case ReminderScheduler.wakeAction:
+            await sl<SleepService>().wakeUp();
         }
       },
     ),

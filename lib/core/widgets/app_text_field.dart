@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 
 /// Figma `input/text` box — glass fill, 20 radius, background blur and the
 /// default / active / filled / error / success states. Shared by
@@ -190,7 +191,7 @@ class AppTextField extends StatefulWidget {
     this.autofocus = false,
     this.reserveErrorSpace = false,
   }) : keyboardType = TextInputType.number,
-       inputFormatters = const [_digitsOnly],
+       inputFormatters = const [_digitsOnly, _numberLength],
        textCapitalization = TextCapitalization.none,
        onTap = null,
        readOnly = false,
@@ -219,7 +220,7 @@ class AppTextField extends StatefulWidget {
     this.autofocus = false,
     this.reserveErrorSpace = false,
   }) : keyboardType = const TextInputType.numberWithOptions(decimal: true),
-       inputFormatters = const [_decimalOnly],
+       inputFormatters = const [_decimalOnly, _numberLength],
        textCapitalization = TextCapitalization.none,
        onTap = null,
        readOnly = false,
@@ -229,8 +230,13 @@ class AppTextField extends StatefulWidget {
        maxLength = null,
        showCounter = false;
 
+  /// Longest number the numeric variants accept (e.g. "99999.9"); anything
+  /// longer is a typo or a paste, never a real value in this app.
+  static const maxNumberLength = 7;
+
   static const _digitsOnly = _RegexFormatter(r'^\d*$');
-  static const _decimalOnly = _RegexFormatter(r'^\d*\.?\d*$');
+  static const _decimalOnly = _DecimalFormatter();
+  static const _numberLength = _MaxCharsFormatter(maxNumberLength);
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -269,10 +275,35 @@ class _AppTextFieldState extends State<AppTextField> {
     super.dispose();
   }
 
-  void _onFocus() => setState(() => _focused = _focus.hasFocus);
+  void _onFocus() {
+    if (!mounted) return;
+    final focused = _focus.hasFocus;
+    if (focused != _focused) setState(() => _focused = focused);
+  }
 
-  // Filled vs empty changes the box fill.
-  void _onText() => setState(() {});
+  // Filled vs empty (and the counter) changes with the text.
+  void _onText() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _singleLine => !widget.multiline || widget.maxLines == 1;
+
+  int get _minLines {
+    if (_singleLine) return 1;
+    final min = widget.minLines ?? 1;
+    final max = widget.maxLines;
+    return max != null && min > max ? max : min;
+  }
+
+  int? get _maxLines => _singleLine ? 1 : widget.maxLines;
+
+  /// Invisible / control characters are always blocked, and line breaks are
+  /// blocked in single-line fields, before the caller's own formatters run.
+  List<TextInputFormatter> get _formatters => [
+    InputFormatters.noInvisible,
+    if (_singleLine) InputFormatters.singleLine,
+    ...?widget.inputFormatters,
+  ];
 
   Widget _field(String? errorText) {
     final colors = context.colors;
@@ -308,7 +339,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 const SizedBox.shrink(),
               if (widget.showCounter && widget.maxLength != null)
                 Text(
-                  '${widget.controller.text.length}/${widget.maxLength}',
+                  '${widget.controller.text.characters.length}/${widget.maxLength}',
                   style: context.text.bodySmall?.copyWith(color: v.grayText),
                 ),
             ],
@@ -343,11 +374,11 @@ class _AppTextFieldState extends State<AppTextField> {
                   keyboardType: widget.multiline
                       ? TextInputType.multiline
                       : widget.keyboardType,
-                  inputFormatters: widget.inputFormatters,
+                  inputFormatters: _formatters,
                   textInputAction: widget.textInputAction,
                   textCapitalization: widget.textCapitalization,
-                  minLines: widget.multiline ? (widget.minLines ?? 1) : 1,
-                  maxLines: widget.multiline ? widget.maxLines : 1,
+                  minLines: _minLines,
+                  maxLines: _maxLines,
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   onTap: widget.onTap,
@@ -598,6 +629,37 @@ class AppDisplayField extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Rejects edits longer than [max] characters (keeps the previous value).
+class _MaxCharsFormatter extends TextInputFormatter {
+  final int max;
+
+  const _MaxCharsFormatter(this.max);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) => newValue.text.length <= max ? newValue : oldValue;
+}
+
+/// Digits with at most one decimal separator. A comma (some keyboards only
+/// offer one) is turned into a dot so callers can parse the text directly.
+class _DecimalFormatter extends TextInputFormatter {
+  const _DecimalFormatter();
+
+  static final _valid = RegExp(r'^\d*\.?\d*$');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(',', '.');
+    if (!_valid.hasMatch(text)) return oldValue;
+    return text == newValue.text ? newValue : newValue.copyWith(text: text);
   }
 }
 

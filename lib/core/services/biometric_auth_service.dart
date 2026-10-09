@@ -43,6 +43,17 @@ class BiometricAuthService {
     }
   }
 
+  /// The device has a screen lock (biometrics or PIN/pattern) that can
+  /// confirm the user. When it doesn't (lock removed after app lock was
+  /// turned on), the app lock can't work and must not trap the user.
+  Future<bool> canConfirmUser() async {
+    try {
+      return await _auth.isDeviceSupported();
+    } catch (_) {
+      return true; // Unknown: keep the lock, the prompt decides.
+    }
+  }
+
   /// Get list of available biometric types (fingerprint, face, etc.)
   Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
@@ -65,6 +76,8 @@ class BiometricAuthService {
     } on LocalAuthException {
       return false;
     } on PlatformException {
+      return false;
+    } catch (_) {
       return false;
     }
   }

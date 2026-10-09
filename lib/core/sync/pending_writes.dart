@@ -177,18 +177,48 @@ class PendingWrites {
   /// A write the server keeps rejecting is dropped after this many tries.
   static const _maxAttempts = 5;
 
+  /// Hard cap on the outbox so a long offline spell can't grow it forever;
+  /// the oldest writes go first.
+  static const maxQueued = 500;
+
+  /// One request in a flush may take at most this long.
+  static const _sendTimeout = Duration(seconds: 30);
+
+  Future<void>? _flushing;
+
   /// Wired by DI once the sync engine exists (it depends on this queue).
   void attach(SyncHooks hooks) => _hooks = hooks;
 
+  List<String> _raw() => _prefs.getStringList(_storageKey) ?? const <String>[];
+
+  /// Decodes one stored write; null for a corrupt entry (dropped on the
+  /// next save instead of breaking the whole queue).
+  static PendingWrite? _decode(String raw) {
+    try {
+      return PendingWrite.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('PendingWrites: dropping unreadable entry: $e');
+      return null;
+    }
+  }
+
   List<PendingWrite> _all() => [
-    for (final raw in _prefs.getStringList(_storageKey) ?? const <String>[])
-      PendingWrite.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+    for (final raw in _raw()) ?_decode(raw),
   ];
 
-  Future<void> _save(List<PendingWrite> writes) => _prefs.setStringList(
-    _storageKey,
-    [for (final w in writes) jsonEncode(w.toJson())],
-  );
+  Future<void> _save(List<PendingWrite> writes) {
+    var list = writes;
+    if (list.length > maxQueued) {
+      CrashReporter.log(
+        'PendingWrites: queue full, dropping ${list.length - maxQueued} oldest',
+      );
+      list = list.sublist(list.length - maxQueued);
+    }
+    return _prefs.setStringList(
+      _storageKey,
+      [for (final w in list) jsonEncode(w.toJson())],
+    );
+  }
 
   /// Writes queued for [userId].
   int countFor(String userId) => _all().where((w) => w.userId == userId).length;
@@ -229,7 +259,7 @@ class PendingWrites {
       return false;
     }
     try {
-      await write.send(client);
+      await write.send(client).timeout(_sendTimeout);
       _connectivity.reportSuccess();
       return true;
     } catch (e) {
@@ -242,26 +272,47 @@ class PendingWrites {
 
   /// Sends queued writes for [userId] in order. Stops at the first offline
   /// failure (rethrown so the caller can back off); writes the server
-  /// rejects are retried a few times, then dropped and reported.
-  Future<void> flush(SupabaseClient client, String userId) async {
-    final all = _all();
-    if (!all.any((w) => w.userId == userId)) return;
+  /// rejects are retried a few times, then dropped and reported. Stops
+  /// quietly when the session expires or the user changes mid-flush.
+  ///
+  /// Concurrent calls share one flush. Writes queued while a flush runs are
+  /// kept (the queue is re-read before saving).
+  Future<void> flush(SupabaseClient client, String userId) {
+    return _flushing ??= _flush(client, userId).whenComplete(() {
+      _flushing = null;
+    });
+  }
 
-    final remaining = <PendingWrite>[];
+  Future<void> _flush(SupabaseClient client, String userId) async {
+    final snapshot = _raw();
+    // Stored entry -> its replacement after this flush (null = remove it).
+    final outcome = <String, String?>{};
     Object? offline;
-    for (var i = 0; i < all.length; i++) {
-      final write = all[i];
+    var stop = false;
+    for (final raw in snapshot) {
+      final write = _decode(raw);
+      if (write == null) {
+        outcome[raw] = null;
+        continue;
+      }
       // Another account's writes can't be sent from this session.
-      if (offline != null || write.userId != userId) {
-        remaining.add(write);
+      if (stop || write.userId != userId) continue;
+      if (client.auth.currentUser?.id != userId) {
+        stop = true; // Signed out or switched account mid-flush.
         continue;
       }
       try {
-        await write.send(client);
+        await write.send(client).timeout(_sendTimeout);
+        outcome[raw] = null;
       } catch (e, stack) {
         if (isOfflineError(e)) {
           offline = e;
-          remaining.add(write);
+          stop = true;
+          continue;
+        }
+        if (_isSessionError(e)) {
+          // Expired session: not the write's fault, try again later.
+          stop = true;
           continue;
         }
         if (write.attempts + 1 >= _maxAttempts) {
@@ -270,13 +321,36 @@ class PendingWrites {
             stack,
             reason: 'Dropped queued ${write.kind} ${write.target}',
           );
+          outcome[raw] = null;
         } else {
           debugPrint('PendingWrites: ${write.key} failed, will retry: $e');
-          remaining.add(write._copy(attempts: write.attempts + 1));
+          outcome[raw] = jsonEncode(write._copy(attempts: write.attempts + 1).toJson());
         }
       }
     }
-    await _save(remaining);
+
+    if (outcome.isNotEmpty) {
+      // Re-read: entries added or coalesced while sending stay queued.
+      final current = _raw();
+      final next = <String>[];
+      for (final raw in current) {
+        if (!outcome.containsKey(raw)) {
+          next.add(raw);
+          continue;
+        }
+        final replacement = outcome.remove(raw);
+        if (replacement != null) next.add(replacement);
+      }
+      await _prefs.setStringList(_storageKey, next);
+    }
     if (offline != null) throw offline;
+  }
+
+  static bool _isSessionError(Object e) {
+    if (e is AuthException) return true;
+    if (e is PostgrestException) {
+      return const {'PGRST301', 'PGRST302', 'PGRST303', '401'}.contains(e.code);
+    }
+    return false;
   }
 }
