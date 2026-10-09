@@ -249,7 +249,12 @@ class _SummaryItem extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.space8),
               TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: (fraction ?? 0).clamp(0.0, 1.0)),
+                tween: Tween(
+                  begin: 0,
+                  end: fraction != null && fraction!.isFinite
+                      ? fraction!.clamp(0.0, 1.0)
+                      : 0.0,
+                ),
                 duration: AppDurations.slow,
                 curve: Curves.easeOutCubic,
                 builder: (context, v, _) =>
@@ -277,6 +282,24 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
   final pace = TrackerStatus.dayPace(now);
 
   final sleep = context.watch<SleepCubit>().state;
+  if (hour < 12 && sleep is SleepNeedsConfirmation) {
+    return (
+      message: 'Your phone noticed about '
+          '${formatDashboardDuration(sleep.estimate.duration)} of sleep. '
+          'Check it looks right.',
+      metric: TrackerMetric.sleep,
+      actionLabel: 'Review',
+      actionIcon: Icons.edit_rounded,
+    );
+  }
+  if (hour >= 4 && hour < 12 && sleep is SleepInBed) {
+    return (
+      message: "Good morning. Save last night's sleep when you're up.",
+      metric: TrackerMetric.sleep,
+      actionLabel: TrackerMetric.sleep.logLabel,
+      actionIcon: TrackerMetric.sleep.logIcon,
+    );
+  }
   if (hour < 12 && sleep is SleepNeedsManualEntry) {
     return (
       message: "Log last night's sleep to see how rested you are.",

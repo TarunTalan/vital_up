@@ -7,7 +7,11 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 import '../../data/services/health_report_service.dart';
 
 class HealthReportPage extends StatefulWidget {
@@ -21,7 +25,12 @@ class _HealthReportPageState extends State<HealthReportPage> {
   int _selectedDays = 30;
   bool _isLoading = true;
   bool _isExporting = false;
+  bool _failed = false;
   HealthReportSummary? _summary;
+  WeightUnit _unit = WeightUnit.kg;
+
+  /// Bumped per load so a slow earlier period can't replace a newer one.
+  int _request = 0;
 
   @override
   void initState() {
@@ -30,21 +39,49 @@ class _HealthReportPageState extends State<HealthReportPage> {
   }
 
   Future<void> _loadReport() async {
-    setState(() => _isLoading = true);
-    final service = sl<HealthReportService>();
-    final summary = await service.generateSummary(days: _selectedDays);
-    if (mounted) {
+    final request = ++_request;
+    final days = _selectedDays;
+    setState(() {
+      _isLoading = true;
+      _failed = false;
+    });
+    try {
+      final summary = await sl<HealthReportService>()
+          .generateSummary(days: days)
+          .withLoadTimeout();
+      final unit = await sl<WeightService>().unit();
+      if (!mounted || request != _request) return;
       setState(() {
         _summary = summary;
+        _unit = unit;
         _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Health report failed: $e');
+      if (!mounted || request != _request) return;
+      setState(() {
+        _summary = null;
+        _isLoading = false;
+        _failed = true;
       });
     }
   }
 
   Future<void> _exportReport() async {
+    if (_isExporting) return;
     setState(() => _isExporting = true);
     HapticFeedback.mediumImpact();
-    await sl<HealthReportService>().exportAndShareReport(days: _selectedDays);
+    try {
+      await sl<HealthReportService>().exportAndShareReport(
+        days: _selectedDays,
+        summary: _summary,
+      );
+    } catch (e) {
+      debugPrint('Health report share failed: $e');
+      if (mounted) {
+        showErrorSnackBar(context, "Couldn't share the report. Try again.");
+      }
+    }
     if (mounted) setState(() => _isExporting = false);
   }
 
@@ -72,12 +109,13 @@ class _HealthReportPageState extends State<HealthReportPage> {
             // 1. Time Horizon Filter
             AppCaption('TIME HORIZON'),
             const SizedBox(height: AppDimens.space8),
-            Row(
+            // Wraps on narrow phones instead of overflowing.
+            Wrap(
+              spacing: AppDimens.space8,
+              runSpacing: AppDimens.space8,
               children: [7, 30, 90].map((days) {
                 final isSelected = _selectedDays == days;
-                return Padding(
-                  padding: const EdgeInsets.only(right: AppDimens.space8),
-                  child: ChoiceChip(
+                return ChoiceChip(
                     label: Text('Last $days Days'),
                     selected: isSelected,
                     selectedColor: AppColors.primary.withAlpha(45),
@@ -102,7 +140,6 @@ class _HealthReportPageState extends State<HealthReportPage> {
                         HapticFeedback.selectionClick();
                       }
                     },
-                  ),
                 );
               }).toList(),
             ),
@@ -111,11 +148,13 @@ class _HealthReportPageState extends State<HealthReportPage> {
             if (_isLoading)
               const Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40.0),
+                  padding: EdgeInsets.symmetric(vertical: AppDimens.space40),
                   child: VitalUpLoader(),
                 ),
               )
-            else if (_summary != null) ...[
+            else if (_failed || _summary == null)
+              LoadErrorView(onRetry: _loadReport)
+            else ...[
               // 2. Patient & Vitals Card
               _buildVitalsCard(context, _summary!),
               const SizedBox(height: AppDimens.space12),
@@ -206,7 +245,7 @@ class _HealthReportPageState extends State<HealthReportPage> {
                 child: _buildMetricTile(
                   context,
                   label: 'Blood Pressure',
-                  value: '${s.bloodPressure} mmHg',
+                  value: reportValue(s.bloodPressure, (v) => '$v mmHg'),
                   icon: Icons.speed_rounded,
                   color: AppColors.error,
                 ),
@@ -216,19 +255,19 @@ class _HealthReportPageState extends State<HealthReportPage> {
                 child: _buildMetricTile(
                   context,
                   label: 'Resting BPM',
-                  value: '${s.restingBpm} bpm',
+                  value: reportValue(s.restingBpm, (v) => '$v bpm'),
                   icon: Icons.monitor_heart_rounded,
                   color: AppColors.teal,
                 ),
               ),
             ],
           ),
-          if (s.latestWeightKg != null) ...[
+          if (s.latestWeightKg case final kg?) ...[
             const SizedBox(height: AppDimens.space8),
             _buildMetricTile(
               context,
               label: 'Recorded Body Weight',
-              value: '${s.latestWeightKg!.toStringAsFixed(1)} kg',
+              value: _unit.format(kg),
               icon: Icons.monitor_weight_rounded,
               color: AppColors.primary,
             ),
@@ -275,7 +314,10 @@ class _HealthReportPageState extends State<HealthReportPage> {
                 child: _buildMetricTile(
                   context,
                   label: 'Daily Sleep Avg',
-                  value: '${s.avgSleepHours.toStringAsFixed(1)} hrs',
+                  value: reportValue(
+                    s.avgSleepHours,
+                    (v) => '${(v as double).toStringAsFixed(1)} hrs',
+                  ),
                   icon: Icons.nightlight_round,
                   color: AppColors.sleep,
                 ),
@@ -285,7 +327,7 @@ class _HealthReportPageState extends State<HealthReportPage> {
                 child: _buildMetricTile(
                   context,
                   label: 'Sleep Quality Score',
-                  value: '${s.avgSleepScore} / 100',
+                  value: reportValue(s.avgSleepScore, (v) => '$v / 100'),
                   icon: Icons.star_half_rounded,
                   color: AppColors.success,
                 ),
@@ -389,7 +431,9 @@ class _HealthReportPageState extends State<HealthReportPage> {
                   ),
                 ),
                 Text(
-                  'Average: ${s.avgWaterMl} ml / day',
+                  s.avgWaterMl == null
+                      ? notRecorded
+                      : 'Average: ${s.avgWaterMl} ml / day',
                   style: context.text.bodySmall?.copyWith(
                     color: AppColors.water,
                     fontWeight: FontWeight.w600,
@@ -424,7 +468,7 @@ class _HealthReportPageState extends State<HealthReportPage> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              Icon(icon, size: AppDimens.iconXs, color: color),
               const SizedBox(width: AppDimens.space4),
               Expanded(
                 child: Text(

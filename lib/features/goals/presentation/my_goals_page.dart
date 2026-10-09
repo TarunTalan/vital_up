@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
@@ -30,8 +32,16 @@ class MyGoalsPage extends StatefulWidget {
 class _MyGoalsPageState extends State<MyGoalsPage> {
   late Future<Map<TrackerMetric, String?>> _goals = _load();
 
-  Future<Map<TrackerMetric, String?>> _load() async {
-    final plan = await sl<GetActiveMealPlan>()();
+  Future<Map<TrackerMetric, String?>> _load() =>
+      _read().withLoadTimeout().catchError((Object e, StackTrace stack) {
+        debugPrint('My goals failed to load: $e');
+        debugPrintStack(stackTrace: stack);
+        throw e;
+      });
+
+  Future<Map<TrackerMetric, String?>> _read() async {
+    // The meal plan may need the network: offline it just shows no goal.
+    final plan = await sl<GetActiveMealPlan>()().orFallback(null);
     final weight = sl<WeightService>();
     final unit = await weight.unit();
     final target = await weight.targetKg();
@@ -79,12 +89,24 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
         subtitle: 'What you are aiming for each day',
       ),
       onRefresh: () async {
-        setState(() => _goals = _load());
-        await _goals;
+        final next = _load();
+        setState(() => _goals = next);
+        try {
+          await next;
+        } catch (_) {
+          // Shown by the FutureBuilder below.
+        }
       },
       body: FutureBuilder<Map<TrackerMetric, String?>>(
         future: _goals,
         builder: (context, snap) {
+          if (snap.hasError) {
+            return LoadErrorView(
+              onRetry: () {
+                setState(() => _goals = _load());
+              },
+            );
+          }
           final goals = snap.data;
           if (goals == null) return const TrackerLoading();
           return Column(

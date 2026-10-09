@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
@@ -34,6 +35,10 @@ class HealthImportService {
   static const _keyLastImport = 'health_import_last';
   static const _firstImport = Duration(days: 30);
   static const _minInterval = Duration(hours: 1);
+
+  /// Longest workout imported; anything longer is a session left running
+  /// on the watch, not a real workout.
+  static const maxWorkoutDuration = Duration(hours: 24);
 
   static const types = [HealthDataType.WEIGHT, HealthDataType.WORKOUT];
 
@@ -106,7 +111,12 @@ class HealthImportService {
         ),
       );
       for (final p in points) {
-        if (await _importPoint(p)) added++;
+        // One unreadable entry must not block every later import.
+        try {
+          if (await _importPoint(p)) added++;
+        } catch (e) {
+          debugPrint('Health import skipped ${p.type.name}: $e');
+        }
       }
       await _prefs.setString(_keyLastImport, now.toIso8601String());
     } catch (e) {
@@ -119,6 +129,7 @@ class HealthImportService {
     final value = p.value;
     if (p.type == HealthDataType.WEIGHT && value is NumericHealthValue) {
       final kg = value.numericValue.toDouble();
+      if (!isPlausibleWeightKg(kg)) return false;
       if (await _weight.existsAt(p.dateFrom)) return false;
       return await _weight.add(kg, at: p.dateFrom, source: 'health') == null;
     }
@@ -132,8 +143,13 @@ class HealthImportService {
     return false;
   }
 
+  /// Weights outside the range VitalUp accepts when typed are bad readings
+  /// (a bag on the scale, a unit mix-up) and are not imported.
+  static bool isPlausibleWeightKg(double kg) =>
+      kg.isFinite && kg >= InputLimits.weightKgMin && kg <= InputLimits.weightKgMax;
+
   /// A health-store workout as a VitalUp session, or null for workout types
-  /// VitalUp doesn't track.
+  /// VitalUp doesn't track and for empty or implausibly long workouts.
   static ActivitySession? workoutToSession(
     String uuid,
     DateTime start,
@@ -154,13 +170,22 @@ class HealthImportService {
     };
     if (type == null) return null;
     final seconds = end.difference(start).inSeconds;
-    if (seconds <= 0) return null;
-    final meters = w.totalDistanceUnit == HealthDataUnit.MILE
+    if (seconds <= 0 || seconds > maxWorkoutDuration.inSeconds) return null;
+    final rawMeters = w.totalDistanceUnit == HealthDataUnit.MILE
         ? (w.totalDistance ?? 0) * 1609.344
         : (w.totalDistance ?? 0).toDouble();
-    final kcal = w.totalEnergyBurnedUnit == HealthDataUnit.SMALL_CALORIE
+    // Faster than the activity allows on average means a bad distance.
+    final maxMeters = seconds * type.maxReasonableSpeedMetersPerSecond;
+    final meters =
+        rawMeters.isFinite && rawMeters > 0 && rawMeters <= maxMeters
+            ? rawMeters
+            : 0.0;
+    final rawKcal = w.totalEnergyBurnedUnit == HealthDataUnit.SMALL_CALORIE
         ? (w.totalEnergyBurned ?? 0) ~/ 1000
         : w.totalEnergyBurned ?? 0;
+    final kcal = rawKcal.clamp(0, InputLimits.caloriesMax).toInt();
+    final steps = w.totalSteps;
+    final validSteps = steps != null && steps >= 0 ? steps : null;
     return ActivitySession(
       id: '$idPrefix$uuid',
       activityType: type,
@@ -172,8 +197,8 @@ class HealthImportService {
           ? (seconds / (meters / 1000)).round()
           : 0,
       calories: kcal,
-      steps: w.totalSteps ?? 0,
-      stepCountReliable: w.totalSteps != null,
+      steps: validSteps ?? 0,
+      stepCountReliable: validSteps != null,
       points: const [],
     );
   }

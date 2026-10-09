@@ -21,8 +21,6 @@ const _metric = TrackerMetric.screenTime;
 class ScreenTimeCard extends StatelessWidget {
   const ScreenTimeCard({super.key});
 
-  static const _topApps = 3;
-
   Future<void> _open(BuildContext context) async {
     final cubit = context.read<ScreenTimeCubit>();
     await context.pushNamed(_metric.route);

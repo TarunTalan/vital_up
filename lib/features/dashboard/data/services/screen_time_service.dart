@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import '../../domain/entities/app_usage_info.dart';
 import '../../domain/entities/trend_series.dart';
+import '../../domain/tracker_input_rules.dart';
 
 class ScreenTimeService {
   final SharedPreferences? _prefs;
@@ -16,11 +18,15 @@ class ScreenTimeService {
   static const defaultLimitMinutes = 240;
 
   /// Daily screen time limit (the "goal" — less is better).
-  int getDailyLimitMinutes() =>
-      _prefs?.getInt(_limitKey) ?? defaultLimitMinutes;
+  int getDailyLimitMinutes() => sanitizeScreenLimit(
+    _prefs?.getInt(_limitKey),
+    fallback: defaultLimitMinutes,
+  );
 
-  Future<void> setDailyLimitMinutes(int minutes) async =>
-      _prefs?.setInt(_limitKey, minutes);
+  Future<void> setDailyLimitMinutes(int minutes) async => _prefs?.setInt(
+    _limitKey,
+    minutes.clamp(screenLimitMinMinutes, screenLimitMaxMinutes),
+  );
 
   static const MethodChannel _channel = MethodChannel(
     'com.example.vital_up/usage_stats',
@@ -110,7 +116,8 @@ class ScreenTimeService {
       infoList.sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
       return infoList;
     } catch (e) {
-      throw Exception('Failed to get usage stats: $e');
+      debugPrint('Usage stats unavailable: $e');
+      rethrow;
     }
   }
 
@@ -122,10 +129,9 @@ class ScreenTimeService {
 
     // Query past 7 days from oldest (6 days ago) to today
     for (int i = 6; i >= 0; i--) {
-      final day = todayStart.subtract(Duration(days: i));
-      final dayEnd = i == 0
-          ? now
-          : day.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+      // Calendar days, not 24h steps, so DST changes don't shift them.
+      final day = DateTime(todayStart.year, todayStart.month, todayStart.day - i);
+      final dayEnd = i == 0 ? now : nextDay(day);
 
       try {
         final usage = await _fetchAppUsage(day, dayEnd);
@@ -263,7 +269,11 @@ class ScreenTimeService {
 
       rawStats.forEach((key, value) {
         final pkg = key.toString().toLowerCase();
-        final durationMillis = (value as num).toInt();
+        final durationMillis = value is num && value.isFinite
+            ? value.toInt()
+            : 0;
+        // Nothing to show for zero or bogus (negative) usage.
+        if (durationMillis <= 0) return;
 
         // Skip system packages
         if (_ignoredPackages.any((ignore) => pkg.contains(ignore))) {
@@ -294,8 +304,9 @@ class ScreenTimeService {
       });
 
       return result;
-    } catch (exception) {
-      throw Exception('Failed to get exact app usage: $exception');
+    } catch (e) {
+      debugPrint('Exact app usage unavailable: $e');
+      rethrow;
     }
   }
 }

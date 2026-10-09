@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
@@ -71,8 +72,19 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
 
   StressCheckInCubit(this._repository) : super(const StressCheckInState());
 
+  @override
+  void emit(StressCheckInState state) {
+    if (!isClosed) super.emit(state);
+  }
+
   void load() {
-    final checkIns = _repository.getStressCheckIns();
+    final List<StressCheckIn> checkIns;
+    try {
+      checkIns = _repository.getStressCheckIns();
+    } catch (e) {
+      debugPrint('Mood check-ins unavailable: $e');
+      return;
+    }
     final byDay = {for (final c in checkIns) startOfDay(c.date): c};
     final days = lastNDays(7);
     emit(state.copyWith(
@@ -83,7 +95,11 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
   }
 
   Future<void> reload() async {
-    await _repository.reload();
+    try {
+      await _repository.reload();
+    } catch (e) {
+      debugPrint('Mood check-ins not reloaded: $e');
+    }
     load();
   }
 
@@ -111,14 +127,20 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
         selectedTags: const {},
       ));
 
-  Future<void> submit() async {
+  /// Saves the picked mood. Returns false when it couldn't be saved.
+  Future<bool> submit() async {
     final level = state.selectedLevel;
-    if (level == null) return;
-    await _repository.saveStressCheckIn(
-      level,
-      tags: StressTag.values.where(state.selectedTags.contains).toList(),
-    );
-    if (isClosed) return;
+    if (level == null) return false;
+    try {
+      await _repository.saveStressCheckIn(
+        level,
+        tags: StressTag.values.where(state.selectedTags.contains).toList(),
+      );
+    } catch (e) {
+      debugPrint('Mood check-in not saved: $e');
+      return false;
+    }
+    if (isClosed) return true;
     emit(state.copyWith(
       editing: false,
       selectedLevel: () => null,
@@ -126,5 +148,6 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
       celebrations: state.celebrations + 1,
     ));
     load();
+    return true;
   }
 }

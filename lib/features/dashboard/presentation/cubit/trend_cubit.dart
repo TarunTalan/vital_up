@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
@@ -28,21 +29,59 @@ class TrendCubit<L> extends Cubit<TrendState<L>> {
   TrendCubit(this._loader, {TrendRange range = TrendRange.week})
       : super(TrendState<L>(range: range));
 
+  /// Bumped per load, so a slow earlier load (say 30D, then 7D tapped
+  /// quickly) can't overwrite a newer one.
+  int _request = 0;
+
+  @override
+  void emit(TrendState<L> state) {
+    if (!isClosed) super.emit(state);
+  }
+
   Future<void> load([TrendRange? range]) async {
     final r = range ?? state.range;
+    final request = ++_request;
     emit(TrendState<L>(range: r, data: state.data));
     try {
       final data = await _loader(r).withLoadTimeout();
-      if (isClosed) return;
+      if (request != _request) return;
       emit(TrendState<L>(range: r, loading: false, data: data));
     } catch (e) {
-      if (isClosed) return;
+      debugPrint('Trend load failed: $e');
+      if (request != _request) return;
       emit(TrendState<L>(
         range: r,
         loading: false,
         data: state.data,
-        error: e.toString(),
+        error: kLoadErrorMessage,
       ));
     }
+  }
+
+  /// Drops [log] from the list right away (a swiped-away tile must leave
+  /// the tree at once), runs [delete], then reloads either way. Returns
+  /// false when [delete] failed; the reload brings the entry back.
+  Future<bool> deleteLog(L log, Future<void> Function() delete) async {
+    final data = state.data;
+    if (data != null) {
+      emit(TrendState<L>(
+        range: state.range,
+        loading: state.loading,
+        data: TrendData<L>(data.series, [
+          for (final l in data.logs)
+            if (!identical(l, log) && l != log) l,
+        ]),
+        error: state.error,
+      ));
+    }
+    var ok = true;
+    try {
+      await delete();
+    } catch (e) {
+      debugPrint('Delete failed: $e');
+      ok = false;
+    }
+    await load();
+    return ok;
   }
 }

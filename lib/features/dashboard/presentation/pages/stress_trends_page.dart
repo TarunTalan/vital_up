@@ -11,6 +11,7 @@ import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/mood_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_detail_scaffold.dart';
@@ -61,7 +62,7 @@ class StressTrendsPage extends StatelessWidget {
                     : today.tags.isEmpty
                     ? 'Checked in today'
                     : today.tags.map((t) => t.label).join(', '),
-                fraction: loggedDays / data.series.points.length,
+                fraction: safeFraction(loggedDays, data.series.points.length),
                 ringLabel: '$loggedDays/${data.series.points.length}',
                 status: today == null
                     ? TrackerStatus.notLogged

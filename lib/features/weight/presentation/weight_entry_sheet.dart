@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -36,6 +37,8 @@ class _WeightEntrySheet extends StatefulWidget {
 }
 
 class _WeightEntrySheetState extends State<_WeightEntrySheet> {
+  static final _pattern = RegExp(r'^\d{0,3}([.,]\d?)?$');
+
   late final _value = TextEditingController(text: widget.initial);
   String? _error;
   bool _saving = false;
@@ -47,20 +50,27 @@ class _WeightEntrySheetState extends State<_WeightEntrySheet> {
   }
 
   Future<void> _save() async {
-    final value = double.tryParse(_value.text.replaceAll(',', '.'));
-    if (value == null) {
-      setState(() => _error = 'Enter your weight.');
+    if (_saving) return;
+    final (:kg, :error) = parseWeightEntry(_value.text, widget.unit);
+    if (kg == null) {
+      setState(() => _error = error);
       return;
     }
     setState(() => _saving = true);
-    final error = await sl<WeightService>().add(widget.unit.toKg(value));
+    String? saveError;
+    try {
+      saveError = await sl<WeightService>().add(kg);
+    } catch (e) {
+      debugPrint('Weight not saved: $e');
+      saveError = "Couldn't save your weight. Try again.";
+    }
     if (!mounted) return;
-    if (error == null) {
+    if (saveError == null) {
       Navigator.pop(context, true);
     } else {
       setState(() {
         _saving = false;
-        _error = error;
+        _error = saveError;
       });
     }
   }
@@ -72,11 +82,21 @@ class _WeightEntrySheetState extends State<_WeightEntrySheet> {
       title: 'Log weight',
       subtitle: 'Weigh in at the same time of day for a steady trend',
       action: AppPrimaryButton(label: 'Save', isLoading: _saving, onTap: _save),
-      child: AppTextField.decimal(
+      child: AppTextField(
         label: 'Weight',
         controller: _value,
         hint: '0.0',
         suffixText: widget.unit.label,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          // Up to 3 digits and one decimal place; "," for locales that use it.
+          TextInputFormatter.withFunction(
+            (old, next) => _pattern.hasMatch(next.text) ? next : old,
+          ),
+          LengthLimitingTextInputFormatter(weightInputMaxLength),
+        ],
+        textInputAction: TextInputAction.done,
+        enabled: !_saving,
         autofocus: true,
         error: _error,
         onSubmitted: (_) => _save(),

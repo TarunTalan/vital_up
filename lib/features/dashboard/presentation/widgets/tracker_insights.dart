@@ -111,7 +111,11 @@ List<TrackerInsight> seriesInsights(
 }
 
 double? _avg(Iterable<DailyPoint> points) {
-  final values = points.map((p) => p.value).whereType<double>().toList();
+  final values = points
+      .map((p) => p.value)
+      .whereType<double>()
+      .where((v) => v.isFinite)
+      .toList();
   if (values.isEmpty) return null;
   return values.reduce((a, b) => a + b) / values.length;
 }

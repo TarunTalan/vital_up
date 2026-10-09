@@ -237,9 +237,6 @@ class _DashboardPageState extends State<DashboardPage> {
             create: (_) =>
                 TrendCubit<WeightLogCache>(sl<WeightService>().trend)..load(),
           ),
-          BlocProvider<ScreenTimeCubit>(
-            create: (context) => sl<ScreenTimeCubit>()..loadStats(),
-          ),
           BlocProvider<SleepCubit>(
             create: (context) => sl<SleepCubit>()..loadSleepData(),
           ),
@@ -249,16 +246,12 @@ class _DashboardPageState extends State<DashboardPage> {
           listener: (context, state) {
             final award = state.award;
             if (award == null) return;
-            // Full celebrations belong to the Arena; elsewhere just a note.
-            if (_selectedIndex == _arenaTab) {
+            // Rewards stay quiet: a level-up in the Arena gets the dialog,
+            // everything else a snackbar.
+            if (award.levelUp && _selectedIndex == _arenaTab) {
               showRewardCelebration(context, award);
             } else {
-              showSuccessSnackBar(
-                context,
-                award.levelUp
-                    ? 'Level ${award.level} reached'
-                    : 'Badge unlocked: ${award.newBadges.first.name}',
-              );
+              showSuccessSnackBar(context, awardMessage(award));
             }
           },
           child: PopScope(
@@ -363,11 +356,14 @@ class _HomeTabState extends State<_HomeTab> {
     HapticFeedback.lightImpact();
     if (!mounted) return;
     _reloadAll();
-    await sl<HomeWidgetService>().refresh();
-
-    if (mounted) {
-      showSuccessSnackBar(context, 'Widget & health data refreshed');
+    try {
+      await sl<HomeWidgetService>().refresh();
+    } catch (e) {
+      debugPrint('Home refresh failed: $e');
+      if (mounted) showErrorSnackBar(context, "Couldn't refresh. Try again.");
+      return;
     }
+    if (mounted) showSuccessSnackBar(context, 'Your data is up to date');
   }
 
   void _reloadAll() {
@@ -422,7 +418,18 @@ class _HomeTabState extends State<_HomeTab> {
       case TrackerMetric.sleep:
         final sleep = context.read<SleepCubit>();
         final trend = context.read<TrendCubit<SleepSessionInfo>>();
-        if (await showSleepLogSheet(context)) {
+        final now = DateTime.now();
+        final estimate = switch (sleep.state) {
+          SleepNeedsConfirmation(:final estimate) => estimate,
+          SleepInBed(:final since) => SleepSessionInfo(
+            bedTime: since,
+            wakeTime: now,
+            duration: now.difference(since),
+            source: SleepDataSource.manual,
+          ),
+          _ => null,
+        };
+        if (await showSleepLogSheet(context, initial: estimate)) {
           sleep.loadSleepData();
           trend.load();
         }

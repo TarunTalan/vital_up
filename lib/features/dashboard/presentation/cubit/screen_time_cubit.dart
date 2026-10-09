@@ -13,6 +13,11 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
   }
 
   @override
+  void emit(ScreenTimeState state) {
+    if (!isClosed) super.emit(state);
+  }
+
+  @override
   Future<void> close() {
     WidgetsBinding.instance.removeObserver(this);
     return super.close();
@@ -25,8 +30,10 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
     }
   }
 
+  /// Already showing figures, it refreshes in place (no placeholder flash
+  /// on every app resume).
   Future<void> loadStats() async {
-    emit(ScreenTimeLoading());
+    if (state is! ScreenTimeLoaded) emit(ScreenTimeLoading());
     try {
       final hasPermission = await _service.hasPermission().withLoadTimeout();
       if (!hasPermission) {
@@ -54,11 +61,18 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
         weeklySummary: summary,
       ));
     } catch (e) {
-      emit(ScreenTimeError(e.toString()));
+      debugPrint('Screen time load failed: $e');
+      if (state is! ScreenTimeLoaded) {
+        emit(const ScreenTimeError(kLoadErrorMessage));
+      }
     }
   }
 
   Future<void> openSettings() async {
-    await _service.openSettings();
+    try {
+      await _service.openSettings();
+    } catch (e) {
+      debugPrint('Usage access settings unavailable: $e');
+    }
   }
 }

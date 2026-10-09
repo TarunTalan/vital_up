@@ -69,7 +69,10 @@ class WaterTrendsPage extends StatelessWidget {
             onLog: () async {
               final added = await showWaterLogSheet(
                 context,
-                onAdd: (ml) => water.addWaterLog(userId, ml),
+                onAdd: (ml) async {
+                  await water.addWaterLog(userId, ml);
+                  return true;
+                },
               );
               if (added != null) cubit.load();
             },
@@ -80,10 +83,12 @@ class WaterTrendsPage extends StatelessWidget {
               title: _presetFor(log.amountMl)?.label ?? 'Water',
               subtitle: DateFormat('EEE d MMM · h:mm a').format(log.timestamp),
               trailing: '${log.amountMl} ml',
-              onDelete: () async {
-                await water.deleteWaterLog(log.id);
-                cubit.load();
-              },
+              onDelete: () => deleteTrackerLog(
+                context,
+                cubit,
+                log,
+                () => water.deleteWaterLog(log.id),
+              ),
             ),
           );
         },

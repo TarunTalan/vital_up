@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -43,7 +45,7 @@ class SleepTrendsPage extends StatelessWidget {
             format: formatHours,
             heroLabel: 'Last night',
             today: (data) {
-              final night = data.logs.firstOrNull;
+              final night = _lastNight(data.logs);
               final goal = data.series.goal;
               final hours = night == null
                   ? null
@@ -56,7 +58,7 @@ class SleepTrendsPage extends StatelessWidget {
                     ? 'Log last night to see your trend'
                     : '${time.format(night.bedTime)} – '
                           '${time.format(night.wakeTime)}',
-                fraction: hours == null || goal == null ? null : hours / goal,
+                fraction: safeFraction(hours, goal),
                 // The night is over, so judge it against the whole goal.
                 status: TrackerStatus.of(value: hours, goal: goal, paceFraction: 1),
                 ringLabel: night == null ? null : '${night.sleepScore}',
@@ -76,7 +78,7 @@ class SleepTrendsPage extends StatelessWidget {
             },
             insights: (data) => _bedtimeInsights(data.logs),
             sections: (context, data) => [
-              if (data.logs.firstOrNull?.hasStages ?? false)
+              if (_lastNight(data.logs)?.hasStages ?? false)
                 AppCard(
                   width: double.infinity,
                   padding: AppDimens.cardPaddingCompact,
@@ -85,7 +87,7 @@ class SleepTrendsPage extends StatelessWidget {
                     children: [
                       const AppCaption('Last night’s stages'),
                       const SizedBox(height: AppDimens.space12),
-                      SleepStagesBar(session: data.logs.first),
+                      SleepStagesBar(session: _lastNight(data.logs)!),
                     ],
                   ),
                 ),
@@ -102,9 +104,11 @@ class SleepTrendsPage extends StatelessWidget {
             },
             logBuilder: (context, night) => TrackerLogTile(
               id: night.bedTime.millisecondsSinceEpoch,
-              icon: night.source == SleepDataSource.healthStore
-                  ? Icons.watch_rounded
-                  : metric.icon,
+              icon: switch (night.source) {
+                SleepDataSource.healthStore => Icons.watch_rounded,
+                SleepDataSource.phone => Icons.smartphone_rounded,
+                SleepDataSource.manual => metric.icon,
+              },
               color: sleepScoreColor(night.sleepScore),
               title: DateFormat('EEE d MMM').format(night.wakeTime),
               subtitle:
@@ -117,6 +121,19 @@ class SleepTrendsPage extends StatelessWidget {
         },
       ),
     );
+  }
+
+  /// The newest night if it ended today (before 4 am, yesterday), as on
+  /// the home card; an older night isn't "last night".
+  static SleepSessionInfo? _lastNight(List<SleepSessionInfo> logs) {
+    final night = logs.firstOrNull;
+    if (night == null) return null;
+    final now = DateTime.now();
+    final today = startOfDay(now);
+    final from = now.hour < 4
+        ? DateTime(today.year, today.month, today.day - 1)
+        : today;
+    return night.wakeTime.isBefore(from) ? null : night;
   }
 
   /// Typical bedtime and how much it moves around.

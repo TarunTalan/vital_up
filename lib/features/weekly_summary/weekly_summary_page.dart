@@ -30,14 +30,27 @@ class _WeeklySummaryPageState extends State<WeeklySummaryPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      onRefresh: () async => setState(() => _data = _load()),
+      onRefresh: () async {
+        final next = _load();
+        // Block body: a setState callback must not return the Future.
+        setState(() {
+          _data = next;
+        });
+        try {
+          await next;
+        } catch (_) {
+          // Shown by the FutureBuilder below.
+        }
+      },
       header: const AppPageHeader(title: 'Your week'),
       body: FutureBuilder<(WeeklySummary, WeightUnit)>(
         future: _data,
         builder: (context, snap) {
           if (snap.hasError) {
             return LoadErrorView(
-              onRetry: () => setState(() => _data = _load()),
+              onRetry: () => setState(() {
+                _data = _load();
+              }),
             );
           }
           final data = snap.data;
@@ -143,10 +156,10 @@ class _Summary extends StatelessWidget {
 
   static String _headline(WeekStats now, WeekStats before) {
     if (now.workouts > before.workouts) {
-      return 'More active than last week — keep it going!';
+      return 'More active than last week. Keep it going.';
     }
-    if (now.waterGoalDays >= 5) return 'Great hydration this week!';
-    if (now.mealDays >= 5) return 'Consistent meal logging — nice work!';
+    if (now.waterGoalDays >= 5) return 'Great hydration this week.';
+    if (now.mealDays >= 5) return 'Consistent meal logging. Nice work.';
     return 'Here\'s how your week went.';
   }
 }
