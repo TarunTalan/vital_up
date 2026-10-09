@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -29,14 +31,25 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
 
   final List<String> _units = ['serving', 'g', 'oz', 'cup', 'piece', 'slice', 'tbsp', 'tsp'];
 
+  /// Prevents a double tap from adding the item twice.
+  bool _submitted = false;
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.item?.name ?? '');
+    final quantity = widget.item?.quantity;
     _quantityController = TextEditingController(
-      text: widget.item?.quantity.toString() ?? '1',
+      text: quantity == null
+          ? '1'
+          : quantity == quantity.roundToDouble()
+              ? quantity.round().toString()
+              : quantity.toStringAsFixed(1),
     );
     _selectedUnit = widget.item?.unit ?? 'serving';
+    // A unit from the server (e.g. "bowl") must be in the list, or the
+    // dropdown asserts.
+    if (!_units.contains(_selectedUnit)) _units.insert(0, _selectedUnit);
   }
 
   @override
@@ -47,15 +60,23 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
   }
 
   void _handleSave() {
-    final name = _nameController.text.trim();
-    final quantity = double.tryParse(_quantityController.text) ?? 1.0;
+    if (_submitted) return;
+    final name = sanitizeText(_nameController.text, maxLength: InputLimits.shortText);
+    final quantity = parseNumberInRange(
+      _quantityController.text,
+      min: NutritionLimits.quantityMin,
+      max: NutritionLimits.quantityMax,
+    );
 
     setState(() {
       _nameError = name.isEmpty ? 'Enter a food name' : null;
-      _quantityError = quantity <= 0 ? 'Enter a quantity' : null;
+      _quantityError = quantity == null
+          ? 'Enter an amount from ${NutritionLimits.quantityMin} to ${NutritionLimits.quantityMax.round()}'
+          : null;
     });
-    if (_nameError != null || _quantityError != null) return;
+    if (_nameError != null || quantity == null) return;
 
+    _submitted = true;
     widget.onSave(name, quantity, _selectedUnit);
     Navigator.of(context).pop();
   }
@@ -112,6 +133,8 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                           controller: _nameController,
                           hint: 'e.g., Grilled Chicken',
                           error: _nameError,
+                          maxLength: InputLimits.shortText,
+                          inputFormatters: InputFormatters.text(InputLimits.shortText),
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.next,
                           onChanged: (_) {
@@ -155,7 +178,7 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                         ),
                         const SizedBox(height: AppDimens.space20),
                         const AppInfoNote(
-                          message: 'Nutrition data will be fetched from USDA database based on the food name.',
+                          message: 'We look up nutrition from the food name.',
                         ),
                       ],
                     ),

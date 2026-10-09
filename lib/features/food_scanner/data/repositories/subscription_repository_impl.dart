@@ -52,13 +52,13 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     try {
       final userId = supabaseClient.auth.currentUser?.id;
       if (userId == null) {
-        return const Left(ServerFailure('User not authenticated'));
+        return const Left(ServerFailure('Please sign in to continue.'));
       }
       return Right(await _isPremium(userId));
     } catch (e) {
       logger.e('Error checking premium status: $e');
       if (isOfflineError(e)) return const Left(NetworkFailure());
-      return const Left(ServerFailure('Failed to check subscription status'));
+      return const Left(ServerFailure("Couldn't check your plan. Try again."));
     }
   }
 
@@ -67,13 +67,13 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     try {
       final userId = supabaseClient.auth.currentUser?.id;
       if (userId == null) {
-        return const Left(ServerFailure('User not authenticated'));
+        return const Left(ServerFailure('Please sign in to continue.'));
       }
       return Right(await _remainingScans(userId));
     } catch (e) {
       logger.e('Error checking remaining scans: $e');
       if (isOfflineError(e)) return const Left(NetworkFailure());
-      return const Left(ServerFailure('Failed to check scan quota'));
+      return const Left(ServerFailure("Couldn't check your scans left. Try again."));
     }
   }
 
@@ -85,7 +85,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       // the cached copies are kept).
       final userId = supabaseClient.auth.currentUser?.id;
       if (userId == null) {
-        return const Left(ServerFailure('User not authenticated'));
+        return const Left(ServerFailure('Please sign in to continue.'));
       }
 
       await Future.wait([
@@ -97,7 +97,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     } catch (e) {
       logger.e('Error refreshing subscription status: $e');
       if (isOfflineError(e)) return const Left(NetworkFailure());
-      return const Left(ServerFailure('Failed to refresh subscription status'));
+      return const Left(ServerFailure("Couldn't refresh your plan. Try again."));
     }
   }
 }

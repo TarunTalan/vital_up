@@ -14,6 +14,7 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.d
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -37,6 +38,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   late Map<String, dynamic> _preferences;
   String _mode = 'cached';
 
+  /// Guards "Set as Active Plan" against double taps.
+  bool _saving = false;
+
   /// Last tweak request, so "Try Again" after a failure retries the tweak.
   String? _instructions;
   MealPlan? _basePlan;
@@ -46,8 +50,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     super.initState();
     _cubit = sl<DietPlanCubit>();
     _mode = widget.params['mode'] as String? ?? 'cached';
-    _preferences = widget.params['preferences'] as Map<String, dynamic>? ?? {};
-    
+    final prefs = widget.params['preferences'];
+    _preferences = prefs is Map ? Map<String, dynamic>.from(prefs) : {};
+
     if (_mode == 'cached') {
       _cubit.loadActiveMealPlan();
     } else {
@@ -61,6 +66,16 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         // Opened from Vita: tweak the active plan with its saved preferences.
         final getActive = sl<GetActiveMealPlan>();
         final base = await getActive();
+        if (!mounted) return;
+        final instructions = sanitizeOptional(
+          widget.params['instructions']?.toString(),
+          maxLength: InputLimits.chatMessage,
+          multiline: true,
+        );
+        if (instructions == null) {
+          _cubit.showError('Tell Vita what to change, then try again.');
+          return;
+        }
         if (base == null) {
           _cubit.showError(
             'Create a diet plan first, then ask Vita to tweak it.',
@@ -68,17 +83,23 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
           return;
         }
         _preferences = await getActive.preferences();
+        if (!mounted) return;
         _target = NutritionTarget(
           calories: base.totalCalories,
           protein: base.totalProtein,
           carbs: base.totalCarbs,
           fat: base.totalFat,
         );
-        _tweak(widget.params['instructions'] as String, base);
+        _tweak(instructions, base);
         return;
       }
       if (_mode == 'manual') {
-        _target = widget.params['target'] as NutritionTarget;
+        final target = widget.params['target'];
+        if (target is! NutritionTarget) {
+          _cubit.showError("Couldn't read your targets. Go back and try again.");
+          return;
+        }
+        _target = target;
       } else {
         final store = sl<OnboardingDataStore>();
         final weight = await store.getWeight();
@@ -89,7 +110,8 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         final gender = await store.getGender();
         final activity = await store.getActivity();
         final healthConditions = await store.getHealthConditions();
-        
+        if (!mounted) return;
+
         final onboardingData = OnboardingData(
           weight: weight,
           weightUnit: weightUnit,
@@ -100,18 +122,26 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
           activity: activity,
           healthConditions: healthConditions,
         );
-        
+
         final calcOnboarding = CalculateTargetFromOnboarding();
-        
+
         if (_mode == 'smart') {
           _target = calcOnboarding(onboardingData);
         } else if (_mode == 'goal') {
-          final targetWeight = widget.params['targetWeight'] as double;
-          final timeframe = widget.params['timeframe'] as int;
-          
+          final targetWeight = (widget.params['targetWeight'] as num?)?.toDouble();
+          final timeframe = (widget.params['timeframe'] as num?)?.round();
+          if (targetWeight == null || timeframe == null || timeframe < 1) {
+            _cubit.showError("Couldn't read your goal. Go back and try again.");
+            return;
+          }
+
           final baseTarget = calcOnboarding(onboardingData);
-          final currentWeight = double.tryParse(onboardingData.weight) ?? 70.0;
-          
+          // The stored weight may be in lbs; the goal weight is in kg.
+          final currentWeight = CalculateTargetFromOnboarding.parseWeightKg(
+            onboardingData.weight,
+            onboardingData.weightUnit,
+          );
+
           final calcGoal = CalculateTargetFromGoal();
           _target = calcGoal(
             currentTdee: baseTarget.calories.toDouble(),
@@ -122,12 +152,13 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
           );
         }
       }
-      
+
       if (_target != null) {
         _cubit.generatePlan(target: _target!, preferences: _preferences);
       }
     } catch (e) {
-      _cubit.showError('Failed to calculate target: $e');
+      debugPrint('Diet plan target failed: $e');
+      _cubit.showError("Couldn't work out your targets. Try again.");
     }
   }
 
@@ -216,7 +247,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                         const VitalUpLoader(),
                         const SizedBox(height: AppDimens.space16),
                         Text(
-                          'Generating your personalized plan...',
+                          'Creating your plan...',
                           textAlign: TextAlign.center,
                           style: context.text.bodyMedium?.copyWith(
                             color: context.vColors.grayText,
@@ -297,12 +328,20 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         const SizedBox(height: AppDimens.space12),
         AppPrimaryButton(
           label: 'Set as Active Plan',
+          isLoading: _saving,
           onTap: () async {
-            await _cubit.saveActivePlan(plan, preferences: _preferences);
-            if (context.mounted) {
-              showSuccessSnackBar(context, 'Active plan saved successfully!');
-              context.goNamed('dashboard');
+            if (_saving) return;
+            setState(() => _saving = true);
+            final saved = await _cubit.saveActivePlan(plan, preferences: _preferences);
+            if (!mounted) return;
+            setState(() => _saving = false);
+            if (!context.mounted) return;
+            if (!saved) {
+              showErrorSnackBar(context, "Couldn't save your plan. Try again.");
+              return;
             }
+            showSuccessSnackBar(context, 'Plan saved as your active plan.');
+            context.goNamed('dashboard');
           },
         ),
       ],
@@ -335,6 +374,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     final thickness = context.w(AppDimens.donutThickness);
     // Values live in the legend below — the ring is too thin to hold
     // "120g Protein" without clipping, especially on small slices.
+    // fl_chart can't draw a ring whose values sum to zero; show an empty
+    // track instead.
+    final hasMacros = plan.totalProtein + plan.totalCarbs + plan.totalFat > 0;
     PieChartSectionData section(Color color, int value) {
       return PieChartSectionData(
         color: color,
@@ -360,11 +402,13 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                   PieChartData(
                     sectionsSpace: AppDimens.space4,
                     centerSpaceRadius: hole,
-                    sections: [
-                      section(AppColors.protein, plan.totalProtein),
-                      section(AppColors.carbs, plan.totalCarbs),
-                      section(AppColors.fat, plan.totalFat),
-                    ],
+                    sections: hasMacros
+                        ? [
+                            section(AppColors.protein, plan.totalProtein),
+                            section(AppColors.carbs, plan.totalCarbs),
+                            section(AppColors.fat, plan.totalFat),
+                          ]
+                        : [section(context.vColors.divider ?? AppColors.protein, 1)],
                   ),
                 ),
                 FittedBox(

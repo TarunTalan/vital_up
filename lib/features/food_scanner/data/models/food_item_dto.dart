@@ -1,4 +1,5 @@
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 
 class FoodItemDto {
   final String id;
@@ -19,15 +20,19 @@ class FoodItemDto {
     this.fdcId,
   });
 
+  /// Tolerates ids sent as numbers and clamps AI values (confidence 0..1,
+  /// a usable quantity, clean single-line text).
   factory FoodItemDto.fromJson(Map<String, dynamic> json) {
+    String? text(Object? v) => v?.toString();
+    final unit = saneFoodName(json['unit'] ?? json['serving_unit']);
     return FoodItemDto(
-      id: json['id'] as String? ?? json['food_id']?.toString() ?? '',
-      name: json['name'] as String? ?? json['food_name'] ?? '',
-      confidenceScore: (json['confidence_score'] as num?)?.toDouble() ?? 0.0,
-      servingDescription: json['serving_description'] as String? ?? json['serving_description'] ?? '',
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
-      unit: json['unit'] as String? ?? json['serving_unit'] ?? 'serving',
-      fdcId: json['fdc_id'] as String?,
+      id: text(json['id']) ?? text(json['food_id']) ?? '',
+      name: saneFoodName(json['name'] ?? json['food_name']),
+      confidenceScore: saneConfidence(json['confidence_score']),
+      servingDescription: saneFoodName(json['serving_description']),
+      quantity: saneQuantity(json['quantity']),
+      unit: unit.isEmpty ? 'serving' : unit,
+      fdcId: text(json['fdc_id']),
     );
   }
 

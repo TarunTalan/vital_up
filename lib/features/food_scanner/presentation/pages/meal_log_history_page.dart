@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
@@ -30,8 +32,6 @@ class _MealLogHistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
     return AppScaffold(
       header: AppPageHeader(
         title: "Today's Meals",
@@ -45,7 +45,12 @@ class _MealLogHistoryView extends StatelessWidget {
           onRefresh: () async {
             context.read<MealLogBloc>().add(const LoadTodaysMeals());
           },
-          child: BlocBuilder<MealLogBloc, MealLogState>(
+          child: BlocConsumer<MealLogBloc, MealLogState>(
+            listenWhen: (_, state) => state is MealLogLoaded && state.notice != null,
+            listener: (context, state) {
+              final notice = (state as MealLogLoaded).notice;
+              if (notice != null) showErrorSnackBar(context, notice);
+            },
             builder: (context, state) {
               if (state is MealLogLoading) {
                 return const Center(child: CircularProgressIndicator());
@@ -58,12 +63,9 @@ class _MealLogHistoryView extends StatelessWidget {
                     height: MediaQuery.of(context).size.height * 0.6,
                     alignment: Alignment.center,
                     padding: context.pagePadding,
-                    child: Text(
-                      'Failed to load meals: ${state.message}',
-                      textAlign: TextAlign.center,
-                      style: context.text.bodyMedium?.copyWith(
-                        color: colors.error,
-                      ),
+                    child: LoadErrorView(
+                      message: state.message,
+                      onRetry: () => context.read<MealLogBloc>().add(const LoadTodaysMeals()),
                     ),
                   ),
                 );

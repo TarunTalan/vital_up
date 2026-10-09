@@ -21,7 +21,7 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return Right(entry);
     } catch (e) {
       logger.e('Error saving meal log: $e');
-      return Left(DatabaseFailure('Failed to save meal log: $e'));
+      return const Left(DatabaseFailure("Couldn't save this meal. Try again."));
     }
   }
 
@@ -32,7 +32,7 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return Right(logs);
     } catch (e) {
       logger.e('Error getting meal logs for date: $e');
-      return Left(DatabaseFailure('Failed to retrieve meal logs: $e'));
+      return const Left(DatabaseFailure("Couldn't load your meals. Try again."));
     }
   }
 
@@ -43,7 +43,7 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return Right(logs);
     } catch (e) {
       logger.e('Error getting all meal logs: $e');
-      return Left(DatabaseFailure('Failed to retrieve meal logs: $e'));
+      return const Left(DatabaseFailure("Couldn't load your meals. Try again."));
     }
   }
 
@@ -54,7 +54,7 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return const Right(unit);
     } catch (e) {
       logger.e('Error deleting meal log: $e');
-      return Left(DatabaseFailure('Failed to delete meal log: $e'));
+      return const Left(DatabaseFailure("Couldn't delete this meal. Try again."));
     }
   }
 }

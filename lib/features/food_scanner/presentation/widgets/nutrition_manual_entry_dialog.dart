@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -89,6 +92,15 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   /// Bumped per keystroke; a cloud search only applies if it is still the latest.
   int _queryGeneration = 0;
 
+  /// Inline errors per numeric field, set on Submit and cleared on edit.
+  final Map<TextEditingController, String?> _fieldErrors = {};
+
+  /// The Autocomplete's own controller, mirrored into [_nameController].
+  TextEditingController? _autocompleteController;
+
+  bool _loadingDetails = false;
+  bool _submitted = false;
+
   /// Cloud results for this dialog, by normalized query.
   final Map<String, List<AutocompleteSuggestion>> _remoteByQuery = {};
 
@@ -103,18 +115,36 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     _quantityController = TextEditingController(text: '100');
 
     // Pre-fill parsed nutrition if available
+    // OCR can misread; clamp what it found so the fields start sane.
     final parsed = widget.parsedNutrition;
-    _caloriesController = TextEditingController(text: parsed?['calories']?.toStringAsFixed(1) ?? '0');
-    _proteinController = TextEditingController(text: parsed?['protein']?.toStringAsFixed(1) ?? '0');
-    _carbsController = TextEditingController(text: parsed?['carbs']?.toStringAsFixed(1) ?? '0');
-    _fatController = TextEditingController(text: parsed?['fat']?.toStringAsFixed(1) ?? '0');
-    _fiberController = TextEditingController(text: parsed?['fiber']?.toStringAsFixed(1) ?? '0');
-    _sugarController = TextEditingController(text: parsed?['sugar']?.toStringAsFixed(1) ?? '0');
-    _sodiumController = TextEditingController(text: parsed?['sodium']?.toStringAsFixed(1) ?? '0');
+    String prefill(String key, double max) => _fmt(saneAmount(parsed?[key], max: max));
+    _caloriesController = TextEditingController(text: prefill('calories', NutritionLimits.caloriesMax));
+    _proteinController = TextEditingController(text: prefill('protein', NutritionLimits.macroGMax));
+    _carbsController = TextEditingController(text: prefill('carbs', NutritionLimits.macroGMax));
+    _fatController = TextEditingController(text: prefill('fat', NutritionLimits.macroGMax));
+    _fiberController = TextEditingController(text: prefill('fiber', NutritionLimits.macroGMax));
+    _sugarController = TextEditingController(text: prefill('sugar', NutritionLimits.macroGMax));
+    _sodiumController = TextEditingController(text: prefill('sodium', NutritionLimits.mgMax));
+  }
+
+  /// "12.5" / "12" with at most one decimal.
+  static String _fmt(double v) => v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
+
+  void _syncName() {
+    final c = _autocompleteController;
+    if (c != null && _nameController.text != c.text) _nameController.text = c.text;
+  }
+
+  /// Fills quantity / unit from a serving text such as "1 bowl (150g)".
+  void _applyServing(String serving) {
+    final parsed = parseServingSize(serving);
+    _quantityController.text = _fmt(parsed.quantity);
+    _selectedUnit = _units.contains(parsed.unit) ? parsed.unit : 'serving';
   }
 
   @override
   void dispose() {
+    _autocompleteController?.removeListener(_syncName);
     _nameController.dispose();
     _quantityController.dispose();
     _caloriesController.dispose();
@@ -203,7 +233,10 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
           _remoteByQuery[query] = onlineSuggestions;
         },
       );
-    } catch (_) {}
+    } catch (e) {
+      // Suggestions are optional; offline matches still show.
+      debugPrint('Food search failed: $e');
+    }
     return onlineSuggestions;
   }
 
@@ -222,39 +255,26 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   void _onSuggestionSelected(AutocompleteSuggestion suggestion) async {
     setState(() {
       _nameController.text = suggestion.name;
+      _fieldErrors.clear();
     });
 
     if (suggestion.isOffline) {
-      // Offline suggestion has all macros pre-populated!
+      // Offline suggestion has all macros pre-populated.
       setState(() {
-        _quantityController.text = suggestion.servingSize.replaceAll(RegExp(r'[^\d.]'), '');
-        if (_quantityController.text.isEmpty) {
-          _quantityController.text = '100';
-        }
-        
-        if (suggestion.servingSize.toLowerCase().contains('serving')) {
-          _selectedUnit = 'serving';
-        } else if (suggestion.servingSize.toLowerCase().contains('piece')) {
-          _selectedUnit = 'piece';
-        } else {
-          _selectedUnit = 'g';
-        }
-
-        _caloriesController.text = suggestion.calories.toStringAsFixed(1);
-        _proteinController.text = suggestion.protein.toStringAsFixed(1);
-        _carbsController.text = suggestion.carbs.toStringAsFixed(1);
-        _fatController.text = suggestion.fat.toStringAsFixed(1);
-        _fiberController.text = suggestion.fiber.toStringAsFixed(1);
-        _sugarController.text = suggestion.sugar.toStringAsFixed(1);
-        _sodiumController.text = suggestion.sodium.toStringAsFixed(1);
+        _applyServing(suggestion.servingSize);
+        _caloriesController.text = _fmt(saneAmount(suggestion.calories, max: NutritionLimits.caloriesMax));
+        _proteinController.text = _fmt(saneAmount(suggestion.protein, max: NutritionLimits.macroGMax));
+        _carbsController.text = _fmt(saneAmount(suggestion.carbs, max: NutritionLimits.macroGMax));
+        _fatController.text = _fmt(saneAmount(suggestion.fat, max: NutritionLimits.macroGMax));
+        _fiberController.text = _fmt(saneAmount(suggestion.fiber, max: NutritionLimits.macroGMax));
+        _sugarController.text = _fmt(saneAmount(suggestion.sugar, max: NutritionLimits.macroGMax));
+        _sodiumController.text = _fmt(saneAmount(suggestion.sodium, max: NutritionLimits.mgMax));
       });
     } else {
-      // Remote suggestion needs details query
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor)),
-      );
+      if (_loadingDetails) return;
+      // Remote suggestion needs a details lookup; fields stay editable
+      // and a small spinner shows instead of a blocking dialog.
+      setState(() => _loadingDetails = true);
 
       final repository = GetIt.instance<NutritionRepository>();
       final dummyItem = FoodItem(
@@ -267,39 +287,25 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       );
 
       final detailResult = await repository.getNutrition(dummyItem);
-      
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loader
-      }
+      if (!mounted) return;
+      setState(() => _loadingDetails = false);
 
       detailResult.fold(
         (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to load nutritional details for selected item.')),
-          );
+          debugPrint('Loading food details failed: $failure');
+          showErrorSnackBar(context, "Couldn't load details. Enter them yourself.");
         },
-        (info) {
+        (raw) {
+          final info = sanitizeNutrition(raw);
           setState(() {
-            _quantityController.text = info.per.servingDescription.replaceAll(RegExp(r'[^\d.]'), '');
-            if (_quantityController.text.isEmpty) {
-              _quantityController.text = '100';
-            }
-
-            if (info.per.servingDescription.toLowerCase().contains('serving')) {
-              _selectedUnit = 'serving';
-            } else if (info.per.servingDescription.toLowerCase().contains('piece')) {
-              _selectedUnit = 'piece';
-            } else {
-              _selectedUnit = 'g';
-            }
-
-            _caloriesController.text = info.calories.toStringAsFixed(1);
-            _proteinController.text = info.proteinG.toStringAsFixed(1);
-            _carbsController.text = info.carbsG.toStringAsFixed(1);
-            _fatController.text = info.fatG.toStringAsFixed(1);
-            _fiberController.text = info.fiberG.toStringAsFixed(1);
-            _sugarController.text = info.sugarG.toStringAsFixed(1);
-            _sodiumController.text = info.sodiumMg.toStringAsFixed(1);
+            _applyServing(info.per.servingDescription);
+            _caloriesController.text = _fmt(info.calories);
+            _proteinController.text = _fmt(info.proteinG);
+            _carbsController.text = _fmt(info.carbsG);
+            _fatController.text = _fmt(info.fatG);
+            _fiberController.text = _fmt(info.fiberG);
+            _sugarController.text = _fmt(info.sugarG);
+            _sodiumController.text = _fmt(info.sodiumMg);
           });
         },
       );
@@ -308,22 +314,53 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
 
   String? _nameError;
 
-  void _handleSave() {
-    final name = _nameController.text.trim();
-    final quantity = double.tryParse(_quantityController.text) ?? 100.0;
-    final calories = double.tryParse(_caloriesController.text) ?? 0.0;
-    final protein = double.tryParse(_proteinController.text) ?? 0.0;
-    final carbs = double.tryParse(_carbsController.text) ?? 0.0;
-    final fat = double.tryParse(_fatController.text) ?? 0.0;
-    final fiber = double.tryParse(_fiberController.text) ?? 0.0;
-    final sugar = double.tryParse(_sugarController.text) ?? 0.0;
-    final sodium = double.tryParse(_sodiumController.text) ?? 0.0;
+  /// Reads [controller] as a number in [0, max] (empty counts as 0) and
+  /// records an inline error when it is out of range.
+  double? _readAmount(TextEditingController controller, double max, String unit) {
+    final text = controller.text.trim();
+    if (text.isEmpty) return 0;
+    final value = parseNumberInRange(text, min: 0, max: max);
+    if (value == null) _fieldErrors[controller] = 'Use 0 to ${max.round()} $unit';
+    return value;
+  }
 
-    if (name.isEmpty) {
-      setState(() => _nameError = 'Enter a product name');
+  void _handleSave() {
+    if (_submitted) return;
+    _syncName();
+    final name = sanitizeText(_nameController.text, maxLength: InputLimits.shortText);
+    _fieldErrors.clear();
+
+    final quantity = parseNumberInRange(
+      _quantityController.text,
+      min: NutritionLimits.quantityMin,
+      max: NutritionLimits.quantityMax,
+    );
+    if (quantity == null) {
+      _fieldErrors[_quantityController] = 'Enter ${NutritionLimits.quantityMin} to ${NutritionLimits.quantityMax.round()}';
+    }
+    final calories = _readAmount(_caloriesController, NutritionLimits.caloriesMax, 'kcal');
+    final protein = _readAmount(_proteinController, NutritionLimits.macroGMax, 'g');
+    final carbs = _readAmount(_carbsController, NutritionLimits.macroGMax, 'g');
+    final fat = _readAmount(_fatController, NutritionLimits.macroGMax, 'g');
+    final fiber = _readAmount(_fiberController, NutritionLimits.macroGMax, 'g');
+    final sugar = _readAmount(_sugarController, NutritionLimits.macroGMax, 'g');
+    final sodium = _readAmount(_sodiumController, NutritionLimits.mgMax, 'mg');
+
+    setState(() => _nameError = name.isEmpty ? 'Enter a product name' : null);
+    if (name.isEmpty ||
+        _fieldErrors.values.any((e) => e != null) ||
+        quantity == null ||
+        calories == null ||
+        protein == null ||
+        carbs == null ||
+        fat == null ||
+        fiber == null ||
+        sugar == null ||
+        sodium == null) {
       return;
     }
 
+    _submitted = true;
     widget.onSave(
       name: name,
       quantity: quantity,
@@ -370,7 +407,13 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                 controller: controller,
                 suffixText: suffix,
                 hint: '0',
+                error: _fieldErrors[controller],
                 textInputAction: TextInputAction.next,
+                onChanged: (_) {
+                  if (_fieldErrors[controller] != null) {
+                    setState(() => _fieldErrors[controller] = null);
+                  }
+                },
               ),
             ),
           ],
@@ -516,15 +559,28 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                             if (textEditingController.text != _nameController.text) {
                                 textEditingController.text = _nameController.text;
                             }
-                            textEditingController.addListener(() {
-                              _nameController.text = textEditingController.text;
-                            });
+                            // Listen once: this builder runs on every rebuild.
+                            if (!identical(_autocompleteController, textEditingController)) {
+                              _autocompleteController?.removeListener(_syncName);
+                              _autocompleteController = textEditingController..addListener(_syncName);
+                            }
 
                             return AppTextField(
                               controller: textEditingController,
                               focusNode: focusNode,
                               hint: 'e.g., Haldiram\'s Bhujia',
                               error: _nameError,
+                              maxLength: InputLimits.shortText,
+                              inputFormatters: InputFormatters.text(InputLimits.shortText),
+                              suffix: _loadingDetails
+                                  ? SizedBox.square(
+                                      dimension: AppDimens.iconMd,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: AppDimens.borderThick,
+                                        color: primary,
+                                      ),
+                                    )
+                                  : null,
                               textCapitalization: TextCapitalization.words,
                               onSubmitted: (_) => onFieldSubmitted(),
                               onChanged: (_) {
@@ -549,6 +605,12 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                               child: AppTextField.decimal(
                                 controller: _quantityController,
                                 hint: '1',
+                                error: _fieldErrors[_quantityController],
+                                onChanged: (_) {
+                                  if (_fieldErrors[_quantityController] != null) {
+                                    setState(() => _fieldErrors[_quantityController] = null);
+                                  }
+                                },
                               ),
                             ),
                             const SizedBox(width: AppDimens.space8),

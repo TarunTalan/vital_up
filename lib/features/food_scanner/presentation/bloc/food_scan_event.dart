@@ -116,6 +116,10 @@ class AddCustomNutritionItemRequested extends FoodScanEvent {
   final double sodiumMg;
   final String source;
 
+  /// Starts a new meal with this item instead of adding to the current one
+  /// (used by the scanner, where any earlier items are left over).
+  final bool replaceCurrent;
+
   const AddCustomNutritionItemRequested({
     required this.barcode,
     required this.name,
@@ -129,6 +133,7 @@ class AddCustomNutritionItemRequested extends FoodScanEvent {
     required this.sugarG,
     required this.sodiumMg,
     required this.source,
+    this.replaceCurrent = false,
   });
 
   @override
@@ -145,5 +150,6 @@ class AddCustomNutritionItemRequested extends FoodScanEvent {
         sugarG,
         sodiumMg,
         source,
+        replaceCurrent,
       ];
 }

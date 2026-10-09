@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/network/api_result.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
@@ -40,13 +41,24 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     String? instructions,
     MealPlan? basePlan,
   }) async {
+    // One generation at a time: each one uses the daily AI quota.
+    if (state is DietPlanLoading) return;
     emit(DietPlanLoading());
-    final result = await _generateMealPlan(
-      target: target,
-      preferences: preferences,
-      instructions: instructions,
-      basePlan: basePlan,
-    );
+    final ApiResult<MealPlan> result;
+    try {
+      result = await _generateMealPlan(
+        target: target,
+        preferences: preferences,
+        instructions: instructions,
+        basePlan: basePlan,
+      );
+    } catch (e) {
+      addError(e);
+      if (!isClosed) emit(DietPlanError(userMessage(e, fallback: "Couldn't create your plan. Try again.")));
+      return;
+    }
+    // The page may have been closed while the plan was generating.
+    if (isClosed) return;
 
     if (result is ApiSuccess<MealPlan>) {
       emit(DietPlanLoaded(result.data));
@@ -56,12 +68,21 @@ class DietPlanCubit extends Cubit<DietPlanState> {
   }
 
   /// Surfaces a failure that happened before generation (e.g. target maths).
-  void showError(String message) => emit(DietPlanError(message));
+  void showError(String message) {
+    if (!isClosed) emit(DietPlanError(message));
+  }
 
-  Future<void> saveActivePlan(
+  /// Saves [plan] as the active plan. False when it couldn't be stored.
+  Future<bool> saveActivePlan(
     MealPlan plan, {
     Map<String, dynamic> preferences = const {},
   }) async {
-    await _setActiveMealPlan(plan, preferences: preferences);
+    try {
+      await _setActiveMealPlan(plan, preferences: preferences);
+      return true;
+    } catch (e) {
+      addError(e);
+      return false;
+    }
   }
 }

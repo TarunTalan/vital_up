@@ -10,10 +10,10 @@ class NutritionTargetModel extends NutritionTarget {
 
   factory NutritionTargetModel.fromJson(Map<String, dynamic> json) {
     return NutritionTargetModel(
-      calories: json['calories'] as int,
-      protein: json['protein'] as int,
-      carbs: json['carbs'] as int,
-      fat: json['fat'] as int,
+      calories: (json['calories'] as num?)?.round() ?? 0,
+      protein: (json['protein'] as num?)?.round() ?? 0,
+      carbs: (json['carbs'] as num?)?.round() ?? 0,
+      fat: (json['fat'] as num?)?.round() ?? 0,
     );
   }
 

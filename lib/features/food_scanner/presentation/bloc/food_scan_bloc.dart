@@ -7,6 +7,8 @@ import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommendation.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/scan_barcode.dart';
@@ -53,6 +55,50 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     on<UpdateMealImageRequested>(_onUpdateMealImageRequested);
     on<AddCustomNutritionItemRequested>(_onAddCustomNutritionItemRequested);
   }
+
+  /// Grams in [qty] of [unit], for scaling a portion across units.
+  static double _gramsOf(double qty, String unit) {
+    switch (unit.toLowerCase()) {
+      case 'g':
+      case 'ml':
+        return qty;
+      case 'oz':
+        return qty * 28.35;
+      case 'cup':
+        return qty * 240;
+      case 'piece':
+      case 'slice':
+        return qty * 50;
+      case 'tbsp':
+        return qty * 15;
+      case 'tsp':
+        return qty * 5;
+      default:
+        return qty * 100;
+    }
+  }
+
+  /// Scale factor from [oldItem]'s portion to [quantity] of [unit]; never
+  /// divides by zero and never explodes (see [safeScale]).
+  static double _portionScale(FoodItem oldItem, double quantity, String unit) {
+    if (oldItem.unit == unit) return safeScale(oldItem.quantity, quantity);
+    return safeScale(_gramsOf(oldItem.quantity, oldItem.unit), _gramsOf(quantity, unit));
+  }
+
+  /// An item id not used by another item in this meal, so edit / remove
+  /// always hit the row the user tapped (two servings of the same food, or
+  /// AI items without ids, would otherwise share one).
+  String _uniqueId(String preferred, {String? except}) {
+    final taken = _currentItems.where((i) => i.id != except).map((i) => i.id).toSet();
+    return preferred.isNotEmpty && !taken.contains(preferred) ? preferred : uuid.v4();
+  }
+
+  /// Pairs [item] with [nutrition] (clamped) under the same id.
+  NutritionInfo _attach(NutritionInfo nutrition, FoodItem item) =>
+      sanitizeNutrition(nutrition.copyWith(per: item)).copyWith(per: item);
+
+  /// Typed name, clean and length-limited before it is used or sent.
+  static String _cleanName(String name) => sanitizeText(name, maxLength: InputLimits.shortText);
 
   @override
   void onChange(Change<FoodScanState> change) {
@@ -101,15 +147,27 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       },
       (nutritionList) {
         logger.i('Nutrition list received: ${nutritionList.length} items');
-        
+
         final resolvedList = <NutritionInfo>[];
+        final ids = <String>{};
         for (final nut in nutritionList) {
-          if (_isZeroPlaceholder(nut)) {
-            logger.w('Scanned item "${nut.per.name}" is all zeros (placeholder). Resolving offline.');
-            resolvedList.add(_estimateOfflineNutrition(nut.per));
-          } else {
-            resolvedList.add(nut);
+          // AI items may share an id or have none; give each row its own.
+          var item = sanitizeFoodItem(nut.per);
+          if (item.id.isEmpty || !ids.add(item.id)) {
+            item = item.copyWith(id: uuid.v4());
+            ids.add(item.id);
           }
+          if (_isZeroPlaceholder(nut)) {
+            logger.w('Scanned item "${item.name}" is all zeros (placeholder). Resolving offline.');
+            resolvedList.add(_attach(_estimateOfflineNutrition(item), item));
+          } else {
+            resolvedList.add(_attach(nut, item));
+          }
+        }
+
+        if (resolvedList.isEmpty) {
+          emit(RecognitionFailed(const NoFoodDetectedFailure(), image: _currentImage));
+          return;
         }
 
         _currentNutrition = resolvedList;
@@ -146,13 +204,17 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     final itemIndex = _currentItems.indexWhere((item) => item.id == event.itemId);
     if (itemIndex == -1) return;
 
+    if (itemIndex >= _currentNutrition.length) return;
+    final quantity = saneQuantity(event.newQuantity, fallback: -1);
+    if (quantity <= 0) return;
+
     final oldItem = _currentItems[itemIndex];
     final oldNutrition = _currentNutrition[itemIndex];
 
-    final scaleFactor = event.newQuantity / oldItem.quantity;
+    final scaleFactor = safeScale(oldItem.quantity, quantity);
 
-    final newItem = oldItem.copyWith(quantity: event.newQuantity);
-    final newNutrition = oldNutrition.scaledBy(scaleFactor);
+    final newItem = oldItem.copyWith(quantity: quantity);
+    final newNutrition = _attach(oldNutrition.scaledBy(scaleFactor), newItem);
 
     // Re-assign new list instances to prevent mutating previous state's lists in-place
     _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = newItem;
@@ -188,11 +250,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Re-assign new list instances to prevent mutating previous state's lists in-place
     _currentItems = List<FoodItem>.of(_currentItems)..removeAt(itemIndex);
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..removeAt(itemIndex);
+    if (itemIndex < _currentNutrition.length) {
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..removeAt(itemIndex);
+    }
 
     if (_currentItems.isEmpty) {
       emit(RecognitionFailed(
-        NoFoodDetectedFailure('All items removed. Please try again.'),
+        const NoFoodDetectedFailure('All items removed. Add a food or scan again.'),
         image: _currentImage,
       ));
       return;
@@ -220,9 +284,17 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   }
 
   Future<void> _onAddManualItemRequested(
-    AddManualItemRequested event,
+    AddManualItemRequested rawEvent,
     Emitter<FoodScanState> emit,
   ) async {
+    if (state is LoadingNutrition || state is SavingMealLog) return;
+    final name = _cleanName(rawEvent.name);
+    final quantity = saneQuantity(rawEvent.quantity, fallback: -1);
+    if (name.isEmpty || quantity <= 0) {
+      _fail(emit, const ValidationFailure('Enter a food name and amount.'));
+      return;
+    }
+    final event = AddManualItemRequested(name: name, quantity: quantity, unit: rawEvent.unit);
     // Remember state before loading so we can return to it after fetch
     _preLoadingStateType = state.runtimeType;
     // Emit loading state
@@ -254,8 +326,8 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         quantity: event.quantity,
         unit: event.unit,
       );
-      
-      final estimatedNutrition = _estimateOfflineNutrition(newItem);
+
+      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
       _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
@@ -274,8 +346,8 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         quantity: event.quantity,
         unit: event.unit,
       );
-      
-      final estimatedNutrition = _estimateOfflineNutrition(newItem);
+
+      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
       _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
@@ -288,9 +360,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Use the first search result
     final searchItem = searchResultsList!.first;
-    
+
     final newItem = FoodItem(
-      id: searchItem.id,
+      id: _uniqueId(searchItem.id),
       name: event.name,
       confidenceScore: 1.0,
       servingDescription: '${event.quantity} ${event.unit}',
@@ -300,7 +372,8 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Fetch nutrition for the manual item
     logger.d('Fetching nutrition for item ID: ${newItem.id}, servingDescription: "${newItem.servingDescription}"');
-    final nutritionResult = await nutritionRepository.getNutrition(newItem);
+    // Look up by the search result's id; the row keeps its own unique id.
+    final nutritionResult = await nutritionRepository.getNutrition(newItem.copyWith(id: searchItem.id));
 
     Failure? nutritionFailure;
     NutritionInfo? nutritionInfo;
@@ -323,7 +396,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         logger.e('Failed to fetch nutrition for manual item: $nutritionFailure. Estimating offline.');
       }
 
-      final estimatedNutrition = _estimateOfflineNutrition(newItem);
+      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
       _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
@@ -333,20 +406,33 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     }
 
     _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(nutritionInfo!);
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(_attach(nutritionInfo!, newItem));
 
     _emitCurrentState(emit);
   }
 
   Future<void> _onEditFoodItemRequested(
-    EditFoodItemRequested event,
+    EditFoodItemRequested rawEvent,
     Emitter<FoodScanState> emit,
   ) async {
-    final itemIndex = _currentItems.indexWhere((item) => item.id == event.itemId);
-    if (itemIndex == -1) return;
+    if (state is LoadingNutrition || state is SavingMealLog) return;
+    final itemIndex = _currentItems.indexWhere((item) => item.id == rawEvent.itemId);
+    if (itemIndex == -1 || itemIndex >= _currentNutrition.length) return;
+    final name = _cleanName(rawEvent.name);
+    final quantity = saneQuantity(rawEvent.quantity, fallback: -1);
+    if (name.isEmpty || quantity <= 0) {
+      _fail(emit, const ValidationFailure('Enter a food name and amount.'));
+      return;
+    }
+    final event = EditFoodItemRequested(
+      itemId: rawEvent.itemId,
+      name: name,
+      quantity: quantity,
+      unit: rawEvent.unit,
+    );
 
     final oldItem = _currentItems[itemIndex];
-    
+
     // If the name did not change, we can perform the nutrition scaling in-place
     // entirely client-side without any network calls! This prevents DNS/connection
     // timeouts from turning values to 0.
@@ -367,47 +453,20 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       if (_isZeroPlaceholder(oldNutrition)) {
         logger.i('Initial scanned nutrition was zero placeholder. Estimating offline nutrition.');
         _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-        _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _estimateOfflineNutrition(updatedItem);
+        _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(_estimateOfflineNutrition(updatedItem), updatedItem);
         _emitCurrentState(emit);
         return;
       }
 
-      double scaleFactor = event.quantity / oldItem.quantity;
+      final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
       logger.d('Scaling: oldQty=${oldItem.quantity} ${oldItem.unit}, newQty=${event.quantity} ${event.unit}, scaleFactor=$scaleFactor');
 
-      // Handle conversion scaling if units are different
-      if (oldItem.unit != event.unit) {
-        double getWeightInGrams(double qty, String unit) {
-          switch (unit.toLowerCase()) {
-            case 'g':
-              return qty;
-            case 'oz':
-              return qty * 28.35;
-            case 'cup':
-              return qty * 240;
-            case 'piece':
-            case 'slice':
-              return qty * 50;
-            case 'tbsp':
-              return qty * 15;
-            case 'tsp':
-              return qty * 5;
-            default:
-              return qty * 100;
-          }
-        }
-        final oldGrams = getWeightInGrams(oldItem.quantity, oldItem.unit);
-        final newGrams = getWeightInGrams(event.quantity, event.unit);
-        scaleFactor = oldGrams > 0 ? (newGrams / oldGrams) : 1.0;
-        logger.d('Unit conversion scaling: oldGrams=$oldGrams, newGrams=$newGrams, scaleFactor=$scaleFactor');
-      }
-
-      final scaledNutrition = oldNutrition.scaledBy(scaleFactor);
+      final scaledNutrition = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
       logger.d('Scaled calories: old=${oldNutrition.calories} -> new=${scaledNutrition.calories}');
 
       _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
       _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = scaledNutrition;
-      
+
       _emitCurrentState(emit);
       return;
     }
@@ -437,8 +496,8 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       // If search fails, scale existing nutrition by quantity change
       final oldItem = _currentItems[itemIndex];
       final oldNutrition = _currentNutrition[itemIndex];
-      final scaleFactor = event.quantity / oldItem.quantity;
-      
+      final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
+
       final updatedItem = FoodItem(
         id: event.itemId,
         name: event.name,
@@ -447,10 +506,10 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         quantity: event.quantity,
         unit: event.unit,
       );
-      
+
       _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-      
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+
       _emitCurrentState(emit);
       return;
     }
@@ -460,8 +519,8 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       // Scale existing nutrition by quantity change
       final oldItem = _currentItems[itemIndex];
       final oldNutrition = _currentNutrition[itemIndex];
-      final scaleFactor = event.quantity / oldItem.quantity;
-      
+      final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
+
       final updatedItem = FoodItem(
         id: event.itemId,
         name: event.name,
@@ -470,19 +529,20 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         quantity: event.quantity,
         unit: event.unit,
       );
-      
+
       _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-      
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+
       _emitCurrentState(emit);
       return;
     }
 
     // Use the first search result
     final searchItem = searchResultsList!.first;
-    
+
+    // The row keeps its id; the lookup below uses the search result's id.
     final updatedItem = FoodItem(
-      id: searchItem.id,
+      id: event.itemId,
       name: event.name,
       confidenceScore: _currentItems[itemIndex].confidenceScore,
       servingDescription: '${event.quantity} ${event.unit}',
@@ -491,7 +551,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     );
 
     // Fetch nutrition for the updated item with new fdc_id
-    final nutritionResult = await nutritionRepository.getNutrition(updatedItem);
+    final nutritionResult = await nutritionRepository.getNutrition(updatedItem.copyWith(id: searchItem.id));
 
     Failure? nutritionFailure;
     NutritionInfo? nutritionInfo;
@@ -507,47 +567,22 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       } else {
         logger.e('Failed to fetch nutrition for edited item: $nutritionFailure. Scaling existing.');
       }
-      
+
       // Scale existing nutrition by portion size change
       final oldItem = _currentItems[itemIndex];
       final oldNutrition = _currentNutrition[itemIndex];
-      double scaleFactor = event.quantity / oldItem.quantity;
+      final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
 
-      if (oldItem.unit != event.unit) {
-        double getWeightInGrams(double qty, String unit) {
-          switch (unit.toLowerCase()) {
-            case 'g':
-              return qty;
-            case 'oz':
-              return qty * 28.35;
-            case 'cup':
-              return qty * 240;
-            case 'piece':
-            case 'slice':
-              return qty * 50;
-            case 'tbsp':
-              return qty * 15;
-            case 'tsp':
-              return qty * 5;
-            default:
-              return qty * 100;
-          }
-        }
-        final oldGrams = getWeightInGrams(oldItem.quantity, oldItem.unit);
-        final newGrams = getWeightInGrams(event.quantity, event.unit);
-        scaleFactor = oldGrams > 0 ? (newGrams / oldGrams) : 1.0;
-      }
-      
       _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = oldNutrition.scaledBy(scaleFactor);
-      
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+
       _emitCurrentState(emit);
       return;
     }
 
     _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = nutritionInfo!;
-    
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(nutritionInfo!, updatedItem);
+
     _emitCurrentState(emit);
   }
 
@@ -555,8 +590,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // Use the pre-loading state type when we are currently in LoadingNutrition,
     // because `state` was already overwritten to LoadingNutrition before the
     // async work ran. Fall back to the live state type for other cases.
-    final effectiveType =
-        (state is LoadingNutrition) ? _preLoadingStateType : state.runtimeType;
+    final effectiveType = (state is LoadingNutrition || state is SavingMealLog || state is ScanActionFailed)
+        ? _preLoadingStateType
+        : state.runtimeType;
 
     // IMPORTANT: always pass NEW list copies so that Equatable does not
     // consider the new state equal to the previous one (which holds a
@@ -609,15 +645,22 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     ConfirmAndSaveRequested event,
     Emitter<FoodScanState> emit,
   ) async {
-    if (_currentItems.isEmpty) {
-      emit(RecognitionFailed(
-        ValidationFailure('No items to save. Please add food items first.'),
-      ));
+    // A second tap while saving must not log the meal twice.
+    if (state is SavingMealLog || state is LoadingNutrition) return;
+    if (_currentItems.isEmpty || _currentNutrition.length != _currentItems.length) {
+      _fail(emit, const ValidationFailure('Add a food before saving.'));
       return;
     }
 
-    emit(SavingMealLog());
+    _preLoadingStateType = state.runtimeType;
+    emit(SavingMealLog(
+      image: _currentImage,
+      items: List<FoodItem>.of(_currentItems),
+      nutrition: List<NutritionInfo>.of(_currentNutrition),
+    ));
 
+    // Clamp once more right before saving: nothing absurd reaches the log.
+    _currentNutrition = [for (final n in _currentNutrition) sanitizeNutrition(n)];
     final totalCalories = _currentNutrition.fold<double>(
       0,
       (sum, nut) => sum + nut.calories,
@@ -635,10 +678,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     );
 
     final result = await saveMealLog(entry);
+    if (isClosed) return;
 
     result.fold(
       (failure) {
-        emit(RecognitionFailed(failure, image: _currentImage));
+        logger.e('Saving meal failed: $failure');
+        // Keep the user's items on screen; just report the failure.
+        _fail(emit, failure);
       },
       (savedEntry) {
         emit(MealLogSaved(savedEntry));
@@ -651,9 +697,11 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     ScanBarcodeRequested event,
     Emitter<FoodScanState> emit,
   ) async {
+    if (state is BarcodeScanning) return;
     emit(BarcodeScanning());
 
     final result = await scanBarcode(event.barcode);
+    if (isClosed) return;
 
     result.fold(
       (failure) {
@@ -666,6 +714,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
           resolvedInfo = _estimateOfflineNutrition(nutritionInfo.per);
         }
 
+        resolvedInfo = sanitizeNutrition(resolvedInfo);
         _currentItems = [resolvedInfo.per];
         _currentNutrition = [resolvedInfo];
         _currentImage = null;
@@ -699,6 +748,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     AddCustomNutritionItemRequested event,
     Emitter<FoodScanState> emit,
   ) async {
+    final name = _cleanName(event.name);
+    if (name.isEmpty) {
+      _fail(emit, const ValidationFailure('Enter a product name.'));
+      return;
+    }
+    if (event.replaceCurrent) _reset();
+    final barcode = normalizeProductBarcode(event.barcode);
     _preLoadingStateType = state.runtimeType;
     emit(LoadingNutrition(
       image: _currentImage,
@@ -707,17 +763,18 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     ));
 
     // Create FoodItem domain entity
+    final quantity = saneQuantity(event.quantity);
     final foodItem = FoodItem(
-      id: event.barcode.isNotEmpty ? event.barcode : uuid.v4(),
-      name: event.name,
+      id: _uniqueId(barcode ?? ''),
+      name: name,
       confidenceScore: 1.0,
-      servingDescription: '${event.quantity} ${event.unit}',
-      quantity: event.quantity,
+      servingDescription: '${_formatQty(quantity)} ${event.unit}',
+      quantity: quantity,
       unit: event.unit,
     );
 
-    // Create NutritionInfo domain entity
-    final nutritionInfo = NutritionInfo(
+    // Create NutritionInfo domain entity (typed / OCR values, clamped)
+    final nutritionInfo = sanitizeNutrition(NutritionInfo(
       calories: event.calories,
       proteinG: event.proteinG,
       carbsG: event.carbsG,
@@ -726,19 +783,17 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       sugarG: event.sugarG,
       sodiumMg: event.sodiumMg,
       per: foodItem,
-    );
+    )).copyWith(per: foodItem);
 
     _currentItems = List<FoodItem>.of(_currentItems)..add(foodItem);
     _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(nutritionInfo);
 
     // Save to cache and remote database progressively in the background
-    if (event.barcode.isNotEmpty) {
-      nutritionRepository.saveProprietaryProduct(
-        event.barcode,
-        event.name,
-        nutritionInfo,
-        event.source,
-      );
+    if (barcode != null) {
+      nutritionRepository
+          .saveProprietaryProduct(barcode, name, nutritionInfo, event.source)
+          .then((result) => result.fold((f) => logger.w('Saving product $barcode failed: $f'), (_) {}))
+          .catchError((Object e) => logger.e('Saving product $barcode failed: $e'));
     }
 
     emit(NutritionLoaded(
@@ -746,6 +801,24 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       items: _currentItems,
       nutrition: _currentNutrition,
     ));
+  }
+
+  static String _formatQty(double q) =>
+      q == q.roundToDouble() ? q.round().toString() : q.toStringAsFixed(1);
+
+  /// Reports [failure] without losing the meal being reviewed: the detail
+  /// page shows it as a snackbar, then the previous content state returns.
+  void _fail(Emitter<FoodScanState> emit, Failure failure) {
+    final hadContent = _currentItems.isNotEmpty;
+    if (state is! LoadingNutrition && state is! SavingMealLog) {
+      _preLoadingStateType = state.runtimeType;
+    }
+    emit(ScanActionFailed(failure));
+    if (hadContent) {
+      _emitCurrentState(emit);
+    } else {
+      _preLoadingStateType = null;
+    }
   }
 
   void _reset() {
@@ -805,7 +878,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
   NutritionInfo _estimateOfflineNutrition(FoodItem item) {
     final nameLower = item.name.toLowerCase();
-    
+
     // Default fallback values (per 100g)
     double cal = 120;
     double protein = 3;
@@ -844,26 +917,26 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Estimate saturated fat (usually ~25% of total fat, but ~50% for fried/dairy foods)
     double satFat = fat * 0.25;
-    if (nameLower.contains('fried') || 
-        nameLower.contains('samosa') || 
-        nameLower.contains('fries') || 
-        nameLower.contains('burger') || 
-        nameLower.contains('pizza') || 
-        nameLower.contains('butter') || 
-        nameLower.contains('cheese') || 
-        nameLower.contains('milk') || 
+    if (nameLower.contains('fried') ||
+        nameLower.contains('samosa') ||
+        nameLower.contains('fries') ||
+        nameLower.contains('burger') ||
+        nameLower.contains('pizza') ||
+        nameLower.contains('butter') ||
+        nameLower.contains('cheese') ||
+        nameLower.contains('milk') ||
         nameLower.contains('cream')) {
       satFat = fat * 0.50;
     }
 
     // Estimate trans fat (negligible unless fried or pastry/donuts)
     double transFat = 0.0;
-    if (nameLower.contains('fried') || 
-        nameLower.contains('samosa') || 
-        nameLower.contains('fries') || 
-        nameLower.contains('donut') || 
-        nameLower.contains('pastry') || 
-        nameLower.contains('cookie') || 
+    if (nameLower.contains('fried') ||
+        nameLower.contains('samosa') ||
+        nameLower.contains('fries') ||
+        nameLower.contains('donut') ||
+        nameLower.contains('pastry') ||
+        nameLower.contains('cookie') ||
         nameLower.contains('cake')) {
       transFat = 0.5; // ~0.5g per 100g
     }

@@ -4,6 +4,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 
 class GoalSetupPage extends StatefulWidget {
@@ -28,18 +29,24 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
     super.dispose();
   }
 
+  /// Longest goal timeframe accepted (two years).
+  static const _maxWeeks = 104;
+
   void _submit() {
-    final weight = double.tryParse(_weightController.text);
-    final timeframe = int.tryParse(_timeframeController.text);
+    final weight = parseNumberInRange(
+      _weightController.text,
+      min: InputLimits.weightKgMin,
+      max: InputLimits.weightKgMax,
+    );
+    final timeframe = parseNumberInRange(_timeframeController.text, min: 1, max: _maxWeeks)?.round();
 
     setState(() {
-      _weightError =
-          weight == null || weight <= 0 ? 'Enter your target weight' : null;
-      _timeframeError = timeframe == null || timeframe < 1
-          ? 'Enter at least 1 week'
+      _weightError = weight == null
+          ? 'Enter ${InputLimits.weightKgMin.round()} to ${InputLimits.weightKgMax.round()} kg'
           : null;
+      _timeframeError = timeframe == null ? 'Enter 1 to $_maxWeeks weeks' : null;
     });
-    if (_weightError != null || _timeframeError != null) return;
+    if (weight == null || timeframe == null) return;
 
     context.pushNamed(
       'diet-plan-result',

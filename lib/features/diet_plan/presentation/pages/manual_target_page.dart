@@ -5,6 +5,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 
 class ManualTargetPage extends StatefulWidget {
@@ -38,21 +39,38 @@ class _ManualTargetPageState extends State<ManualTargetPage> {
     if (_errors[field] != null) setState(() => _errors[field] = null);
   }
 
+  // Daily ranges a plan can be built for.
+  static const _minCalories = 1000;
+  static const _maxCalories = 6000;
+  static const _maxProtein = 400;
+  static const _maxCarbs = 900;
+  static const _maxFat = 300;
+
+  int? _read(TextEditingController c, int min, int max) =>
+      parseNumberInRange(c.text, min: min, max: max)?.round();
+
   void _submit() {
-    final cal = int.tryParse(_calController.text);
-    final pro = int.tryParse(_proController.text);
-    final carb = int.tryParse(_carbController.text);
-    final fat = int.tryParse(_fatController.text);
+    final cal = _read(_calController, _minCalories, _maxCalories);
+    final pro = _read(_proController, 0, _maxProtein);
+    final carb = _read(_carbController, 0, _maxCarbs);
+    final fat = _read(_fatController, 0, _maxFat);
+
+    // Macros must roughly fit the calories (4 / 4 / 9 kcal per gram).
+    final macroKcal = (pro ?? 0) * 4 + (carb ?? 0) * 4 + (fat ?? 0) * 9;
+    final macrosTooHigh = cal != null && pro != null && carb != null && fat != null && macroKcal > cal * 1.25;
 
     setState(() {
       _errors
-        ..[_calController] =
-            cal == null || cal < 1000 ? 'Enter at least 1000 kcal' : null
-        ..[_proController] = pro == null ? 'Enter grams of protein' : null
-        ..[_carbController] = carb == null ? 'Enter grams of carbs' : null
-        ..[_fatController] = fat == null ? 'Enter grams of fat' : null;
+        ..[_calController] = cal == null
+            ? 'Enter $_minCalories to $_maxCalories kcal'
+            : macrosTooHigh
+                ? 'Your macros add up to $macroKcal kcal. Lower them.'
+                : null
+        ..[_proController] = pro == null ? 'Enter 0 to $_maxProtein g' : null
+        ..[_carbController] = carb == null ? 'Enter 0 to $_maxCarbs g' : null
+        ..[_fatController] = fat == null ? 'Enter 0 to $_maxFat g' : null;
     });
-    if (cal == null || cal < 1000 || pro == null || carb == null || fat == null) {
+    if (cal == null || pro == null || carb == null || fat == null || macrosTooHigh) {
       return;
     }
 

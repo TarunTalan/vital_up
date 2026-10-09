@@ -17,6 +17,7 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_state.dart';
@@ -75,6 +76,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   XFile? _selectedImage;
   XFile? _croppedImage;
   bool _permissionDenied = false;
+
+  /// Denied with "don't ask again": only the system settings can grant it.
+  bool _permissionPermanentlyDenied = false;
+
+  /// Last scanned code that is not a product barcode (e.g. a website QR),
+  /// so the hint shows once rather than on every frame.
+  String? _ignoredCode;
   bool _isCapturing = false;
   bool _torchEnabled = false;
   String? _errorMessage;
@@ -114,7 +122,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     if (!mounted) return;
 
     if (!permission.isGranted) {
-      setState(() => _permissionDenied = true);
+      setState(() {
+        _permissionDenied = true;
+        _permissionPermanentlyDenied = permission.isPermanentlyDenied || permission.isRestricted;
+      });
       return;
     }
 
@@ -123,7 +134,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       if (!mounted) return;
 
       if (cameras.isEmpty) {
-        setState(() => _errorMessage = 'No camera found on this device.');
+        setState(() => _errorMessage = 'No camera found. Pick a photo from your gallery.');
         return;
       }
 
@@ -156,8 +167,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
       _startImageStream(controller);
     } catch (error) {
+      debugPrint('Camera start failed: $error');
       if (!mounted) return;
-      setState(() => _errorMessage = 'Unable to start camera.');
+      setState(() => _errorMessage = "Couldn't start the camera. Try again.");
     }
   }
 
@@ -177,7 +189,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     _isStreaming = false;
     _isProcessingFrame = false;
     _detectedQrPoints = [];
-    
+
     final controller = _cameraController;
     if (controller != null && controller.value.isStreamingImages) {
       try {
@@ -192,7 +204,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   void _processCameraImage(CameraImage image) async {
-    if (_isProcessingFrame || _isScanningBarcode) return;
+    // While framing a nutrition label the package barcode is usually in
+    // view too; don't start another lookup for it.
+    if (_isProcessingFrame || _isScanningBarcode || _isScanningNutritionLabel) return;
     _isProcessingFrame = true;
 
     try {
@@ -229,7 +243,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
           }
 
           if (barcodeVal != null && barcodeVal.isNotEmpty) {
-            _onBarcodeDetected(barcodeVal);
+            final productCode = normalizeProductBarcode(barcodeVal);
+            if (productCode != null) {
+              _onBarcodeDetected(productCode);
+            } else if (_ignoredCode != barcodeVal && mounted) {
+              _ignoredCode = barcodeVal;
+              showErrorSnackBar(context, "That isn't a food barcode. Try another.");
+            }
           }
         }
       } else {
@@ -338,6 +358,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     if (controller == null || !controller.value.isInitialized || _isCapturing) {
       return;
     }
+    // One scan at a time: a second capture would spend another scan.
+    if (context.read<FoodScanBloc>().state is RecognizingFood) return;
 
     setState(() => _isCapturing = true);
     try {
@@ -364,27 +386,41 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       } else {
         _analyzeImage(croppedFile.path);
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Photo capture failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Capture failed. Please try again.')),
-      );
+      showErrorSnackBar(context, "Couldn't take the photo. Try again.");
+      _startImageStream(controller);
     } finally {
       if (mounted) setState(() => _isCapturing = false);
     }
   }
 
   Future<void> _pickFromGallery() async {
+    if (context.read<FoodScanBloc>().state is RecognizingFood) return;
     await _stopImageStream();
     // Let the platform downscale large gallery photos natively; the upload
     // encoder shrinks further, but decoding a 12+ MP image in Dart is slow.
-    final image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 2048,
-      maxHeight: 2048,
-      imageQuality: 92,
-    );
-    if (image == null || !mounted) return;
+    XFile? image;
+    try {
+      image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 92,
+      );
+    } catch (e) {
+      // Photo access denied or the picker failed to open.
+      debugPrint('Gallery pick failed: $e');
+      if (mounted) showErrorSnackBar(context, "Couldn't open your photos. Check app permissions.");
+    }
+    if (!mounted) return;
+    if (image == null) {
+      // Cancelled: keep scanning barcodes.
+      final controller = _cameraController;
+      if (controller != null && controller.value.isInitialized) _startImageStream(controller);
+      return;
+    }
 
     setState(() {
       _selectedImage = image;
@@ -415,17 +451,17 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
       final parsed = NutritionOcrParser.parseNutritionText(recognizedText.text);
 
-      // Close the loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (!mounted) return;
+      // Close the loading dialog (shown on the root navigator)
+      Navigator.of(context, rootNavigator: true).pop();
 
       // Open the verify/edit nutrition dialog
       _openNutritionManualEntry(parsed);
     } catch (e) {
       debugPrint('OCR processing error: $e');
       if (mounted) {
-        Navigator.of(context).pop(); // Close loader
+        Navigator.of(context, rootNavigator: true).pop(); // Close loader
+        showErrorSnackBar(context, "Couldn't read the label. Enter the details.");
         // Fallback to manual entry with empty values
         _openNutritionManualEntry(null);
       }
@@ -433,6 +469,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   void _openNutritionManualEntry(Map<String, double>? parsed) {
+    // The dialog lives on the root navigator, above the BlocProvider, so
+    // read the bloc here rather than from the dialog context.
+    final bloc = context.read<FoodScanBloc>();
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -453,8 +492,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             required double sugarG,
             required double sodiumMg,
           }) {
-            final bloc = context.read<FoodScanBloc>();
             bloc.add(AddCustomNutritionItemRequested(
+              // A new product: don't add to items left from an earlier scan.
+              replaceCurrent: true,
               barcode: _currentFailedBarcode ?? '',
               name: name,
               quantity: quantity,
@@ -470,6 +510,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             ));
 
             // Clean up state
+            if (!mounted) return;
             setState(() {
               _isScanningNutritionLabel = false;
               _currentFailedBarcode = null;
@@ -481,7 +522,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       },
     ).then((_) {
       // If dialog was dismissed without saving, reset scanner
-      if (_currentFailedBarcode != null) {
+      if (mounted && _currentFailedBarcode != null) {
         _restartScanning();
       }
     });
@@ -508,13 +549,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Product Not Found',
+                'Product not found',
                 style: context.text.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimens.space12),
               Text(
-                'We couldn\'t find details for barcode "$_currentFailedBarcode". How would you like to proceed?',
+                "We don't know this product yet. Scan its label or add it yourself.",
                 style: context.text.bodyMedium?.copyWith(color: grey),
                 textAlign: TextAlign.center,
               ),
@@ -573,6 +614,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   void _restartScanning() {
+    if (!mounted) return;
     setState(() {
       _selectedImage = null;
       _croppedImage = null;
@@ -589,6 +631,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   void _analyzeImage(String path) {
     final bloc = context.read<FoodScanBloc>();
+    if (bloc.state is RecognizingFood) return;
     bloc.add(ImageSelected(File(path)));
     bloc.add(RecognizeFoodRequested());
   }
@@ -629,9 +672,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       setState(() => _torchEnabled = enabled);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Flash is not available.')));
+      showErrorSnackBar(context, 'Flash is not available on this phone.');
     }
   }
 
@@ -651,16 +692,21 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
       listenWhen: (previous, current) {
+        // States the detail page owns; returning from them is not a new
+        // result for this page (or it would push a second detail page).
         final wasInDetail = previous is RecognitionSucceeded ||
             previous is RecognitionLowConfidence ||
             previous is NutritionLoaded ||
-            previous is LoadingNutrition;
+            previous is LoadingNutrition ||
+            previous is SavingMealLog ||
+            previous is ScanActionFailed;
 
         return !wasInDetail &&
             (current is RecognitionSucceeded ||
              current is RecognitionLowConfidence ||
              current is NutritionLoaded ||
-             current is RecognitionFailed);
+             current is RecognitionFailed ||
+             current is ScanActionFailed);
       },
       listener: (context, state) {
         if (state is RecognitionSucceeded ||
@@ -685,11 +731,12 @@ class _FoodScannerViewState extends State<FoodScannerView> {
           if (state.failure is BarcodeNotFoundFailure) {
             _showLookupFailureOptions();
           } else {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+            showErrorSnackBar(context, state.failure.message);
             _restartScanning();
           }
+        } else if (state is ScanActionFailed) {
+          showErrorSnackBar(context, state.failure.message);
+          _restartScanning();
         }
       },
       builder: (context, state) {
@@ -824,8 +871,19 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   Widget _buildCameraLayer() {
     if (_permissionDenied) {
+      if (_permissionPermanentlyDenied) {
+        // The system won't ask again; send the user to settings.
+        return _ScannerMessage(
+          message: 'Allow camera access in Settings to scan food.',
+          buttonLabel: 'Open Settings',
+          onTap: () async {
+            await openAppSettings();
+            if (mounted) _initializeCamera();
+          },
+        );
+      }
       return _ScannerMessage(
-        message: 'Camera permission is required to scan food.',
+        message: 'Allow camera access to scan food.',
         buttonLabel: 'Grant Permission',
         onTap: _initializeCamera,
       );
