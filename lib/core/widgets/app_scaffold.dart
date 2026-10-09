@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
@@ -35,6 +36,16 @@ class AppScaffold extends StatelessWidget {
     this.onRefresh,
   });
 
+  /// Pull-to-refresh never spins forever and never surfaces an error from
+  /// here: the page shows its own state once the reload settles.
+  Future<void> _refresh() async {
+    try {
+      await onRefresh!().timeout(kLoadTimeout);
+    } catch (e) {
+      debugPrint('AppScaffold: refresh failed: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final padding = bodyPadding ??
@@ -61,7 +72,7 @@ class AppScaffold extends StatelessWidget {
 
     if (onRefresh != null) {
       content = RefreshIndicator(
-        onRefresh: onRefresh!,
+        onRefresh: _refresh,
         child: content,
       );
     }

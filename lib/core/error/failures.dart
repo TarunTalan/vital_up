@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 
 abstract class Failure extends Equatable {
   final String message;
-  
+
   const Failure(this.message);
 
   @override
@@ -10,41 +10,41 @@ abstract class Failure extends Equatable {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure([super.message = 'A server error occurred. Please try again later.']);
+  const ServerFailure([super.message = 'Something went wrong. Try again.']);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([super.message = 'Failed to load local data.']);
+  const CacheFailure([super.message = "Couldn't load your saved data. Try again."]);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = 'No internet connection. Please check your network settings.']);
+  const NetworkFailure([super.message = "You're offline. Check your connection."]);
 }
 
 class DatabaseFailure extends Failure {
-  const DatabaseFailure([super.message = 'Local database operation failed.']);
+  const DatabaseFailure([super.message = "Couldn't save on this phone. Try again."]);
 }
 
 class ValidationFailure extends Failure {
-  const ValidationFailure([super.message = 'Invalid input details provided.']);
+  const ValidationFailure([super.message = 'Check the details and try again.']);
 }
 
 class NoFoodDetectedFailure extends Failure {
-  const NoFoodDetectedFailure([super.message = 'No food was detected in the image. Please try again with a clearer photo.']);
+  const NoFoodDetectedFailure([super.message = 'No food found. Try a clearer photo.']);
 }
 
 class LowConfidenceFailure extends Failure {
-  const LowConfidenceFailure([super.message = 'Food recognition confidence is low. Please review and confirm the detected items.']);
+  const LowConfidenceFailure([super.message = 'Not sure about this one. Check the items.']);
 }
 
 class BarcodeNotFoundFailure extends Failure {
-  const BarcodeNotFoundFailure([super.message = 'Barcode not found in database. Please try manual search.']);
+  const BarcodeNotFoundFailure([super.message = 'Barcode not found. Try searching instead.']);
 }
 
 class RecognitionUnavailableFailure extends Failure {
-  const RecognitionUnavailableFailure([super.message = 'Food recognition is temporarily busy. Please try again shortly.']);
+  const RecognitionUnavailableFailure([super.message = 'Food scanning is busy. Try again soon.']);
 }
 
 class ScanQuotaExceededFailure extends Failure {
-  const ScanQuotaExceededFailure([super.message = "You've used today's photo scans. You can still log food by searching or scanning a barcode. Scans reset at midnight."]);
+  const ScanQuotaExceededFailure([super.message = "No photo scans left today. They reset at midnight."]);
 }

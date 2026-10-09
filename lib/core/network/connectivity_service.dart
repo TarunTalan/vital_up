@@ -35,6 +35,7 @@ class ConnectivityService {
   Stream<bool> get onlineChanges => _changes.stream;
 
   Future<void> init() async {
+    if (_sub != null) return; // Already listening.
     try {
       _hasInterface = _isConnected(await _connectivity.checkConnectivity());
     } catch (e) {
@@ -64,7 +65,7 @@ class ConnectivityService {
   }
 
   void _emitIfChanged(bool wasOnline) {
-    if (wasOnline != isOnline) _changes.add(isOnline);
+    if (wasOnline != isOnline && !_changes.isClosed) _changes.add(isOnline);
   }
 
   static bool _isConnected(List<ConnectivityResult> results) =>

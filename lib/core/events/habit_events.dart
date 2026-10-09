@@ -1,7 +1,7 @@
 import 'dart:async';
 
 /// Something the user tracks; matches the reminder kinds.
-enum Habit { water, meal, activity, mood, weight }
+enum Habit { water, meal, activity, mood, weight, sleep }
 
 /// The user just logged [habit]. Reminders use this to stay quiet for the
 /// rest of the day once it's done.
@@ -23,5 +23,7 @@ class HabitEvents {
 
   Stream<HabitLogged> get stream => _controller.stream;
 
-  void logged(HabitLogged event) => _controller.add(event);
+  void logged(HabitLogged event) {
+    if (!_controller.isClosed) _controller.add(event);
+  }
 }

@@ -33,7 +33,8 @@ class RetryInterceptor extends Interceptor {
     ErrorInterceptorHandler handler,
   ) async {
     final extra = err.requestOptions.extra;
-    final currentAttempt = (extra[retryCountKey] as int? ?? 0);
+    final count = extra[retryCountKey];
+    final currentAttempt = count is int ? count : 0;
 
     if (!_shouldRetry(err) || currentAttempt >= maxRetries) {
       return handler.next(err);
@@ -61,15 +62,28 @@ class RetryInterceptor extends Interceptor {
     }
   }
 
+  static const _idempotent = {'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'};
+
   /// Evaluates whether an error should be retried.
   bool _shouldRetry(DioException error) {
+    // A POST/PATCH that may have reached the server is not repeated (it
+    // could create a duplicate); only failures before sending are retried.
+    final idempotent = _idempotent.contains(
+      error.requestOptions.method.toUpperCase(),
+    );
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
       case DioExceptionType.connectionError:
         return true;
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return idempotent;
       case DioExceptionType.badResponse:
+        if (!idempotent) {
+          // 429 / 503 mean the request was refused, not processed.
+          final status = error.response?.statusCode;
+          return status == 429 || status == 503;
+        }
         final status = error.response?.statusCode;
         if (status == null) return false;
         // 408 Request Timeout, 429 Rate Limit, 500, 502 Bad Gateway, 503 Unavailable, 504 Gateway Timeout
@@ -81,7 +95,9 @@ class RetryInterceptor extends Interceptor {
             status == 504;
       case DioExceptionType.cancel:
       case DioExceptionType.badCertificate:
+        return false;
       case DioExceptionType.unknown:
+        if (!idempotent) return false;
         final message = error.message?.toLowerCase() ?? '';
         return message.contains('socketexception') ||
             message.contains('connection') ||

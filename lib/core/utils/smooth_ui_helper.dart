@@ -1,6 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
+/// Guards against a double tap opening the same sheet or dialog twice: while
+/// a modal opened from a [BuildContext] is still showing, another open from
+/// that same context within [_reopenGuard] is ignored (returns null).
+/// Opening one after the other, or a nested modal from the sheet's own
+/// context, works as usual.
+const _reopenGuard = Duration(milliseconds: 500);
+final Expando<DateTime> _openSince = Expando<DateTime>('modalOpenSince');
+
+bool _shouldIgnoreOpen(BuildContext context) {
+  final now = DateTime.now();
+  final since = _openSince[context];
+  if (since != null && now.difference(since) < _reopenGuard) return true;
+  _openSince[context] = now;
+  return false;
+}
+
+Future<T?> _trackOpen<T>(BuildContext context, Future<T?> modal) {
+  final opened = _openSince[context];
+  return modal.whenComplete(() {
+    if (identical(_openSince[context], opened)) _openSince[context] = null;
+  });
+}
+
 /// Shows a dialog with a custom, premium scale and fade transition.
 ///
 /// The dialog scales up slightly from 92% to 100% using [Curves.easeOutBack]
@@ -12,36 +35,34 @@ Future<T?> showSmoothDialog<T>({
   Color? barrierColor,
   String? barrierLabel,
 }) {
-  return showGeneralDialog<T>(
-    context: context,
-    barrierDismissible: barrierDismissible,
-    barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.54),
-    barrierLabel: barrierLabel ?? 'Dismiss',
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return builder(context);
-    },
-    transitionDuration: AppDurations.slow,
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      final scale = Tween<double>(begin: 0.92, end: 1.0).animate(
-        CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutBack,
-        ),
-      );
-      final opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOut,
-        ),
-      );
-      return FadeTransition(
-        opacity: opacity,
-        child: ScaleTransition(
-          scale: scale,
-          child: child,
-        ),
-      );
-    },
+  if (!context.mounted || _shouldIgnoreOpen(context)) {
+    return Future<T?>.value();
+  }
+  return _trackOpen(
+    context,
+    showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.54),
+      barrierLabel: barrierLabel ?? 'Dismiss',
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return builder(context);
+      },
+      transitionDuration: AppDurations.slow,
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final scale = Tween<double>(begin: 0.92, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+        );
+        final opacity = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
+        return FadeTransition(
+          opacity: opacity,
+          child: ScaleTransition(scale: scale, child: child),
+        );
+      },
+    ),
   );
 }
 
@@ -58,9 +79,13 @@ void showSmoothSnackBar(
   SnackBarAction? action,
 }) {
   if (!context.mounted) return;
-  
-  ScaffoldMessenger.of(context).clearSnackBars();
-  final controller = ScaffoldMessenger.of(context).showSnackBar(
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  // Never show an empty bubble.
+  if (message.trim().isEmpty) message = 'Something went wrong. Try again.';
+
+  messenger.clearSnackBars();
+  final controller = messenger.showSnackBar(
     SnackBar(
       behavior: SnackBarBehavior.floating,
       dismissDirection: DismissDirection.horizontal,
@@ -76,15 +101,9 @@ void showSmoothSnackBar(
       action: action,
       content: Row(
         children: [
-          Icon(
-            icon,
-            color: iconColor,
-            size: AppDimens.iconMd,
-          ),
+          Icon(icon, color: iconColor, size: AppDimens.iconMd),
           const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Text(message),
-          ),
+          Expanded(child: Text(message)),
         ],
       ),
     ),
@@ -100,7 +119,11 @@ void showSmoothSnackBar(
 }
 
 /// Show a consistent success snackbar with the cyan primary theme color.
-void showSuccessSnackBar(BuildContext context, String message, {SnackBarAction? action}) {
+void showSuccessSnackBar(
+  BuildContext context,
+  String message, {
+  SnackBarAction? action,
+}) {
   showSmoothSnackBar(
     context,
     message: message,
@@ -132,19 +155,25 @@ Future<T?> showAppBottomSheet<T>({
   bool showDragHandle = true,
   bool useSafeArea = true,
 }) {
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: isScrollControlled,
-    isDismissible: isDismissible,
-    enableDrag: enableDrag,
-    showDragHandle: showDragHandle,
-    useSafeArea: useSafeArea,
-    constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+  if (!context.mounted || _shouldIgnoreOpen(context)) {
+    return Future<T?>.value();
+  }
+  return _trackOpen(
+    context,
+    showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: isScrollControlled,
+      isDismissible: isDismissible,
+      enableDrag: enableDrag,
+      showDragHandle: showDragHandle,
+      useSafeArea: useSafeArea,
+      constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: builder(sheetContext),
       ),
-      child: builder(sheetContext),
     ),
   );
 }

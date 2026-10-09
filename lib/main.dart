@@ -16,6 +16,7 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_error_fallback.dart';
 import 'package:vital_up/core/widgets/biometric_lock_guard.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
@@ -24,7 +25,6 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
-import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 
@@ -36,6 +36,10 @@ void main() async {
 
   // Uncaught errors go to Crashlytics (release builds, once configured).
   await CrashReporter.init();
+
+  // A widget that fails to build shows a calm placeholder in release
+  // builds instead of the grey/red error box with raw exception text.
+  if (!kDebugMode) ErrorWidget.builder = AppErrorFallback.errorWidgetBuilder;
   
   // Initialize communication port for foreground task manager
   ForegroundServiceManager.init();
@@ -49,7 +53,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  
+  var started = false;
   try {
     // Initialize Supabase
     await Supabase.initialize(
@@ -76,10 +80,18 @@ void main() async {
     final isarService = sl<IsarService>();
     final supabase = sl<SupabaseClient>();
     isarService.syncOfflineFoodsBackground(supabase, sl<SharedPreferences>());
+    started = true;
   } catch (e, stackTrace) {
     CrashReporter.report(e, stackTrace, reason: 'Initialization failed');
   }
-  
+
+  // Core services are missing (e.g. the database couldn't open): the app
+  // can't work, so say so plainly instead of crashing on the first lookup.
+  if (!started && !sl.isRegistered<AuthCubit>()) {
+    runApp(const _StartupFailedApp());
+    return;
+  }
+
   runApp(
     DevicePreview(
       enabled: !kReleaseMode,
@@ -97,8 +109,10 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
+        // One app-wide copy: the Home card and the routed trends page share
+        // it. (SleepCubit lives on the dashboard: loading it here would ask
+        // for Health Connect access before sign-in.)
         BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
-        BlocProvider(create: (context) => sl<SleepCubit>()..loadSleepData()),
         BlocProvider(create: (context) => sl<SettingsCubit>()..loadSettings()),
       ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
@@ -141,10 +155,9 @@ class MyApp extends StatelessWidget {
                   BlocListener<OnboardingCubit, OnboardingData>(
                     listenWhen: (previous, current) => previous.status != current.status,
                     listener: (context, state) {
-                      if (state.status == SubmissionStatus.error && state.errorMessage != null) {
-                        showErrorSnackBar(context, state.errorMessage!);
-                      } else if (state.status == SubmissionStatus.success) {
-                        showSuccessSnackBar(context, 'Health profile completed successfully!');
+                      // Errors are shown by the onboarding page itself.
+                      if (state.status == SubmissionStatus.success) {
+                        showSuccessSnackBar(context, 'Health profile saved.');
                       }
                     },
                   ),
@@ -156,6 +169,28 @@ class MyApp extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+/// Shown when start-up failed before the app's services were ready.
+class _StartupFailedApp extends StatelessWidget {
+  const _StartupFailedApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'VitalUp',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      home: const Scaffold(
+        body: SafeArea(
+          child: AppErrorFallback(
+            message: "VitalUp couldn't start. Close the app and open it again.",
+          ),
+        ),
       ),
     );
   }

@@ -43,6 +43,14 @@ class CacheStore {
   final Map<String, Cached<Object?>> _memory = {};
   final Map<String, Future<Object?>> _inFlight = {};
 
+  /// Bumped by [clear]; a fetch that started before a clear (sign-out)
+  /// must not write the old account's data back into the cache.
+  int _generation = 0;
+
+  /// Longest [fetch] waits for the server before falling back to the
+  /// cached copy (or failing with a timeout when there is none).
+  static const fetchTimeout = Duration(seconds: 30);
+
   Future<Directory> _directory() async {
     if (_dir != null) return _dir!;
     final dir = _override ??
@@ -74,17 +82,21 @@ class CacheStore {
     if (cached != null && !_connectivity.hasNetwork) return cached.value;
 
     try {
-      final json = await (_inFlight[key] ??= () async {
-        final value = await remote();
+      final generation = _generation;
+      late final Future<Object?> request;
+      request = _inFlight[key] ??= () async {
+        final value = await remote().timeout(fetchTimeout);
         _connectivity.reportSuccess();
         final data = encode == null ? value : encode(value);
-        await write(key, data);
+        if (generation == _generation) await write(key, data);
         return data;
       }().whenComplete(() {
         // Block body on purpose: returning the removed future would make
-        // whenComplete wait on itself.
-        _inFlight.remove(key);
-      }));
+        // whenComplete wait on itself. Only drop our own entry: a clear()
+        // may have let a newer request take the slot.
+        if (identical(_inFlight[key], request)) _inFlight.remove(key);
+      });
+      final json = await request;
       return decode == null ? json as T : decode(json);
     } catch (e) {
       if (isOfflineError(e)) {
@@ -119,10 +131,13 @@ class CacheStore {
     _memory[key] = entry;
     try {
       final file = await _file(key);
-      await file.writeAsString(
+      // Write then rename, so a crash mid-write never leaves half a file.
+      final tmp = File('${file.path}.tmp');
+      await tmp.writeAsString(
         jsonEncode({'t': entry.savedAt.millisecondsSinceEpoch, 'v': data}),
         flush: true,
       );
+      await tmp.rename(file.path);
     } catch (e) {
       debugPrint('CacheStore: failed to persist "$key": $e');
     }
@@ -133,7 +148,16 @@ class CacheStore {
   Future<void> update(String key, Object? Function(Object? data) change) async {
     final entry = _memory[key] ?? await _load(key);
     if (entry == null) return;
-    await write(key, change(entry.value));
+    final Object? changed;
+    try {
+      changed = change(entry.value);
+    } catch (e) {
+      // Cached shape no longer matches: drop it, the next fetch refills it.
+      debugPrint('CacheStore: dropping "$key", update failed: $e');
+      await remove(key);
+      return;
+    }
+    await write(key, changed);
   }
 
   Future<void> remove(String key) async {
@@ -147,19 +171,24 @@ class CacheStore {
   /// Removes every key starting with [prefix].
   Future<void> removeWhere(String prefix) async {
     _memory.removeWhere((k, _) => k.startsWith(prefix));
-    final dir = await _directory();
     final encoded = _fileName(prefix).split('.').first;
-    await for (final f in dir.list()) {
-      if (f is File && p.basename(f.path).startsWith(encoded)) {
-        try {
-          await f.delete();
-        } catch (_) {}
+    try {
+      final dir = await _directory();
+      await for (final f in dir.list()) {
+        if (f is File && p.basename(f.path).startsWith(encoded)) {
+          try {
+            await f.delete();
+          } catch (_) {}
+        }
       }
+    } catch (e) {
+      debugPrint('CacheStore: failed to clear "$prefix": $e');
     }
   }
 
   /// Drops everything (sign-out / account deletion).
   Future<void> clear() async {
+    _generation++;
     _memory.clear();
     _inFlight.clear();
     try {
@@ -173,14 +202,21 @@ class CacheStore {
     try {
       final file = await _file(key);
       if (!await file.exists()) return null;
-      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final raw = jsonDecode(await file.readAsString());
+      final savedAt = raw is Map ? raw['t'] : null;
+      if (raw is! Map || savedAt is! num || !raw.containsKey('v')) {
+        throw const FormatException('unexpected cache file shape');
+      }
       final entry = Cached<Object?>(
         raw['v'],
-        DateTime.fromMillisecondsSinceEpoch(raw['t'] as int),
+        DateTime.fromMillisecondsSinceEpoch(savedAt.toInt()),
       );
       return _memory[key] = entry;
     } catch (e) {
-      debugPrint('CacheStore: failed to read "$key": $e');
+      // Corrupt or truncated file (e.g. the app was killed mid-write): drop
+      // it so the next fetch starts clean.
+      debugPrint('CacheStore: dropping unreadable "$key": $e');
+      await remove(key);
       return null;
     }
   }

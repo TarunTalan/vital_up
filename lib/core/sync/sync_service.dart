@@ -54,6 +54,12 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
   static const _maxBackoff = Duration(minutes: 5);
 
+  /// One request (a page of rows, an upload batch) may take at most this
+  /// long before it counts as a network failure.
+  static const _requestTimeout = Duration(seconds: 30);
+
+  bool _started = false;
+
   Future<void>? _running;
   Future<void>? _queued;
   bool _rerunPull = false;
@@ -70,9 +76,19 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   /// Starts syncing on sign-in, app resume and reconnect. Call once at
   /// startup.
   void start() {
+    if (_started) return;
+    _started = true;
     WidgetsBinding.instance.addObserver(this);
     _writes.attach(this);
     _authSub = _client.auth.onAuthStateChange.listen((auth) {
+      if (auth.event == AuthChangeEvent.signedOut) {
+        // Nothing left to sync for this session; don't retry into the next.
+        _debounce?.cancel();
+        _retryTimer?.cancel();
+        _consecutiveFailures = 0;
+        _lastPull = null;
+        return;
+      }
       if (auth.session != null &&
           (auth.event == AuthChangeEvent.initialSession ||
               auth.event == AuthChangeEvent.signedIn)) {
@@ -89,6 +105,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   }
 
   void dispose() {
+    _started = false;
     WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
     _onlineSub?.cancel();
@@ -190,6 +207,9 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       await _writes.flush(_client, userId);
       await _pushDeletes(userId);
       for (final adapter in _adapters) {
+        // Signed out or switched account mid-run: stop, so nothing from the
+        // old account lands in the (wiped) local data.
+        if (_userId != userId) return;
         try {
           await _push(adapter, userId);
           if (pull) await _pull(adapter, userId);
@@ -203,6 +223,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
           );
         }
       }
+      if (_userId != userId) return;
       _connectivity.reportSuccess();
       if (pull) _lastPull = DateTime.now();
     } catch (e, stack) {
@@ -248,23 +269,49 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     final pending = await adapter.pending(userId);
     for (var i = 0; i < pending.length; i += _uploadBatch) {
       final batch = pending.skip(i).take(_uploadBatch).toList();
-      await _retryOperation(() async {
-        await _client.from(adapter.table).upsert([
-          for (final p in batch) p.row,
-        ], onConflict: 'id');
-      });
+      try {
+        await _retryOperation(() async {
+          await _client.from(adapter.table).upsert([
+            for (final p in batch) p.row,
+          ], onConflict: 'id');
+        });
+      } on PostgrestException catch (e) {
+        if (!_isRejectedRow(e)) rethrow;
+        // A row breaks a server limit (e.g. logged before the app checked
+        // ranges): send the batch row by row so one bad entry can't block
+        // the whole table forever.
+        await _pushOneByOne(adapter, batch);
+      }
       await adapter.markSynced(userId, [for (final p in batch) p.localKey]);
+    }
+  }
+
+  /// Postgres refused the data itself (check constraint, value too long,
+  /// out of range), so retrying the same row can never succeed.
+  static bool _isRejectedRow(PostgrestException e) =>
+      const {'23514', '22001', '22003', '23502'}.contains(e.code);
+
+  Future<void> _pushOneByOne(SyncAdapter adapter, List<PendingRow> batch) async {
+    for (final p in batch) {
+      try {
+        await _client.from(adapter.table).upsert(p.row, onConflict: 'id');
+      } on PostgrestException catch (e, stack) {
+        if (!_isRejectedRow(e)) rethrow;
+        // Kept on this device, just not backed up.
+        CrashReporter.report(
+          e,
+          stack,
+          reason: 'Sync of ${adapter.table} row rejected by server limits',
+        );
+      }
     }
   }
 
   Future<void> _pull(SyncAdapter adapter, String userId) async {
     final cursorKey = 'sync_cursor_${adapter.table}_$userId';
-    final saved = _prefs.getString(cursorKey);
-    var cursor = saved == null
-        ? null
-        : DateTime.parse(
-            saved,
-          ).subtract(_pullOverlap).toUtc().toIso8601String();
+    final saved = DateTime.tryParse(_prefs.getString(cursorKey) ?? '');
+    // A corrupt cursor just means a full re-read (merging is idempotent).
+    var cursor = saved?.subtract(_pullOverlap).toUtc().toIso8601String();
 
     while (true) {
       var query = _client.from(adapter.table).select().eq('user_id', userId);
@@ -276,9 +323,12 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       });
 
       if (rows.isEmpty) break;
+      if (_userId != userId) return;
       await adapter.apply(userId, rows);
-      cursor = rows.last['updated_at'] as String;
-      await _prefs.setString(cursorKey, cursor);
+      final last = rows.last['updated_at'];
+      if (last is! String || last == cursor) break; // No progress: stop.
+      cursor = last;
+      await _prefs.setString(cursorKey, last);
       if (rows.length < _pageSize) break;
     }
   }
@@ -286,27 +336,43 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   Future<void> _pushDeletes(String userId) async {
     final queued = _prefs.getStringList(_keyDeletes) ?? const [];
     if (queued.isEmpty) return;
-    final remaining = <String>[];
-    for (var i = 0; i < queued.length; i++) {
-      final d = jsonDecode(queued[i]) as Map<String, dynamic>;
-      // Another account's leftovers can't be sent from this session.
-      if (d['user'] != userId) continue;
+    // Entries handled in this pass (sent, unreadable or another account's
+    // leftovers); everything else, including deletes recorded meanwhile,
+    // stays queued.
+    final done = <String>{};
+    for (final raw in queued) {
+      Map<String, dynamic>? d;
+      try {
+        d = jsonDecode(raw) as Map<String, dynamic>;
+      } catch (_) {}
+      final table = d?['table'];
+      final id = d?['id'];
+      // Unreadable, or another account's leftovers that can't be sent from
+      // this session.
+      if (table is! String || id is! String || d!['user'] != userId) {
+        done.add(raw);
+        continue;
+      }
+      if (_userId != userId) break;
       try {
         await _retryOperation(() async {
           await _client
-              .from(d['table'] as String)
+              .from(table)
               .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
-              .eq('id', d['id'] as String);
+              .eq('id', id);
         });
+        done.add(raw);
       } catch (e) {
-        if (isOfflineError(e)) {
-          remaining.addAll(queued.skip(i));
-          break;
-        }
-        remaining.add(queued[i]);
+        if (isOfflineError(e)) break;
+        // Rejected by the server: keep it for the next run.
       }
     }
-    await _prefs.setStringList(_keyDeletes, remaining);
+    if (done.isEmpty) return;
+    final current = _prefs.getStringList(_keyDeletes) ?? const [];
+    await _prefs.setStringList(_keyDeletes, [
+      for (final raw in current)
+        if (!done.contains(raw)) raw,
+    ]);
   }
 
   /// Transient operation retry with rapid exponential backoff (e.g., 500ms, 1s)
@@ -318,7 +384,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     while (true) {
       attempts++;
       try {
-        return await action();
+        return await action().timeout(_requestTimeout);
       } catch (e) {
         if (attempts >= maxAttempts || !isOfflineError(e)) {
           rethrow;

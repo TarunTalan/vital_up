@@ -56,6 +56,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_health_analysis_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/pages/friends_page.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
@@ -335,7 +338,7 @@ class AppRouter {
         name: 'friends',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: FriendsPage(myUsername: state.extra as String?),
+          child: FriendsPage(myUsername: _extraAs<String>(state)),
         ),
       ),
       GoRoute(
@@ -347,7 +350,9 @@ class AppRouter {
             state.extra is Community ? null : '/dashboard',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: LeaderboardPage(community: state.extra! as Community),
+          child: state.extra is Community
+              ? LeaderboardPage(community: state.extra! as Community)
+              : const _RouteUnavailable(),
         ),
       ),
 
@@ -478,7 +483,7 @@ class AppRouter {
         path: '/diet-plan-mode',
         name: 'diet-plan-mode',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final extra = _extraMap(state);
           return AppPage(
             key: state.pageKey,
             child: DietPlanModeSelectPage(preferences: extra),
@@ -489,7 +494,7 @@ class AppRouter {
         path: '/diet-plan-goal',
         name: 'diet-plan-goal',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final extra = _extraMap(state);
           return AppPage(
             key: state.pageKey,
             child: GoalSetupPage(preferences: extra),
@@ -500,7 +505,7 @@ class AppRouter {
         path: '/diet-plan-manual',
         name: 'diet-plan-manual',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final extra = _extraMap(state);
           return AppPage(
             key: state.pageKey,
             child: ManualTargetPage(preferences: extra),
@@ -519,7 +524,7 @@ class AppRouter {
         path: '/diet-plan-result',
         name: 'diet-plan-result',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final extra = _extraMap(state);
           return AppPage(
             key: state.pageKey,
             child: DietPlanResultPage(params: extra),
@@ -583,7 +588,7 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: ContactSupportPage(
-            args: state.extra as ContactSupportArgs? ??
+            args: _extraAs<ContactSupportArgs>(state) ??
                 const ContactSupportArgs(initialCategory: SupportCategory.general),
           ),
         ),
@@ -611,7 +616,7 @@ class AppRouter {
           final extra = state.extra;
           final args = extra is VitaChatArgs
               ? extra
-              : VitaChatArgs(initialPrompt: extra as String?);
+              : VitaChatArgs(initialPrompt: extra is String ? extra : null);
           return AppPage(
             key: state.pageKey,
             child: VitaChatPage(
@@ -656,12 +661,64 @@ class AppRouter {
         redirect: (context, state) => HomeWidgetService.handleLink(state.uri),
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('No route defined for ${state.uri.toString()}'),
-      ),
-    ),
+    // Unknown or stale links: a calm page with a way back, never the raw
+    // path.
+    errorBuilder: (context, state) => const _RouteUnavailable(),
   );
+}
+
+/// `extra` when it has the expected type, otherwise null (deep links and
+/// restored routes carry no `extra`, or a different one).
+T? _extraAs<T>(GoRouterState state) {
+  final extra = state.extra;
+  return extra is T ? extra : null;
+}
+
+/// `extra` as a JSON-like map; empty when missing or of another type.
+Map<String, dynamic> _extraMap(GoRouterState state) {
+  final extra = state.extra;
+  if (extra is! Map) return <String, dynamic>{};
+  return {
+    for (final e in extra.entries)
+      if (e.key is String) e.key as String: e.value,
+  };
+}
+
+/// Shown for a link the app can't open.
+class _RouteUnavailable extends StatelessWidget {
+  const _RouteUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppScaffold(
+      scrollable: false,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.link_off_rounded,
+              size: AppDimens.iconXl,
+              color: context.vColors.grayText,
+            ),
+            const SizedBox(height: AppDimens.space12),
+            Text(
+              "This page isn't available.",
+              textAlign: TextAlign.center,
+              style: context.text.bodyMedium?.copyWith(
+                color: context.vColors.grayText,
+              ),
+            ),
+            const SizedBox(height: AppDimens.space24),
+            AppPrimaryButton(
+              label: 'Go to Home',
+              onTap: () => context.go('/splash'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Pages under Profile get the Profile tab's cubit as `extra`, so edits show
