@@ -42,7 +42,7 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
         if (state.status == SubmissionStatus.success) {
           context.go('/dashboard');
         } else if (state.status == SubmissionStatus.error) {
-          showErrorSnackBar(context, state.errorMessage ?? 'An error occurred');
+          showErrorSnackBar(context, state.errorMessage ?? "Couldn't save your details. Try again.");
         }
       },
       builder: (context, state) {

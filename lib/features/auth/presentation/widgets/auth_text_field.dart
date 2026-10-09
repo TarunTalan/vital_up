@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 
 class AuthTextField extends StatefulWidget {
@@ -144,7 +145,7 @@ class _AuthTextFieldState extends State<AuthTextField>
   }
 
   String _sanitizeInput(String input) {
-    final maxLen = widget.isPassword ? 16 : widget.maxLength;
+    final maxLen = widget.isPassword ? InputLimits.passwordMax : widget.maxLength;
     String filtered = input;
 
     if (widget.keyboardType == TextInputType.emailAddress) {
@@ -269,6 +270,14 @@ class _AuthTextFieldState extends State<AuthTextField>
                       autofillHints: widget.autofillHints,
                       maxLines: widget.singleLine ? 1 : null,
                       enableInteractiveSelection: !widget.isPassword,
+                      // Invisible characters and over-long pastes never reach
+                      // onChanged; _sanitizeInput still filters per type.
+                      inputFormatters: InputFormatters.text(
+                        widget.isPassword
+                            ? InputLimits.passwordMax
+                            : widget.maxLength,
+                        multiline: !widget.singleLine,
+                      ),
                       onTapOutside: (event) {},
                       style: context.text.bodyMedium?.copyWith(
                         color: textColor,
@@ -529,7 +538,7 @@ class AuthEmailField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.enabled = true,
-    this.maxLength = 250,
+    this.maxLength = InputLimits.email,
   });
 
   @override

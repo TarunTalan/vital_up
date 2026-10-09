@@ -10,6 +10,8 @@ import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/presentation/widgets/username_input.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 import 'dart:math' as math;
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 
 class PersonalDetailsPage extends StatefulWidget {
   const PersonalDetailsPage({super.key});
@@ -42,7 +44,9 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     _gender = cubit.state.gender;
     
     _nameController.addListener(() {
-      context.read<OnboardingCubit>().updateFullName(_nameController.text.trim());
+      context.read<OnboardingCubit>().updateFullName(
+        ProfileRules.cleanName(_nameController.text),
+      );
     });
     _loadUsernameStatus();
   }
@@ -103,21 +107,14 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     }
   }
 
-  String? _nameError() {
-    final text = _nameController.text.trim();
-    if (text.isEmpty) return "Full Name is required";
-    if (text.length < 2) return "Must be at least 2 characters";
-    if (!RegExp(r"^[a-zA-Z\s]+$").hasMatch(text)) return "Letters and spaces only";
-    return null;
-  }
+  String? _nameError() => ProfileRules.nameError(_nameController.text);
 
-  bool _isValid() {
-    final age = _calculateAge();
-    return _nameError() == null &&
-        _dob.isNotEmpty &&
-        age != null && age >= 10 &&
-        (_gender.toLowerCase() == 'male' || _gender.toLowerCase() == 'female');
-  }
+  String? get _dobError => ProfileRules.dobError(_dob);
+
+  bool _isValid() =>
+      _nameError() == null &&
+      _dobError == null &&
+      (_gender.toLowerCase() == 'male' || _gender.toLowerCase() == 'female');
 
   String _formatWithSlashes(String input) {
     final digits = input.replaceAll(RegExp(r'\D'), '');
@@ -126,54 +123,28 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4, math.min(8, digits.length))}';
   }
 
-  int? _calculateAge() {
-    if (_dob.length == 8) {
-       try {
-         final day = int.parse(_dob.substring(0, 2));
-         final month = int.parse(_dob.substring(2, 4));
-         final year = int.parse(_dob.substring(4, 8));
-         final dobDate = DateTime(year, month, day);
-         final now = DateTime.now();
-         int age = now.year - dobDate.year;
-         if (now.month < dobDate.month || (now.month == dobDate.month && now.day < dobDate.day)) {
-           age--;
-         }
-         if (age <= 0) return null;
-         return age;
-       } catch (_) {}
-    }
-    return null;
-  }
+  int? _calculateAge() => ProfileRules.ageFromDob(_dob);
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime now = DateTime.now();
-    DateTime? initialDate;
-    if (_dob.length == 8) {
-       try {
-         final day = int.parse(_dob.substring(0, 2));
-         final month = int.parse(_dob.substring(2, 4));
-         final year = int.parse(_dob.substring(4, 8));
-         initialDate = DateTime(year, month, day);
-       } catch (_) {}
-    }
-    
+    final now = DateTime.now();
+    // The picker only offers supported ages (InputLimits.ageMin to ageMax);
+    // the initial date must sit inside that range or the picker asserts.
+    final saved = ProfileRules.parseDob(_dob);
     final picked = await showDatePicker(
       context: context,
-      initialDate: initialDate ?? now,
-      firstDate: DateTime(1900),
-      lastDate: now,
+      initialDate: ProfileRules.clampDob(
+        saved ?? DateTime(now.year - 25, now.month, 1),
+        now,
+      ),
+      firstDate: ProfileRules.firstDob(now),
+      lastDate: ProfileRules.lastDob(now),
     );
-    
-    if (picked != null) {
-      setState(() {
-        final day = picked.day.toString().padLeft(2, '0');
-        final month = picked.month.toString().padLeft(2, '0');
-        final year = picked.year.toString();
-        _dob = '$day$month$year';
-        _showErrors = false;
-      });
-      context.read<OnboardingCubit>().updateDob(_dob);
-    }
+    if (picked == null || !mounted) return;
+    setState(() {
+      _dob = ProfileRules.formatDob(picked);
+      _showErrors = false;
+    });
+    this.context.read<OnboardingCubit>().updateDob(_dob);
   }
 
   @override
@@ -182,7 +153,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     final errorColor = context.colors.error;
     final nameError = _showErrors && _nameError() != null;
     final age = _calculateAge();
-    final dobError = _showErrors && (_dob.isEmpty || age == null || age < 13);
+    final dobError = _showErrors && _dobError != null;
     final genderError = _showErrors &&
         (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female");
 
@@ -245,7 +216,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
           OnboardingTextField(
             label: "Full Name",
             value: _nameController.text,
-            maxLength: 50,
+            maxLength: InputLimits.name,
             onChange: (val) {
               _nameController.text = val;
               if (_showErrors) {
@@ -280,13 +251,11 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
           ),
           const SizedBox(height: AppDimens.inputLabelGap),
           Text(
-            _showErrors && _dob.isEmpty
-                ? "Date of Birth is required"
-                : (_showErrors && _dob.isNotEmpty && (age == null || age < 13)
-                    ? "You must be at least 13 years old"
-                    : (age != null
-                        ? "Age: $age"
-                        : "Enter your DOB in DD/MM/YYYY format")),
+            dobError
+                ? _dobError!
+                : (age != null
+                    ? "Age: $age"
+                    : "Tap to choose your date of birth"),
             style: context.text.bodyLarge?.copyWith(
               color: dobError
                   ? errorColor

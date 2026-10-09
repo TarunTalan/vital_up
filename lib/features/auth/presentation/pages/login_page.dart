@@ -22,6 +22,9 @@ class _LoginPageState extends State<LoginPage>
   late TabController _tabController;
   int _selectedTab = 0;
 
+  /// Kept for dispose, where looking up the widget tree isn't allowed.
+  late final AuthCubit _authCubit = context.read<AuthCubit>();
+
   @override
   void initState() {
     super.initState();
@@ -30,16 +33,16 @@ class _LoginPageState extends State<LoginPage>
       if (_tabController.indexIsChanging) return;
       FocusManager.instance.primaryFocus?.unfocus();
       setState(() => _selectedTab = _tabController.index);
-      context.read<AuthCubit>().clearAllFields();
+      _authCubit.clearAllFields();
     });
     // Clear all fields on entry
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
     super.dispose();
   }
 
@@ -150,8 +153,16 @@ class _LoginPageState extends State<LoginPage>
                           ),
                           SignupScreen(
                             onOTPSent: (token, email) {
+                              // Encoded: a "+" in the email would decode to a space.
                               context.push(
-                                '/verify-otp?email=$email&token=$token&flow=signup',
+                                Uri(
+                                  path: '/verify-otp',
+                                  queryParameters: {
+                                    'email': email,
+                                    'token': token,
+                                    'flow': 'signup',
+                                  },
+                                ).toString(),
                               );
                             },
                           ),

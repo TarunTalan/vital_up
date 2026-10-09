@@ -18,18 +18,41 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+  /// Kept for dispose, where looking up the widget tree isn't allowed.
+  late final AuthCubit _authCubit = context.read<AuthCubit>();
+
   @override
   void initState() {
     super.initState();
     // Clear fields and errors when entering this page
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
   }
 
   @override
   void dispose() {
     // Clear fields and errors when leaving this page
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
     super.dispose();
+  }
+
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    _authCubit.requestForgotPassword(
+      onSuccess: (token) {
+        if (!mounted) return;
+        // Encoded: a "+" in the email would decode to a space.
+        context.push(
+          Uri(
+            path: '/verify-otp',
+            queryParameters: {
+              'email': _authCubit.emailVal,
+              'token': token,
+              'flow': 'forgot',
+            },
+          ).toString(),
+        );
+      },
+    );
   }
 
   @override
@@ -91,17 +114,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               value: emailSnapshot.data ?? '',
                                               label: 'Email ID',
                                               textInputAction: TextInputAction.done,
-                                              onSubmitted: (_) {
-                                                FocusScope.of(context).unfocus();
-                                                cubit.requestForgotPassword(
-                                                  onSuccess: (token) {
-                                                    if (!context.mounted) return;
-                                                    context.push(
-                                                      '/verify-otp?email=${cubit.emailVal}&token=$token&flow=forgot',
-                                                    );
-                                                  },
-                                                );
-                                              },
+                                              onSubmitted: (_) => _submit(),
                                               onChange: cubit.onEmailChange,
                                               error: errorSnapshot.data,
                                               validate: cubit.validateEmail,
@@ -120,17 +133,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                         return PrimaryAuthButton(
                                           label: 'Send',
                                           isLoading: isLoading,
-                                          onTap: () {
-                                            FocusScope.of(context).unfocus();
-                                            cubit.requestForgotPassword(
-                                              onSuccess: (token) {
-                                                if (!context.mounted) return;
-                                                context.push(
-                                                  '/verify-otp?email=${cubit.emailVal}&token=$token&flow=forgot',
-                                                );
-                                              },
-                                            );
-                                          },
+                                          onTap: _submit,
                                         );
                                       },
                                     ),

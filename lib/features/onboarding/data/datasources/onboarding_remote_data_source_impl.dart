@@ -5,6 +5,7 @@ import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 
 class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
   final SupabaseClient supabaseClient;
@@ -20,7 +21,7 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
   /// The `user_health_data` row written for [data].
   static Map<String, dynamic> payloadFor(String userId, OnboardingData data) => {
         'id': userId,
-        'full_name': data.fullName,
+        'full_name': ProfileRules.cleanName(data.fullName),
         'dob': data.dob,
         'gender': data.gender,
         'weight': data.weight,
@@ -31,9 +32,9 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
         'target_weight': double.tryParse(data.targetWeight),
         'target_weight_unit': data.targetWeightUnit,
         'goal_duration_months': int.tryParse(data.goalDurationMonths),
-        'health_conditions': data.healthConditions,
-        'medicines': data.medicines,
-        'allergies': data.allergies,
+        'health_conditions': ProfileRules.cleanNote(data.healthConditions),
+        'medicines': ProfileRules.cleanNote(data.medicines),
+        'allergies': ProfileRules.cleanNote(data.allergies),
         'smokes': data.smokes,
         'blood_pressure_top': data.bloodPressureTop,
         'blood_pressure_bottom': data.bloodPressureBottom,

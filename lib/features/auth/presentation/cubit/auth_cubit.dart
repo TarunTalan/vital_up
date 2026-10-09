@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:flutter/foundation.dart';
+import 'package:vital_up/features/auth/domain/auth_rules.dart';
 import 'package:vital_up/features/auth/domain/entities/user_entity.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
+import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
@@ -122,29 +125,17 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   // Validation functions matching AuthViewModel
+  /// Shown under the password field when the login can't match an account.
+  static const credentialsMessage = 'Wrong username or password. Try again.';
+
   bool validateUsernameLogin() {
-    final val = _usernameLogin.trim();
-    if (val.isEmpty) {
-      _usernameErrorLoginController.add('Username or Email is required');
+    if (AuthRules.cleanLoginId(_usernameLogin).isEmpty) {
+      _usernameErrorLoginController.add('Enter your username or email');
       return false;
     }
-    
-    bool isFormatValid = true;
-    if (val.contains('@')) {
-      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-      if (!emailRegex.hasMatch(val) || val.length > 254) {
-        isFormatValid = false;
-      }
-    } else {
-      final usernameRegex = RegExp(r'^[A-Za-z0-9._]+$');
-      if (val.length < 3 || val.length > 20 || !usernameRegex.hasMatch(val)) {
-        isFormatValid = false;
-      }
-    }
-
-    if (!isFormatValid) {
+    if (!AuthRules.isPlausibleLoginId(_usernameLogin)) {
       _usernameErrorLoginController.add('');
-      _passwordErrorController.add('Invalid credentials.');
+      _passwordErrorController.add(credentialsMessage);
       return false;
     }
 
@@ -153,78 +144,35 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   bool validateUsernameSignup() {
-    if (_usernameSignup.trim().isEmpty) {
-      _usernameErrorSignupController.add('Username is required');
-      return false;
-    }
-    if (_usernameSignup.length < 3) {
-      _usernameErrorSignupController.add('Username must be at least 3 characters');
-      return false;
-    }
-    if (_usernameSignup.length > 20) {
-      _usernameErrorSignupController.add('Username must be at most 20 characters');
-      return false;
-    }
-    final regex = RegExp(r'^[A-Za-z0-9._]+$');
-    if (!regex.hasMatch(_usernameSignup)) {
-      _usernameErrorSignupController.add('Username can only contain letters, numbers, dots, and underscores');
-      return false;
-    }
-    _usernameErrorSignupController.add(null);
-    return true;
+    final error = UsernameService.formatError(_usernameSignup);
+    _usernameErrorSignupController.add(error);
+    return error == null;
   }
 
   bool validateEmail() {
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (_email.trim().isEmpty) {
-      _emailErrorController.add('Email is required');
-      return false;
-    }
-    if (_email.length > 100) {
-      _emailErrorController.add('Email must be at most 100 characters');
-      return false;
-    }
-    if (!emailRegex.hasMatch(_email)) {
-      _emailErrorController.add('Please enter a valid email');
-      return false;
-    }
-    _emailErrorController.add(null);
-    return true;
+    final error = AuthRules.emailError(_email);
+    _emailErrorController.add(error);
+    return error == null;
   }
 
   bool validatePassword() {
-    if (_password.isEmpty) {
-      _passwordErrorController.add('Password is required');
-      return false;
-    }
-    final error = _getPasswordValidationError(_password);
-    if (error != null) {
-      _passwordErrorController.add(error);
-      return false;
-    }
-    _passwordErrorController.add(null);
-    return true;
+    final error = AuthRules.passwordError(_password);
+    _passwordErrorController.add(error);
+    return error == null;
   }
 
   bool validatePasswordForLogin() {
     if (_password.isEmpty) {
-      _passwordErrorController.add('Password is required');
+      _passwordErrorController.add('Enter your password');
       return false;
     }
-    if (_password.length < 8 || _password.length > 16) {
+    if (!AuthRules.isPlausiblePassword(_password)) {
       _usernameErrorLoginController.add('');
-      _passwordErrorController.add('Invalid credentials.');
+      _passwordErrorController.add(credentialsMessage);
       return false;
     }
     _passwordErrorController.add(null);
     return true;
-  }
-
-  String? _getPasswordValidationError(String password) {
-    if (password.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    return null;
   }
 
   void clearErrorsOnly() {
@@ -260,6 +208,7 @@ class AuthCubit extends Cubit<AuthState> {
     _isUsernameAvailable = null; // Reset while checking
 
     final result = await _authRepository.checkUsernameAvailability(username);
+    if (isClosed) return;
     result.fold(
       (failure) {
         if (_usernameSignup == username) {
@@ -281,29 +230,34 @@ class AuthCubit extends Cubit<AuthState> {
     _isCheckingUsernameController.add(false);
   }
 
-  String _sanitizeRawErrorMessage(String message) {
-    // Extract nested message text if inside exception string formats
-    // e.g. "AuthApiException(message: XYZ, statusCode: ...)"
-    final messageRegExp = RegExp(r'(?:message:\s*|message\s*=\s*|message:\s*")([^",\)]+)');
-    final match = messageRegExp.firstMatch(message);
-    if (match != null) {
-      return match.group(1)?.trim() ?? message;
-    }
-    return message;
-  }
+  static final _nestedMessage = RegExp(
+    r'(?:message:\s*|message\s*=\s*|message:\s*")([^",\)]+)',
+  );
 
-  // Auth Operations
-  String _mapFailureToMessage(String originalMessage) {
+  /// Extracts the message from "AuthApiException(message: XYZ, ...)".
+  static String _sanitizeRawErrorMessage(String message) =>
+      _nestedMessage.firstMatch(message)?.group(1)?.trim() ?? message;
+
+  /// Short user-facing text for a failure from the auth repository. Raw
+  /// server text is never shown; [otp] maps code/token errors to a wrong
+  /// code message (only meaningful while verifying a code).
+  @visibleForTesting
+  static String messageForFailure(String originalMessage, {bool otp = false}) {
     final origLower = originalMessage.toLowerCase();
-    
-    // Check network errors on the original raw message FIRST to give it absolute priority!
-    if (origLower.contains('socketexception') || 
-        origLower.contains('network') || 
-        origLower.contains('connection') || 
-        origLower.contains('handshake') || 
+
+    // Network problems first: they're often wrapped in other errors.
+    if (origLower.contains('socketexception') ||
+        origLower.contains('network') ||
+        origLower.contains('connection') ||
+        origLower.contains('handshake') ||
         origLower.contains('failed host lookup') ||
-        origLower.contains('clientexception')) {
-      return 'No internet connection. Please check your network.';
+        origLower.contains('clientexception') ||
+        origLower.contains("you're offline")) {
+      return "You're offline. Try again when connected.";
+    }
+    if (origLower.contains('timeoutexception') ||
+        origLower.contains('taking too long')) {
+      return 'This is taking too long. Try again.';
     }
 
     final cleanMsg = _sanitizeRawErrorMessage(originalMessage);
@@ -312,116 +266,101 @@ class AuthCubit extends Cubit<AuthState> {
     if (msg.contains('cancelled') || msg.contains('canceled')) {
       return 'Google sign-in was cancelled.';
     }
-
-    if (msg.contains('missing id token') || 
-        msg.contains('missing_id_token') || 
-        msg.contains('failed: missing')) {
-      return 'Google authentication failed. Please try again.';
+    if (msg.contains('missing id token') ||
+        msg.contains('missing_id_token') ||
+        msg.contains('failed: missing') ||
+        msg.contains('google')) {
+      return "Couldn't sign in with Google. Try again.";
     }
-    
-    if (msg.contains('rate limit') || 
-        msg.contains('too many requests') || 
-        msg.contains('too_many_requests')) {
-      return 'Too many attempts. Please try again in a few minutes.';
+    if (msg.contains('rate limit') ||
+        msg.contains('too many requests') ||
+        msg.contains('too_many_requests') ||
+        msg.contains('over_request_rate_limit')) {
+      return 'Too many attempts. Wait a few minutes.';
     }
-
     if (msg.contains('security purposes') || msg.contains('request this after')) {
       final match = RegExp(r'\d+').firstMatch(cleanMsg);
       if (match != null) {
-        final seconds = match.group(0);
-        return 'Please wait ${seconds}s before requesting a new OTP.';
+        return 'Wait ${match.group(0)}s before asking for a new code.';
       }
-      return 'Please wait before requesting a new OTP.';
+      return 'Wait a moment before asking for a new code.';
     }
-    
-    if (msg.contains('invalid login credentials') || 
+    if (msg.contains('invalid login credentials') ||
         msg.contains('invalid_credentials') ||
         msg.contains('username or password') ||
-        msg.contains('no account exist') ||
-        msg.contains('invalid username or password')) {
-      return 'Invalid credentials.';
+        msg.contains('no account exist')) {
+      return credentialsMessage;
     }
-    
-    if (msg.contains('email not confirmed') || 
+    if (msg.contains('email not confirmed') ||
         msg.contains('email_not_confirmed')) {
-      return 'Please verify your email address first.';
+      return 'Verify your email first, then sign in.';
     }
-    
-    if (msg.contains('already exists') || 
-        msg.contains('already registered') || 
-        msg.contains('user already registered') ||
+    if (msg.contains('username') && msg.contains('taken')) {
+      return 'That username is taken';
+    }
+    if (msg.contains('already exists') ||
+        msg.contains('already registered') ||
         msg.contains('email already in use') ||
-        msg.contains('email already registered')) {
+        msg.contains('email_exists')) {
       return 'This email is already registered.';
     }
-
-    if (msg.contains('not registered') || 
-        msg.contains('please sign up') || 
+    if (msg.contains('not registered') ||
+        msg.contains('please sign up') ||
         msg.contains('no user found')) {
-      return 'Email is not registered. Please sign up.';
+      return 'No account with this email. Sign up instead.';
     }
-
     if (msg.contains('should be different from') ||
         msg.contains('different from the old') ||
         msg.contains('must be different') ||
-        msg.contains('same as old')) {
-      return 'New password must be different from your old password.';
+        msg.contains('same as old') ||
+        msg.contains('same_password')) {
+      return "Use a password you haven't used before.";
     }
-    
-    if (msg.contains('password should be') || 
+    if (msg.contains('password should be') ||
         msg.contains('weak password') ||
+        msg.contains('weak_password') ||
         msg.contains('password too short')) {
-      return 'Password is too weak. Please check password requirements.';
+      return 'Choose a stronger password.';
     }
-    
-    if (msg.contains('token') ||
-        msg.contains('otp') ||
-        msg.contains('verification') ||
-        msg.contains('confirmation') ||
-        msg.contains('code') ||
-        msg.contains('expired')) {
-      return 'Invalid or expired OTP. Please check and try again.';
+    if (otp &&
+        (msg.contains('token') ||
+            msg.contains('otp') ||
+            msg.contains('verification') ||
+            msg.contains('confirmation') ||
+            msg.contains('code') ||
+            msg.contains('expired'))) {
+      return 'Wrong or expired code. Try again.';
     }
-
-    if (cleanMsg.isNotEmpty) {
-      final hasTechnicalTerms = msg.contains('exception') || 
-                                msg.contains('error') || 
-                                msg.contains('database') || 
-                                msg.contains('rls') || 
-                                msg.contains('row-level') || 
-                                msg.contains('postgres') || 
-                                msg.contains('supabase') || 
-                                msg.contains('null') || 
-                                msg.contains('api') || 
-                                msg.contains('sdk') ||
-                                msg.contains('statuscode') ||
-                                msg.contains('failed');
-                                
-      if (cleanMsg.length < 60 && !hasTechnicalTerms && !cleanMsg.contains('{') && !cleanMsg.contains('[')) {
-        return cleanMsg;
-      }
-    }
-    
-    return 'An unexpected error occurred. Please try again.';
+    return 'Something went wrong. Try again.';
   }
 
+  String _mapFailureToMessage(String originalMessage, {bool otp = false}) {
+    debugPrint('Auth failure: $originalMessage');
+    return messageForFailure(originalMessage, otp: otp);
+  }
+
+  /// A request is already running (double taps, enter + button).
+  bool get _busy => state is AuthLoading;
+
   Future<void> signIn({required Function() onSuccess}) async {
+    if (_busy) return;
     if (!validateUsernameLogin() || !validatePasswordForLogin()) return;
 
     emit(AuthLoading());
-    final result = await _authRepository.signIn(_usernameLogin, _password);
+    final result = await _authRepository.signIn(
+      AuthRules.cleanLoginId(_usernameLogin),
+      _password,
+    );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
         final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        if (userFriendlyMessage.toLowerCase().contains('incorrect') ||
-            userFriendlyMessage.toLowerCase().contains('credentials') ||
-            userFriendlyMessage.toLowerCase().contains('username/email') ||
-            userFriendlyMessage.toLowerCase().contains('password')) {
+        if (userFriendlyMessage == credentialsMessage) {
           // Highlight both fields in red, but display the text below the password field
           _usernameErrorLoginController.add('');
-          _passwordErrorController.add('Invalid credentials.');
-        } else if (userFriendlyMessage.contains('verify')) {
+          _passwordErrorController.add(credentialsMessage);
+        } else if (userFriendlyMessage.toLowerCase().contains('verify')) {
           _usernameErrorLoginController.add(userFriendlyMessage);
         } else {
           _passwordErrorController.add(userFriendlyMessage);
@@ -439,16 +378,24 @@ class AuthCubit extends Cubit<AuthState> {
     required Function(String token) onOTPSent,
     required Function(String error) onError,
   }) async {
+    if (_busy) return;
     // Guard: block if username availability check hasn't passed
     if (_isUsernameAvailable != true) {
-      final msg = _lastUsernameError ?? 'Please wait for username check or choose an available username.';
+      final msg = _lastUsernameError ?? 'Checking your username. Try again in a moment.';
       _usernameErrorSignupController.add(msg);
       onError(msg);
       return;
     }
 
+    // The cleaned email is also what the OTP screen verifies against.
+    _email = AuthRules.cleanEmail(_email);
     emit(AuthLoading());
-    final result = await _authRepository.signUp(_usernameSignup, _email, _password);
+    final result = await _authRepository.signUp(
+      _usernameSignup.trim(),
+      _email,
+      _password,
+    );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
@@ -488,8 +435,9 @@ class AuthCubit extends Cubit<AuthState> {
     required Function() onSuccess,
     required Function(String err) onError,
   }) async {
-    if (otp.length != 6) {
-      const msg = 'Please enter all 6 digits';
+    if (_busy) return;
+    if (!_isSixDigits(otp)) {
+      const msg = 'Enter all 6 digits';
       _otpErrorController.add(msg);
       onError(msg);
       return;
@@ -501,6 +449,7 @@ class AuthCubit extends Cubit<AuthState> {
       otp: otp,
       token: token,
     );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
@@ -510,7 +459,7 @@ class AuthCubit extends Cubit<AuthState> {
         final used = _otpFailCounts[key] ?? 1;
         final remaining = (_maxOtpAttempts - used).clamp(0, _maxOtpAttempts);
 
-        final errorMsg = _mapFailureToMessage(failure.message);
+        final errorMsg = _mapFailureToMessage(failure.message, otp: true);
         final attemptsMessage = remaining > 0
             ? '$errorMsg ($remaining ${remaining == 1 ? 'attempt' : 'attempts'} left)'
             : errorMsg;
@@ -525,7 +474,8 @@ class AuthCubit extends Cubit<AuthState> {
           final user = UserEntity(
             id: currentUser.id,
             email: currentUser.email ?? email,
-            displayName: currentUser.userMetadata?['username'] ?? email.split('@')[0],
+            displayName: currentUser.userMetadata?['username'] as String? ??
+                email.split('@')[0],
           );
           emit(AuthAuthenticated(user));
         } else {
@@ -551,10 +501,11 @@ class AuthCubit extends Cubit<AuthState> {
       email: email,
       token: token,
     );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
-        final userFriendlyMessage = _mapFailureToMessage(failure.message);
+        final userFriendlyMessage = _mapFailureToMessage(failure.message, otp: true);
         emit(AuthOtpSent(token: token, email: email));
         _otpErrorController.add(userFriendlyMessage);
         onError(userFriendlyMessage);
@@ -568,21 +519,19 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> requestForgotPassword({required Function(String token) onSuccess}) async {
+    if (_busy) return;
     if (!validateEmail()) return;
 
+    _email = AuthRules.cleanEmail(_email);
     emit(AuthLoading());
     final result = await _authRepository.requestForgotPassword(_email);
+    if (isClosed) return;
 
     result.fold(
       (failure) {
-        final userFriendlyMessage = _mapFailureToMessage(failure.message);
-        if (userFriendlyMessage.contains('not registered') || 
-            userFriendlyMessage.contains('sign up')) {
-          _emailErrorController.add(userFriendlyMessage);
-          emit(AuthInitial());
-        } else {
-          emit(AuthError(userFriendlyMessage));
-        }
+        // Shown under the field: this page has no other place for errors.
+        _emailErrorController.add(_mapFailureToMessage(failure.message));
+        emit(AuthInitial());
       },
       (token) {
         emit(AuthForgotPasswordOtpSent(token: token, email: _email));
@@ -598,8 +547,9 @@ class AuthCubit extends Cubit<AuthState> {
     required Function(String err) onError,
     required String token,
   }) async {
-    if (code.length != 6) {
-      const msg = 'Please enter all 6 digits';
+    if (_busy) return;
+    if (!_isSixDigits(code)) {
+      const msg = 'Enter all 6 digits';
       _otpErrorController.add(msg);
       onError(msg);
       return;
@@ -611,6 +561,7 @@ class AuthCubit extends Cubit<AuthState> {
       otp: code,
       token: token,
     );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
@@ -620,7 +571,7 @@ class AuthCubit extends Cubit<AuthState> {
         final used = _otpFailCounts[key] ?? 1;
         final remaining = (_maxOtpAttempts - used).clamp(0, _maxOtpAttempts);
 
-        final errorMsg = _mapFailureToMessage(failure.message);
+        final errorMsg = _mapFailureToMessage(failure.message, otp: true);
         final attemptsMessage = remaining > 0
             ? '$errorMsg ($remaining ${remaining == 1 ? 'attempt' : 'attempts'} left)'
             : errorMsg;
@@ -650,10 +601,11 @@ class AuthCubit extends Cubit<AuthState> {
       email: _email,
       token: currentToken,
     );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
-        final userFriendlyMessage = _mapFailureToMessage(failure.message);
+        final userFriendlyMessage = _mapFailureToMessage(failure.message, otp: true);
         emit(AuthForgotPasswordOtpSent(token: currentToken, email: _email));
         _otpErrorController.add(userFriendlyMessage);
         onError(userFriendlyMessage);
@@ -670,6 +622,7 @@ class AuthCubit extends Cubit<AuthState> {
     required String resetToken,
     required Function() onSuccess,
   }) async {
+    if (_busy) return;
     if (!validatePassword()) return;
 
     emit(AuthLoading());
@@ -677,6 +630,7 @@ class AuthCubit extends Cubit<AuthState> {
       newPassword: _password,
       token: resetToken,
     );
+    if (isClosed) return;
 
     result.fold(
       (failure) {
@@ -693,11 +647,21 @@ class AuthCubit extends Cubit<AuthState> {
 
 
   Future<void> signInWithGoogle({required Function() onSuccess}) async {
+    if (_busy) return;
     emit(AuthLoading());
     final result = await _authRepository.signInWithGoogle();
+    if (isClosed) return;
 
     result.fold(
-      (failure) => emit(AuthError(_mapFailureToMessage(failure.message))),
+      (failure) {
+        final lower = failure.message.toLowerCase();
+        // Closing the account chooser isn't an error.
+        if (lower.contains('cancelled') || lower.contains('canceled')) {
+          emit(AuthInitial());
+          return;
+        }
+        emit(AuthError(_mapFailureToMessage(failure.message)));
+      },
       (user) {
         emit(AuthAuthenticated(user));
         onSuccess();
@@ -710,33 +674,31 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> checkSession() async {
     final active = await _authRepository.isSessionActive();
-    active.fold(
-      (_) => emit(AuthUnauthenticated()),
-      (isActive) async {
-        if (isActive) {
-          final userResult = await _authRepository.getCurrentUser();
-          userResult.fold(
-            (_) => emit(AuthUnauthenticated()),
-            (user) {
-              if (user != null) {
-                emit(AuthAuthenticated(user));
-              } else {
-                emit(AuthUnauthenticated());
-              }
-            },
-          );
-        } else {
-          emit(AuthUnauthenticated());
-        }
-      },
-    );
+    if (isClosed) return;
+    if (!active.getOrElse(() => false)) {
+      emit(AuthUnauthenticated());
+      return;
+    }
+    final userResult = await _authRepository.getCurrentUser();
+    if (isClosed) return;
+    final user = userResult.getOrElse(() => null);
+    emit(user != null ? AuthAuthenticated(user) : AuthUnauthenticated());
   }
 
   Future<void> logout() async {
     emit(AuthLoading());
-    await _beforeSignOut?.call();
-    await _authRepository.signOut();
-    emit(AuthUnauthenticated());
+    try {
+      await _beforeSignOut?.call();
+    } catch (e) {
+      // Still sign out: a failed push unregister mustn't keep the user in.
+      debugPrint('Before sign-out step failed: $e');
+    }
+    try {
+      await _authRepository.signOut();
+    } catch (e) {
+      debugPrint('Sign-out failed: $e');
+    }
+    if (!isClosed) emit(AuthUnauthenticated());
   }
 
   /// The account was deleted and the device already wiped (AccountService).
@@ -760,6 +722,8 @@ class AuthCubit extends Cubit<AuthState> {
     clearErrorsOnly();
     emit(AuthInitial());
   }
+
+  static bool _isSixDigits(String code) => RegExp(r'^\d{6}$').hasMatch(code);
 
   // No client-side freeze helpers — Supabase enforces server-side rate limits.
 

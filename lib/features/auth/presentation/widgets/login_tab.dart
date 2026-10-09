@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
@@ -43,15 +44,16 @@ class LoginTab extends StatelessWidget {
                               label: 'Username or Email Id',
                               textInputAction: TextInputAction.next,
                               onChange: (val) {
+                                // Emails may contain + % and - too.
                                 final filtered = val.replaceAll(
-                                  RegExp(r'[^A-Za-z0-9._@]'),
+                                  RegExp(r'[^A-Za-z0-9._@+%\-]'),
                                   '',
                                 );
                                 cubit.onUsernameLoginChange(filtered);
                               },
                               error: errorSnapshot.data,
                               enabled: !isLoading,
-                              maxLength: 250,
+                              maxLength: InputLimits.email,
                             );
                           },
                         );

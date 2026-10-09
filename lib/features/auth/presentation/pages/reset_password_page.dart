@@ -20,17 +20,20 @@ class ResetPasswordPage extends StatefulWidget {
 }
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
+  /// Kept for dispose, where looking up the widget tree isn't allowed.
+  late final AuthCubit _authCubit = context.read<AuthCubit>();
+
   @override
   void initState() {
     super.initState();
     // Clean fields and errors on entry
-    context.read<AuthCubit>().clearResetFields();
+    _authCubit.clearResetFields();
   }
 
   @override
   void dispose() {
     // Clean fields and errors on exit
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
     super.dispose();
   }
 

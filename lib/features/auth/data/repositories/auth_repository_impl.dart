@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:vital_up/features/auth/data/models/auth_models.dart';
@@ -31,13 +35,13 @@ class AuthRepositoryImpl implements AuthRepository {
         await _localDataSource.saveAccessToken(data.accessToken);
         await _localDataSource.saveRefreshToken(data.refreshToken);
 
-        // Fetch actual user metadata if possible, but mock for now as Supabase handles it
-        final user = UserEntity(
-          id: Supabase.instance.client.auth.currentUser?.id ?? 'usr_1',
-          email: Supabase.instance.client.auth.currentUser?.email ?? '$username@example.com',
-          displayName: username,
-          weightKg: Supabase.instance.client.auth.currentUser?.userMetadata?['weight_kg']?.toDouble(),
-        );
+        // A successful sign-in always has a session user; without one the
+        // app would run under a fake id, so treat it as a failure.
+        // The typed login may be an email; prefer the account's username.
+        final user = _sessionUser(fallbackName: username);
+        if (user == null) {
+          return const Left(ServerFailure('Sign-in session missing'));
+        }
         await _localDataSource.saveUser(jsonEncode({
           'id': user.id,
           'email': user.email,
@@ -52,7 +56,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -71,7 +75,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -115,7 +119,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -137,7 +141,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -153,7 +157,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -172,7 +176,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -195,7 +199,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -217,7 +221,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -239,7 +243,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -309,7 +313,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(_unexpected(e));
     }
   }
 
@@ -321,7 +325,8 @@ class AuthRepositoryImpl implements AuthRepository {
       await _localDataSource.clearUser();
       return const Right(null);
     } catch (e) {
-      return Left(DatabaseFailure(e.toString()));
+      debugPrint('Sign-out cleanup failed: $e');
+      return const Left(DatabaseFailure("Couldn't sign out. Try again."));
     }
   }
 
@@ -331,18 +336,52 @@ class AuthRepositoryImpl implements AuthRepository {
       final userJson = await _localDataSource.getUser();
       if (userJson != null) {
         final map = jsonDecode(userJson);
-        return Right(UserEntity(
-          id: map['id'],
-          email: map['email'],
-          displayName: map['displayName'],
-          photoUrl: map['photoUrl'],
-          weightKg: map['weightKg']?.toDouble(),
-        ));
+        if (map is Map && map['id'] is String) {
+          return Right(UserEntity(
+            id: map['id'] as String,
+            email: map['email'] as String? ?? '',
+            displayName: map['displayName'] as String? ?? '',
+            photoUrl: map['photoUrl'] as String?,
+            weightKg: (map['weightKg'] as num?)?.toDouble(),
+          ));
+        }
       }
-      return const Right(null);
+      // Nothing stored locally (e.g. signed up through the OTP flow, which
+      // never saved it) or it was unreadable: the live session still knows.
+      return Right(_sessionUser());
     } catch (e) {
-      return Left(DatabaseFailure(e.toString()));
+      debugPrint('Stored user unreadable: $e');
+      return Right(_sessionUser());
     }
+  }
+
+  /// The signed-in Supabase user, or null.
+  UserEntity? _sessionUser({String? fallbackName}) {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+    final meta = user.userMetadata;
+    final email = user.email ?? '';
+    final name = meta?['username'] ?? meta?['full_name'] ?? meta?['name'];
+    return UserEntity(
+      id: user.id,
+      email: email,
+      displayName: name is String && name.isNotEmpty
+          ? name
+          : fallbackName ?? email.split('@').first,
+      weightKg: (meta?['weight_kg'] as num?)?.toDouble(),
+    );
+  }
+
+  /// Failure for an unexpected error: the cubit maps its text to a short
+  /// message, so keep offline / timeout recognisable and log the rest.
+  Failure _unexpected(Object error) {
+    debugPrint('Auth request failed: $error');
+    if (isOfflineError(error)) {
+      return ServerFailure(
+        error is TimeoutException ? 'TimeoutException' : 'SocketException',
+      );
+    }
+    return ServerFailure(error.toString());
   }
 
   @override

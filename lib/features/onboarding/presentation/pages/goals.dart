@@ -4,6 +4,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/onboarding/domain/entities/weight_goal.dart';
 import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
 class GoalsPage extends StatefulWidget {
@@ -70,13 +71,15 @@ class _GoalsPageState extends State<GoalsPage> {
     if (_goal == GoalType.maintain) return null;
     final target = _targetKg;
     if (target == null) return 'Enter your target weight.';
+    final rangeError = ProfileRules.weightError(target);
+    if (rangeError != null) return rangeError;
     final current = _currentKg;
     if (current == null) return null;
     if (_goal == GoalType.lose && target >= current) {
-      return 'To lose weight, your target should be below your current weight.';
+      return 'Pick a target below your current weight.';
     }
     if (_goal == GoalType.buildMuscle && target < current) {
-      return 'To build muscle, your target should be at or above your current weight.';
+      return 'Pick a target at or above your current weight.';
     }
     return null;
   }

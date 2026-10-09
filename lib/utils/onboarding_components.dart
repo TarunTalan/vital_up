@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
@@ -338,7 +339,7 @@ class _OnboardingTextFieldState extends State<OnboardingTextField> {
           ? (widget.showErrorText ? (widget.error ?? "Required") : "")
           : (widget.showErrorText ? widget.error : null),
       showValidation: widget.showErrorText,
-      maxLength: widget.maxLength > 0 ? widget.maxLength : 1000,
+      maxLength: widget.maxLength > 0 ? widget.maxLength : InputLimits.shortText,
       enabled: !widget.readOnly,
       showForgot: false,
       reserveErrorSpace: false,
@@ -476,7 +477,9 @@ class _OnboardingNumberFieldState<T extends num>
 
   void _onChanged(String text) {
     if (text.isEmpty) {
-      widget.onValueChange(widget.min);
+      // Cleared to retype: report "no value" instead of snapping to min,
+      // which refilled the box and made it impossible to clear.
+      widget.onValueChange(null);
       return;
     }
 
@@ -576,7 +579,16 @@ class _OnboardingNumberFieldState<T extends num>
                   if (T == int)
                     FilteringTextInputFormatter.digitsOnly
                   else
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    // One decimal point at most ("1.2.3" can't be parsed).
+                    TextInputFormatter.withFunction(
+                      (oldValue, newValue) =>
+                          RegExp(r'^\d*\.?\d*$').hasMatch(newValue.text)
+                          ? newValue
+                          : oldValue,
+                    ),
+                  LengthLimitingTextInputFormatter(
+                    widget.max.toInt().toString().length + (T == int ? 0 : 2),
+                  ),
                 ],
                 textAlign: TextAlign.center,
                 onTapOutside: (event) {},
