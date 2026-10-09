@@ -26,6 +26,7 @@ const CATEGORIES: FoodCategory[] = ['whole_food', 'prepared_dish', 'packaged', '
 
 // JSON extraction lives with the LLM clients; re-exported for callers/tests.
 export { extractJson } from '../_shared/llm.ts';
+import { cleanText, LIMITS } from '../_shared/validate.ts';
 
 // ---------------------------------------------------------------------------
 // Numbers & nutrition sanity
@@ -224,17 +225,17 @@ export function normalizeVisionItems(parsed: unknown): VisionItem[] {
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as Record<string, unknown>;
-    const name = String(e.name ?? e.candidateName ?? e.food ?? '').trim();
+    const name = cleanText(String(e.name ?? e.candidateName ?? e.food ?? ''), LIMITS.shortText);
     if (!name) continue;
 
-    const portion = String(e.portion ?? e.estimatedPortionDescription ?? e.serving ?? '').trim();
+    const portion = cleanText(String(e.portion ?? e.estimatedPortionDescription ?? e.serving ?? ''), LIMITS.shortText);
     const grams = toNumber(e.grams ?? e.estimatedGrams ?? e.weight_g) ?? parsePortionGrams(portion) ?? 100;
     const category = CATEGORIES.includes(e.category as FoodCategory)
       ? (e.category as FoodCategory)
       : 'prepared_dish';
 
     items.push({
-      name: name.slice(0, 120),
+      name,
       category,
       portion: portion || `~${Math.round(grams)} g`,
       grams: clamp(grams, 1, 2000),

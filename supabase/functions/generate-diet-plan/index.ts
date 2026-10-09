@@ -1,12 +1,163 @@
+// Generates a one-day Indian meal plan for a nutrition target.
+//
+// POST { target: { calories, protein, carbs, fat },
+//        preferences: { dietaryType?, mealsPerDay?, region?, allergies?, avoid?, recentItems? },
+//        instructions?, basePlan?: { meals: [{ name, items, calories }] } }
+//   -> { meals: [{ name, items, calories, protein, carbs, fat }],
+//        totalCalories, totalProtein, totalCarbs, totalFat, approximate? }
+// Errors: 400 invalid input, 401 not signed in, 405, 413, 415,
+//         422 no valid / safe plan, 429 daily limit (code: daily_limit), 500.
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
 import { consumeDailyQuota, dailyLimit, refundDailyQuota } from "../_shared/quota.ts";
+import {
+  bearerToken,
+  clampNumber,
+  cleanText,
+  handleError,
+  HttpError,
+  isObject,
+  type JsonObject,
+  KB,
+  LIMITS,
+  optionalArray,
+  optionalEnum,
+  optionalNumber,
+  optionalObject,
+  optionalText,
+  RANGES,
+  readJsonBody,
+  requireMethod,
+  requireNumber,
+} from "../_shared/validate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const MAX_BODY_BYTES = 64 * KB;
+const MAX_MEALS = 8;
+const MAX_ITEMS_PER_MEAL = 10;
+const MAX_RECENT_ITEMS = 40;
+/** Options offered by the app's preferences page, plus the prompt's own wording. */
+const DIETARY_TYPES = ["Any", "Vegetarian", "Vegan", "Eggetarian", "Pescatarian", "Non-Vegetarian"] as const;
+
+interface Target {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface Preferences {
+  dietaryType?: string;
+  region?: string;
+  allergies?: string;
+  avoid?: string;
+  mealsPerDay: number;
+  recentItems: string[];
+}
+
+interface Meal {
+  name: string;
+  items: string[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+function parseTarget(value: unknown): Target {
+  if (!isObject(value)) throw new HttpError(400, "target and preferences are required");
+  const grams = { min: RANGES.grams.min, max: RANGES.grams.max };
+  return {
+    calories: requireNumber(value.calories, "target.calories", { min: 1, max: RANGES.calories.max }),
+    protein: requireNumber(value.protein, "target.protein", grams),
+    carbs: requireNumber(value.carbs, "target.carbs", grams),
+    fat: requireNumber(value.fat, "target.fat", grams),
+  };
+}
+
+function textList(value: unknown, field: string, maxItems: number, maxChars: number): string[] {
+  const list = optionalArray(value, field, maxItems, "first") ?? [];
+  return list.map((v) => cleanText(v, maxChars)).filter(Boolean);
+}
+
+function parsePreferences(value: unknown): Preferences {
+  const p = optionalObject(value, "preferences");
+  if (!p) throw new HttpError(400, "target and preferences are required");
+  // Case-insensitive match onto the known options; anything else is refused.
+  const dietLower = typeof p.dietaryType === "string" ? p.dietaryType.trim().toLowerCase() : null;
+  const rawDiet = dietLower === null
+    ? p.dietaryType
+    : dietLower === ""
+    ? undefined
+    : DIETARY_TYPES.find((d) => d.toLowerCase() === dietLower) ?? p.dietaryType;
+  return {
+    dietaryType: optionalEnum(rawDiet, "preferences.dietaryType", DIETARY_TYPES),
+    region: optionalText(p.region, "preferences.region", { max: LIMITS.city, clip: true }),
+    allergies: optionalText(p.allergies, "preferences.allergies", { max: LIMITS.note, clip: true }),
+    avoid: optionalText(p.avoid, "preferences.avoid", { max: LIMITS.note, clip: true }),
+    mealsPerDay: optionalNumber(p.mealsPerDay, "preferences.mealsPerDay", { min: 1, max: MAX_MEALS, integer: true }) ?? 4,
+    recentItems: textList(p.recentItems, "preferences.recentItems", MAX_RECENT_ITEMS, LIMITS.shortText),
+  };
+}
+
+function parseBaseMeals(value: unknown): { name: string; items: string[]; calories: number }[] {
+  if (!isObject(value)) return [];
+  const meals = optionalArray(value.meals, "basePlan.meals", MAX_MEALS, "first") ?? [];
+  return meals.filter(isObject).map((m: JsonObject) => ({
+    name: cleanText(m.name, LIMITS.shortText) || "Meal",
+    items: Array.isArray(m.items)
+      ? m.items.slice(0, MAX_ITEMS_PER_MEAL).map((i) => cleanText(i, LIMITS.shortText)).filter(Boolean)
+      : [],
+    calories: Math.round(clampNumber(m.calories, 0, RANGES.calories.max)),
+  }));
+}
+
+/**
+ * Validates the model's plan: at least one meal, strings sanitised and
+ * clipped, numbers clamped and rounded. Totals the model left out (or got
+ * wrong type) are summed from the meals. Throws when there's nothing usable.
+ */
+function normalizePlan(raw: unknown): { meals: Meal[]; totalCalories: number; totalProtein: number; totalCarbs: number; totalFat: number } {
+  if (!isObject(raw) || !Array.isArray(raw.meals)) throw new Error("Plan has no meals array");
+  const cal = (v: unknown) => Math.round(clampNumber(v, 0, RANGES.calories.max));
+  const g = (v: unknown) => Math.round(clampNumber(v, 0, RANGES.grams.max));
+  const meals: Meal[] = raw.meals
+    .filter(isObject)
+    .slice(0, MAX_MEALS)
+    .map((m: JsonObject, i: number) => ({
+      name: cleanText(m.name, 40) || `Meal ${i + 1}`,
+      items: Array.isArray(m.items)
+        ? m.items.slice(0, MAX_ITEMS_PER_MEAL).map((it) => cleanText(it, LIMITS.shortText)).filter(Boolean)
+        : [],
+      calories: cal(m.calories),
+      protein: g(m.protein),
+      carbs: g(m.carbs),
+      fat: g(m.fat),
+    }))
+    .filter((m) => m.items.length > 0);
+  if (meals.length === 0) throw new Error("Plan has no usable meals");
+  const sum = (key: "calories" | "protein" | "carbs" | "fat") => meals.reduce((s, m) => s + m[key], 0);
+  const total = (v: unknown, key: "calories" | "protein" | "carbs" | "fat", max: number) =>
+    typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(Math.min(v, max)) : sum(key);
+  return {
+    meals,
+    totalCalories: total(raw.totalCalories, "calories", RANGES.calories.max),
+    totalProtein: total(raw.totalProtein, "protein", RANGES.grams.max),
+    totalCarbs: total(raw.totalCarbs, "carbs", RANGES.grams.max),
+    totalFat: total(raw.totalFat, "fat", RANGES.grams.max),
+  };
+}
+
+let serviceClient: ReturnType<typeof createClient> | null = null;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -14,24 +165,29 @@ serve(async (req) => {
   }
 
   try {
+    requireMethod(req, "POST");
+
+    const url = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !serviceKey) {
+      console.error("generate-diet-plan: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set");
+      return json({ error: "Diet plans are not available right now." }, 500);
+    }
     // Service-role client, used both to validate the caller's JWT and for the
     // quota RPCs. Passing the token to getUser() explicitly (same as
     // scan-food) is reliable; relying on a global Authorization header with
     // an argument-less getUser() is not.
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    serviceClient ??= createClient(url, serviceKey);
+    const client = serviceClient;
 
     console.time("TotalExecution");
 
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
+    const token = bearerToken(req);
 
     console.time("SetupAndAuth");
     const [authResult, bodyResult] = await Promise.allSettled([
-      token ? serviceClient.auth.getUser(token) : Promise.reject(new Error("missing bearer token")),
-      req.json()
+      token ? client.auth.getUser(token) : Promise.reject(new Error("missing bearer token")),
+      readJsonBody(req, MAX_BODY_BYTES),
     ]);
     console.timeEnd("SetupAndAuth");
 
@@ -44,52 +200,36 @@ serve(async (req) => {
         : (authResult.reason as Error)?.message;
       console.warn(`generate-diet-plan auth rejected: ${reason ?? "no user"}`);
       console.timeEnd("TotalExecution");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Unauthorized" }, 401);
     }
 
     if (bodyResult.status === "rejected") {
       console.timeEnd("TotalExecution");
-      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      throw bodyResult.reason;
     }
+    const body = bodyResult.value;
 
-    const { target, preferences, instructions, basePlan } = bodyResult.value;
+    const target = parseTarget(body.target);
+    const preferences = parsePreferences(body.preferences);
     // Optional tweak request (from Vita or the plan screen): a free-text change
-    // applied to the plan the user already has.
-    const tweak = typeof instructions === "string" ? instructions.trim().slice(0, 600) : "";
-    const baseMeals: { name?: unknown; items?: unknown; calories?: unknown }[] =
-      tweak && Array.isArray(basePlan?.meals) ? basePlan.meals.slice(0, 8) : [];
-    if (!target?.calories || !preferences) {
-      console.timeEnd("TotalExecution");
-      return new Response(JSON.stringify({ error: "target and preferences are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // applied to the plan the user already has. Cut rather than refused: Vita
+    // writes these, capped at the same length.
+    const tweak = optionalText(body.instructions, "instructions", { max: LIMITS.note, clip: true }) ?? "";
+    const baseMeals = tweak ? parseBaseMeals(body.basePlan) : [];
 
     // Per-user daily fair-use cap: all users share one free-tier LLM quota.
-    const quota = await consumeDailyQuota(serviceClient, user.id, "diet_plan", dailyLimit("DIET_PLAN_DAILY_LIMIT", 15));
+    const quota = await consumeDailyQuota(client, user.id, "diet_plan", dailyLimit("DIET_PLAN_DAILY_LIMIT", 15));
     if (!quota.allowed) {
       console.timeEnd("TotalExecution");
-      return new Response(JSON.stringify({ error: "Daily diet plan limit reached", code: "daily_limit", limit: quota.limit }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Daily diet plan limit reached", code: "daily_limit", limit: quota.limit }, 429);
     }
-    const refundQuota = () => refundDailyQuota(serviceClient, user.id, "diet_plan");
+    const refundQuota = () => refundDailyQuota(client, user.id, "diet_plan");
 
     // Used to force divergence between calls with an otherwise-identical prompt.
     const varietySeed = crypto.randomUUID();
 
     const baseMealLines = baseMeals
-      .map((m) => `- ${String(m.name ?? "Meal")} (${Number(m.calories) || "?"} kcal): ${
-        Array.isArray(m.items) ? m.items.map(String).join(", ") : ""
-      }`)
+      .map((m) => `- ${m.name} (${m.calories || "?"} kcal): ${m.items.join(", ")}`)
       .join("\n");
     const tweakSection = tweak
       ? `
@@ -171,7 +311,11 @@ serve(async (req) => {
     // can be overridden without a deploy via these secrets.
     const geminiModels = envList("DIET_PLAN_GEMINI_MODELS", GEMINI_DEFAULT_MODELS);
     const groqModels = envList("DIET_PLAN_GROQ_MODELS", ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]);
-    let resultJson = null;
+    const allergiesList = (preferences.allergies ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    let resultJson: (ReturnType<typeof normalizePlan> & { approximate?: boolean }) | null = null;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       let usedProvider = "gemini";
@@ -207,66 +351,48 @@ serve(async (req) => {
         }
         console.timeEnd(`GeminiCall_Attempt${attempt}`);
 
-        resultJson = extractJson(aiResponseText) as any;
-        resultJson._debugProvider = usedProvider;
+        const plan: ReturnType<typeof normalizePlan> & { approximate?: boolean } = normalizePlan(
+          extractJson(aiResponseText),
+        );
+        console.log(`generate-diet-plan served by ${usedProvider} (attempt ${attempt})`);
 
-        const tCal = resultJson.totalCalories;
-        const targetCal = target.calories;
-        const diffPercent = Math.abs(tCal - targetCal) / targetCal;
+        const diffPercent = Math.abs(plan.totalCalories - target.calories) / target.calories;
         // A tweak may legitimately move calories ("lighter dinner").
         if (diffPercent > (tweak ? 0.25 : 0.1)) {
           if (attempt === 1) throw new Error("Macros off by more than 10%");
-          else resultJson.approximate = true;
+          else plan.approximate = true;
         }
 
-        const allergiesStr = preferences.allergies || "";
-        if (allergiesStr.length > 0) {
-          const allergiesList = allergiesStr.split(",").map((s: string) => s.trim().toLowerCase());
-          let containsAllergen = false;
-          for (const meal of resultJson.meals || []) {
-            for (const item of meal.items || []) {
+        if (allergiesList.length > 0) {
+          const containsAllergen = plan.meals.some((meal) =>
+            meal.items.some((item) => {
               const itemLower = item.toLowerCase();
-              if (allergiesList.some((al: string) => itemLower.includes(al))) {
-                containsAllergen = true;
-                break;
-              }
-            }
-            if (containsAllergen) break;
-          }
+              return allergiesList.some((al) => itemLower.includes(al));
+            })
+          );
           if (containsAllergen) {
-             if (attempt === 1) throw new Error("Contains allergen");
-             await refundQuota();
-             return new Response(JSON.stringify({ error: "Could not generate a safe meal plan matching your allergies. Please try again." }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            if (attempt === 1) throw new Error("Contains allergen");
+            await refundQuota();
+            console.timeEnd("TotalExecution");
+            return json({ error: "Could not generate a safe meal plan matching your allergies. Please try again." }, 422);
           }
         }
 
+        resultJson = plan;
         break;
-      } catch (e: any) {
-        console.timeEnd(`GeminiCall_Attempt${attempt}`);
+      } catch (e) {
         console.error(`Attempt ${attempt} failed:`, e);
         if (attempt === 2) {
           console.timeEnd("TotalExecution");
           await refundQuota();
-          return new Response(JSON.stringify({
-            error: "Failed to generate valid plan.",
-            details: e.message
-          }), {
-            status: 422,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return json({ error: "Failed to generate valid plan." }, 422);
         }
       }
     }
 
     console.timeEnd("TotalExecution");
-    return new Response(JSON.stringify(resultJson), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error: any) {
-    console.timeEnd("TotalExecution");
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(resultJson);
+  } catch (error) {
+    return handleError(error, "generate-diet-plan", corsHeaders);
   }
 });

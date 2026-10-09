@@ -17,11 +17,14 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { bearerToken, errorResponse, jsonResponse, UUID_RE } from "../_shared/validate.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
+/** The request carries no meaningful body; anything bigger than this is refused. */
+const MAX_BODY_BYTES = 4 * 1024;
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const admin = createClient(SUPABASE_URL || "http://localhost", SERVICE_ROLE_KEY || "missing");
 
 /** Tables keyed by the user that may not cascade from auth.users. */
 const USER_TABLES: Array<{ table: string; column: string }> = [
@@ -29,12 +32,7 @@ const USER_TABLES: Array<{ table: string; column: string }> = [
   { table: "profiles", column: "id" },
 ];
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+const json = jsonResponse;
 
 async function removeFolder(bucket: string, folder: string): Promise<void> {
   // list() is paged; keep going until the folder is empty.
@@ -46,18 +44,36 @@ async function removeFolder(bucket: string, folder: string): Promise<void> {
     if (!data || data.length === 0) return;
     const { error: removeError } = await admin.storage
       .from(bucket)
-      .remove(data.map((f) => `${folder}/${f.name}`));
+      .remove(data.map((f: { name: string }) => `${folder}/${f.name}`));
     if (removeError) throw removeError;
   }
 }
 
 serve(async (req) => {
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== "POST") return errorResponse(405, "Method not allowed.");
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    console.error("delete-account: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set");
+    return errorResponse(500, "Could not delete the account. Try again.");
+  }
+  const declared = Number(req.headers.get("content-length") ?? "0");
+  if (!Number.isFinite(declared) || declared > MAX_BODY_BYTES) return errorResponse(413, "Request is too large.");
 
-  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const { data: auth, error: authError } = await admin.auth.getUser(jwt);
-  if (authError || !auth.user) return json({ error: "Not signed in" }, 401);
-  const userId = auth.user.id;
+  const jwt = bearerToken(req);
+  if (!jwt) return errorResponse(401, "Not signed in");
+  let userId: string;
+  try {
+    const { data: auth, error: authError } = await admin.auth.getUser(jwt);
+    if (authError || !auth.user) return errorResponse(401, "Not signed in");
+    userId = auth.user.id;
+  } catch (e) {
+    console.error("delete-account: auth check failed:", e);
+    return errorResponse(503, "Could not verify your session. Try again.");
+  }
+  // The id names the storage folder below; never let anything else through.
+  if (!UUID_RE.test(userId)) {
+    console.error(`delete-account: unexpected user id format: ${userId}`);
+    return errorResponse(500, "Could not delete the account. Try again.");
+  }
 
   try {
     await removeFolder("avatars", userId);
