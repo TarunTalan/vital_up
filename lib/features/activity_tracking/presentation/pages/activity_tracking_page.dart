@@ -13,7 +13,9 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
@@ -26,6 +28,8 @@ import 'package:vital_up/features/activity_tracking/presentation/widgets/activit
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/countdown_overlay.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/interrupted_workout_dialog.dart';
+import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
 import 'package:isar_community/isar.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/favorite_audio.dart';
@@ -91,11 +95,20 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   StreamSubscription<Position>? _positionSubscription;
   late final AppLifecycleListener _lifecycleListener;
 
+  /// Set once Start or Resume is tapped, so the map preview never
+  /// subscribes while the workout's own GPS stream is starting.
+  bool _workoutRequested = false;
+
+  /// A choice about an interrupted workout is being carried out.
+  bool _recoveryBusy = false;
+
+  late final Future<void> _prefsLoaded;
+
   @override
   void initState() {
     super.initState();
     _unitNotifier.load();
-    _prefsNotifier.load().then((_) {
+    _prefsLoaded = _prefsNotifier.load().then((_) {
       _checkIfCurrentTrackFavorited();
     });
     _prefsNotifier.addListener(_onPrefsChanged);
@@ -103,7 +116,11 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
-    _startLocationUpdates();
+    // Settle an interrupted workout first: its resume needs the GPS stream
+    // and the location prompt to itself.
+    _checkInterruptedWorkout().whenComplete(() {
+      if (mounted) _startLocationUpdates();
+    });
     // Checkpoint the workout whenever the app leaves the foreground — the
     // OS may kill a backgrounded app without further notice.
     _lifecycleListener = AppLifecycleListener(
@@ -294,7 +311,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   Future<void> _startLocationUpdates() async {
-    if (_positionSubscription != null) return;
+    if (_positionSubscription != null || _workoutRequested) return;
     LocationPermission permission;
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -316,6 +333,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     // A workout may have started while we were awaiting permission.
     if (!mounted ||
         _positionSubscription != null ||
+        _workoutRequested ||
         context.read<ActivityTrackingBloc>().state is! TrackingIdle) {
       return;
     }
@@ -353,6 +371,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   /// Starts the workout. Shared by the instant start and the countdown.
   void _beginTracking() {
+    _workoutRequested = true;
     _stopLocationUpdates();
     _prefsNotifier.applyDailyTargetIfEnabled();
     context.read<ActivityTrackingBloc>().add(StartTracking());
@@ -360,6 +379,123 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       _voiceCoach.announceStart();
     }
     _playWorkoutAudio();
+  }
+
+  /// Offers to carry on a workout the app was closed in the middle of. One
+  /// too old to resume is saved to history as it was.
+  Future<void> _checkInterruptedWorkout() async {
+    final recovery = sl<WorkoutRecoveryService>();
+    final InterruptedWorkout? workout;
+    try {
+      workout = await recovery.pending();
+    } catch (e) {
+      debugPrint('Reading the interrupted workout failed: $e');
+      return;
+    }
+    if (workout == null || !mounted) return;
+    if (context.read<ActivityTrackingBloc>().state is! TrackingIdle) return;
+
+    if (workout.action == InterruptedWorkoutAction.saveOnly) {
+      await _finishInterrupted(workout, announceOld: true);
+      return;
+    }
+
+    final choice = await showSmoothDialog<InterruptedWorkoutChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => InterruptedWorkoutDialog(
+        session: workout!.session,
+        unit: _unitNotifier.value,
+      ),
+    );
+    if (!mounted || choice == null || _recoveryBusy) return;
+    switch (choice) {
+      case InterruptedWorkoutChoice.resume:
+        _resumeInterrupted(workout);
+      case InterruptedWorkoutChoice.save:
+        await _finishInterrupted(workout);
+      case InterruptedWorkoutChoice.discard:
+        await _discardInterrupted(workout);
+    }
+  }
+
+  void _resumeInterrupted(InterruptedWorkout workout) {
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingIdle) return;
+    _workoutRequested = true;
+    // geolocator has one native stream: the preview must let go of it
+    // before the workout subscribes.
+    _stopLocationUpdates();
+    bloc.add(RestoreTracking(
+      checkpoint: workout.checkpoint,
+      session: workout.session,
+    ));
+  }
+
+  Future<void> _finishInterrupted(
+    InterruptedWorkout workout, {
+    bool announceOld = false,
+  }) async {
+    if (_recoveryBusy) return;
+    _recoveryBusy = true;
+    try {
+      await _prefsLoaded;
+      final prefs = _prefsNotifier.value;
+      final hasTarget =
+          prefs.targetType != WorkoutTargetType.none && prefs.targetValue > 0;
+      final session = workout.session;
+      final outcome = await sl<WorkoutRecoveryService>().finish(
+        workout,
+        targetType: hasTarget ? prefs.targetType.name : null,
+        targetValue: hasTarget ? prefs.targetValue : null,
+        targetAchieved: hasTarget &&
+            isActivityTargetMet(
+              prefs.targetType,
+              prefs.targetValue,
+              distanceMeters: session.totalDistanceMeters,
+              calories: session.calories,
+            ),
+      );
+      if (outcome != InterruptedWorkoutOutcome.failed) {
+        await _prefsNotifier.clearSessionTarget();
+      }
+      if (!mounted) return;
+      switch (outcome) {
+        case InterruptedWorkoutOutcome.saved:
+          showSuccessSnackBar(
+            context,
+            announceOld
+                ? 'Your last workout was saved to history.'
+                : 'Workout saved to your history.',
+          );
+        case InterruptedWorkoutOutcome.discarded:
+          // An accidental start nobody needs to hear about later on.
+          if (!announceOld) {
+            showErrorSnackBar(context, 'Workout too short to save.');
+          }
+        case InterruptedWorkoutOutcome.failed:
+          showErrorSnackBar(context, "Couldn't save your workout. Try again.");
+      }
+    } finally {
+      _recoveryBusy = false;
+    }
+  }
+
+  Future<void> _discardInterrupted(InterruptedWorkout workout) async {
+    if (_recoveryBusy) return;
+    _recoveryBusy = true;
+    try {
+      final ok = await sl<WorkoutRecoveryService>().discard(workout);
+      if (ok) await _prefsNotifier.clearSessionTarget();
+      if (!mounted) return;
+      if (ok) {
+        showSuccessSnackBar(context, 'Workout discarded.');
+      } else {
+        showErrorSnackBar(context, "Couldn't discard your workout. Try again.");
+      }
+    } finally {
+      _recoveryBusy = false;
+    }
   }
 
   /// Keeps a 10 km offline map around the user so the tracking map still
@@ -604,6 +740,11 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         } else if (state is TrackingPaused) {
           if (_prefsNotifier.value.voiceCoachEnabled)
             _voiceCoach.announcePause();
+          // A workout resumed in its paused state starts here.
+          if (_startPoint == null && state.routePoints.isNotEmpty) {
+            setState(() => _startPoint = state.routePoints.first);
+            _updateStartPoint(state.routePoints.first);
+          }
           // Stay unlocked or locked as per user preference
           _updateRoute(state.routePoints);
           if (state.routePoints.isNotEmpty) {
@@ -649,6 +790,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           );
         } else if (state is TrackingIdle) {
           // Clear map annotations when reset
+          _workoutRequested = false;
           _clearMapAnnotations();
           _startLocationUpdates();
         }
@@ -1073,31 +1215,23 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                           final s = context
                                               .read<ActivityTrackingBloc>()
                                               .state;
-                                          if (prefs.targetType ==
-                                              WorkoutTargetType.distance) {
-                                            final targetMeters =
-                                                prefs.targetValue * 1000;
-                                            if (s is TrackingInProgress) {
-                                              tAchieved =
-                                                  s.distanceMeters >=
-                                                  targetMeters;
-                                            } else if (s is TrackingPaused) {
-                                              tAchieved =
-                                                  s.distanceMeters >=
-                                                  targetMeters;
-                                            }
-                                          } else if (prefs.targetType ==
-                                              WorkoutTargetType.calories) {
-                                            if (s is TrackingInProgress) {
-                                              tAchieved =
-                                                  s.calories >=
-                                                  prefs.targetValue;
-                                            } else if (s is TrackingPaused) {
-                                              tAchieved =
-                                                  s.calories >=
-                                                  prefs.targetValue;
-                                            }
-                                          }
+                                          final (meters, kcal) = switch (s) {
+                                            TrackingInProgress() => (
+                                              s.distanceMeters,
+                                              s.calories,
+                                            ),
+                                            TrackingPaused() => (
+                                              s.distanceMeters,
+                                              s.calories,
+                                            ),
+                                            _ => (0.0, 0),
+                                          };
+                                          tAchieved = isActivityTargetMet(
+                                            prefs.targetType,
+                                            prefs.targetValue,
+                                            distanceMeters: meters,
+                                            calories: kcal,
+                                          );
                                         }
                                         bloc.add(
                                           StopAndSaveTracking(

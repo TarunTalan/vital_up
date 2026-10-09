@@ -190,12 +190,14 @@ class AppDatabase extends _$AppDatabase {
   /// Closes sessions that were still recording when the app died (they
   /// are checkpointed with no end time) and drops orphaned track points.
   /// Must only run when no workout is being recorded, i.e. at startup.
-  Future<void> finalizeInterruptedSessions() async {
+  /// [keepOpenId] stays open: a recent workout the user may resume.
+  Future<void> finalizeInterruptedSessions({String? keepOpenId}) async {
     await transaction(() async {
       await customStatement(
         "UPDATE drift_activity_sessions "
         "SET end_time = start_time + total_duration_seconds, synced = 0 "
-        "WHERE end_time IS NULL",
+        "WHERE end_time IS NULL AND id IS NOT ?",
+        [keepOpenId],
       );
       await customStatement(
         'DELETE FROM drift_track_points '

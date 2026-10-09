@@ -56,3 +56,19 @@ ActivityTargetResult parseActivityTarget(
 
 String _fmt(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+/// Whether a workout reached its target. [targetValue] is km for distance
+/// and kcal for calories; no target is never met.
+bool isActivityTargetMet(
+  WorkoutTargetType type,
+  double targetValue, {
+  required double distanceMeters,
+  required int calories,
+}) {
+  if (targetValue <= 0) return false;
+  return switch (type) {
+    WorkoutTargetType.distance => distanceMeters >= targetValue * 1000,
+    WorkoutTargetType.calories => calories >= targetValue,
+    WorkoutTargetType.none => false,
+  };
+}

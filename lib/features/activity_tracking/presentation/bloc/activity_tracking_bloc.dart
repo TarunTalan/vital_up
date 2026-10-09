@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/geo_math.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_save_session.dart';
@@ -20,6 +22,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   final GetLiveStepsStream getLiveStepsStream;
   final StopAndSaveSession stopAndSaveSession;
   final AuthRepository authRepository;
+
+  /// Marks the workout as in progress so it can be resumed after an app
+  /// kill. Optional so tests can leave it out.
+  final WorkoutCheckpointStore? checkpointStore;
 
   /// How often a running workout is checkpointed to the local database.
   static const Duration _checkpointInterval = Duration(seconds: 30);
@@ -50,6 +56,11 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   /// Monotonic active-time clock: unaffected by wall-clock changes (NTP,
   /// timezone, manual edits) and naturally excludes paused time.
   final Stopwatch _activeClock = Stopwatch();
+
+  /// Active time recorded before this run of the app (a resumed workout).
+  Duration _activeOffset = Duration.zero;
+
+  Duration get _activeElapsed => _activeOffset + _activeClock.elapsed;
 
   /// Monotonic clock for "when did the last fix arrive", independent of
   /// the GPS timestamps (which follow the satellite clock).
@@ -82,9 +93,11 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     required this.getLiveStepsStream,
     required this.stopAndSaveSession,
     required this.authRepository,
+    this.checkpointStore,
   }) : super(const TrackingIdle()) {
     on<SelectActivityType>(_onSelectActivityType);
     on<StartTracking>(_onStartTracking);
+    on<RestoreTracking>(_onRestoreTracking);
     on<PauseTracking>(_onPauseTracking);
     on<ResumeTracking>(_onResumeTracking);
     on<StopAndSaveTracking>(_onStopAndSaveTracking);
@@ -146,6 +159,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
 
       _currentSessionId = const Uuid().v4();
       _startedAt = DateTime.now();
+      _activeOffset = Duration.zero;
       _activeClock
         ..reset()
         ..start();
@@ -179,20 +193,119 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
 
       _subscribeToLocation(activityType);
+      await _subscribeToSteps(hasStepPermission);
+    } finally {
+      _isStarting = false;
+    }
+  }
 
-      await _stepSubscription?.cancel();
-      _stepSubscription = null;
-      if (hasStepPermission) {
-        _stepSubscription = getLiveStepsStream().listen(
-          (steps) => add(UpdateSteps(steps)),
-          onError: (Object e) {
-            // Sensor missing or revoked: keep the workout going, but don't
-            // present a frozen count as accurate.
-            debugPrint('Step counter error: $e');
-            _stepCountReliable = false;
-          },
-        );
+  Future<void> _subscribeToSteps(bool hasStepPermission) async {
+    await _stepSubscription?.cancel();
+    _stepSubscription = null;
+    if (!hasStepPermission) return;
+    _stepSubscription = getLiveStepsStream().listen(
+      (steps) => add(UpdateSteps(steps)),
+      onError: (Object e) {
+        // Sensor missing or revoked: keep the workout going, but don't
+        // present a frozen count as accurate.
+        debugPrint('Step counter error: $e');
+        _stepCountReliable = false;
+      },
+    );
+  }
+
+  /// Carries on a workout the app was killed in the middle of, from its
+  /// last checkpoint. The time the app was dead is not counted, and the
+  /// first fix only re-anchors the route (like resuming from a pause).
+  Future<void> _onRestoreTracking(
+    RestoreTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) async {
+    if (state is! TrackingIdle || _isStarting || _isStopping) return;
+    _isStarting = true;
+
+    try {
+      final session = event.session;
+      final checkpoint = event.checkpoint;
+      final activityType = session.activityType;
+
+      final hasPermission = await getLiveLocationStream.ensurePermission();
+      if (!hasPermission) {
+        // The checkpoint stays, so the user can try again.
+        emit(TrackingPermissionDenied(
+          'Turn on location and allow access to track.',
+          activityType: activityType,
+        ));
+        emit(TrackingIdle(activityType: activityType));
+        return;
       }
+      final hasStepPermission = await getLiveStepsStream.ensurePermission();
+
+      try {
+        await ForegroundServiceManager.start(activityName: activityType.label);
+      } catch (e) {
+        debugPrint('Foreground service failed to start: $e');
+      }
+
+      _cachedWeightKg = checkpoint.weightKg;
+      _currentSessionId = session.id;
+      _startedAt = session.startTime;
+      _activeOffset = WorkoutCheckpoint.restoredElapsed(session);
+      _activeClock.reset();
+      if (!checkpoint.paused) _activeClock.start();
+      _sessionClock
+        ..reset()
+        ..start();
+      _lastFixAt = null;
+      // A new step stream counts from zero; carry the recorded steps over.
+      _currentSteps = session.steps;
+      _lastRawSteps = 0;
+      _rawStepsAtPause = 0;
+      _ignoredPausedSteps = -session.steps;
+      _stepCountReliable = hasStepPermission && session.stepCountReliable;
+      _skipDistanceForNextPoint = true;
+      _stationarySince = null;
+      _elevationGain = checkpoint.elevationGainMeters;
+      _elevationReference = null;
+      _lastCheckpointAt = Duration.zero;
+
+      final elapsed = _activeElapsed;
+      final distance = session.totalDistanceMeters;
+      final pace = _calculateOverallPace(elapsed, distance);
+      final calories = _calculateCalories(activityType, elapsed, distance);
+
+      if (checkpoint.paused) {
+        emit(TrackingPaused(
+          activityType: activityType,
+          elapsed: elapsed,
+          distanceMeters: distance,
+          avgPaceSecondsPerKm: pace,
+          calories: calories,
+          steps: session.steps,
+          stepCountReliable: _stepCountReliable,
+          routePoints: session.points,
+          elevationGainMeters: _elevationGain,
+        ));
+      } else {
+        emit(TrackingInProgress(
+          activityType: activityType,
+          elapsed: elapsed,
+          distanceMeters: distance,
+          avgPaceSecondsPerKm: pace,
+          calories: calories,
+          steps: session.steps,
+          stepCountReliable: _stepCountReliable,
+          routePoints: session.points,
+          elevationGainMeters: _elevationGain,
+        ));
+        _timer?.cancel();
+        _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
+      }
+
+      _subscribeToLocation(activityType);
+      await _subscribeToSteps(hasStepPermission);
+      // Marks the checkpoint as fresh again.
+      _checkpoint(state);
     } finally {
       _isStarting = false;
     }
@@ -231,7 +344,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _rawStepsAtPause = _lastRawSteps;
     _timer?.cancel();
 
-    final elapsed = _activeClock.elapsed;
+    final elapsed = _activeElapsed;
     final paused = TrackingPaused(
       activityType: s.activityType,
       elapsed: elapsed,
@@ -312,6 +425,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       // A checkpoint may still be writing; let it land first so it can't
       // overwrite the final session with endTime = null.
       await _pendingSave;
+      await _clearCheckpointMarker();
 
       if (StopAndSaveSession.isTooShortToKeep(session)) {
         // A checkpoint may already have stored it.
@@ -352,7 +466,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     final s = state;
     if (s is! TrackingInProgress || _isStopping) return;
 
-    final elapsed = _activeClock.elapsed;
+    final elapsed = _activeElapsed;
     final calories = _calculateCalories(s.activityType, elapsed, s.distanceMeters);
     final pace = _calculateOverallPace(elapsed, s.distanceMeters);
 
@@ -412,7 +526,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _updateStationaryState(point, segmentDistance);
     _updateElevation(point);
 
-    final elapsed = _activeClock.elapsed;
+    final elapsed = _activeElapsed;
     final pace = _calculateOverallPace(elapsed, distance);
     final calories = _calculateCalories(s.activityType, elapsed, distance);
 
@@ -489,7 +603,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     required int previousSteps,
     required int currentSteps,
   }) {
-    final elapsedSeconds = _activeClock.elapsed.inSeconds;
+    final elapsedSeconds = _activeElapsed.inSeconds;
     // Too early to judge cadence: a handful of steps in the first seconds
     // reads as an absurd steps-per-minute figure.
     if (elapsedSeconds < 30) return true;
@@ -578,7 +692,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     bool targetAchieved = false,
   }) {
     final s = state;
-    final elapsed = _activeClock.elapsed;
+    final elapsed = _activeElapsed;
     final distance = switch (s) {
       TrackingInProgress() => s.distanceMeters,
       TrackingPaused() => s.distanceMeters,
@@ -619,18 +733,36 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   }
 
   /// Saves the running workout with no end time. Writes are chained so
-  /// they land in order and the final save can wait for them.
+  /// they land in order and the final save can wait for them. The marker
+  /// that lets it be resumed after an app kill is written after the
+  /// session, so it never points at a session that isn't stored.
   void _checkpoint(ActivityTrackingState s) {
     if (_isStopping || _currentSessionId == null) return;
     _lastCheckpointAt = _sessionClock.elapsed;
     final session = _buildSession(endTime: null);
+    final marker = WorkoutCheckpoint(
+      sessionId: session.id,
+      savedAt: DateTime.now(),
+      paused: s is TrackingPaused,
+      elevationGainMeters: _elevationGain,
+      weightKg: _cachedWeightKg,
+    );
     _pendingSave = _pendingSave.then((_) async {
       try {
         await stopAndSaveSession(session);
+        await checkpointStore?.write(marker);
       } catch (e) {
         debugPrint('Activity checkpoint failed: $e');
       }
     });
+  }
+
+  Future<void> _clearCheckpointMarker() async {
+    try {
+      await checkpointStore?.clear();
+    } catch (e) {
+      debugPrint('Clearing the workout checkpoint failed: $e');
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -645,6 +777,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     final activityType = state.activityType;
     _currentSessionId = null;
     _startedAt = null;
+    _activeOffset = Duration.zero;
     _activeClock
       ..stop()
       ..reset();

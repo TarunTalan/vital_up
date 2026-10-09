@@ -8,6 +8,7 @@ import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
@@ -77,6 +78,10 @@ class AccountService {
     });
     await _step('diet plan preferences', () async {
       await _prefs.remove(DietPlanRepositoryImpl.preferencesKey);
+    });
+    // Points at a workout that was just wiped with the rest of Drift.
+    await _step('workout in progress', () async {
+      await _prefs.remove(WorkoutCheckpointStore.key);
     });
   }
 

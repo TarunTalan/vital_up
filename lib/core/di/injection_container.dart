@@ -111,6 +111,7 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_loc
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
@@ -434,10 +435,20 @@ Future<void> initDependencies() async {
           sl<HabitEvents>(),
         ),
   );
+  sl.registerLazySingleton<WorkoutCheckpointStore>(
+    () => WorkoutCheckpointStore(sl<SharedPreferences>()),
+  );
+  sl.registerLazySingleton<WorkoutRecoveryService>(
+    () => WorkoutRecoveryService(
+      repository: sl<ActivityRepository>(),
+      store: sl<WorkoutCheckpointStore>(),
+    ),
+  );
   // A workout still open from a previous run means the app was killed
-  // mid-recording; close it so its checkpointed progress shows in history.
+  // mid-recording. A recent one stays open for the tracking screen to offer
+  // resuming; anything else is closed so its progress shows in history.
   try {
-    await sl<ActivityRepository>().finalizeInterruptedSessions();
+    await sl<WorkoutRecoveryService>().settleAtStartup();
   } catch (e) {
     debugPrint('Could not finalize interrupted activity sessions: $e');
   }
@@ -500,6 +511,7 @@ Future<void> initDependencies() async {
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
       authRepository: sl<AuthRepository>(),
+      checkpointStore: sl<WorkoutCheckpointStore>(),
     ),
   );
   sl.registerFactory(
