@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
@@ -44,11 +46,12 @@ class _HeightPageState extends State<HeightPage> {
       nextEnabled: true,
       child: _HeightContent(
         onValidityChange: (valid) {
+          // Only rebuild on a real change: an unconditional setState here
+          // rebuilt the child, which reported again, every frame.
+          if (valid == _latestValid) return;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                _latestValid = valid;
-              });
+            if (mounted && valid != _latestValid) {
+              setState(() => _latestValid = valid);
             }
           });
         },
@@ -105,11 +108,12 @@ class _HeightContentState extends State<_HeightContent> {
 
   @override
   Widget build(BuildContext context) {
-    // Dynamic bounds based on unit
-    final minHeight = _selectedUnit == "ft" ? 2 : 20;
-    final maxHeight = _selectedUnit == "ft" ? 12 : 250;
+    // Dynamic bounds based on unit (the cm range is InputLimits').
+    final minHeight = _selectedUnit == "ft" ? 1 : InputLimits.heightCmMin.round();
+    final maxHeight = _selectedUnit == "ft" ? 8 : InputLimits.heightCmMax.round();
 
-    final valid = _height != null;
+    final error = ProfileRules.heightError(_heightCm);
+    final valid = error == null;
     widget.onValidityChange(valid);
 
     return Row(
@@ -142,8 +146,7 @@ class _HeightContentState extends State<_HeightContent> {
               OnboardingNumberField<int>(
                 value: _height,
                 onValueChange: (val) {
-                  final newValue = val ?? minHeight;
-                  setState(() => _height = newValue);
+                  setState(() => _height = val);
                   _saveHeight();
                 },
                 min: minHeight,
@@ -156,28 +159,38 @@ class _HeightContentState extends State<_HeightContent> {
               OnboardingNumberField<int>(
                 value: _inches,
                 onValueChange: (val) {
-                  final newValue = val ?? 0;
-                  setState(() => _inches = newValue);
+                  setState(() => _inches = val);
                   _saveHeight();
                 },
                 min: 0,
                 max: 11,
                 showButtons: true,
                 suffixText: "in",
-                isError: widget.showErrors && _inches == null,
+                isError: widget.showErrors && !valid,
               ),
             ] else ...[
               OnboardingNumberField<int>(
                 value: _height,
                 onValueChange: (val) {
-                  final newValue = val ?? minHeight;
-                  setState(() => _height = newValue);
+                  setState(() => _height = val);
                   _saveHeight();
                 },
                 min: minHeight,
                 max: maxHeight,
                 showButtons: true,
                 isError: widget.showErrors && !valid,
+              ),
+            ],
+            if (widget.showErrors && error != null) ...[
+              const SizedBox(height: AppDimens.space8),
+              SizedBox(
+                width: AppDimens.numberFieldWidth * 2,
+                child: Text(
+                  error,
+                  textAlign: TextAlign.center,
+                  style: context.text.bodySmall
+                      ?.copyWith(color: context.colors.error),
+                ),
               ),
             ],
             const SizedBox(height: AppDimens.space8),
@@ -189,11 +202,14 @@ class _HeightContentState extends State<_HeightContent> {
                   if (_selectedUnit != unit) {
                     if (unit == "ft" && _height != null) {
                       final totalInches = (_height! / 2.54).round();
-                      _height = (totalInches ~/ 12).clamp(2, 12);
+                      _height = (totalInches ~/ 12).clamp(1, 8);
                       _inches = (totalInches % 12).clamp(0, 11);
                     } else if (unit == "cm" && _height != null) {
                       final totalInches = (_height! * 12) + (_inches ?? 0);
-                      _height = (totalInches * 2.54).round().clamp(20, 250);
+                      _height = (totalInches * 2.54).round().clamp(
+                        InputLimits.heightCmMin.round(),
+                        InputLimits.heightCmMax.round(),
+                      );
                       _inches = 0;
                     }
                     _selectedUnit = unit;
@@ -208,8 +224,17 @@ class _HeightContentState extends State<_HeightContent> {
     );
   }
 
+  /// The entered height in cm, or null while incomplete.
+  double? get _heightCm {
+    final h = _height;
+    if (h == null) return null;
+    if (_selectedUnit != "ft") return h.toDouble();
+    return (h * 12 + (_inches ?? 0)) * 2.54;
+  }
+
   void _saveHeight() {
-    if (_height != null) {
+    // Out-of-range values stay on screen (with an error) but aren't saved.
+    if (_height != null && ProfileRules.heightError(_heightCm) == null) {
       final heightStr = _selectedUnit == "ft" ? "$_height-${_inches ?? 0}" : _height.toString();
       context.read<OnboardingCubit>().updateHeight(heightStr, _selectedUnit);
     }

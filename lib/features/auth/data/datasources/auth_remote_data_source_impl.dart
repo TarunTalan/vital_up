@@ -12,6 +12,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required this._logger,
   });
 
+  /// Auth calls fail with a timeout instead of hanging on a bad network.
+  static const _timeout = Duration(seconds: 20);
+
+  /// Exact, case-insensitive match for an email in an `ilike` filter.
+  static String _likeExact(String value) => value.trim().replaceAllMapped(
+        RegExp(r'[\\%_]'),
+        (m) => '\\${m[0]}',
+      );
+
   @override
   Future<LoginResponse> login(LoginRequest request) async {
     try {
@@ -19,7 +28,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       
       // If the input doesn't look like an email, assume it's a username
       if (!email.contains('@')) {
-         final response = await _supabaseClient.rpc('get_email_by_username', params: {'p_username': request.username});
+         final response = await _supabaseClient
+             .rpc('get_email_by_username', params: {'p_username': request.username.trim()})
+             .timeout(_timeout);
          if (response != null && response is String && response.isNotEmpty) {
            email = response;
          } else {
@@ -27,10 +38,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
          }
       }
 
-      final authResponse = await _supabaseClient.auth.signInWithPassword(
-        email: email,
-        password: request.password,
-      );
+      final authResponse = await _supabaseClient.auth
+          .signInWithPassword(email: email.trim(), password: request.password)
+          .timeout(_timeout);
 
       return LoginResponse(
         data: LoginData(
@@ -59,7 +69,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .select('username')
           .ilike('username', pattern)
           .limit(1)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(_timeout);
 
       final isAvailable = response == null;
       return UsernameCheckResponse(
@@ -79,8 +90,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final existingEmail = await _supabaseClient
           .from('profiles')
           .select('email')
-          .eq('email', request.email.trim())
-          .maybeSingle();
+          .ilike('email', _likeExact(request.email))
+          .limit(1)
+          .maybeSingle()
+          .timeout(_timeout);
 
       if (existingEmail != null) {
         throw const AuthException('This email is already registered.');
@@ -90,18 +103,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final existingUsername = await _supabaseClient
           .from('profiles')
           .select('username')
-          .eq('username', request.username.trim())
-          .maybeSingle();
+          .ilike('username', _likeExact(request.username))
+          .limit(1)
+          .maybeSingle()
+          .timeout(_timeout);
 
       if (existingUsername != null) {
         throw const AuthException('Username is already taken.');
       }
 
-      await _supabaseClient.auth.signUp(
-        email: request.email,
-        password: request.password,
-        data: {'username': request.username},
-      );
+      await _supabaseClient.auth
+          .signUp(
+            email: request.email.trim(),
+            password: request.password,
+            data: {'username': request.username.trim()},
+          )
+          .timeout(_timeout);
       
       return RegistrationResponse(
         data: request.email, // Return email as "token" for OTP steps
@@ -117,11 +134,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<OTPValidationResponse> validateRegistration(ValidateRegistrationRequest request) async {
     try {
-      final authResponse = await _supabaseClient.auth.verifyOTP(
-        type: OtpType.signup,
-        token: request.otp,
-        email: request.email,
-      );
+      final authResponse = await _supabaseClient.auth
+          .verifyOTP(type: OtpType.signup, token: request.otp, email: request.email)
+          .timeout(_timeout);
 
       // After OTP confirmation the user is fully created in auth.users.
       // Upsert their profile so the profiles table is always consistent
@@ -150,10 +165,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<ResendOTPResponse> resendOTP(ResendOTPRequest request) async {
     try {
-      await _supabaseClient.auth.resend(
-        type: OtpType.signup,
-        email: request.email,
-      );
+      await _supabaseClient.auth
+          .resend(type: OtpType.signup, email: request.email)
+          .timeout(_timeout);
       
       return ResendOTPResponse(
         data: null,
@@ -196,16 +210,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final profile = await _supabaseClient
           .from('profiles')
           .select('email')
-          .eq('email', request.email)
-          .maybeSingle();
+          .ilike('email', _likeExact(request.email))
+          .limit(1)
+          .maybeSingle()
+          .timeout(_timeout);
 
       if (profile == null) {
         throw const AuthException('Email is not registered. Please sign up.');
       }
 
       // 2. Proceed with resetPasswordForEmail
-      await _supabaseClient.auth.resetPasswordForEmail(request.email);
-      
+      await _supabaseClient.auth
+          .resetPasswordForEmail(request.email)
+          .timeout(_timeout);
+
       return ForgotPasswordResponse(
         data: request.email, // Use email as token
         message: 'OTP Sent successfully',
@@ -220,11 +238,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<VerifyForgotPasswordResponse> verifyForgotPassword(VerifyForgotPasswordRequest request) async {
     try {
-      await _supabaseClient.auth.verifyOTP(
-        type: OtpType.recovery,
-        token: request.otp,
-        email: request.email,
-      );
+      await _supabaseClient.auth
+          .verifyOTP(type: OtpType.recovery, token: request.otp, email: request.email)
+          .timeout(_timeout);
       
       return VerifyForgotPasswordResponse(
         data: DataVerifyForgotPwd(token: request.email), // After verify OTP, session is created in Supabase
@@ -241,8 +257,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<ResendForgotPwdResponse> resendForgotOtp(ResendForgotPwdRequest request) async {
     try {
       // Supabase uses the same resetPasswordForEmail to resend
-      await _supabaseClient.auth.resetPasswordForEmail(request.email);
-      
+      await _supabaseClient.auth
+          .resetPasswordForEmail(request.email)
+          .timeout(_timeout);
+
       return ResendForgotPwdResponse(
         data: request.email,
         message: 'OTP resent',
@@ -259,9 +277,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       // In Supabase, verifyOTP(recovery) automatically logs the user in.
       // So we can just update the user attributes
-      await _supabaseClient.auth.updateUser(UserAttributes(
-        password: request.newPassword,
-      ));
+      await _supabaseClient.auth
+          .updateUser(UserAttributes(password: request.newPassword))
+          .timeout(_timeout);
       
       return ResetPwdResponse(
         data: 'Success',

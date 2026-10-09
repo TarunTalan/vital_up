@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/utils/onboarding_components.dart';
 
@@ -46,11 +49,12 @@ class _WeightPageState extends State<WeightPage> {
       titleBottomSpace: AppDimens.space16,
       child: _WeightContent(
         onValidityChange: (valid) {
+          // Only rebuild on a real change: an unconditional setState here
+          // rebuilt the child, which reported again, every frame.
+          if (valid == _latestValid) return;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                _latestValid = valid;
-              });
+            if (mounted && valid != _latestValid) {
+              setState(() => _latestValid = valid);
             }
           });
         },
@@ -96,12 +100,24 @@ class _WeightContentState extends State<_WeightContent> {
     }
   }
 
+  static const _kgPerLb = CalculateCalorieGoal.kgPerLb;
+
+  /// The entered weight in kg, or null while empty.
+  double? get _weightKg => _weight == null
+      ? null
+      : CalculateCalorieGoal.weightInKg('$_weight', _selectedUnit);
+
   @override
   Widget build(BuildContext context) {
-    final minWeight = 10;
-    final maxWeight = _selectedUnit.toLowerCase() == "lb" ? 800 : 400;
-
-    final valid = _weight != null;
+    final isLb = _selectedUnit.toLowerCase() == "lb";
+    final minWeight = isLb
+        ? (InputLimits.weightKgMin / _kgPerLb).ceil()
+        : InputLimits.weightKgMin.round();
+    final maxWeight = isLb
+        ? (InputLimits.weightKgMax / _kgPerLb).floor()
+        : InputLimits.weightKgMax.round();
+    final error = ProfileRules.weightError(_weightKg);
+    final valid = error == null;
     widget.onValidityChange(valid);
 
     return Column(
@@ -117,9 +133,11 @@ class _WeightContentState extends State<_WeightContent> {
                   OnboardingNumberField<int>(
                     value: _weight,
                     onValueChange: (val) {
-                      final newValue = val ?? minWeight;
-                      setState(() => _weight = newValue);
-                      context.read<OnboardingCubit>().updateWeight(newValue.toString(), _selectedUnit);
+                      setState(() => _weight = val);
+                      // Out-of-range values show an error and aren't saved.
+                      if (val != null && ProfileRules.weightError(_weightKg) == null) {
+                        context.read<OnboardingCubit>().updateWeight(val.toString(), _selectedUnit);
+                      }
                     },
                     min: minWeight,
                     max: maxWeight,
@@ -128,6 +146,15 @@ class _WeightContentState extends State<_WeightContent> {
                   ),
                 ],
               ),
+              if (widget.showErrors && error != null) ...[
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  error,
+                  textAlign: TextAlign.center,
+                  style: context.text.bodySmall
+                      ?.copyWith(color: context.colors.error),
+                ),
+              ],
               const SizedBox(height: AppDimens.space8),
               UnitDropdown(
                 selectedUnit: _selectedUnit,
@@ -136,14 +163,20 @@ class _WeightContentState extends State<_WeightContent> {
                   setState(() {
                     if (_selectedUnit != unit) {
                       if (unit == "lb" && _weight != null) {
-                        _weight = (_weight! * 2.20462).round().clamp(22, 880);
+                        _weight = (_weight! / _kgPerLb).round().clamp(
+                          (InputLimits.weightKgMin / _kgPerLb).ceil(),
+                          (InputLimits.weightKgMax / _kgPerLb).floor(),
+                        );
                       } else if (unit == "kg" && _weight != null) {
-                        _weight = (_weight! / 2.20462).round().clamp(10, 400);
+                        _weight = (_weight! * _kgPerLb).round().clamp(
+                          InputLimits.weightKgMin.round(),
+                          InputLimits.weightKgMax.round(),
+                        );
                       }
                       _selectedUnit = unit;
                     }
                   });
-                  if (_weight != null) {
+                  if (_weight != null && ProfileRules.weightError(_weightKg) == null) {
                     context.read<OnboardingCubit>().updateWeight(_weight.toString(), unit);
                   }
                 },

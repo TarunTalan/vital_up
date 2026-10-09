@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/features/onboarding/domain/entities/weight_goal.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 
 /// Derives the daily calorie goal from the onboarding answers:
 /// TDEE (Mifflin-St Jeor BMR × activity factor) adjusted by the weekly pace.
@@ -104,18 +105,9 @@ class CalculateCalorieGoal {
     return (cm == null || cm <= 0) ? null : cm;
   }
 
-  /// DOB is stored as "ddMMyyyy".
+  /// DOB is stored as "ddMMyyyy". Null for impossible or future dates.
   static int? ageFromDob(String dob, {DateTime? now}) {
-    if (dob.length != 8) return null;
-    final day = int.tryParse(dob.substring(0, 2));
-    final month = int.tryParse(dob.substring(2, 4));
-    final year = int.tryParse(dob.substring(4));
-    if (day == null || month == null || year == null) return null;
-    final today = now ?? DateTime.now();
-    var age = today.year - year;
-    if (today.month < month || (today.month == month && today.day < day)) {
-      age--;
-    }
-    return age > 0 ? age : null;
+    final age = ProfileRules.ageFromDob(dob, now: now);
+    return age != null && age > 0 ? age : null;
   }
 }

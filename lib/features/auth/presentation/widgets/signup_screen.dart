@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
@@ -31,7 +32,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!isTermsValid) {
       setState(() {
-        _termsError = 'Please accept the terms & conditions';
+        _termsError = 'Accept the terms and conditions to continue';
       });
     }
 
@@ -95,7 +96,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       isAvailable: isAvailable,
                                       isChecking: isChecking,
                                       validate: cubit.validateUsernameSignup,
-                                      maxLength: 20,
+                                      maxLength: InputLimits.usernameMax,
                                       enabled: !isLoading,
                                     );
                                   },

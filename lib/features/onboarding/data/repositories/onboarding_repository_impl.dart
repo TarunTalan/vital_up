@@ -4,6 +4,7 @@ import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/error/exceptions.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
@@ -36,10 +37,9 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
       final userId = currentUserId();
       if (userId != null) await _saveLocally(userId, data);
       return const Right(null);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(_mapExceptionMessage(e.message)));
     } catch (e) {
-      return Left(ServerFailure(_mapExceptionMessage(e.toString())));
+      debugPrint('Onboarding submit failed: $e');
+      return Left(ServerFailure(_messageFor(e)));
     }
   }
 
@@ -68,19 +68,14 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
     }
   }
 
-  String _mapExceptionMessage(String originalMessage) {
-    final msg = originalMessage.toLowerCase();
-    if (isOfflineError(originalMessage)) {
-      return 'No internet connection. Please check your network settings.';
+  /// Short message for the user; details go to the log.
+  static String _messageFor(Object error) {
+    const fallback = "Couldn't save your details. Try again.";
+    final text = error is ServerException ? error.message : '$error';
+    if (isOfflineError(error) || isOfflineError(text)) {
+      return "You're offline. Try again when connected.";
     }
-    if (msg.contains('postgrestexception') || msg.contains('database') || msg.contains('postgres') || msg.contains('upsert')) {
-      return 'Database operation failed. Please try again.';
-    }
-    // Remove technical prefixes like 'Exception: ' if present
-    final cleanMsg = originalMessage.replaceFirst(RegExp(r'^Exception:\s*'), '');
-    if (cleanMsg.length < 60 && !cleanMsg.contains('{') && !cleanMsg.contains('[')) {
-      return cleanMsg;
-    }
-    return 'An unexpected error occurred. Please try again.';
+    if (text.contains('not authenticated')) return 'Please sign in again.';
+    return userMessage(error, fallback: fallback);
   }
 }

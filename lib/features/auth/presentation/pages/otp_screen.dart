@@ -44,6 +44,9 @@ class _OtpScreenState extends State<OtpScreen>
   bool _hasError = false;
   bool _isResending = false;
 
+  /// Kept for dispose, where looking up the widget tree isn't allowed.
+  late final AuthCubit _authCubit = context.read<AuthCubit>();
+
   @override
   void initState() {
     super.initState();
@@ -97,7 +100,7 @@ class _OtpScreenState extends State<OtpScreen>
   @override
   void dispose() {
     // Clear all fields and state in the Cubit when this screen is dismissed
-    context.read<AuthCubit>().clearAllFields();
+    _authCubit.clearAllFields();
     for (var c in _controllers) {
       c.dispose();
     }
@@ -155,7 +158,7 @@ class _OtpScreenState extends State<OtpScreen>
         _controllers.map((c) => c.text.replaceAll('\u200B', '')).join();
 
     if (otp.length < _otpLength) {
-      cubit.setOtpError('Please fill in all 6 digits');
+      cubit.setOtpError('Enter all 6 digits');
       _triggerShake();
       return;
     }
@@ -187,7 +190,12 @@ class _OtpScreenState extends State<OtpScreen>
         token: _currentToken,
         onSuccess: (resetToken) {
           if (!mounted) return;
-          context.push('/reset-password?token=$resetToken');
+          context.push(
+            Uri(
+              path: '/reset-password',
+              queryParameters: {'token': resetToken},
+            ).toString(),
+          );
         },
         onError: (_) => _triggerShake(),
       );
@@ -538,7 +546,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                              onSuccess: () {
                                                                if (!mounted) return;
                                                                setState(() => _isResending = false);
-                                                               cubit.setOtpError('OTP resent successfully');
+                                                               cubit.setOtpError('New code sent');
                                                              },
                                                              onError: (_) {
                                                                if (!mounted) return;
@@ -554,7 +562,7 @@ class _OtpScreenState extends State<OtpScreen>
                                                                 _currentToken = newToken;
                                                                 _isResending = false;
                                                               });
-                                                              cubit.setOtpError('New OTP sent to your email');
+                                                              cubit.setOtpError('New code sent to your email');
                                                             },
                                                             onError: (_) {
                                                               if (!mounted) return;

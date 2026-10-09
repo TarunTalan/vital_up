@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/onboarding_data.dart';
 import '../../data/datasources/onboarding_data_store.dart';
@@ -36,6 +37,7 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final dietaryPreference = await _onboardingDataStore.getDietaryPreference();
     final activity = await _onboardingDataStore.getActivity();
     final sleep = await _onboardingDataStore.getSleep();
+    if (isClosed) return;
 
     emit(OnboardingData(
       fullName: fullName,
@@ -193,7 +195,9 @@ class OnboardingCubit extends Cubit<OnboardingData> {
   }
 
   Future<void> submitOnboardingDataToBackend() async {
-    emit(state.copyWith(status: SubmissionStatus.submitting, errorMessage: null));
+    // Double taps on "Done" would upload twice.
+    if (state.status == SubmissionStatus.submitting) return;
+    emit(state.copyWith(status: SubmissionStatus.submitting));
 
     // Personalised calorie goal from TDEE + chosen pace.
     final calorieGoal = _calculateCalorieGoal(state);
@@ -203,18 +207,22 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     }
 
     final result = await _onboardingRepository.submitOnboardingData(state);
+    if (isClosed) return;
 
-    result.fold(
-      (failure) {
-        emit(state.copyWith(
-          status: SubmissionStatus.error,
-          errorMessage: failure.message,
-        ));
-      },
-      (_) async {
-        await completeOnboarding(); // Mark locally as completed
-        emit(state.copyWith(status: SubmissionStatus.success));
-      },
-    );
+    final failure = result.fold((f) => f, (_) => null);
+    if (failure != null) {
+      emit(state.copyWith(
+        status: SubmissionStatus.error,
+        errorMessage: failure.message,
+      ));
+      return;
+    }
+    try {
+      await completeOnboarding(); // Mark locally as completed
+    } catch (e) {
+      // The server has the answers; the flag is only a local shortcut.
+      debugPrint('Onboarding completion flag not saved: $e');
+    }
+    if (!isClosed) emit(state.copyWith(status: SubmissionStatus.success));
   }
 }

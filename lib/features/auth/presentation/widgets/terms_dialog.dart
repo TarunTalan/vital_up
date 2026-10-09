@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/config/legal_links.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -17,19 +18,18 @@ class TermsAndConditionsDialog extends StatelessWidget {
   });
 
   static const List<String> _terms = [
-    'VitalApp is designed to support general health, wellness, and activity tracking, not medical care.',
+    'VitalUp is designed to support general health, wellness, and activity tracking, not medical care.',
     'The app does not replace professional medical advice, diagnosis, or treatment.',
     'Always consult a qualified healthcare provider before making health or fitness decisions.',
-    'You must be legally eligible to use VitalApp and provide accurate, current information.',
+    'You must be legally eligible to use VitalUp and provide accurate, current information.',
     'You are responsible for safeguarding your account and all activity under it.',
     'Health data you enter is used to personalize insights and improve your experience.',
-    'VitalApp is not liable for any loss or damages arising from use of the app.',
-    'You retain ownership of your data while granting VitalApp permission to process it.',
+    'VitalUp is not liable for any loss or damages arising from use of the app.',
+    'You retain ownership of your data while granting VitalUp permission to process it.',
     'Data is handled in accordance with our Privacy Policy and applicable laws.',
-    'VitalApp may update features or suspend access for misuse or policy violations.',
+    'VitalUp may update features or suspend access for misuse or policy violations.',
     'The app is provided "as is" without guarantees of accuracy or availability.',
-    'Data is handled in accordance with our Privacy Policy and applicable laws.',
-    'VitalApp provides wellness insights based on user-submitted data and does not guarantee accuracy or outcomes.',
+    'VitalUp provides wellness insights based on user-submitted data and does not guarantee accuracy or outcomes.',
     'The app\'s features may evolve, be modified, or discontinued without prior notice.',
     'Users may not copy, distribute, or exploit any part of the app without written consent.',
   ];
@@ -81,6 +81,28 @@ class TermsAndConditionsDialog extends StatelessWidget {
                       children: [
                         for (var i = 0; i < _terms.length; i++)
                           _TermItem(index: i + 1, text: _terms[i]),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: AppDimens.space8,
+                          children: [
+                            TextButton(
+                              onPressed: () =>
+                                  LegalLinks.open(LegalLinks.terms),
+                              child: Text(
+                                'Full terms of use',
+                                style: TextStyle(color: v.termsLink),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  LegalLinks.open(LegalLinks.privacyPolicy),
+                              child: Text(
+                                'Privacy policy',
+                                style: TextStyle(color: v.termsLink),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
