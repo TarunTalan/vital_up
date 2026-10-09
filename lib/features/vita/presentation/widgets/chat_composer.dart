@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_bubble.dart';
@@ -68,7 +69,9 @@ class ChatComposer extends StatefulWidget {
 class _ChatComposerState extends State<ChatComposer> {
   final _controller = TextEditingController();
 
-  bool get _canSend => widget.enabled && _controller.text.trim().isNotEmpty;
+  bool get _canSend =>
+      widget.enabled &&
+      sanitizeText(_controller.text, multiline: true).isNotEmpty;
 
   @override
   void initState() {
@@ -128,6 +131,11 @@ class _ChatComposerState extends State<ChatComposer> {
                     controller: _controller,
                     minLines: 1,
                     maxLines: 4,
+                    textCapitalization: TextCapitalization.sentences,
+                    inputFormatters: InputFormatters.text(
+                      InputLimits.chatMessage,
+                      multiline: true,
+                    ),
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
                     style: context.text.bodyLarge?.copyWith(

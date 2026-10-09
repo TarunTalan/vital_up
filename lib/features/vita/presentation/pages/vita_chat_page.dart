@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
@@ -113,11 +114,7 @@ class _VitaChatViewState extends State<_VitaChatView> {
               listener: (context, state) {
                 _scrollToEnd();
                 final error = state.error;
-                if (error != null) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(content: Text(error)));
-                }
+                if (error != null) showErrorSnackBar(context, error);
               },
               listenWhen: (prev, next) =>
                   prev.messages.length != next.messages.length ||

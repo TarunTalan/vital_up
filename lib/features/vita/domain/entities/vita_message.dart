@@ -74,11 +74,14 @@ class VitaMessage extends Equatable {
         sender: json['s'] == VitaSender.user.name
             ? VitaSender.user
             : VitaSender.vita,
-        text: json['t'] as String? ?? '',
-        sentAt: DateTime.tryParse(json['at'] as String? ?? '') ?? DateTime.now(),
-        bullets: (json['b'] as List?)?.cast<String>() ?? const [],
+        text: json['t'] is String ? json['t'] as String : '',
+        sentAt: DateTime.tryParse(json['at'] is String ? json['at'] as String : '') ??
+            DateTime.now(),
+        bullets: json['b'] is List
+            ? (json['b'] as List).whereType<String>().toList()
+            : const [],
         action: VitaAction.fromWire(json['a']),
-        planInstructions: json['pi'] as String?,
+        planInstructions: json['pi'] is String ? json['pi'] as String : null,
         failed: json['f'] == true,
       );
 

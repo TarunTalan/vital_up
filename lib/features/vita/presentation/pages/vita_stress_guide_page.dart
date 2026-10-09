@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -28,26 +29,39 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
       _repository.getDailyInsights();
   bool _connecting = false;
 
-  void _reload() =>
-      setState(() => _report = _repository.getStressReport());
+  // Block body: an arrow body would hand setState the Future and throw.
+  void _reload() {
+    setState(() {
+      _report = _repository.getStressReport();
+    });
+  }
 
   Future<void> _checkIn(int level) async {
-    await _repository.saveStressCheckIn(level);
+    try {
+      await _repository.saveStressCheckIn(level);
+    } catch (e) {
+      debugPrint('Stress check-in not saved: $e');
+      if (mounted) showErrorSnackBar(context, "Couldn't save your check-in. Try again.");
+      return;
+    }
     if (mounted) _reload();
   }
 
   Future<void> _connectWearable() async {
+    if (_connecting) return;
     setState(() => _connecting = true);
-    final granted = await _repository.connectWearable();
+    var granted = false;
+    try {
+      granted = await _repository.connectWearable();
+    } catch (e) {
+      debugPrint('Wearable connect failed: $e');
+    }
     if (!mounted) return;
     setState(() => _connecting = false);
     if (granted) {
       _reload();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No heart data access granted. You can allow it in '
-            'Health Connect / Health settings.'),
-      ));
+      showErrorSnackBar(context, 'No heart data access. Allow it in Health settings.');
     }
   }
 
@@ -238,7 +252,7 @@ class _TriggersCard extends StatelessWidget {
           if (triggers.isEmpty) ...[
             const SizedBox(height: AppDimens.space16),
             Text(
-              'No triggers detected today 🎉',
+              'No triggers detected today',
               style: rowStyle?.copyWith(color: context.vColors.grayText),
             ),
           ],
