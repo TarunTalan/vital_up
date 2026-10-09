@@ -97,6 +97,9 @@ class GamificationRepositoryImpl implements GamificationRepository {
       // The server keeps each day's highest numbers, so re-sending the
       // same ones can't award anything.
       if (sent[param] != fingerprint) {
+        // Signed out or switched account mid-sync: never report this
+        // user's data under another session.
+        if (_remote.userId != userId) return total;
         try {
           final result = AwardResult.fromJson(
             await _remote.submitDailyReport(metrics),
@@ -143,10 +146,8 @@ class GamificationRepositoryImpl implements GamificationRepository {
     return jsonEncode(json);
   }
 
-  Future<void> _markChanged(String userId) => _prefs.setInt(
-    _changedKey(userId),
-    DateTime.now().millisecondsSinceEpoch,
-  );
+  Future<void> _markChanged(String userId) =>
+      _prefs.setInt(_changedKey(userId), DateTime.now().millisecondsSinceEpoch);
 
   /// Cache-first read of [key]. Copies saved before the last report that
   /// changed [userId]'s score are refreshed even if younger than [maxAge].
@@ -162,9 +163,7 @@ class GamificationRepositoryImpl implements GamificationRepository {
     final changed = userId == null ? null : _prefs.getInt(_changedKey(userId));
     if (!force && changed != null) {
       final cached = await _cache.read<Object?>(key);
-      force =
-          cached != null &&
-          cached.savedAt.millisecondsSinceEpoch < changed;
+      force = cached != null && cached.savedAt.millisecondsSinceEpoch < changed;
     }
     return _cache.fetch<T>(
       key,
@@ -307,10 +306,32 @@ class GamificationRepositoryImpl implements GamificationRepository {
           e['earned_at'] as String? ?? '',
         ),
     };
+    final progress = {
+      for (final p in await _badgeProgress(userId)) p['code'] as String: p,
+    };
     return [
       for (final b in catalog)
-        GameBadge.fromJson(b, earnedAt: earnedAt[b['code']]),
+        GameBadge.fromJson(
+          b,
+          earnedAt: earnedAt[b['code']],
+          progress: progress[b['code']],
+        ),
     ];
+  }
+
+  /// Progress is a nice-to-have: badges still load without it.
+  Future<List<Map<String, dynamic>>> _badgeProgress(String userId) async {
+    try {
+      return await _fetch(
+        'gamification:badge_progress:$userId',
+        remote: _remote.fetchBadgeProgress,
+        decode: _rows,
+        userId: userId,
+      );
+    } catch (e) {
+      debugPrint('Badge progress unavailable: $e');
+      return const [];
+    }
   }
 
   @override

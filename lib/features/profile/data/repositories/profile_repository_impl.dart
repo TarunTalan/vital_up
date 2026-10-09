@@ -5,10 +5,11 @@ import 'package:logger/logger.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/user_profile_cache.dart';
-import 'package:vital_up/core/error/exceptions.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
+import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource_impl.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/domain/repositories/profile_repository.dart';
@@ -33,8 +34,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required this.logger,
   });
 
-  static const _offlineMessage =
-      'No internet connection. Please check your network settings.';
+  static const _offlineMessage = "You're offline. Try again when connected.";
 
   @override
   Future<Either<Failure, ProfileEntity>> getProfile({
@@ -42,7 +42,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }) async {
     final userId = currentUserId();
     if (userId == null) {
-      return const Left(ServerFailure('User is not authenticated'));
+      return const Left(ServerFailure('Please sign in again.'));
     }
     try {
       final profile = await cacheStore.fetch<ProfileEntity>(
@@ -68,7 +68,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
           return Right(legacy);
         }
       }
-      return Left(ServerFailure(_messageFor(e)));
+      logger.e('Profile load failed: $e');
+      return Left(ServerFailure(
+        _messageFor(e, fallback: "Couldn't load your profile. Try again."),
+      ));
     }
   }
 
@@ -94,6 +97,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
       } else {
         await cacheStore.remove(key);
       }
+      logger.e('Profile save failed: $e');
       return Left(ServerFailure(_messageFor(e)));
     }
   }
@@ -192,30 +196,21 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   /// Photo changes go straight to storage, so they need the network.
-  String _photoMessageFor(Object error) => isOfflineError(error)
-      ? "You're offline. Connect to the internet to change your photo."
-      : _messageFor(error);
-
-  String _messageFor(Object error) {
-    if (isOfflineError(error)) return _offlineMessage;
-    return _mapExceptionMessage(
-      error is ServerException ? error.message : error.toString(),
-    );
+  String _photoMessageFor(Object error) {
+    logger.e('Profile photo change failed: $error');
+    return isOfflineError(error)
+        ? "You're offline. Connect to change your photo."
+        : _messageFor(error, fallback: "Couldn't update your photo. Try again.");
   }
 
-  String _mapExceptionMessage(String originalMessage) {
-    final msg = originalMessage.toLowerCase();
-    if (isOfflineError(originalMessage)) return _offlineMessage;
-    if (msg.contains('postgrestexception') ||
-        msg.contains('database') ||
-        msg.contains('postgres') ||
-        msg.contains('upsert')) {
-      return 'Database operation failed. Please try again.';
-    }
-    final cleanMsg = originalMessage.replaceFirst(RegExp(r'^Exception:\s*'), '');
-    if (cleanMsg.length < 60 && !cleanMsg.contains('{') && !cleanMsg.contains('[')) {
-      return cleanMsg;
-    }
-    return 'An unexpected error occurred. Please try again.';
+  /// Short message for the user. [ProfileUserError]s are already written
+  /// for the user; anything else is replaced by [fallback].
+  String _messageFor(
+    Object error, {
+    String fallback = "Couldn't save your profile. Try again.",
+  }) {
+    if (isOfflineError(error)) return _offlineMessage;
+    if (error is ProfileUserError) return error.message;
+    return userMessage(error, fallback: fallback);
   }
 }

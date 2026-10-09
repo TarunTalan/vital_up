@@ -28,14 +28,18 @@ class _BadgesPageState extends State<BadgesPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      onRefresh: () async => setState(() => _badges = _load()),
+      onRefresh: () async => setState(() {
+        _badges = _load();
+      }),
       header: const AppPageHeader(title: 'Badges'),
       body: FutureBuilder<List<GameBadge>>(
         future: _badges,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return LoadErrorView(
-              onRetry: () => setState(() => _badges = _load()),
+              onRetry: () => setState(() {
+                _badges = _load();
+              }),
             );
           }
           final badges = snapshot.data;
@@ -92,6 +96,15 @@ class BadgeTile extends StatelessWidget {
 
   const BadgeTile({super.key, required this.badge});
 
+  static final _number = NumberFormat.decimalPattern();
+
+  /// "7 of 10", for locked badges with known progress.
+  String? get _progressLabel {
+    if (badge.progressFraction == null) return null;
+    final t = badge.threshold!;
+    return '${_number.format(badge.progress!.clamp(0, t))} of ${_number.format(t)}';
+  }
+
   void _showDetails(BuildContext context) {
     final earnedAt = badge.earnedAt;
     ScaffoldMessenger.of(context)
@@ -101,7 +114,8 @@ class BadgeTile extends StatelessWidget {
           content: Text(
             earnedAt != null
                 ? '${badge.name}: earned ${DateFormat.yMMMd().format(earnedAt.toLocal())}'
-                : '${badge.name}: ${badge.description}',
+                : '${badge.name}: ${badge.description}'
+                      '${_progressLabel == null ? '' : ' ($_progressLabel)'}',
           ),
         ),
       );
@@ -110,39 +124,67 @@ class BadgeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = badge.earned ? AppColors.rankGold : context.vColors.grayText!;
+    final fraction = badge.progressFraction;
+    final progressLabel = _progressLabel;
     return AppCard(
       padding: const EdgeInsets.all(AppDimens.space8),
       onTap: () => _showDetails(context),
-      child: Opacity(
-        opacity: badge.earned ? 1 : AppDimens.badgeLockedOpacity,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AppIconBadge(
-              size: AppDimens.badgeTile,
-              color: color,
-              icon: GameIcon(
-                GamificationIcons.badge(badge.iconKey),
-                fallback: badge.earned
-                    ? Icons.military_tech_rounded
-                    : Icons.lock_outline_rounded,
-                size: AppDimens.iconXl,
-                color: color,
-              ),
+      // Locked badges are dimmed, but not their progress: being close to
+      // one is the point.
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Opacity(
+            opacity: badge.earned ? 1 : AppDimens.badgeLockedOpacity,
+            child: _content(context, color),
+          ),
+          if (fraction != null && progressLabel != null) ...[
+            const SizedBox(height: AppDimens.space4),
+            AppProgressBar(
+              value: fraction,
+              color: context.colors.primary,
+              height: AppDimens.badgeProgressHeight,
             ),
-            const SizedBox(height: AppDimens.space8),
+            const SizedBox(height: AppDimens.space4),
             Text(
-              badge.name,
-              maxLines: 2,
-              textAlign: TextAlign.center,
+              progressLabel,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: context.text.labelMedium?.copyWith(
-                color: context.colors.onSurface,
+              style: context.text.labelSmall?.copyWith(
+                color: context.vColors.grayText,
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
+
+  Widget _content(BuildContext context, Color color) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      AppIconBadge(
+        size: AppDimens.badgeTile,
+        color: color,
+        icon: GameIcon(
+          GamificationIcons.badge(badge.iconKey),
+          fallback: badge.earned
+              ? Icons.military_tech_rounded
+              : Icons.lock_outline_rounded,
+          size: AppDimens.iconXl,
+          color: color,
+        ),
+      ),
+      const SizedBox(height: AppDimens.space8),
+      Text(
+        badge.name,
+        maxLines: 2,
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+        style: context.text.labelMedium?.copyWith(
+          color: context.colors.onSurface,
+        ),
+      ),
+    ],
+  );
 }

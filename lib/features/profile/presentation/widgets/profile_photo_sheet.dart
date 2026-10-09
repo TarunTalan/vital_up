@@ -105,12 +105,13 @@ Future<void> showProfilePhotoOptions(
     if (picked == null) return;
     await cubit.uploadPhoto(File(picked.path));
   } catch (e) {
+    debugPrint('Profile photo pick failed: $e');
     if (!context.mounted) return;
     showErrorSnackBar(
       context,
       choice == _PhotoAction.camera
-          ? 'Camera access is needed to take a photo. You can allow it in Settings.'
-          : 'Photo access is needed to choose a picture. You can allow it in Settings.',
+          ? 'Allow camera access in Settings to take a photo.'
+          : 'Allow photo access in Settings to pick a picture.',
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -18,6 +19,7 @@ import 'package:vital_up/features/account/data/data_export_service.dart';
 import 'package:vital_up/features/account/presentation/delete_account_sheet.dart';
 import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
@@ -115,13 +117,7 @@ class _AccountFormState extends State<_AccountForm> {
     return date == null ? '' : DateFormat('d MMM yyyy').format(date);
   }
 
-  static DateTime? _parseDob(String dob) {
-    if (dob.length != 8) return null;
-    final d = int.tryParse(dob.substring(0, 2));
-    final m = int.tryParse(dob.substring(2, 4));
-    final y = int.tryParse(dob.substring(4));
-    return d == null || m == null || y == null ? null : DateTime(y, m, d);
-  }
+  static DateTime? _parseDob(String dob) => ProfileRules.parseDob(dob);
 
   DateTime? _pickedDob;
 
@@ -133,24 +129,31 @@ class _AccountFormState extends State<_AccountForm> {
       _usernameController.text.trim() != _saved.username;
 
   bool get _dirty =>
-      _name.text.trim() != _saved.fullName ||
+      ProfileRules.cleanName(_name.text) != _saved.fullName ||
       _usernameChanged ||
       _dobRaw != _saved.dob ||
       _gender != _saved.gender.toLowerCase();
 
   Future<void> _pickDob() async {
+    final now = DateTime.now();
+    // Supported ages only; the initial date is clamped into that range or
+    // the picker asserts (e.g. a saved birthday under the minimum age).
     final picked = await showDatePicker(
       context: context,
-      initialDate: _pickedDob ?? _parseDob(_saved.dob) ?? DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      initialDate: ProfileRules.clampDob(
+        _pickedDob ?? _parseDob(_saved.dob) ?? DateTime(now.year - 25),
+        now,
+      ),
+      firstDate: ProfileRules.firstDob(now),
+      lastDate: ProfileRules.lastDob(now),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     _pickedDob = picked;
     _dob.text = DateFormat('d MMM yyyy').format(picked);
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final cubit = context.read<ProfileCubit>();
     var username = _saved.username;
@@ -187,7 +190,7 @@ class _AccountFormState extends State<_AccountForm> {
 
     await cubit.updateProfile(
       (cubit.currentProfile ?? _saved).copyWith(
-        fullName: _name.text.trim(),
+        fullName: ProfileRules.cleanName(_name.text),
         username: username,
         dob: _dobRaw,
         gender: _gender,
@@ -197,6 +200,7 @@ class _AccountFormState extends State<_AccountForm> {
   }
 
   Future<void> _export() async {
+    if (_exporting) return;
     setState(() => _exporting = true);
     final error = await sl<DataExportService>().exportAndShare();
     if (!mounted) return;
@@ -317,13 +321,9 @@ class _AccountFormState extends State<_AccountForm> {
                   prefixIcon: Icons.badge_rounded,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  validator: (value) {
-                    if (value.trim().isEmpty) return 'Enter your name';
-                    if (value.trim().length < 2) {
-                      return 'Use at least 2 characters';
-                    }
-                    return null;
-                  },
+                  keyboardType: TextInputType.name,
+                  maxLength: InputLimits.name,
+                  validator: ProfileRules.nameError,
                 ),
                 const SizedBox(height: AppDimens.space16),
                 ListenableBuilder(
@@ -367,8 +367,7 @@ class _AccountFormState extends State<_AccountForm> {
                   readOnly: true,
                   onTap: _pickDob,
                   suffix: const Icon(Icons.arrow_drop_down_rounded),
-                  validator: (value) =>
-                      value.trim().isEmpty ? 'Add your date of birth' : null,
+                  validator: (_) => ProfileRules.dobError(_dobRaw),
                 ),
                 const SizedBox(height: AppDimens.space16),
                 Padding(

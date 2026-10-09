@@ -54,7 +54,9 @@ class _HeadToHeadComparisonPageState extends State<HeadToHeadComparisonPage> {
     return AppScaffold(
       header: const AppPageHeader(title: 'Compare'),
       onRefresh: () async {
-        setState(() => _profiles = _load());
+        setState(() {
+          _profiles = _load();
+        });
         await _profiles;
       },
       body: FutureBuilder<(PlayerProfile, PlayerProfile)>(
@@ -68,7 +70,9 @@ class _HeadToHeadComparisonPageState extends State<HeadToHeadComparisonPage> {
                 if (error is PlayerProfileException)
                   AppInfoNote(message: error.message),
                 LoadErrorView(
-                  onRetry: () => setState(() => _profiles = _load()),
+                  onRetry: () => setState(() {
+                    _profiles = _load();
+                  }),
                 ),
               ],
             );

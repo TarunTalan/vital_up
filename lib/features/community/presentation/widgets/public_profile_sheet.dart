@@ -88,11 +88,15 @@ class PublicProfileSheet extends StatelessWidget {
                       ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppDimens.radiusCard - AppDimens.borderThick),
+                      borderRadius: BorderRadius.circular(
+                        AppDimens.radiusCard - AppDimens.borderThick,
+                      ),
                       child: UserAvatar(
                         username: username,
                         url: avatarUrl,
-                        size: context.w(AppDimens.avatarLarge) - AppDimens.borderThick * 2,
+                        size:
+                            context.w(AppDimens.avatarLarge) -
+                            AppDimens.borderThick * 2,
                       ),
                     ),
                   ),
@@ -120,12 +124,12 @@ class PublicProfileSheet extends StatelessWidget {
                     const SizedBox(height: AppDimens.space4),
                     Text(
                       '@$username',
-                      style: context.text.bodySmall?.copyWith(color: v.grayText),
+                      style: context.text.bodySmall?.copyWith(
+                        color: v.grayText,
+                      ),
                     ),
                     const SizedBox(height: AppDimens.space8),
-                    LevelTagPill(
-                      level: level,
-                    ),
+                    LevelTagPill(level: level),
                   ],
                 ),
               ),
@@ -138,14 +142,18 @@ class PublicProfileSheet extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final friend = state.friends!.where((f) => f.username == username).firstOrNull;
+              final friend = state.friends!
+                  .where((f) => f.username == username)
+                  .firstOrNull;
 
               if (friend != null) {
                 if (friend.status == FriendStatus.accepted) {
                   return AppPrimaryButton(
                     label: 'Already Friends',
                     onTap: () {},
-                    containerColor: context.colors.primary.withValues(alpha: 0.5),
+                    containerColor: context.colors.primary.withValues(
+                      alpha: 0.5,
+                    ),
                   );
                 } else if (friend.status == FriendStatus.incoming) {
                   return Row(
@@ -153,14 +161,20 @@ class PublicProfileSheet extends StatelessWidget {
                       Expanded(
                         child: AppPrimaryButton(
                           label: 'Accept Request',
-                          onTap: () => context.read<FriendsCubit>().respond(friend, accept: true),
+                          onTap: () => context.read<FriendsCubit>().respond(
+                            friend,
+                            accept: true,
+                          ),
                         ),
                       ),
                       const SizedBox(width: AppDimens.space16),
                       Expanded(
                         child: AppPrimaryButton(
                           label: 'Decline',
-                          onTap: () => context.read<FriendsCubit>().respond(friend, accept: false),
+                          onTap: () => context.read<FriendsCubit>().respond(
+                            friend,
+                            accept: false,
+                          ),
                           containerColor: context.colors.error,
                         ),
                       ),
@@ -170,7 +184,9 @@ class PublicProfileSheet extends StatelessWidget {
                   return AppPrimaryButton(
                     label: 'Request Sent',
                     onTap: () {},
-                    containerColor: context.colors.primary.withValues(alpha: 0.5),
+                    containerColor: context.colors.primary.withValues(
+                      alpha: 0.5,
+                    ),
                   );
                 }
               }

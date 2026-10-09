@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -19,6 +20,7 @@ import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
 import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
@@ -40,6 +42,7 @@ class _HealthDetailsPageState extends State<HealthDetailsPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final cubit = context.read<ProfileCubit>();
       if (cubit.state is ProfileInitial || cubit.state is ProfileError) {
         cubit.loadProfile();
@@ -395,12 +398,30 @@ class _BodySheetState extends State<_BodySheet> {
   late final int? _inches = _cm == null
       ? null
       : (_cm / CalculateCalorieGoal.cmPerInch).round();
-  late final _feet = TextEditingController(
-    text: _inches == null ? '' : '${_inches ~/ 12}',
-  );
-  late final _inch = TextEditingController(
-    text: _inches == null ? '' : '${_inches % 12}',
-  );
+  late final _feet = TextEditingController(text: _initialFeet);
+  late final _inch = TextEditingController(text: _initialInch);
+  late final String _initialFeet = _inches == null ? '' : '${_inches ~/ 12}';
+  late final String _initialInch = _inches == null ? '' : '${_inches % 12}';
+  late final String _initialCm = _heightCm.text;
+
+  /// Height in cm from the fields (null while empty).
+  double? _enteredCm(bool imperial) {
+    if (!imperial) return double.tryParse(_heightCm.text.trim());
+    final ft = int.tryParse(_feet.text.trim());
+    if (ft == null) return null;
+    final inch = int.tryParse(_inch.text.trim()) ?? 0;
+    return (ft * 12 + inch) * CalculateCalorieGoal.cmPerInch;
+  }
+
+  /// Range check on the whole height, or null when fine or left empty.
+  String? _heightError(bool imperial) {
+    final empty = imperial
+        ? _feet.text.trim().isEmpty && _inch.text.trim().isEmpty
+        : _heightCm.text.trim().isEmpty;
+    if (empty) return null;
+    if (imperial && _feet.text.trim().isEmpty) return 'Enter feet too';
+    return ProfileRules.heightError(_enteredCm(imperial));
+  }
   late String _activity = widget.profile.activity;
 
   @override
@@ -431,7 +452,8 @@ class _BodySheetState extends State<_BodySheet> {
               controller: _feet,
               label: 'Height',
               suffixText: 'ft',
-              validator: _range(3, 8, 'feet'),
+              validator: (value) =>
+                  _range(1, 8, 'feet')(value) ?? _heightError(true),
             ),
             AppTextField.integer(
               controller: _inch,
@@ -446,7 +468,7 @@ class _BodySheetState extends State<_BodySheet> {
             label: 'Height',
             prefixIcon: Icons.straighten_rounded,
             suffixText: 'cm',
-            validator: _range(100, 250, 'a height'),
+            validator: (_) => _heightError(false),
           ),
         _fieldGap,
         AppDropdownField<String>(
@@ -467,6 +489,14 @@ class _BodySheetState extends State<_BodySheet> {
         _fieldGap,
       ],
       onSave: () {
+        // Untouched height keeps its saved value and unit (a cm height
+        // shown in ft/in would otherwise be rounded on every save).
+        final heightUnchanged = imperial
+            ? _feet.text == _initialFeet && _inch.text == _initialInch
+            : _heightCm.text == _initialCm;
+        if (heightUnchanged) {
+          return widget.profile.copyWith(activity: _activity);
+        }
         if (imperial) {
           final ft = _feet.text.trim();
           final inch = _inch.text.trim();
@@ -646,6 +676,7 @@ class _MedicalSheetState extends State<_MedicalSheet> {
     hint: 'Separate items with commas',
     prefixIcon: icon,
     textCapitalization: TextCapitalization.sentences,
+    maxLength: InputLimits.note,
   );
 
   @override
@@ -662,9 +693,9 @@ class _MedicalSheetState extends State<_MedicalSheet> {
         _fieldGap,
       ],
       onSave: () => widget.profile.copyWith(
-        healthConditions: _conditions.text.trim(),
-        allergies: _allergies.text.trim(),
-        medicines: _medicines.text.trim(),
+        healthConditions: ProfileRules.cleanNote(_conditions.text),
+        allergies: ProfileRules.cleanNote(_allergies.text),
+        medicines: ProfileRules.cleanNote(_medicines.text),
       ),
     );
   }

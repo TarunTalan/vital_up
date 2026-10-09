@@ -112,11 +112,13 @@ class PlayerProfileException implements Exception {
   final String message;
   const PlayerProfileException(this.message);
 
+  static const alreadyCheered = 'You already cheered them today.';
+
   static PlayerProfileException fromServer(String serverMessage) {
     const messages = {
       'not_friends': "You're no longer friends.",
       'user_not_found': "That profile isn't available.",
-      'already_cheered': 'You already cheered them today.',
+      'already_cheered': alreadyCheered,
       'cannot_cheer_self': "You can't cheer yourself.",
     };
     for (final e in messages.entries) {

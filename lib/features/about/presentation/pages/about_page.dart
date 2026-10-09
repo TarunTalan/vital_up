@@ -3,15 +3,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vital_up/core/config/legal_links.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
+import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
+
+/// Feedback text as sent: no invisible characters, at most
+/// [InputLimits.note] characters.
+String cleanFeedback(String raw) =>
+    sanitizeText(raw, maxLength: InputLimits.note, multiline: true);
+
+/// Inline error for the feedback field, or null when it can be sent.
+String? validateFeedback(String raw) {
+  final text = cleanFeedback(raw);
+  if (text.isEmpty) return 'Write your feedback first.';
+  if (text.characters.length < 3) return 'Add a few more words.';
+  return null;
+}
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -24,6 +41,8 @@ class _AboutPageState extends State<AboutPage> {
   final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
   final TextEditingController _feedbackController = TextEditingController();
   int _selectedRating = 5;
+  String? _feedbackError;
+  bool _sendingFeedback = false;
 
   @override
   void dispose() {
@@ -33,34 +52,41 @@ class _AboutPageState extends State<AboutPage> {
 
   Future<void> _rateApp() async {
     HapticFeedback.mediumImpact();
-    // Use store intent or fallback web url
-    final String appId = Platform.isIOS ? 'id123456789' : 'com.vitalup.app';
-    final Uri url = Uri.parse(
-      Platform.isIOS
-          ? 'https://apps.apple.com/app/$appId?action=write-review'
-          : 'market://details?id=$appId',
-    );
-    final Uri webFallback = Uri.parse(
-      'https://play.google.com/store/apps/details?id=$appId',
-    );
+    // The Play id is this build's package name; the App Store id is a
+    // placeholder until iOS ships.
+    final Uri url;
+    final Uri? webFallback;
+    if (Platform.isIOS) {
+      url = Uri.parse('https://apps.apple.com/app/id123456789?action=write-review');
+      webFallback = null;
+    } else {
+      String appId;
+      try {
+        appId = (await _packageInfo).packageName;
+      } catch (e) {
+        debugPrint('Package info unavailable: $e');
+        appId = _fallbackPackage;
+      }
+      url = Uri.parse('market://details?id=$appId');
+      webFallback =
+          Uri.parse('https://play.google.com/store/apps/details?id=$appId');
+    }
 
-    try {
-      final launched = await launchUrl(
-        url,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) {
-        await launchUrl(webFallback, mode: LaunchMode.externalApplication);
+    var opened = false;
+    for (final target in [url, ?webFallback]) {
+      try {
+        opened = await launchUrl(target, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Store link not opened ($target): $e');
       }
-    } catch (_) {
-      if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Thank you for rating VitalUp $_selectedRating stars!',
-        );
-      }
+      if (opened) break;
+    }
+    if (!opened && mounted) {
+      showErrorSnackBar(context, "Couldn't open the store. Try again later.");
     }
   }
+
+  static const _fallbackPackage = 'com.tarun_siddhi.vital_up';
 
   void _onRate(int stars) {
     setState(() => _selectedRating = stars);
@@ -68,25 +94,27 @@ class _AboutPageState extends State<AboutPage> {
   }
 
   Future<void> _submitFeedback() async {
-    final feedbackText = _feedbackController.text.trim();
-    if (feedbackText.isEmpty) {
-      showErrorSnackBar(
-        context,
-        'Please enter your feedback before submitting.',
-      );
+    if (_sendingFeedback) return;
+    final error = validateFeedback(_feedbackController.text);
+    if (error != null) {
+      setState(() => _feedbackError = error);
       return;
     }
+    final feedbackText = cleanFeedback(_feedbackController.text);
 
     FocusScope.of(context).unfocus();
+    _sendingFeedback = true;
 
     PackageInfo? info;
     try {
       info = await _packageInfo;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Package info unavailable: $e');
+    }
 
     final ver = info != null
         ? '${info.version} (${info.buildNumber})'
-        : '1.0.0 (1)';
+        : 'unknown';
     final subject = 'VitalUp Feedback ($_selectedRating Stars)';
     final body =
         '''
@@ -101,48 +129,32 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
 -------------------------
 ''';
 
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: 'support@vitalup.app',
-      queryParameters: {'subject': subject, 'body': body},
-    );
-
+    var launched = false;
     try {
-      final launched = await launchUrl(
-        emailUri,
+      launched = await launchUrl(
+        supportMailUri(subject: subject, body: body),
         mode: LaunchMode.externalApplication,
       );
-      if (!launched) {
-        await Clipboard.setData(
-          ClipboardData(
-            text: 'To: support@vitalup.app\nSubject: $subject\n\n$body',
-          ),
-        );
-        if (mounted) {
-          showSuccessSnackBar(
-            context,
-            'Feedback copied to clipboard. You can paste into your email to support@vitalup.app',
-          );
-        }
-      } else if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Thank you! Email opened in your mail app.',
-        );
-        _feedbackController.clear();
-      }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Feedback mail not opened: $e');
+    }
+    _sendingFeedback = false;
+    if (!mounted) return;
+    if (launched) {
+      showSuccessSnackBar(context, 'Your email app is open. Send it from there.');
+      _feedbackController.clear();
+      return;
+    }
+    try {
       await Clipboard.setData(
-        ClipboardData(
-          text: 'To: support@vitalup.app\nSubject: $subject\n\n$body',
-        ),
+        ClipboardData(text: 'To: $kSupportEmail\nSubject: $subject\n\n$body'),
       );
       if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Feedback copied to clipboard. You can paste into your email to support@vitalup.app',
-        );
+        showSuccessSnackBar(context, 'Feedback copied. Paste it into an email to us.');
       }
+    } catch (e) {
+      debugPrint('Clipboard unavailable: $e');
+      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
     }
   }
 
@@ -164,6 +176,10 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
           _RateAppCard(
             rating: _selectedRating,
             feedbackController: _feedbackController,
+            feedbackError: _feedbackError,
+            onFeedbackChanged: (_) {
+              if (_feedbackError != null) setState(() => _feedbackError = null);
+            },
             onRate: _onRate,
             onRateOnStore: _rateApp,
             onSubmitFeedback: _submitFeedback,
@@ -172,6 +188,8 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
           const _Section(title: 'About the app', child: _AboutAppCard()),
           const SizedBox(height: AppDimens.sectionGap),
           const _Section(title: 'Core highlights', child: _FeatureHighlights()),
+          const SizedBox(height: AppDimens.sectionGap),
+          const _LegalLinks(),
           const SizedBox(height: AppDimens.sectionGap),
           const _Footer(),
         ],
@@ -274,6 +292,8 @@ class _HeroBanner extends StatelessWidget {
 class _RateAppCard extends StatelessWidget {
   final int rating;
   final TextEditingController feedbackController;
+  final String? feedbackError;
+  final ValueChanged<String> onFeedbackChanged;
   final ValueChanged<int> onRate;
   final VoidCallback onRateOnStore;
   final VoidCallback onSubmitFeedback;
@@ -281,6 +301,8 @@ class _RateAppCard extends StatelessWidget {
   const _RateAppCard({
     required this.rating,
     required this.feedbackController,
+    required this.feedbackError,
+    required this.onFeedbackChanged,
     required this.onRate,
     required this.onRateOnStore,
     required this.onSubmitFeedback,
@@ -344,11 +366,19 @@ class _RateAppCard extends StatelessWidget {
             AppTextField(
               controller: feedbackController,
               hint: 'Describe your feedback, issues, or suggestions...',
+              multiline: true,
               minLines: 3,
               maxLines: 4,
-              maxLength: 500,
+              maxLength: InputLimits.note,
+              inputFormatters: InputFormatters.text(
+                InputLimits.note,
+                multiline: true,
+              ),
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              error: feedbackError,
+              onChanged: onFeedbackChanged,
               showCounter: true,
-              textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: AppDimens.space12),
             AppPrimaryButton(
@@ -494,6 +524,37 @@ class _FeatureHighlights extends StatelessWidget {
           if (i > 0) const SizedBox(height: AppDimens.space8),
           tiles[i],
         ],
+      ],
+    );
+  }
+}
+
+class _LegalLinks extends StatelessWidget {
+  const _LegalLinks();
+
+  Future<void> _open(BuildContext context, String url) async {
+    if (!await LegalLinks.open(url) && context.mounted) {
+      showErrorSnackBar(context, "Couldn't open the page. Try again later.");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppListGroup(
+      title: 'Legal',
+      children: [
+        AppListTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy policy',
+          trailing: const Icon(Icons.open_in_new_rounded),
+          onTap: () => _open(context, LegalLinks.privacyPolicy),
+        ),
+        AppListTile(
+          icon: Icons.description_outlined,
+          title: 'Terms of use',
+          trailing: const Icon(Icons.open_in_new_rounded),
+          onTap: () => _open(context, LegalLinks.terms),
+        ),
       ],
     );
   }

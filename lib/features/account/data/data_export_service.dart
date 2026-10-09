@@ -110,22 +110,26 @@ class DataExportService {
     Map<String, dynamic>? profile;
     List<PointEvent> points = const [];
     try {
+      // Bounded so a bad connection can't hang the export.
+      const timeout = Duration(seconds: 15);
       final account = await _client
           .from('profiles')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(timeout);
       final health = await _client
           .from('user_health_data')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(timeout);
       profile = {
         'email': _client.auth.currentUser?.email,
         'account': account,
         'health': health,
       };
-      points = await _game.getHistory(days: 3650);
+      points = await _game.getHistory(days: 3650).timeout(timeout);
     } catch (e) {
       debugPrint('Export without server data: $e');
     }

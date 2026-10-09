@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -13,6 +13,7 @@ import 'package:vital_up/features/vita/presentation/widgets/chat_composer.dart';
 import '../../data/services/support_bot_service.dart';
 import '../../domain/entities/support_ticket.dart';
 import 'contact_support_page.dart';
+import 'help_support_page.dart';
 
 /// Support assistant chat — same bubbles, quick replies and composer as
 /// Vita Chat so both conversations look alike.
@@ -52,8 +53,12 @@ class _SupportChatPageState extends State<SupportChatPage> {
   }
 
   void _sendMessage(String text) {
-    final query = text.trim();
-    if (query.isEmpty) return;
+    final query = sanitizeText(
+      text,
+      maxLength: InputLimits.chatMessage,
+      multiline: true,
+    );
+    if (query.isEmpty || _isTyping) return;
 
     setState(() {
       _messages.add(SupportBotMessage(text: query, isUser: true));
@@ -85,7 +90,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
 
   void _handleQuickAction(SupportBotMessage msg) {
     if (msg.actionRoute != null) {
-      context.pushNamed(msg.actionRoute!);
+      openSupportRoute(context, msg.actionRoute!);
     } else {
       _contactSupport(subject: 'Question from Support Chat');
     }

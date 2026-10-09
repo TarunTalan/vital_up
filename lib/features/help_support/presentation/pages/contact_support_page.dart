@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -12,8 +13,6 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import '../../domain/entities/support_ticket.dart';
-
-const String _kSupportEmail = 'support@vitalup.app';
 
 /// `contact-support` route extra: prefills the ticket form.
 class ContactSupportArgs {
@@ -63,6 +62,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
   bool _includeDiagnostics = true;
   bool _isSubmitting = false;
   String? _appVersion;
+  String? _descriptionError;
 
   @override
   void initState() {
@@ -85,7 +85,9 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
           _appVersion = '${info.version} (${info.buildNumber})';
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Package info unavailable: $e');
+    }
   }
 
   @override
@@ -96,14 +98,17 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
   }
 
   Future<void> _submitTicket() async {
-    final rawSubject = _subjectController.text.trim();
-    final subject = rawSubject.isNotEmpty
-        ? rawSubject
-        : _selectedCategory.label;
-    final description = _descriptionController.text.trim();
+    if (_isSubmitting) return;
+    final cleanSubject = SupportTicketRules.cleanSubject(_subjectController.text);
+    final subject =
+        cleanSubject.isNotEmpty ? cleanSubject : _selectedCategory.label;
+    final description =
+        SupportTicketRules.cleanDescription(_descriptionController.text);
 
-    if (description.isEmpty) {
-      showErrorSnackBar(context, 'Please describe your issue or question');
+    final error =
+        SupportTicketRules.validateDescription(_descriptionController.text);
+    if (error != null) {
+      setState(() => _descriptionError = error);
       return;
     }
 
@@ -123,11 +128,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     final emailSubject = '[VitalUp ${_selectedCategory.label}] $subject';
     final emailBody = ticket.toFormattedEmailBody();
 
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: _kSupportEmail,
-      queryParameters: {'subject': emailSubject, 'body': emailBody},
-    );
+    final emailUri = supportMailUri(subject: emailSubject, body: emailBody);
 
     try {
       final launched = await launchUrl(
@@ -136,44 +137,50 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       );
 
       if (!launched) {
-        await _fallbackCopyToClipboard(emailBody);
+        await _copyTicket(emailBody);
       } else if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Support mail opened in your email client.',
-        );
+        showSuccessSnackBar(context, 'Your email app is open. Send it from there.');
         context.pop();
       }
     } catch (e) {
-      await _fallbackCopyToClipboard(emailBody);
+      debugPrint('Support mail not opened: $e');
+      await _copyTicket(emailBody);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  Future<void> _fallbackCopyToClipboard(String body) async {
-    await Clipboard.setData(ClipboardData(text: body));
+  /// No mail app: copy the ticket so it can be pasted into any email.
+  Future<void> _copyTicket(String body) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: body));
+    } catch (e) {
+      debugPrint('Clipboard unavailable: $e');
+      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
+      return;
+    }
     if (mounted) {
-      showSuccessSnackBar(
-        context,
-        'Ticket details copied to clipboard. You can paste into your email to $_kSupportEmail',
-      );
+      showSuccessSnackBar(context, 'Details copied. Paste them into an email to us.');
       context.pop();
     }
   }
 
   Future<void> _openDirectEmail() async {
-    final Uri emailUri = Uri(scheme: 'mailto', path: _kSupportEmail);
+    var launched = false;
     try {
-      final launched = await launchUrl(
-        emailUri,
+      launched = await launchUrl(
+        supportMailUri(),
         mode: LaunchMode.externalApplication,
       );
-      if (!launched && mounted) {
-        await _fallbackCopyToClipboard(_kSupportEmail);
-      }
-    } catch (_) {
-      if (mounted) await _fallbackCopyToClipboard(_kSupportEmail);
+    } catch (e) {
+      debugPrint('Support mail not opened: $e');
+    }
+    if (launched) return;
+    try {
+      await Clipboard.setData(const ClipboardData(text: kSupportEmail));
+      if (mounted) showSuccessSnackBar(context, 'Support email address copied.');
+    } catch (e) {
+      debugPrint('Clipboard unavailable: $e');
     }
   }
 
@@ -212,7 +219,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
                   ),
                   const SizedBox(width: AppDimens.space6),
                   Text(
-                    'Direct contact: $_kSupportEmail',
+                    'Direct contact: $kSupportEmail',
                     style: context.text.bodySmall?.copyWith(
                       color: context.colors.primary,
                       fontWeight: FontWeight.w600,
@@ -246,7 +253,8 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
             label: 'Subject (optional)',
             hint: 'e.g., GPS disconnects after 30 minutes',
             prefixIcon: Icons.title_rounded,
-            maxLength: 100,
+            maxLength: SupportTicketRules.subjectMax,
+            inputFormatters: InputFormatters.text(SupportTicketRules.subjectMax),
             showCounter: true,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.next,
@@ -260,7 +268,18 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
                 'Please describe what happened, steps to reproduce, or your question in detail...',
             multiline: true,
             minLines: 5,
-            maxLength: 1000,
+            maxLength: SupportTicketRules.descriptionMax,
+            inputFormatters: InputFormatters.text(
+              SupportTicketRules.descriptionMax,
+              multiline: true,
+            ),
+            keyboardType: TextInputType.multiline,
+            error: _descriptionError,
+            onChanged: (_) {
+              if (_descriptionError != null) {
+                setState(() => _descriptionError = null);
+              }
+            },
             showCounter: true,
             textCapitalization: TextCapitalization.sentences,
           ),

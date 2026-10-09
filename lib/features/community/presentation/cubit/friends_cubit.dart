@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -83,19 +84,39 @@ class FriendsCubit extends Cubit<FriendsState> {
   /// Returns true when the request went through (the field can be cleared).
   Future<bool> send(String username) async {
     if (state.sending) return false;
+    final String name;
+    try {
+      name = normalizeFriendUsername(username);
+    } on FriendRequestException catch (e) {
+      emit(state.copyWith(message: e.message));
+      return false;
+    }
+    // Already on the list: say so without asking the server.
+    final existing = state.friends
+        ?.where((f) => f.username.toLowerCase() == name.toLowerCase())
+        .firstOrNull;
+    if (existing != null && existing.status != FriendStatus.incoming) {
+      emit(
+        state.copyWith(
+          message: existing.status == FriendStatus.accepted
+              ? "You're already friends."
+              : 'Request already sent.',
+        ),
+      );
+      return false;
+    }
     emit(state.copyWith(sending: true));
     try {
       final nowFriends = await _repository
-          .sendFriendRequest(username)
+          .sendFriendRequest(name)
           .withLoadTimeout();
-      final name = username.trim().replaceFirst('@', '');
       if (isClosed) return true;
       emit(
         state.copyWith(
           sending: false,
           message: nowFriends
-              ? "You and @$name are now friends!"
-              : 'Friend request sent to @$name',
+              ? 'You and @$name are now friends.'
+              : 'Friend request sent to @$name.',
         ),
       );
       await load();
@@ -109,7 +130,10 @@ class FriendsCubit extends Cubit<FriendsState> {
         emit(
           state.copyWith(
             sending: false,
-            message: "Couldn't send the request. Try again.",
+            message: userMessage(
+              e,
+              fallback: "Couldn't send the request. Try again.",
+            ),
           ),
         );
       }
@@ -120,15 +144,15 @@ class FriendsCubit extends Cubit<FriendsState> {
   Future<void> respond(Friend friend, {required bool accept}) => _act(
     friend,
     () => _repository.respondToRequest(friend, accept: accept),
-    failure: "Couldn't update the request.",
+    failure: "Couldn't update the request. Try again.",
   );
 
   Future<void> remove(Friend friend) => _act(
     friend,
     () => _repository.removeFriend(friend),
     failure: friend.status == FriendStatus.accepted
-        ? "Couldn't remove @${friend.username}."
-        : "Couldn't cancel the request.",
+        ? "Couldn't remove @${friend.username}. Try again."
+        : "Couldn't cancel the request. Try again.",
   );
 
   Future<void> _act(
@@ -146,7 +170,9 @@ class FriendsCubit extends Cubit<FriendsState> {
       await load();
     } catch (e) {
       debugPrint('Friend action failed: $e');
-      if (!isClosed) emit(state.copyWith(message: failure));
+      if (!isClosed) {
+        emit(state.copyWith(message: userMessage(e, fallback: failure)));
+      }
     } finally {
       if (!isClosed) {
         emit(state.copyWith(busy: {...state.busy}..remove(friend.userId)));

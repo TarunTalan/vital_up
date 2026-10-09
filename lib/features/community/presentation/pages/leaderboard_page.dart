@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
-import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -52,9 +52,12 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
     final messenger = ScaffoldMessenger.of(context);
     final repo = sl<CommunityRepository>();
     final joining = !community.isMember;
+    if (_membershipBusy) return;
     setState(() => _membershipBusy = true);
     try {
       joining ? await repo.join(community) : await repo.leave(community);
+      // Left the page meanwhile: its cubit is closed.
+      if (!mounted) return;
       cubit.updateCommunity(
         community.copyWith(
           isMember: joining,
@@ -62,12 +65,16 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
         ),
       );
     } catch (e) {
+      debugPrint('Membership change failed: $e');
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            isOfflineError(e)
-                ? CommunityRepository.offlineMessage
-                : "Couldn't ${joining ? 'join' : 'leave'} ${community.name}.",
+            userMessage(
+              e,
+              fallback: joining
+                  ? "Couldn't join. Try again."
+                  : "Couldn't leave. Try again.",
+            ),
           ),
         ),
       );
@@ -284,52 +291,52 @@ class _PodiumPlace extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (first)
-          GameIcon(
-            GamificationIcons.crown,
-            fallback: Icons.workspace_premium_rounded,
-            size: AppDimens.iconXl,
-            color: color,
+            GameIcon(
+              GamificationIcons.crown,
+              fallback: Icons.workspace_premium_rounded,
+              size: AppDimens.iconXl,
+              color: color,
+            ),
+          UserAvatar(
+            username: e.username,
+            url: e.avatarUrl,
+            size: first
+                ? AppDimens.podiumAvatarFirst
+                : AppDimens.podiumAvatarOther,
+            ringColor: color,
           ),
-        UserAvatar(
-          username: e.username,
-          url: e.avatarUrl,
-          size: first
-              ? AppDimens.podiumAvatarFirst
-              : AppDimens.podiumAvatarOther,
-          ringColor: color,
-        ),
-        const SizedBox(height: AppDimens.space6),
-        Text(
-          e.isMe ? 'You' : e.username,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.titleSmall?.copyWith(
-            color: context.colors.onSurface,
-          ),
-        ),
-        Text(
-          '${_points.format(e.points)} pts',
-          style: context.text.bodySmall?.copyWith(
-            color: context.vColors.grayText,
-          ),
-        ),
-        const SizedBox(height: AppDimens.space6),
-        Container(
-          height: step,
-          width: double.infinity,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.25),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppDimens.radiusSm),
+          const SizedBox(height: AppDimens.space6),
+          Text(
+            e.isMe ? 'You' : e.username,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
-          child: Text(
-            '${e.rank}',
-            style: context.text.headlineSmall?.copyWith(color: color),
+          Text(
+            '${_points.format(e.points)} pts',
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: AppDimens.space6),
+          Container(
+            height: step,
+            width: double.infinity,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.25),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppDimens.radiusSm),
+              ),
+            ),
+            child: Text(
+              '${e.rank}',
+              style: context.text.headlineSmall?.copyWith(color: color),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -363,43 +370,43 @@ class _RankRow extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-            width: AppDimens.rankColumnWidth,
-            child: Text(
-              e.rank == null ? '–' : '${e.rank}',
-              style: context.text.titleSmall?.copyWith(color: onSurface),
+              width: AppDimens.rankColumnWidth,
+              child: Text(
+                e.rank == null ? '–' : '${e.rank}',
+                style: context.text.titleSmall?.copyWith(color: onSurface),
+              ),
             ),
-          ),
-          UserAvatar(username: e.username, url: e.avatarUrl),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  e.isMe ? '${e.username} (you)' : e.username,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall?.copyWith(color: onSurface),
-                ),
-                Text(
-                  pinned && e.rank == null
-                      ? 'Earn points to get ranked'
-                      : 'Level ${e.level}',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
+            UserAvatar(username: e.username, url: e.avatarUrl),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.isMe ? '${e.username} (you)' : e.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.titleSmall?.copyWith(color: onSurface),
                   ),
-                ),
-              ],
+                  Text(
+                    pinned && e.rank == null
+                        ? 'Earn points to get ranked'
+                        : 'Level ${e.level}',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.vColors.grayText,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            '${_points.format(e.points)} pts',
-            style: context.text.titleSmall?.copyWith(
-              color: context.colors.primary,
+            Text(
+              '${_points.format(e.points)} pts',
+              style: context.text.titleSmall?.copyWith(
+                color: context.colors.primary,
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

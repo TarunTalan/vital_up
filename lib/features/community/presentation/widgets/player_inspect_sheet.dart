@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -62,6 +63,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
       });
 
   Future<void> _cheer() async {
+    if (_cheering || _cheered) return;
     setState(() => _cheering = true);
     try {
       await _repo.sendCheer(widget.friend.userId);
@@ -69,7 +71,20 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
       setState(() => _cheered = true);
       showSuccessSnackBar(context, 'Cheer sent to @${widget.friend.username}');
     } on PlayerProfileException catch (e) {
-      if (mounted) showErrorSnackBar(context, e.message);
+      if (!mounted) return;
+      // Sent earlier (maybe from another device): show it as sent.
+      if (e.message == PlayerProfileException.alreadyCheered) {
+        setState(() => _cheered = true);
+      }
+      showErrorSnackBar(context, e.message);
+    } catch (e) {
+      debugPrint('Cheer failed: $e');
+      if (mounted) {
+        showErrorSnackBar(
+          context,
+          userMessage(e, fallback: "Couldn't send the cheer. Try again."),
+        );
+      }
     } finally {
       if (mounted) setState(() => _cheering = false);
     }
@@ -143,7 +158,9 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                       if (error is PlayerProfileException)
                         AppInfoNote(message: error.message),
                       LoadErrorView(
-                        onRetry: () => setState(() => _profile = _load()),
+                        onRetry: () => setState(() {
+                          _profile = _load();
+                        }),
                       ),
                     ],
                   );

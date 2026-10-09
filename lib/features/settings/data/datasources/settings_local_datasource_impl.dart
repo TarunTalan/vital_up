@@ -15,11 +15,12 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
 
   @override
   Future<SettingsEntity> getSettings() async {
-    final themeMode = sharedPreferences.getString(_keyThemeMode) ?? 'system';
+    // Unknown stored values (older builds, edits) fall back to defaults.
+    final themeMode = _oneOf(_keyThemeMode, const ['system', 'light', 'dark'], 'system');
     final notificationsEnabled = sharedPreferences.getBool(_keyNotificationsEnabled) ?? true;
     final healthSyncEnabled = sharedPreferences.getBool(_keyHealthSyncEnabled) ?? false;
-    final weightUnit = sharedPreferences.getString(_keyWeightUnit) ?? 'kg';
-    final heightUnit = sharedPreferences.getString(_keyHeightUnit) ?? 'cm';
+    final weightUnit = _oneOf(_keyWeightUnit, const ['kg', 'lbs'], 'kg');
+    final heightUnit = _oneOf(_keyHeightUnit, const ['cm', 'in'], 'cm');
 
     return SettingsEntity(
       themeMode: themeMode,
@@ -28,6 +29,11 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
       weightUnit: weightUnit,
       heightUnit: heightUnit,
     );
+  }
+
+  String _oneOf(String key, List<String> allowed, String fallback) {
+    final value = sharedPreferences.getString(key);
+    return value != null && allowed.contains(value) ? value : fallback;
   }
 
   @override

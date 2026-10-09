@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
@@ -38,27 +39,26 @@ class ActivityCalendarState extends Equatable {
 
   @override
   List<Object?> get props => [
-        selectedDate,
-        focusedMonth,
-        loading,
-        selectedMetrics,
-        monthMetrics,
-      ];
+    selectedDate,
+    focusedMonth,
+    loading,
+    selectedMetrics,
+    monthMetrics,
+  ];
 }
 
 class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
   final DailyMetricsCollector _collector;
   final SupabaseClient _client;
 
-  ActivityCalendarCubit(
-    this._collector,
-    this._client,
-    DateTime initialDate,
-  ) : super(ActivityCalendarState(
+  ActivityCalendarCubit(this._collector, this._client, DateTime initialDate)
+    : super(
+        ActivityCalendarState(
           selectedDate: startOfDay(initialDate),
           focusedMonth: DateTime(initialDate.year, initialDate.month, 1),
           loading: true,
-        )) {
+        ),
+      ) {
     loadMonth(state.focusedMonth);
     selectDate(state.selectedDate);
   }
@@ -66,13 +66,12 @@ class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
   Future<void> selectDate(DateTime date) async {
     final d = startOfDay(date);
     emit(state.copyWith(selectedDate: d, loading: true));
-    
+
     // Check if we already have it in monthMetrics
     if (state.monthMetrics.containsKey(d)) {
-      emit(state.copyWith(
-        selectedMetrics: state.monthMetrics[d],
-        loading: false,
-      ));
+      emit(
+        state.copyWith(selectedMetrics: state.monthMetrics[d], loading: false),
+      );
       return;
     }
 
@@ -84,13 +83,12 @@ class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
 
     try {
       final metrics = await _collector.collect(userId, d);
-      if (isClosed) return;
-      emit(state.copyWith(
-        selectedMetrics: metrics,
-        loading: false,
-      ));
-    } catch (_) {
-      if (isClosed) return;
+      // Another day was picked meanwhile: that load owns the state.
+      if (isClosed || state.selectedDate != d) return;
+      emit(state.copyWith(selectedMetrics: metrics, loading: false));
+    } catch (e) {
+      debugPrint('Calendar day failed to load: $e');
+      if (isClosed || state.selectedDate != d) return;
       emit(state.copyWith(loading: false));
     }
   }
@@ -105,12 +103,12 @@ class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
     try {
       final now = DateTime.now();
       final today = startOfDay(now);
-      
+
       // Determine range to load (from 1st of month to either end of month or today, whichever is earlier)
       // Future dates have no metrics
       final daysInMonth = DateTime(m.year, m.month + 1, 0).day;
       final daysToLoad = <DateTime>[];
-      
+
       for (int i = 1; i <= daysInMonth; i++) {
         final d = DateTime(m.year, m.month, i);
         if (d.isAfter(today)) break;
@@ -121,17 +119,22 @@ class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
         daysToLoad.map((d) => _collector.collect(userId, d, now: now)),
       );
 
-      if (isClosed) return;
+      // Moved to another month meanwhile.
+      if (isClosed || state.focusedMonth != m) return;
 
       final Map<DateTime, DailyMetrics> newMap = Map.of(state.monthMetrics);
       for (final r in results) {
         newMap[startOfDay(r.day)] = r;
       }
 
-      emit(state.copyWith(
-        monthMetrics: newMap,
-        selectedMetrics: newMap[state.selectedDate] ?? state.selectedMetrics,
-      ));
-    } catch (_) {}
+      emit(
+        state.copyWith(
+          monthMetrics: newMap,
+          selectedMetrics: newMap[state.selectedDate] ?? state.selectedMetrics,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Calendar month failed to load: $e');
+    }
   }
 }

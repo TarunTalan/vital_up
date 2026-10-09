@@ -30,6 +30,10 @@ class PlayerStats extends Equatable {
   final int streak;
   final int longestStreak;
 
+  /// Rest days banked (0-2): each covers one missed day so the streak
+  /// survives. One is earned every 7 active days in a row.
+  final int streakFreezes;
+
   /// Current level, and the next one (null at the top level).
   final GameLevel level;
   final GameLevel? nextLevel;
@@ -39,9 +43,16 @@ class PlayerStats extends Equatable {
     required this.categoryPoints,
     required this.streak,
     required this.longestStreak,
+    this.streakFreezes = 0,
     required this.level,
     this.nextLevel,
   });
+
+  static const maxStreakFreezes = 2;
+
+  /// Active days still needed to earn the next rest day (0 when full).
+  int get daysToNextFreeze =>
+      streakFreezes >= maxStreakFreezes ? 0 : 7 - streak % 7;
 
   static const empty = PlayerStats(
     totalPoints: 0,
@@ -97,6 +108,7 @@ class PlayerStats extends Equatable {
       },
       streak: effectiveStreak,
       longestStreak: read('longest_streak'),
+      streakFreezes: read('streak_freezes'),
       level: current,
       nextLevel: next,
     );
@@ -108,6 +120,7 @@ class PlayerStats extends Equatable {
     categoryPoints,
     streak,
     longestStreak,
+    streakFreezes,
     level,
     nextLevel,
   ];

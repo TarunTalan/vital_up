@@ -37,10 +37,10 @@ const List<FaqItem> kFaqDatabase = [
     category: FaqCategory.activity,
     question: 'Can I customize the metrics shown during my workout?',
     answer:
-        'Yes! While tracking or in workout settings, tap "Customize Layout" to reorder and toggle metrics such as Current Pace, Heart Rate, Elevation, Split Times, and Calories.',
+        'Yes. While tracking or in workout settings, tap "Customize Layout" to reorder and toggle metrics such as Current Pace, Heart Rate, Elevation, Split Times, and Calories.',
     tags: ['metrics', 'layout', 'customization', 'hud'],
     actionLabel: 'Customize HUD',
-    actionRoute: 'customize-layout',
+    actionRoute: 'activity-tracking',
   ),
   FaqItem(
     id: 'act_3',
@@ -50,7 +50,7 @@ const List<FaqItem> kFaqDatabase = [
         'VitalUp includes automated Text-to-Speech coaching that announces your split times, distance intervals (e.g. every 1 km), heart rate zones, and pace milestones through your headphones without needing to look at your phone.',
     tags: ['audio', 'voice coach', 'tts', 'split', 'headphones'],
     actionLabel: 'Audio Settings',
-    actionRoute: 'workout-audio-settings',
+    actionRoute: 'activity-tracking',
   ),
 
   // ── Hydration ──
@@ -69,7 +69,7 @@ const List<FaqItem> kFaqDatabase = [
     category: FaqCategory.hydration,
     question: 'What do the Hydration Pace indicators mean?',
     answer:
-        'VitalUp calculates expected water intake throughout your waking day (e.g., 200ml every 2 hours). "On Track 💧" means you are well hydrated, "Hydration Nudge ⏰" indicates you are falling behind your optimal pace, and "Goal Met 🎉" celebrates reaching 100% of your daily target.',
+        'VitalUp calculates expected water intake throughout your waking day (e.g., 200ml every 2 hours). "On Track" means you are well hydrated, "Hydration Nudge" indicates you are falling behind your optimal pace, and "Goal Met" celebrates reaching 100% of your daily target.',
     tags: ['pace', 'hydration nudge', 'status', 'goal'],
   ),
 
@@ -89,7 +89,7 @@ const List<FaqItem> kFaqDatabase = [
     category: FaqCategory.sleep,
     question: 'How do I use the 24-Hour Circular Dial to log sleep?',
     answer:
-        'Tap the Moon/Sun icon on the Sleep Card to open the circular dial clock. Drag the Moon handle (🌙) to set your bedtime and the Sun handle (☀️) to set your wake time. The dial updates your duration and projected score in real time with haptic ticks.',
+        'Tap the Moon/Sun icon on the Sleep Card to open the circular dial clock. Drag the Moon handle to set your bedtime and the Sun handle to set your wake time. The dial updates your duration and projected score in real time with haptic ticks.',
     tags: ['dial', 'clock', 'bedtime', 'wake', 'interactive'],
   ),
 
@@ -102,17 +102,17 @@ const List<FaqItem> kFaqDatabase = [
         'Open the Food Scanner and aim your camera at a meal or a packaged food item. Google ML Kit processes barcodes or extracts nutritional text from labels (Calories, Protein, Carbs, Fats, Fiber) in sub-second offline processing.',
     tags: ['food scanner', 'camera', 'barcode', 'ocr', 'macros'],
     actionLabel: 'Open Scanner',
-    actionRoute: 'food-scanner',
+    actionRoute: 'food-scan',
   ),
   FaqItem(
     id: 'nut_2',
     category: FaqCategory.nutrition,
     question: 'Can Vita AI generate a personalized diet plan?',
     answer:
-        'Yes! Vita AI analyzes your metabolic rate, dietary preferences (vegetarian, vegan, keto, high-protein), allergies, and fitness goal (fat loss, maintenance, muscle gain) to generate tailored daily recipes and macro breakdowns.',
+        'Yes. Vita AI analyzes your metabolic rate, dietary preferences (vegetarian, vegan, keto, high-protein), allergies, and fitness goal (fat loss, maintenance, muscle gain) to generate tailored daily recipes and macro breakdowns.',
     tags: ['diet plan', 'vita', 'ai', 'recipes', 'macros'],
     actionLabel: 'Diet Plan',
-    actionRoute: 'diet-plan-setup',
+    actionRoute: 'vita-diet-plan',
   ),
 
   // ── Screen Time ──

@@ -30,7 +30,7 @@ class SupportBotService {
         id: _uuid.v4(),
         isUser: false,
         text:
-            '👋 Hello! I am the **VitalUp Support Assistant**.\n\nI can help you troubleshoot sync issues, explain metrics, set up goals, or connect you with our engineering team.',
+            'Hi, I am the **VitalUp Support Assistant**.\n\nI can help you troubleshoot sync issues, explain metrics, set up goals, or connect you with our engineering team.',
         quickReplies: const [
           'Troubleshoot Health Sync',
           'How is Sleep Score calculated?',
@@ -55,7 +55,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '🔗 **Health Connect & Smartwatch Sync:**\n\n'
+            '**Health Connect & Smartwatch Sync:**\n\n'
             '1. Ensure you have the **Google Health Connect** app installed.\n'
             '2. Go to **Settings → Alerts & Integrations → Health Sync**.\n'
             '3. Turn on the toggle and grant permissions for Workouts, Sleep, and Weight.\n'
@@ -75,7 +75,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '🌙 **Sleep Tracking & Score Guide:**\n\n'
+            '**Sleep Tracking & Score Guide:**\n\n'
             '• **Sleep Score (0–100%)** combines your target duration (8h recommended), sleep stage depth (Deep/REM), and schedule regularity.\n'
             '• **Interactive 24h Dial**: Tap the Moon/Sun on your Sleep Card to effortlessly set bedtime and wake time by dragging the handles.\n'
             '• **Auto-sync**: If you wear a compatible smartwatch to bed, stages are synced automatically.',
@@ -94,12 +94,12 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '💧 **Water Intake & Hydration Pace:**\n\n'
+            '**Water Intake & Hydration Pace:**\n\n'
             '• **1-Tap Presets**: Tap 150ml (Cup), 250ml (Glass), or 500ml (Bottle) directly on the Dashboard.\n'
             '• **Pace Status**:\n'
-            '  - *On Track 💧*: You are drinking regularly throughout the day.\n'
-            '  - *Hydration Nudge ⏰*: Time for a glass of water!\n'
-            '  - *Goal Met 🎉*: You hit 100% of your daily goal.',
+            '  - *On Track*: You are drinking regularly throughout the day.\n'
+            '  - *Hydration Nudge*: Time for a glass of water.\n'
+            '  - *Goal Met*: You hit 100% of your daily goal.',
         actionLabel: 'Water Trends & History',
         actionRoute: 'water-trends',
         quickReplies: const [
@@ -121,7 +121,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '🏃 **Workout Tracking & Voice Coach:**\n\n'
+            '**Workout Tracking & Voice Coach:**\n\n'
             '• **GPS Routing**: Uses Mapbox vector maps with high precision and low battery drain.\n'
             '• **Voice Coach**: Enable audio split announcements every 1 km so you don\'t need to glance at your screen.\n'
             '• **Custom HUD**: Tap "Customize Layout" during workouts to reorder pace, distance, and heart rate.',
@@ -146,11 +146,11 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '🥗 **Food Scanner & AI Diet Plan:**\n\n'
+            '**Food Scanner & AI Diet Plan:**\n\n'
             '• **Offline OCR Scanner**: Point your camera at food nutrition labels or barcodes for sub-second macro extraction.\n'
             '• **Vita Diet Planner**: AI plans customized recipes with exact calorie and protein targets tailored to your goals.',
         actionLabel: 'Open Food Scanner',
-        actionRoute: 'food-scanner',
+        actionRoute: 'food-scan',
         quickReplies: const [
           'Create Diet Plan',
           'Water Tracking',
@@ -164,7 +164,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '📱 **Screen Time & Digital Wellness:**\n\n'
+            '**Screen Time & Digital Wellness:**\n\n'
             '• Tracks total phone usage, daily averages, and highlights your lowest vs highest usage days.\n'
             '• Check the **7-Day Trend Graph** to identify screen time peaks before bedtime for better sleep hygiene.',
         actionLabel: 'Screen Time Trends',
@@ -188,7 +188,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '⚙️ **Account & Customization:**\n\n'
+            '**Account & Customization:**\n\n'
             '• **Theme Toggle**: Switch between System, Light, and Dark mode in Settings.\n'
             '• **Offline Privacy**: Your metrics are stored locally in encrypted Isar databases and safely synced to your private Supabase profile.\n'
             '• **Account Deletion**: Navigate to Settings → Account → Delete Account.',
@@ -213,7 +213,7 @@ class SupportBotService {
       return SupportBotMessage(
         isUser: false,
         text:
-            '📩 **Direct Support & Bug Reporting:**\n\n'
+            '**Direct Support & Bug Reporting:**\n\n'
             'Would you like to send an email ticket to our developer team?\n\n'
             'You can specify your issue category (Bug Report, Feature Request, Health Sync, etc.), write a description, and attach device diagnostics.',
         actionLabel: 'Submit Support Ticket',
@@ -229,7 +229,7 @@ class SupportBotService {
     return SupportBotMessage(
       isUser: false,
       text:
-          '💡 I\'m here to help with all aspects of VitalUp!\n\n'
+          'I\'m here to help with all aspects of VitalUp.\n\n'
           'Could you clarify what you\'d like assistance with? You can choose one of the topics below or submit a ticket directly to our support team.',
       quickReplies: const [
         'Troubleshoot Health Sync',

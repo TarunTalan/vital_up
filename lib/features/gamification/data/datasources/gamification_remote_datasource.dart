@@ -35,6 +35,12 @@ class GamificationRemoteDataSource {
       .select('badge_code, earned_at')
       .eq('user_id', userId);
 
+  /// `get_badge_progress()`: {code, value, threshold} per badge.
+  Future<List<Map<String, dynamic>>> fetchBadgeProgress() async {
+    final rows = await _client.rpc('get_badge_progress');
+    return [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
+  }
+
   Future<List<Map<String, dynamic>>> fetchEvents(
     String userId, {
     required DateTime from,

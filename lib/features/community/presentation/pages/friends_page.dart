@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -237,7 +238,13 @@ class _AddFriendCard extends StatelessWidget {
             hint: '@username',
             prefixIcon: Icons.person_search_rounded,
             textInputAction: TextInputAction.send,
-            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+            keyboardType: TextInputType.visiblePassword,
+            inputFormatters: [
+              // Usernames: letters, numbers, dots and underscores; a
+              // leading @ is fine.
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9._@]')),
+              LengthLimitingTextInputFormatter(InputLimits.usernameMax + 1),
+            ],
             onSubmitted: (_) => onSend(),
           ),
           const SizedBox(height: AppDimens.space12),

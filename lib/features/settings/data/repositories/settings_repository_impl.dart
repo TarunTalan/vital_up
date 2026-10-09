@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/settings/data/datasources/settings_local_datasource.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
@@ -15,7 +16,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       final settings = await localDataSource.getSettings();
       return Right(settings);
     } catch (e) {
-      return const Left(CacheFailure('Failed to load settings preferences'));
+      debugPrint('Settings load failed: $e');
+      return const Left(CacheFailure("Couldn't load your settings. Try again."));
     }
   }
 
@@ -25,7 +27,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       await localDataSource.saveSettings(settings);
       return const Right(null);
     } catch (e) {
-      return const Left(CacheFailure('Failed to save settings preferences'));
+      debugPrint('Settings save failed: $e');
+      return const Left(CacheFailure("Couldn't save your settings. Try again."));
     }
   }
 }
