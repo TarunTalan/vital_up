@@ -57,4 +57,37 @@ void main() {
       isNull,
     );
   });
+
+  test('implausible watch data is not imported as-is', () {
+    WorkoutHealthValue walk({double? distance, int? kcal, int? steps}) =>
+        WorkoutHealthValue(
+          workoutActivityType: HealthWorkoutActivityType.WALKING,
+          totalDistance: distance?.round(),
+          totalDistanceUnit: HealthDataUnit.METER,
+          totalEnergyBurned: kcal,
+          totalEnergyBurnedUnit: HealthDataUnit.KILOCALORIE,
+          totalSteps: steps,
+        );
+    // 50 km walked in 30 minutes: distance dropped, workout kept.
+    final fast = HealthImportService.workoutToSession(
+      'a', start, end, walk(distance: 50000, kcal: -20, steps: -5))!;
+    expect(fast.totalDistanceMeters, 0);
+    expect(fast.avgPaceSecondsPerKm, 0);
+    expect(fast.calories, 0);
+    expect(fast.stepCountReliable, isFalse);
+
+    // Left running on the watch for two days.
+    expect(
+      HealthImportService.workoutToSession(
+        'b', start, start.add(const Duration(hours: 48)), walk()),
+      isNull,
+    );
+  });
+
+  test('scale readings outside the human range are skipped', () {
+    expect(HealthImportService.isPlausibleWeightKg(72.4), isTrue);
+    expect(HealthImportService.isPlausibleWeightKg(0), isFalse);
+    expect(HealthImportService.isPlausibleWeightKg(900), isFalse);
+    expect(HealthImportService.isPlausibleWeightKg(double.nan), isFalse);
+  });
 }

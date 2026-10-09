@@ -17,6 +17,7 @@ import 'package:vital_up/features/gamification/domain/entities/point_event.dart'
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/reward_celebration_dialog.dart';
 
 const _levels = [
   GameLevel(level: 1, minPoints: 0, title: 'Starter'),
@@ -77,6 +78,8 @@ class _FakeRemote implements GamificationRemoteDataSource {
   Future<List<Map<String, dynamic>>> fetchBadges() async => const [];
   @override
   Future<List<Map<String, dynamic>>> fetchEarnedBadges(String userId) async => const [];
+  @override
+  Future<List<Map<String, dynamic>>> fetchBadgeProgress() async => const [];
   @override
   Future<List<Map<String, dynamic>>> fetchEvents(
     String userId, {
@@ -433,5 +436,72 @@ void main() {
       expect(cubit.state.award?.levelUp, isTrue);
       await cubit.close();
     });
+  });
+
+  group('rest days', () {
+    const level = GameLevel(level: 1, minPoints: 0, title: 'Starter');
+
+    test('stats read banked rest days and days to the next one', () {
+      final stats = PlayerStats.fromRow(
+        {'streak_freezes': 1, 'current_streak': 9},
+        const [level],
+        effectiveStreak: 9,
+      );
+      expect(stats.streakFreezes, 1);
+      expect(stats.daysToNextFreeze, 5);
+      expect(
+        PlayerStats.fromRow(
+          {'streak_freezes': 2},
+          const [level],
+          effectiveStreak: 3,
+        ).daysToNextFreeze,
+        0,
+      );
+    });
+
+    test('a rest day earned or used is worth a quiet note', () {
+      final used = AwardResult.fromJson({
+        'streak': 8,
+        'freezes_used': 1,
+        'freeze_earned': false,
+      });
+      expect(used.celebrate, isFalse);
+      expect(used.notable, isTrue);
+      expect(awardMessage(used), 'A rest day kept your 8-day streak going');
+
+      final earned = AwardResult.fromJson({'freeze_earned': true});
+      expect(earned.notable, isTrue);
+      expect(awardMessage(earned), startsWith('Rest day earned'));
+
+      final merged = used.merge(earned);
+      expect(merged.freezeEarned, isTrue);
+      expect(merged.freezesUsed, 1);
+    });
+
+    test('nothing new is not notable', () {
+      expect(AwardResult.fromJson({'points_awarded': 12}).notable, isFalse);
+    });
+  });
+
+  test('locked badges show progress, earned ones do not', () {
+    const json = {
+      'code': 'workouts_25',
+      'name': 'Regular',
+      'description': 'Complete 25 workouts',
+      'threshold': 25,
+    };
+    final locked = GameBadge.fromJson(
+      json,
+      progress: {'code': 'workouts_25', 'value': 7, 'threshold': 25},
+    );
+    expect(locked.progress, 7);
+    expect(locked.progressFraction, closeTo(0.28, 1e-9));
+    final earned = GameBadge.fromJson(
+      json,
+      earnedAt: DateTime(2026, 10, 1),
+      progress: {'code': 'workouts_25', 'value': 30, 'threshold': 25},
+    );
+    expect(earned.progressFraction, isNull);
+    expect(GameBadge.fromJson(json).progressFraction, isNull);
   });
 }

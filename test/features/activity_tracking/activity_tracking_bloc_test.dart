@@ -52,8 +52,9 @@ class _FakeActivityRepo implements ActivityRepository {
   Future<List<ActivitySession>> getSessions() async => saved;
   @override
   Future<ActivitySession?> getSessionById(String id) async => null;
+  final deleted = <String>[];
   @override
-  Future<void> deleteSession(String id) async {}
+  Future<void> deleteSession(String id) async => deleted.add(id);
   @override
   Future<void> finalizeInterruptedSessions() async {}
 }
@@ -225,5 +226,31 @@ void main() {
     await first.close();
     await Future<void>.delayed(const Duration(seconds: 4));
     expect(location.subscriptions, 2);
+  });
+
+  test('an accidental start with nothing recorded is discarded, not saved', () async {
+    bloc.add(StartTracking());
+    await _settle();
+    bloc.add(PersistProgress()); // a checkpoint already stored it
+    await _settle();
+    bloc.add(const StopAndSaveTracking());
+    await _settle();
+
+    final state = bloc.state as TrackingCompleted;
+    expect(state.discarded, isTrue);
+    expect(repo.saved.where((s) => s.endTime != null), isEmpty);
+    expect(repo.deleted, [repo.saved.single.id]);
+  });
+
+  test('denied permission message is short and plain', () async {
+    location.granted = false;
+    final states = <ActivityTrackingState>[];
+    final sub = bloc.stream.listen(states.add);
+    bloc.add(StartTracking());
+    await _settle();
+    await sub.cancel();
+    final message = (states.first as TrackingPermissionDenied).message;
+    expect(message.length, lessThan(60));
+    expect(message.contains('!'), isFalse);
   });
 }

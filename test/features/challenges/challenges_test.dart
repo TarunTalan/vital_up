@@ -35,7 +35,7 @@ void main() {
     );
     expect(
       ChallengeException.fromServer('something else').message,
-      "Couldn't reach the server. Try again.",
+      'Something went wrong. Try again.',
     );
   });
 }

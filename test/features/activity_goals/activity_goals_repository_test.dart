@@ -83,4 +83,16 @@ void main() {
     await repo.deleteGoal(distance);
     expect(repo.getGoals().any((g) => g.id == distance.id), isFalse);
   });
+
+  test('goal targets stay within sensible bounds', () {
+    const m = GoalMetric.steps;
+    expect(m.clampTarget(GoalPeriod.daily, -10), m.step);
+    expect(m.clampTarget(GoalPeriod.daily, 1e9), m.maxDaily);
+    expect(m.clampTarget(GoalPeriod.weekly, 1e9), m.maxDaily * 7);
+    expect(m.clampTarget(GoalPeriod.daily, double.nan), m.daily);
+
+    final stored = ActivityGoal.fromJson({'m': 'steps', 'p': 'daily', 't': 5e7});
+    expect(stored!.target, m.maxDaily);
+    expect(ActivityGoal.fromJson({'m': 'steps', 'p': 'daily', 't': 0}), isNull);
+  });
 }

@@ -98,7 +98,7 @@ void main() {
     final result = await repo.getProfile();
     expect(result.isLeft(), isTrue);
     result.fold(
-      (f) => expect(f.message, contains('No internet connection')),
+      (f) => expect(f.message, contains("You're offline")),
       (_) {},
     );
   });

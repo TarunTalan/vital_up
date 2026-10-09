@@ -50,7 +50,8 @@ class _FakeRemote implements NotificationsRemoteDataSource {
   }
 
   @override
-  Stream<Map<String, dynamic>> changes() => feed.stream;
+  Stream<Map<String, dynamic>> changes({void Function()? onResubscribed}) =>
+      feed.stream;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
