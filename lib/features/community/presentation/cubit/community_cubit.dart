@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
@@ -145,9 +145,12 @@ class CommunityCubit extends Cubit<CommunityState> {
       emit(
         state.copyWith(
           busy: {...state.busy}..remove(community.id),
-          message: isOfflineError(e)
-              ? CommunityRepository.offlineMessage
-              : "Couldn't ${joining ? 'join' : 'leave'} ${community.name}. Try again.",
+          message: userMessage(
+            e,
+            fallback: joining
+                ? "Couldn't join. Try again."
+                : "Couldn't leave. Try again.",
+          ),
         ),
       );
     }
@@ -186,7 +189,10 @@ class CommunityCubit extends Cubit<CommunityState> {
       emit(
         state.copyWith(
           settings: previous,
-          message: "Couldn't update your leaderboard visibility.",
+          message: userMessage(
+            e,
+            fallback: "Couldn't update your visibility. Try again.",
+          ),
         ),
       );
     }

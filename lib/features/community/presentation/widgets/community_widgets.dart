@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -183,7 +184,8 @@ class _CitySheetState extends State<CitySheet> {
   late final _country = TextEditingController(
     text: widget.countryCode ?? CitySheet.defaultCountry,
   );
-  String? _error;
+  String? _cityError;
+  String? _countryError;
 
   @override
   void dispose() {
@@ -193,13 +195,18 @@ class _CitySheetState extends State<CitySheet> {
   }
 
   void _save() {
-    final city = _city.text.trim();
-    final country = _country.text.trim().toUpperCase();
-    if (city.isNotEmpty && country.length != 2) {
-      setState(() => _error = 'Use a 2-letter country code, like IN');
+    final city = sanitizeText(_city.text, maxLength: InputLimits.city);
+    final country = sanitizeText(_country.text).toUpperCase();
+    final cityError = cityInputError(city);
+    final countryError = countryCodeInputError(city, country);
+    if (cityError != null || countryError != null) {
+      setState(() {
+        _cityError = cityError;
+        _countryError = countryError;
+      });
       return;
     }
-    Navigator.of(context).pop((city, country));
+    Navigator.of(context).pop((city, city.isEmpty ? '' : country));
   }
 
   @override
@@ -232,19 +239,31 @@ class _CitySheetState extends State<CitySheet> {
               label: 'City',
               hint: 'e.g. Bengaluru',
               autofocus: true,
+              error: _cityError,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              inputFormatters: [LengthLimitingTextInputFormatter(60)],
+              inputFormatters: InputFormatters.text(InputLimits.city),
+              onChanged: (_) {
+                if (_cityError != null) setState(() => _cityError = null);
+              },
             ),
             const SizedBox(height: AppDimens.space12),
             AppTextField(
               controller: _country,
               label: 'Country code',
               hint: 'IN',
-              error: _error,
+              error: _countryError,
               textCapitalization: TextCapitalization.characters,
               textInputAction: TextInputAction.done,
-              inputFormatters: [LengthLimitingTextInputFormatter(2)],
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
+                LengthLimitingTextInputFormatter(2),
+              ],
+              onChanged: (_) {
+                if (_countryError != null) {
+                  setState(() => _countryError = null);
+                }
+              },
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: AppDimens.sectionGap),

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/community/data/datasources/community_remote_datasource.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
@@ -132,8 +135,8 @@ class CommunityRepositoryImpl implements CommunityRepository {
 
   @override
   Future<void> setCity(String city, String countryCode) async {
-    final c = city.trim();
-    final cc = countryCode.trim();
+    final c = sanitizeText(city, maxLength: InputLimits.city);
+    final cc = sanitizeText(countryCode).toUpperCase();
     final sent = await _remote.setCity(c, cc);
     await _patchSettings({
       'city': c.isEmpty ? null : c,
@@ -247,12 +250,11 @@ class CommunityRepositoryImpl implements CommunityRepository {
   /// Online only: the answer (pending / accepted / error) is needed now.
   @override
   Future<bool> sendFriendRequest(String username) async {
-    final name = username.trim();
-    if (name.isEmpty || name == '@') {
-      throw const FriendRequestException('Enter a username.');
-    }
+    final name = normalizeFriendUsername(username);
     try {
-      final accepted = await _remote.sendFriendRequest(name) == 'accepted';
+      final accepted =
+          await _remote.sendFriendRequest(name).timeout(_requestTimeout) ==
+          'accepted';
       await _invalidateFriends();
       return accepted;
     } on PostgrestException catch (e) {
@@ -268,11 +270,16 @@ class CommunityRepositoryImpl implements CommunityRepository {
   @override
   Future<void> respondToRequest(Friend friend, {required bool accept}) async {
     try {
-      await _remote.respondToRequest(friend.userId, accept);
+      await _remote
+          .respondToRequest(friend.userId, accept)
+          .timeout(_requestTimeout);
     } on PostgrestException catch (e) {
       // Gone or already answered: the cached list is out of date.
       await _invalidateFriends();
-      throw FriendRequestException.fromServer(e.message);
+      throw FriendRequestException.fromServer(
+        e.message,
+        fallback: "Couldn't update the request. Try again.",
+      );
     } catch (e) {
       if (isOfflineError(e)) {
         throw const FriendRequestException(CommunityRepository.offlineMessage);
@@ -295,7 +302,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
 
   @override
   Future<void> sendCheer(String userId) =>
-      _profileCall(() => _remote.sendCheer(userId));
+      _profileCall(() => _remote.sendCheer(userId).timeout(_requestTimeout));
 
   /// Maps server and network failures to [PlayerProfileException].
   Future<T> _profileCall<T>(Future<T> Function() run) async {
@@ -307,6 +314,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       if (isOfflineError(e)) {
         throw const PlayerProfileException(CommunityRepository.offlineMessage);
       }
+      if (e is TimeoutException) throw PlayerProfileException(userMessage(e));
       rethrow;
     }
   }

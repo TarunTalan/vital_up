@@ -5,6 +5,22 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/features/gamification/domain/entities/award_result.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
+/// One-line note for [award], shown as a snackbar. Rewards stay quiet; only
+/// a level-up in the Arena gets the full dialog.
+String awardMessage(AwardResult award) {
+  final badges = award.newBadges;
+  if (award.levelUp) return 'Level ${award.level} reached';
+  if (badges.length > 1) return '${badges.length} badges unlocked';
+  if (badges.isNotEmpty) return 'Badge unlocked: ${badges.first.name}';
+  if (award.freezesUsed > 0) {
+    return award.freezesUsed == 1
+        ? 'A rest day kept your ${award.streak}-day streak going'
+        : '${award.freezesUsed} rest days kept your ${award.streak}-day '
+              'streak going';
+  }
+  return 'Rest day earned: miss a day and your streak stays';
+}
+
 /// Shows a level-up / new-badge celebration for [award].
 Future<void> showRewardCelebration(BuildContext context, AwardResult award) =>
     showSmoothDialog(
@@ -21,10 +37,10 @@ class RewardCelebrationDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final badge = award.newBadges.firstOrNull;
     final title = award.levelUp
-        ? 'Level ${award.level}!'
+        ? 'Level ${award.level} reached'
         : award.newBadges.length > 1
-        ? '${award.newBadges.length} new badges!'
-        : 'Badge unlocked!';
+        ? '${award.newBadges.length} new badges'
+        : 'Badge unlocked';
     final subtitle = award.levelUp
         ? "You've levelled up. Keep it going!"
         : badge?.description ?? '';

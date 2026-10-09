@@ -419,13 +419,13 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
     } else if (state.selectedMetrics != null) {
       final score = _getDayStatus(state.selectedDate, state);
       if (score == 3) {
-        message = "Excellent day! You've met most of your wellness goals.";
+        message = "Excellent day. You met most of your wellness goals.";
       } else if (score == 2) {
-        message = "Good day! A few more healthy choices could boost your score.";
+        message = "Good day. A few more healthy choices could boost your score.";
       } else if (score == 1) {
         message = "Light activity day. Take it easy and try to get some rest.";
       } else {
-        message = "No goals were met on this day. Remember, every little bit counts!";
+        message = "No goals met on this day. Every little bit counts.";
       }
     }
 

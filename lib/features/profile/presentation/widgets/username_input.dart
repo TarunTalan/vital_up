@@ -25,6 +25,7 @@ class UsernameInput extends ChangeNotifier {
   UsernameCheck _check = UsernameCheck.idle;
   Timer? _timer;
   int _generation = 0;
+  bool _disposed = false;
 
   String get text => _text;
   UsernameCheck get check => _check;
@@ -87,8 +88,8 @@ class UsernameInput extends ChangeNotifier {
         debugPrint('Username availability check failed: $e');
         result = UsernameCheck.unknown;
       }
-      // A newer keystroke started another check.
-      if (generation != _generation) return;
+      // A newer keystroke started another check, or the page closed.
+      if (_disposed || generation != _generation) return;
       _check = result;
       notifyListeners();
     });
@@ -96,6 +97,7 @@ class UsernameInput extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _timer?.cancel();
     super.dispose();
   }

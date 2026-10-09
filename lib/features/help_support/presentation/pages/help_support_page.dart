@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -14,6 +15,17 @@ import '../../data/datasources/faq_data.dart';
 import '../../domain/entities/faq_item.dart';
 import '../../domain/entities/support_ticket.dart';
 import 'contact_support_page.dart';
+
+/// Opens a help link's screen. A link to a screen that no longer exists
+/// shows a short message instead of crashing.
+void openSupportRoute(BuildContext context, String routeName) {
+  try {
+    context.pushNamed(routeName);
+  } catch (e) {
+    debugPrint('Help link to unknown route "$routeName": $e');
+    showErrorSnackBar(context, "That screen isn't available.");
+  }
+}
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -58,36 +70,22 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   Future<void> _sendDirectEmail({
     String subject = 'Support Inquiry - VitalUp',
   }) async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: 'support@vitalup.app',
-      queryParameters: subject.isNotEmpty ? {'subject': subject} : null,
-    );
-
+    var launched = false;
     try {
-      final launched = await launchUrl(
-        emailUri,
+      launched = await launchUrl(
+        supportMailUri(subject: subject),
         mode: LaunchMode.externalApplication,
       );
-      if (!launched) {
-        await Clipboard.setData(
-          const ClipboardData(text: 'support@vitalup.app'),
-        );
-        if (mounted) {
-          showSuccessSnackBar(
-            context,
-            'Support email copied to clipboard: support@vitalup.app',
-          );
-        }
-      }
     } catch (e) {
-      await Clipboard.setData(const ClipboardData(text: 'support@vitalup.app'));
-      if (mounted) {
-        showSuccessSnackBar(
-          context,
-          'Support email copied to clipboard: support@vitalup.app',
-        );
-      }
+      debugPrint('Support mail not opened: $e');
+    }
+    if (launched) return;
+    try {
+      await Clipboard.setData(const ClipboardData(text: kSupportEmail));
+      if (mounted) showSuccessSnackBar(context, 'Support email address copied.');
+    } catch (e) {
+      debugPrint('Clipboard unavailable: $e');
+      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
     }
   }
 
@@ -99,7 +97,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     );
   }
 
-  void _openAssistant() => context.pushNamed('support-chat');
+  void _openAssistant() => openSupportRoute(context, 'support-chat');
 
   void _toggleFaq(FaqItem faq) {
     setState(() {
@@ -112,7 +110,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     setState(() => _helpfulVotes[faq.id] = helpful);
     HapticFeedback.lightImpact();
     if (helpful) {
-      showSuccessSnackBar(context, 'Thanks for your feedback!');
+      showSuccessSnackBar(context, 'Thanks for your feedback.');
     } else {
       _contactSupport(subject: 'Help Article Feedback: ${faq.question}');
     }
@@ -139,6 +137,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
             hint: 'Search FAQs, topics, or errors...',
             prefixIcon: Icons.search_rounded,
             textInputAction: TextInputAction.search,
+            inputFormatters: InputFormatters.text(InputLimits.search),
             onChanged: (_) => setState(() {}),
             suffix: _searchController.text.isEmpty
                 ? null
@@ -193,7 +192,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                   onVote: (helpful) => _vote(faq, helpful),
                   onAction: faq.actionRoute == null
                       ? null
-                      : () => context.pushNamed(faq.actionRoute!),
+                      : () => openSupportRoute(context, faq.actionRoute!),
                 ),
               ),
           const SizedBox(height: AppDimens.sectionGap),

@@ -19,7 +19,7 @@ class GamificationState extends Equatable {
   /// [stats] is kept). Offline, loads return the last cached values.
   final bool failed;
 
-  /// Latest level-up / new-badge result to celebrate; [awardId] changes
+  /// Latest level-up / new-badge / rest-day result to show; [awardId] changes
   /// with every new one so listeners fire once per award.
   final AwardResult? award;
   final int awardId;
@@ -106,7 +106,7 @@ class GamificationCubit extends Cubit<GamificationState> {
     try {
       final award = await _repository.sync().withLoadTimeout();
       if (isClosed) return;
-      if (award != null && award.celebrate) {
+      if (award != null && award.notable) {
         emit(state.copyWith(award: award, awardId: state.awardId + 1));
       }
     } catch (e) {

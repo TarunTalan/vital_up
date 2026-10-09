@@ -107,6 +107,9 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
       emit(
         state.copyWith(
           loading: false,
+          // A page request from the previous filter is dropped, so it
+          // can't reset this itself.
+          loadingMore: false,
           entries: entries,
           me: () => me,
           hasMore: entries.length == pageSize,
@@ -115,7 +118,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
     } catch (e) {
       debugPrint('Leaderboard failed to load: $e');
       if (isClosed || request != _request) return;
-      emit(state.copyWith(loading: false, failed: true));
+      emit(state.copyWith(loading: false, loadingMore: false, failed: true));
     }
   }
 
@@ -135,10 +138,17 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
           )
           .withLoadTimeout();
       if (isClosed || request != _request) return;
+      // Ranks shift between pages (offset paging), so a player can come
+      // back twice; keep the first copy.
+      final seen = {for (final e in current) e.userId};
       emit(
         state.copyWith(
           loadingMore: false,
-          entries: [...current, ...more],
+          entries: [
+            ...current,
+            for (final e in more)
+              if (seen.add(e.userId)) e,
+          ],
           hasMore: more.length == pageSize,
         ),
       );

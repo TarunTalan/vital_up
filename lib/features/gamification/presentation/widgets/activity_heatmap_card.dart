@@ -63,7 +63,8 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
         _dailyCategories = categories;
         _selectedDate = DateTime.now();
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Activity history failed to load: $e');
       if (mounted) {
         setState(() {
           _selectedDate = DateTime.now();

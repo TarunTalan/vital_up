@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 
 enum SupportCategory {
   bug(
@@ -88,5 +89,41 @@ class SupportTicket {
     }
 
     return buffer.toString();
+  }
+}
+
+const kSupportEmail = 'support@vitalup.app';
+
+/// `mailto:` link to support. Built by hand so spaces encode as `%20`:
+/// `Uri(queryParameters:)` uses `+`, which many mail apps show literally.
+Uri supportMailUri({String? subject, String? body}) {
+  final query = [
+    if (subject != null && subject.isNotEmpty)
+      'subject=${Uri.encodeComponent(subject)}',
+    if (body != null && body.isNotEmpty) 'body=${Uri.encodeComponent(body)}',
+  ].join('&');
+  return Uri.parse('mailto:$kSupportEmail${query.isEmpty ? '' : '?$query'}');
+}
+
+/// Limits and checks for the support ticket form.
+abstract final class SupportTicketRules {
+  static const subjectMax = InputLimits.shortText;
+  static const descriptionMax = InputLimits.chatMessage;
+  static const descriptionMin = 10;
+
+  static String cleanSubject(String raw) =>
+      sanitizeText(raw, maxLength: subjectMax);
+
+  static String cleanDescription(String raw) =>
+      sanitizeText(raw, maxLength: descriptionMax, multiline: true);
+
+  /// Inline error for the description, or null when it's fine.
+  static String? validateDescription(String raw) {
+    final text = cleanDescription(raw);
+    if (text.isEmpty) return 'Describe your issue or question.';
+    if (text.characters.length < descriptionMin) {
+      return 'Add a few more words so we can help.';
+    }
+    return null;
   }
 }

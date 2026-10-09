@@ -121,10 +121,45 @@ class ScoreStreakCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: AppDimens.cardInnerGap),
+              _RestDays(stats: stats),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Rest days banked, or how close the next one is.
+class _RestDays extends StatelessWidget {
+  final PlayerStats stats;
+
+  const _RestDays({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final banked = stats.streakFreezes;
+    final toGo = stats.daysToNextFreeze;
+    final text = banked == 0
+        ? 'Stay active $toGo more ${toGo == 1 ? 'day' : 'days'} in a row to '
+              'earn a rest day'
+        : '$banked rest ${banked == 1 ? 'day' : 'days'} saved: a missed day '
+              "won't break your streak";
+    final color = banked > 0 ? AppColors.info : context.vColors.grayText;
+    return Row(
+      children: [
+        Icon(Icons.ac_unit_rounded, size: AppDimens.iconXs, color: color),
+        const SizedBox(width: AppDimens.space8),
+        Expanded(
+          child: Text(
+            text,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

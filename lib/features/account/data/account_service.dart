@@ -6,6 +6,7 @@ import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
@@ -34,20 +35,26 @@ class AccountService {
     this._cache,
   );
 
+  static const _deleteFailed = "Couldn't delete your account. Try again.";
+
   /// Null on success, otherwise a message to show.
   Future<String?> deleteAccount() async {
     try {
-      final response = await _client.functions.invoke('delete-account');
+      if (_client.auth.currentUser == null) return 'Please sign in again.';
+      final response = await _client.functions
+          .invoke('delete-account')
+          .timeout(const Duration(seconds: 30));
       final data = response.data;
       if (data is! Map || data['deleted'] != true) {
-        return 'Could not delete your account. Try again.';
+        debugPrint('Account deletion refused: $data');
+        return _deleteFailed;
       }
     } on FunctionException catch (e) {
       CrashReporter.report(e, StackTrace.current, reason: 'Account deletion');
-      return 'Could not delete your account. Try again.';
+      return userMessage(e, fallback: _deleteFailed);
     } catch (e) {
       debugPrint('Account deletion failed: $e');
-      return 'Could not reach the server. Check your connection and try again.';
+      return userMessage(e, fallback: _deleteFailed);
     }
 
     // The account is gone; from here on, clean up as much as possible.

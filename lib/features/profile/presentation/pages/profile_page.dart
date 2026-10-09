@@ -114,6 +114,9 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         } else if (state is ProfilePhotoFailed) {
           showErrorSnackBar(context, state.message);
+        } else if (state is ProfileError && _lastProfile != null) {
+          // A failed refresh keeps the profile on screen; say why.
+          showErrorSnackBar(context, state.message);
         }
       },
       builder: (context, state) {

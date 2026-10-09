@@ -3,12 +3,17 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/error/exceptions.dart';
-import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
+
+/// A failure whose [message] is written for the user (shown as is).
+class ProfileUserError extends ServerException {
+  const ProfileUserError(String message) : super(message: message);
+}
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   final SupabaseClient supabaseClient;
@@ -38,7 +43,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       final user = supabaseClient.auth.currentUser;
       if (user == null) {
-        throw const ServerException(message: 'User is not authenticated');
+        throw const ProfileUserError('Please sign in again.');
       }
       final userId = user.id;
 
@@ -99,8 +104,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } catch (e) {
       logger.e('Error fetching profile from Supabase: $e');
       // Kept as-is so the cache can tell "offline" from a real failure.
-      if (isOfflineError(e)) rethrow;
-      throw ServerException(message: e.toString());
+      // Kept as-is: the repository logs it and shows a short message.
+      rethrow;
     }
   }
 
@@ -117,7 +122,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       final user = supabaseClient.auth.currentUser;
       if (user == null) {
-        throw const ServerException(message: 'User is not authenticated');
+        throw const ProfileUserError('Please sign in again.');
       }
       var sent = true;
 
@@ -138,7 +143,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       // 2. Update user_health_data table
       final payload = {
         'id': user.id,
-        'full_name': profile.fullName,
+        'full_name': ProfileRules.cleanName(profile.fullName),
         'dob': profile.dob,
         'gender': profile.gender,
         'weight': profile.weight,
@@ -146,9 +151,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         'height': profile.height,
         'height_unit': profile.heightUnit,
         'oxygen_level': profile.oxygenLevel,
-        'health_conditions': profile.healthConditions,
-        'medicines': profile.medicines,
-        'allergies': profile.allergies,
+        'health_conditions': ProfileRules.cleanNote(profile.healthConditions),
+        'medicines': ProfileRules.cleanNote(profile.medicines),
+        'allergies': ProfileRules.cleanNote(profile.allergies),
         'smokes': profile.smokes,
         'blood_pressure_top': profile.bloodPressureTop,
         'blood_pressure_bottom': profile.bloodPressureBottom,
@@ -190,9 +195,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       rethrow;
     } catch (e) {
       logger.e('Error updating profile in Supabase: $e');
-      throw ServerException(
-        message: UsernameService.messageForServerError(e) ?? e.toString(),
-      );
+      final usernameMessage = UsernameService.messageForServerError(e);
+      if (usernameMessage != null) throw ProfileUserError(usernameMessage);
+      rethrow;
     }
   }
 
@@ -205,9 +210,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final ext = dot == -1 ? '' : imageFile.path.substring(dot + 1).toLowerCase();
       final contentType = _imageTypes[ext];
       if (contentType == null) {
-        throw const ServerException(
-          message: 'Please choose a JPG, PNG, WEBP or HEIC image.',
-        );
+        throw const ProfileUserError('Choose a JPG, PNG, WEBP or HEIC image.');
       }
 
       // A new file name per upload busts image caches holding the old URL.
@@ -232,7 +235,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       rethrow;
     } catch (e) {
       logger.e('Error uploading profile photo: $e');
-      throw ServerException(message: e.toString());
+      rethrow;
     }
   }
 
@@ -253,7 +256,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       rethrow;
     } catch (e) {
       logger.e('Error removing profile photo: $e');
-      throw ServerException(message: e.toString());
+      rethrow;
     }
   }
 
@@ -272,10 +275,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   void _requireCurrentUser(String userId) {
     final user = supabaseClient.auth.currentUser;
     if (user == null) {
-      throw const ServerException(message: 'User is not authenticated');
+      throw const ProfileUserError('Please sign in again.');
     }
     if (user.id != userId) {
-      throw const ServerException(message: "Can't change another user's photo");
+      throw const ProfileUserError("Can't change another user's photo.");
     }
   }
 

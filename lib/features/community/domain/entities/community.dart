@@ -104,3 +104,31 @@ class Community extends Equatable {
     isMember,
   ];
 }
+
+/// City names: letters (any script), spaces, dots, hyphens and apostrophes,
+/// starting with a letter.
+final _cityPattern = RegExp(r"^\p{L}[\p{L}\p{M} .'\-]*$", unicode: true);
+
+/// Two letters, like IN.
+final _countryPattern = RegExp(r'^[A-Z]{2}$');
+
+/// Why the city sheet can't be saved, or null when it can. An empty
+/// [city] leaves the local community, so the country is then ignored.
+/// Both values are expected cleaned (see `sanitizeText`).
+String? cityInputError(String city) {
+  if (city.isEmpty) return null;
+  if (city.length < 2) return 'Enter the full city name';
+  if (!_cityPattern.hasMatch(city)) {
+    return 'Use letters, spaces and hyphens only';
+  }
+  return null;
+}
+
+/// See [cityInputError]; [countryCode] is expected upper-cased.
+String? countryCodeInputError(String city, String countryCode) {
+  if (city.isEmpty) return null;
+  if (!_countryPattern.hasMatch(countryCode)) {
+    return 'Use a 2-letter country code, like IN';
+  }
+  return null;
+}

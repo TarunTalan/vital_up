@@ -39,7 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SettingsCubit>().loadSettings();
+      if (mounted) context.read<SettingsCubit>().loadSettings();
     });
   }
 
@@ -47,16 +47,25 @@ class _SettingsPageState extends State<SettingsPage> {
       context.read<SettingsCubit>().updateSettings(settings);
 
   Future<void> _setHealthSync(SettingsEntity settings, bool on) async {
-    if (on && !await sl<HealthImportService>().connect()) {
+    var connected = true;
+    if (on) {
+      try {
+        connected = await sl<HealthImportService>().connect();
+      } catch (e) {
+        debugPrint('Health connect failed: $e');
+        connected = false;
+      }
+    }
+    if (!connected) {
       if (mounted) {
         showErrorSnackBar(
           context,
-          'Allow VitalUp to read weight and workouts in '
-          'Health Connect / Apple Health to turn this on.',
+          'Allow health data access to turn this on.',
         );
       }
       return;
     }
+    if (!mounted) return;
     _update(settings.copyWith(healthSyncEnabled: on));
   }
 
@@ -69,8 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
     } else if (on) {
       showErrorSnackBar(
         context,
-        "Couldn't turn on app lock. Check that this device has a "
-        'fingerprint, face or PIN set up.',
+        'Set up a screen lock on this device first.',
       );
     }
   }
@@ -80,14 +88,21 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_openingLeaderboards) return;
     setState(() => _openingLeaderboards = true);
     final cubit = sl<CommunityCubit>();
-    await cubit.load();
+    var failed = false;
+    try {
+      await cubit.load();
+      failed = cubit.state.failed;
+    } catch (e) {
+      debugPrint('Leaderboard settings failed to load: $e');
+      failed = true;
+    }
     if (!mounted) {
       await cubit.close();
       return;
     }
     setState(() => _openingLeaderboards = false);
-    if (cubit.state.failed) {
-      showErrorSnackBar(context, "Couldn't load your leaderboard settings.");
+    if (failed) {
+      showErrorSnackBar(context, "Couldn't load leaderboard settings. Try again.");
     } else {
       await CommunitySettingsSheet.show(context, cubit: cubit);
     }
