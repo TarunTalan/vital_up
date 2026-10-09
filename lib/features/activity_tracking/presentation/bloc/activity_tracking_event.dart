@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 
 abstract class ActivityTrackingEvent extends Equatable {
@@ -19,6 +21,17 @@ class SelectActivityType extends ActivityTrackingEvent {
 }
 
 class StartTracking extends ActivityTrackingEvent {}
+
+/// Carries on [session], a workout the app was killed in the middle of.
+class RestoreTracking extends ActivityTrackingEvent {
+  final WorkoutCheckpoint checkpoint;
+  final ActivitySession session;
+
+  const RestoreTracking({required this.checkpoint, required this.session});
+
+  @override
+  List<Object?> get props => [checkpoint.sessionId, checkpoint.savedAt];
+}
 
 class PauseTracking extends ActivityTrackingEvent {}
 

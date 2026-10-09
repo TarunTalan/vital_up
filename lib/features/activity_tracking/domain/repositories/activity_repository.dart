@@ -8,5 +8,6 @@ abstract class ActivityRepository {
 
   /// Closes sessions left open by an app kill or crash mid-workout, keeping
   /// everything recorded up to their last checkpoint. Call at startup only.
-  Future<void> finalizeInterruptedSessions();
+  /// [keepOpenId] is a recent workout left open so the user can resume it.
+  Future<void> finalizeInterruptedSessions({String? keepOpenId});
 }

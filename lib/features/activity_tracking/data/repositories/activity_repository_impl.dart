@@ -82,8 +82,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
   }
 
   @override
-  Future<void> finalizeInterruptedSessions() {
-    return database.finalizeInterruptedSessions();
+  Future<void> finalizeInterruptedSessions({String? keepOpenId}) {
+    return database.finalizeInterruptedSessions(keepOpenId: keepOpenId);
   }
 
   ActivitySession _toEntity(
