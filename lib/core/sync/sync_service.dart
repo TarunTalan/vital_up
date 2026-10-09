@@ -11,6 +11,7 @@ import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
+import 'package:vital_up/core/sync/sync_uploader.dart';
 
 /// Backs up the logs recorded on this device to Supabase and brings back
 /// entries made on other devices (see migration 20261008_synced_logs.sql),
@@ -32,14 +33,21 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   final List<SyncAdapter> _adapters;
   final ConnectivityService _connectivity;
   final PendingWrites _writes;
+  final SyncUploader _uploader;
 
+  /// [remote] replaces the Supabase upload call (tests).
   SyncService(
     this._client,
     this._prefs,
     this._adapters,
     this._connectivity,
-    this._writes,
-  );
+    this._writes, {
+    SyncRemote? remote,
+  }) : _uploader = SyncUploader(
+         remote ?? SupabaseSyncRemote(_client),
+         batchSize: _uploadBatch,
+         requestTimeout: _requestTimeout,
+       );
 
   static const _keyDeletes = 'sync_pending_deletes';
   static const _pageSize = 500;
@@ -211,7 +219,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
         // old account lands in the (wiped) local data.
         if (_userId != userId) return;
         try {
-          await _push(adapter, userId);
+          await _uploader.push(adapter, userId);
           if (pull) await _pull(adapter, userId);
         } catch (e, stack) {
           if (isOfflineError(e)) rethrow;
@@ -263,48 +271,6 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     _retryTimer = Timer(delay, () {
       if (_userId != null) sync();
     });
-  }
-
-  Future<void> _push(SyncAdapter adapter, String userId) async {
-    final pending = await adapter.pending(userId);
-    for (var i = 0; i < pending.length; i += _uploadBatch) {
-      final batch = pending.skip(i).take(_uploadBatch).toList();
-      try {
-        await _retryOperation(() async {
-          await _client.from(adapter.table).upsert([
-            for (final p in batch) p.row,
-          ], onConflict: 'id');
-        });
-      } on PostgrestException catch (e) {
-        if (!_isRejectedRow(e)) rethrow;
-        // A row breaks a server limit (e.g. logged before the app checked
-        // ranges): send the batch row by row so one bad entry can't block
-        // the whole table forever.
-        await _pushOneByOne(adapter, batch);
-      }
-      await adapter.markSynced(userId, [for (final p in batch) p.localKey]);
-    }
-  }
-
-  /// Postgres refused the data itself (check constraint, value too long,
-  /// out of range), so retrying the same row can never succeed.
-  static bool _isRejectedRow(PostgrestException e) =>
-      const {'23514', '22001', '22003', '23502'}.contains(e.code);
-
-  Future<void> _pushOneByOne(SyncAdapter adapter, List<PendingRow> batch) async {
-    for (final p in batch) {
-      try {
-        await _client.from(adapter.table).upsert(p.row, onConflict: 'id');
-      } on PostgrestException catch (e, stack) {
-        if (!_isRejectedRow(e)) rethrow;
-        // Kept on this device, just not backed up.
-        CrashReporter.report(
-          e,
-          stack,
-          reason: 'Sync of ${adapter.table} row rejected by server limits',
-        );
-      }
-    }
   }
 
   Future<void> _pull(SyncAdapter adapter, String userId) async {
@@ -375,23 +341,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     ]);
   }
 
-  /// Transient operation retry with rapid exponential backoff (e.g., 500ms, 1s)
-  Future<T> _retryOperation<T>(
-    Future<T> Function() action, {
-    int maxAttempts = 3,
-  }) async {
-    int attempts = 0;
-    while (true) {
-      attempts++;
-      try {
-        return await action().timeout(_requestTimeout);
-      } catch (e) {
-        if (attempts >= maxAttempts || !isOfflineError(e)) {
-          rethrow;
-        }
-        final delayMs = (300 * pow(2, attempts - 1)).toInt();
-        await Future<void>.delayed(Duration(milliseconds: delayMs));
-      }
-    }
-  }
+  /// One request with a timeout; transient network failures retry quickly.
+  Future<T> _retryOperation<T>(Future<T> Function() action) =>
+      retrySyncRequest(action, timeout: _requestTimeout);
 }
