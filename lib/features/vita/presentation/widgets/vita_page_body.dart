@@ -32,7 +32,7 @@ class VitaFutureBody<T> extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(top: AppDimens.space48),
             child: Text(
-              "Vita couldn't load this right now. Please try again later.",
+              "Vita couldn't load this. Try again later.",
               textAlign: TextAlign.center,
               style: context.text.bodyLarge?.copyWith(
                 color: context.vColors.grayText,

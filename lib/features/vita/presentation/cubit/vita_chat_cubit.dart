@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
@@ -48,14 +50,27 @@ class VitaChatCubit extends Cubit<VitaChatState> {
   /// Loads saved history, then optionally sends [initialPrompt].
   Future<void> load({String? initialPrompt, MealPlan? draftPlan}) async {
     _draftPlan = draftPlan;
-    final history = await _repository.loadHistory();
+    var history = const <VitaMessage>[];
+    try {
+      history = await _repository.loadHistory();
+    } catch (e) {
+      debugPrint('Vita chat history unreadable: $e');
+    }
     if (isClosed) return;
     emit(state.copyWith(messages: history, isLoading: false));
     if (initialPrompt != null) await send(initialPrompt);
   }
 
+  /// Cleans a typed message: no invisible characters, at most
+  /// [InputLimits.chatMessage] characters. Empty when nothing is left.
+  static String cleanMessage(String text) => sanitizeText(
+        text,
+        maxLength: InputLimits.chatMessage,
+        multiline: true,
+      );
+
   Future<void> send(String text) async {
-    final trimmed = text.trim();
+    final trimmed = cleanMessage(text);
     if (trimmed.isEmpty || state.isTyping || state.isLoading) return;
     await _ask([
       ...state.messages,
@@ -69,26 +84,27 @@ class VitaChatCubit extends Cubit<VitaChatState> {
 
   /// Re-sends a user message Vita couldn't answer.
   Future<void> retry(VitaMessage message) async {
-    if (state.isTyping || !message.failed) return;
+    if (state.isTyping || state.isLoading || !message.failed) return;
     final rest = state.messages.where((m) => m != message).toList();
     await _ask([...rest, message.copyWith(failed: false)]);
   }
 
   Future<void> _ask(List<VitaMessage> history) async {
     emit(state.copyWith(messages: history, isTyping: true, error: () => null));
-    await _repository.saveHistory(history);
+    await _save(history);
 
     try {
       final reply = await _repository.reply(history, draftPlan: _draftPlan);
       if (isClosed) return;
       final updated = [...history, reply];
       emit(state.copyWith(messages: updated, isTyping: false));
-      await _repository.saveHistory(updated);
+      await _save(updated);
     } catch (e) {
+      debugPrint('Vita reply failed: $e');
       if (isClosed) return;
       final message = e is VitaException
           ? e.message
-          : "Vita couldn't respond right now. Please try again.";
+          : userMessage(e, fallback: VitaException.couldNotReply);
       final updated = [
         ...history.sublist(0, history.length - 1),
         history.last.copyWith(failed: true),
@@ -98,7 +114,16 @@ class VitaChatCubit extends Cubit<VitaChatState> {
         isTyping: false,
         error: () => message,
       ));
-      await _repository.saveHistory(updated);
+      await _save(updated);
+    }
+  }
+
+  /// Storage failures must not leave the chat stuck on "typing".
+  Future<void> _save(List<VitaMessage> messages) async {
+    try {
+      await _repository.saveHistory(messages);
+    } catch (e) {
+      debugPrint('Vita chat history not saved: $e');
     }
   }
 }

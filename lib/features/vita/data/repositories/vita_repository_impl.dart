@@ -42,9 +42,9 @@ class VitaRepositoryImpl implements VitaRepository {
   VitaMessage _greeting() => VitaMessage(
         sender: VitaSender.vita,
         sentAt: DateTime.now(),
-        text: "Hey! I'm Vita 👋 Your personal health companion inside "
-            "VitalUp. I'm connected to your health data — diet, sleep, "
-            "stress, activity, and more. What's on your mind today?",
+        text: "Hi, I'm Vita, your health companion in VitalUp. I can see "
+            'your diet, sleep, stress, activity and more. '
+            "What's on your mind today?",
       );
 
   // --- Chat -----------------------------------------------------------------
@@ -77,7 +77,19 @@ class VitaRepositoryImpl implements VitaRepository {
       },
     );
     if (message.text.isEmpty) {
-      throw const VitaException("Vita couldn't respond right now. Please try again.");
+      if (message.bullets.isEmpty) {
+        debugPrint('vita-chat returned an empty reply');
+        throw const VitaException(VitaException.couldNotReply);
+      }
+      // A bullets-only reply is still an answer; give the bubble a lead line.
+      return VitaMessage(
+        sender: message.sender,
+        text: 'Here is what I suggest:',
+        sentAt: message.sentAt,
+        bullets: message.bullets,
+        action: message.action,
+        planInstructions: message.planInstructions,
+      );
     }
     return message;
   }

@@ -14,6 +14,14 @@ class VitaException implements Exception {
     this.dailyLimit = false,
   });
 
+  // Short user-facing messages (no technical detail; that goes to logs).
+  static const couldNotReply = "Vita couldn't reply. Try again.";
+  static const signIn = 'Sign in to chat with Vita.';
+  static const sessionExpired = 'Your session expired. Sign in again.';
+  static const dailyLimitReached = "You've hit today's Vita limit. Try tomorrow.";
+  static const tooSlow = 'Vita is taking too long. Try again.';
+  static const offlineMessage = "You're offline. Try again when connected.";
+
   @override
   String toString() => message;
 }

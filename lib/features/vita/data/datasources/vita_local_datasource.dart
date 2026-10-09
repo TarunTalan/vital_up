@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
@@ -60,9 +62,14 @@ class VitaLocalDataSource {
     final raw = _prefs.getString(_key('scores', userId));
     if (raw == null) return {};
     try {
-      return (jsonDecode(raw) as Map<String, dynamic>)
-          .map((k, v) => MapEntry(k, (v as num).toInt()));
-    } catch (_) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return {};
+      return {
+        for (final e in decoded.entries)
+          if (e.value is num) e.key: (e.value as num).toInt(),
+      };
+    } catch (e) {
+      debugPrint('Vita scores unreadable: $e');
       return {};
     }
   }
@@ -92,17 +99,28 @@ class VitaLocalDataSource {
 
   // --- Helpers ---------------------------------------------------------------
 
+  /// Reads a stored JSON list. A malformed entry is skipped rather than
+  /// discarding the whole list (the next write would otherwise erase it).
   List<T> _readList<T>(String key, T Function(Map<String, dynamic>) parse) {
     final raw = _prefs.getString(key);
     if (raw == null) return [];
+    final Object? decoded;
     try {
-      return (jsonDecode(raw) as List)
-          .whereType<Map<String, dynamic>>()
-          .map(parse)
-          .toList();
-    } catch (_) {
+      decoded = jsonDecode(raw);
+    } catch (e) {
+      debugPrint('Vita $key unreadable: $e');
       return [];
     }
+    if (decoded is! List) return [];
+    final items = <T>[];
+    for (final item in decoded.whereType<Map<String, dynamic>>()) {
+      try {
+        items.add(parse(item));
+      } catch (e) {
+        debugPrint('Vita $key: skipped bad entry ($e)');
+      }
+    }
+    return items;
   }
 
   static String dayKey(DateTime d) =>

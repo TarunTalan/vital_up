@@ -87,17 +87,16 @@ enum StressSource {
 
 /// What's behind a stress check-in (optional chips on the dashboard).
 enum StressTag {
-  work('Work', '💼'),
-  sleep('Sleep', '😴'),
-  family('Family', '🏠'),
-  health('Health', '🩺'),
-  money('Money', '💸'),
-  social('Social', '🫂'),
-  other('Other', '✨');
+  work('Work'),
+  sleep('Sleep'),
+  family('Family'),
+  health('Health'),
+  money('Money'),
+  social('Social'),
+  other('Other');
 
   final String label;
-  final String emoji;
-  const StressTag(this.label, this.emoji);
+  const StressTag(this.label);
 
   static StressTag? fromName(String name) {
     for (final t in values) {
@@ -117,9 +116,6 @@ class StressCheckIn extends Equatable {
     'Very stressed',
   ];
 
-  /// Mood faces for levels 1–5.
-  static const emojis = ['😌', '🙂', '😐', '😣', '😫'];
-
   final DateTime date;
   final int level;
   final List<StressTag> tags;
@@ -131,7 +127,6 @@ class StressCheckIn extends Equatable {
   });
 
   String get label => labels[(level - 1).clamp(0, 4)];
-  String get emoji => emojis[(level - 1).clamp(0, 4)];
 
   Map<String, dynamic> toJson() => {
         'd': date.toIso8601String(),
@@ -140,14 +135,23 @@ class StressCheckIn extends Equatable {
       };
 
   /// Older check-ins have no `t` (tags) key.
-  factory StressCheckIn.fromJson(Map<String, dynamic> json) => StressCheckIn(
-        date: DateTime.parse(json['d'] as String),
-        level: json['l'] as int,
-        tags: [
-          for (final name in (json['t'] as List? ?? const []).whereType<String>())
+  ///
+  /// Throws [FormatException] when the stored entry has no valid date or
+  /// level; the reader skips such entries instead of dropping all of them.
+  factory StressCheckIn.fromJson(Map<String, dynamic> json) {
+    final date = json['d'] is String ? DateTime.tryParse(json['d'] as String) : null;
+    final level = json['l'] is num ? (json['l'] as num).toInt() : null;
+    if (date == null || level == null || level < 1 || level > 5) {
+      throw const FormatException('Invalid stress check-in');
+    }
+    return StressCheckIn._parsed(date, level, json['t']);
+  }
+
+  StressCheckIn._parsed(this.date, this.level, Object? tags)
+      : tags = [
+          for (final name in (tags is List ? tags : const []).whereType<String>())
             ?StressTag.fromName(name),
-        ],
-      );
+        ];
 
   @override
   List<Object?> get props => [date, level, tags];

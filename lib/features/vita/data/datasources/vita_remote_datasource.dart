@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 
@@ -37,22 +38,36 @@ class VitaRemoteDataSource {
         for (final m in context)
           {
             'role': m.isFromVita ? 'vita' : 'user',
-            'text': m.bullets.isEmpty
-                ? m.text
-                : '${m.text}\n${m.bullets.map((b) => '- $b').join('\n')}',
+            'text': _clip(
+              m.bullets.isEmpty
+                  ? m.text
+                  : '${m.text}\n${m.bullets.map((b) => '- $b').join('\n')}',
+            ),
           },
       ],
     });
 
+    final text = data['text'];
+    final plan = data['planInstructions'];
     return VitaMessage(
       sender: VitaSender.vita,
-      text: (data['text'] as String? ?? '').trim(),
-      bullets: (data['bullets'] as List?)?.whereType<String>().toList() ?? const [],
+      text: text is String ? text.trim() : '',
+      bullets: [
+        for (final b in (data['bullets'] is List ? data['bullets'] as List : const []))
+          if (b is String && b.trim().isNotEmpty) b.trim(),
+      ],
       action: VitaAction.fromWire(data['action']),
-      planInstructions: (data['planInstructions'] as String?)?.trim(),
+      planInstructions: plan is String && plan.trim().isNotEmpty ? plan.trim() : null,
       sentAt: DateTime.now(),
     );
   }
+
+  /// Longest single turn sent as context; older long replies are cut so the
+  /// request stays small.
+  static const maxTurnChars = 2000;
+
+  static String _clip(String text) =>
+      text.length <= maxTurnChars ? text : text.substring(0, maxTurnChars);
 
   /// headline / stressTip / dietNote for today.
   Future<Map<String, dynamic>> insights(Map<String, dynamic> snapshot) =>
@@ -63,7 +78,7 @@ class VitaRemoteDataSource {
     bool retried = false,
   }) async {
     if (_client.auth.currentSession == null) {
-      throw const VitaException('Please sign in to chat with Vita.');
+      throw const VitaException(VitaException.signIn);
     }
     try {
       // An access token that expired while the app sat in the background is
@@ -78,7 +93,8 @@ class VitaRemoteDataSource {
           ? jsonDecode(response.data as String)
           : response.data;
       if (data is! Map<String, dynamic>) {
-        throw const VitaException("Vita couldn't respond right now. Please try again.");
+        debugPrint('vita-chat returned unexpected data: ${data.runtimeType}');
+        throw const VitaException(VitaException.couldNotReply);
       }
       return data;
     } on VitaException {
@@ -91,33 +107,30 @@ class VitaRemoteDataSource {
           await _client.auth.refreshSession();
         } catch (refreshError) {
           debugPrint('vita-chat session refresh failed: $refreshError');
-          throw const VitaException('Your session expired. Please sign in again.');
+          throw const VitaException(VitaException.sessionExpired);
         }
         return _invoke(body, retried: true);
       }
+      if (e.status == 0 || isOfflineError(e)) {
+        throw const VitaException(VitaException.offlineMessage, offline: true);
+      }
       throw switch (e.status) {
-        401 => const VitaException('Your session expired. Please sign in again.'),
+        401 => const VitaException(VitaException.sessionExpired),
         429 => const VitaException(
-            "You've reached today's Vita limit. Please try again tomorrow.",
+            VitaException.dailyLimitReached,
             dailyLimit: true,
           ),
-        _ => const VitaException("Vita couldn't respond right now. Please try again."),
+        _ => const VitaException(VitaException.couldNotReply),
       };
     } on TimeoutException {
-      throw const VitaException('Vita is taking too long. Please try again.');
+      throw const VitaException(VitaException.tooSlow);
     } on SocketException {
-      throw const VitaException(
-        "You're offline. Vita will reply once you're back online.",
-        offline: true,
-      );
+      throw const VitaException(VitaException.offlineMessage, offline: true);
     } catch (e) {
-      final offline = e.toString().contains('SocketException') ||
-          e.toString().contains('Failed host lookup') ||
-          e.toString().contains('ClientException');
+      debugPrint('vita-chat failed: $e');
+      final offline = isOfflineError(e);
       throw VitaException(
-        offline
-            ? "You're offline. Vita will reply once you're back online."
-            : "Vita couldn't respond right now. Please try again.",
+        offline ? VitaException.offlineMessage : VitaException.couldNotReply,
         offline: offline,
       );
     }
