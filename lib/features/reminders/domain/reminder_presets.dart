@@ -73,7 +73,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_sleep',
     kind: ReminderKind.sleep,
     title: 'Time to wind down',
-    body: 'Put the screens away — good sleep starts now.',
+    body: 'Put the screens away. Tap Going to bed when you turn in.',
     times: [ReminderTime(22, 30)],
     isPreset: true,
     route: 'sleep-trends',
@@ -81,11 +81,11 @@ const reminderPresets = <Reminder>[
   Reminder(
     id: 'preset_morning_sleep',
     kind: ReminderKind.sleep,
-    title: 'Good morning! ☀️',
-    body: 'Review your sleep quality score and log last night.',
+    title: 'Good morning',
+    body: 'See how you slept and confirm last night.',
     times: [ReminderTime(8, 0)],
     isPreset: true,
-    route: 'sleep-trends',
+    // Opens Home, where the sleep card asks to confirm last night.
   ),
 ];
 

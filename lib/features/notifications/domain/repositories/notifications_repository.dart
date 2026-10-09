@@ -23,5 +23,7 @@ abstract class NotificationsRepository {
   });
 
   /// Each of the caller's notifications as it is added or changed.
-  Stream<AppNotification> watch();
+  /// [onResync] runs after the live feed reconnects: rows sent while it
+  /// was down are not replayed, so refetch the list then.
+  Stream<AppNotification> watch({void Function()? onResync});
 }

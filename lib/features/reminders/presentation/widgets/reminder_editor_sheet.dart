@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
+import 'package:vital_up/features/reminders/domain/reminder_rules.dart';
 import 'package:vital_up/features/reminders/presentation/widgets/reminder_style.dart';
 
 /// What the editor sheet closed with.
@@ -47,8 +49,14 @@ class ReminderEditorSheet extends StatefulWidget {
 }
 
 class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
-  static const _maxTimes = 6;
-  static const _intervals = [30, 60, 90, 120, 180, 240];
+  static const _maxTimes = ReminderRules.maxTimes;
+
+  /// Offered gaps, plus a stored one that isn't in the list (a dropdown
+  /// whose value isn't among its items throws).
+  List<int> get _intervals => {
+    ...ReminderRules.intervals,
+    ?_interval,
+  }.toList()..sort();
 
   late final _title = TextEditingController(text: widget.reminder.title);
   late List<ReminderTime> _times = [...widget.reminder.times];
@@ -68,28 +76,29 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
     super.dispose();
   }
 
+  /// Null when cancelled or when the sheet closed while the picker was open.
   Future<ReminderTime?> _pick(ReminderTime initial) async {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: initial.hour, minute: initial.minute),
     );
-    return picked == null ? null : ReminderTime(picked.hour, picked.minute);
+    if (!mounted || picked == null) return null;
+    _error = null;
+    return ReminderTime(picked.hour, picked.minute);
   }
 
   void _save() {
-    final title = _title.text.trim();
-    final String? error;
-    if (_isCustom && title.isEmpty) {
-      error = 'Give your reminder a name.';
-    } else if (_weekdays.isEmpty) {
-      error = 'Pick at least one day.';
-    } else if (_isInterval && _windowEnd!.compareTo(_windowStart!) <= 0) {
-      error = 'The end time must be after the start time.';
-    } else if (!_isInterval && _times.isEmpty) {
-      error = 'Add at least one time.';
-    } else {
-      error = null;
-    }
+    final title = ReminderRules.cleanTitle(_title.text);
+    final error = ReminderRules.validate(
+      isCustom: _isCustom,
+      title: title,
+      weekdays: _weekdays,
+      isInterval: _isInterval,
+      times: _times,
+      intervalMinutes: _interval,
+      windowStart: _windowStart,
+      windowEnd: _windowEnd,
+    );
     if (error != null) {
       setState(() => _error = error);
       return;
@@ -155,6 +164,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                 hint: 'e.g. Take vitamins',
                 textCapitalization: TextCapitalization.sentences,
                 autofocus: widget.isNew,
+                maxLength: ReminderRules.titleMax,
+                inputFormatters: InputFormatters.text(ReminderRules.titleMax),
+                textInputAction: TextInputAction.done,
                 onChanged: (_) {
                   if (_error != null) setState(() => _error = null);
                 },

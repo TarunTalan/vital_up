@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -82,10 +83,16 @@ class NotificationsCubit extends Cubit<NotificationsState> {
 
   /// Applies each row the server adds or changes.
   void watch() {
-    _changes ??= _repository.watch().listen(
-      _upsert,
-      onError: (Object e) => debugPrint('Notifications feed error: $e'),
-    );
+    _changes ??= _repository
+        .watch(
+          onResync: () {
+            if (!isClosed) load(refresh: true);
+          },
+        )
+        .listen(
+          _upsert,
+          onError: (Object e) => debugPrint('Notifications feed error: $e'),
+        );
   }
 
   void _upsert(AppNotification notification) {
@@ -136,7 +143,11 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     } catch (e) {
       debugPrint('Delete notification failed: $e');
       if (isClosed) return;
-      emit(state.copyWith(message: "Couldn't remove that notification."));
+      emit(
+        state.copyWith(
+          message: "Couldn't remove that notification. Try again.",
+        ),
+      );
       await load(refresh: true);
     }
   }
@@ -159,7 +170,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
         _drop(notification.id);
       }
       if (!isClosed && accept && name != null) {
-        emit(state.copyWith(message: 'You and @$name are now friends!'));
+        emit(state.copyWith(message: 'You and @$name are now friends.'));
       }
     } on FriendRequestException catch (e) {
       if (!isClosed) emit(state.copyWith(message: e.message));
@@ -170,7 +181,14 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     } catch (e) {
       debugPrint('Friend request response failed: $e');
       if (!isClosed) {
-        emit(state.copyWith(message: "Couldn't update the request."));
+        emit(
+          state.copyWith(
+            message: userMessage(
+              e,
+              fallback: "Couldn't update the request. Try again.",
+            ),
+          ),
+        );
       }
     } finally {
       if (!isClosed) {

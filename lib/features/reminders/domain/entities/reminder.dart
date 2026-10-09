@@ -28,13 +28,26 @@ class ReminderTime extends Equatable implements Comparable<ReminderTime> {
 
   const ReminderTime(this.hour, this.minute);
 
-  factory ReminderTime.fromMinutes(int minutes) =>
-      ReminderTime(minutes ~/ 60, minutes % 60);
+  /// Minutes since midnight, wrapped into a single day.
+  factory ReminderTime.fromMinutes(int minutes) {
+    final m = minutes % (24 * 60);
+    return ReminderTime(m ~/ 60, m % 60);
+  }
 
-  /// Parses `HH:mm`.
-  factory ReminderTime.parse(String value) {
-    final parts = value.split(':');
-    return ReminderTime(int.parse(parts[0]), int.parse(parts[1]));
+  /// Parses `HH:mm`; throws [FormatException] when it isn't a valid time.
+  factory ReminderTime.parse(String value) =>
+      tryParse(value) ?? (throw FormatException('Invalid time', value));
+
+  /// Parses `HH:mm`, or null when it isn't a valid time of day.
+  static ReminderTime? tryParse(String value) {
+    final parts = value.trim().split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) {
+      return null;
+    }
+    return ReminderTime(h, m);
   }
 
   int get inMinutes => hour * 60 + minute;
@@ -93,17 +106,17 @@ class Reminder extends Equatable {
   bool get isDaily => weekdays.length == 7;
 
   /// Every time of day this reminder fires, sorted and without duplicates.
+  /// An interval window that ends before it starts runs past midnight.
   List<ReminderTime> get firingTimes {
     if (isInterval) {
       final step = intervalMinutes!.clamp(30, 24 * 60);
-      return [
-        for (
-          var m = windowStart!.inMinutes;
-          m <= windowEnd!.inMinutes;
-          m += step
-        )
-          ReminderTime.fromMinutes(m),
-      ];
+      final start = windowStart!.inMinutes;
+      var end = windowEnd!.inMinutes;
+      if (end < start) end += 24 * 60;
+      return {
+        for (var m = start; m <= end; m += step) ReminderTime.fromMinutes(m),
+      }.toList()
+        ..sort();
     }
     return times.toSet().toList()..sort();
   }
@@ -148,25 +161,36 @@ class Reminder extends Equatable {
     'window_end': windowEnd?.label,
   };
 
+  /// Tolerates bad stored values: unknown times and days are dropped and
+  /// odd intervals clamped. Throws [FormatException] only without an id.
   factory Reminder.fromJson(Map<String, dynamic> json) {
-    ReminderTime? time(Object? v) => v is String ? ReminderTime.parse(v) : null;
+    final id = json['id'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Reminder without an id');
+    }
+    ReminderTime? time(Object? v) => v is String ? ReminderTime.tryParse(v) : null;
+    String text(Object? v) => v is String ? v : '';
+    final times = json['times'];
+    final days = json['weekdays'];
+    final interval = json['interval_minutes'];
     return Reminder(
-      id: json['id'] as String,
-      kind: ReminderKind.fromCode(json['kind'] as String?),
-      title: json['title'] as String? ?? '',
-      body: json['body'] as String? ?? '',
+      id: id,
+      kind: ReminderKind.fromCode(json['kind'] is String ? json['kind'] as String : null),
+      title: text(json['title']),
+      body: text(json['body']),
       times: [
-        for (final t in (json['times'] as List? ?? const []))
-          ReminderTime.parse(t as String),
+        for (final t in (times is List ? times : const []))
+          ?time(t),
       ],
       weekdays: {
-        for (final d in (json['weekdays'] as List? ?? allWeekdays))
-          (d as num).toInt(),
+        for (final d in (days is List ? days : allWeekdays))
+          if (d is num && d >= DateTime.monday && d <= DateTime.sunday)
+            d.toInt(),
       },
-      enabled: json['enabled'] as bool? ?? false,
-      isPreset: json['is_preset'] as bool? ?? false,
-      route: json['route'] as String?,
-      intervalMinutes: (json['interval_minutes'] as num?)?.toInt(),
+      enabled: json['enabled'] == true,
+      isPreset: json['is_preset'] == true,
+      route: json['route'] is String ? json['route'] as String : null,
+      intervalMinutes: interval is num ? interval.toInt().clamp(30, 24 * 60) : null,
       windowStart: time(json['window_start']),
       windowEnd: time(json['window_end']),
     );

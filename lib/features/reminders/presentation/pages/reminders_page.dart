@@ -64,14 +64,12 @@ class RemindersPage extends StatelessWidget {
               if (!state.notificationsEnabled)
                 const _Banner(
                   message:
-                      'Notifications are off in Settings, so reminders '
-                      "won't be delivered.",
+                      "Notifications are off in Settings, so reminders won't ring.",
                 )
               else if (state.permissionDenied)
                 _Banner(
                   message:
-                      'Notifications are blocked for VitalUp. Allow them in '
-                      'your phone settings to get reminders.',
+                      'Notifications are blocked. Allow them in phone settings.',
                   actionLabel: 'Open phone settings',
                   onAction: () => openAppSettings(),
                 ),

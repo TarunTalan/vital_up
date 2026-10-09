@@ -7,7 +7,6 @@ import 'package:vital_up/features/community/presentation/widgets/community_widge
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 
-
 /// Routes an announcement's `data.route` may open.
 const notificationLinkableRoutes = {
   'friends',
@@ -327,16 +326,16 @@ class _NotificationLeading extends StatelessWidget {
         GamificationIcons.streak,
         Icons.local_fire_department_rounded,
       ),
-      _ => (
-        context.colors.primary,
-        '',
-        Icons.campaign_rounded,
-      ),
+      _ => (context.colors.primary, '', Icons.campaign_rounded),
     };
     return AppIconBadge(
       color: color,
       icon: asset.isEmpty
-          ? Icon(fallback, color: context.colors.onSurface, size: AppDimens.iconMd)
+          ? Icon(
+              fallback,
+              color: context.colors.onSurface,
+              size: AppDimens.iconMd,
+            )
           : GameIcon(asset, fallback: fallback, size: AppDimens.iconMd),
     );
   }

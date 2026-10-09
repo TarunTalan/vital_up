@@ -35,8 +35,7 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
 
   /// Applies [change] to the cached rows, if any.
   Future<void> _patch(
-    List<Map<String, dynamic>> Function(List<Map<String, dynamic>> rows)
-    change,
+    List<Map<String, dynamic>> Function(List<Map<String, dynamic>> rows) change,
   ) async {
     final key = _key;
     if (key == null) return;
@@ -126,21 +125,23 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   }
 
   @override
-  Stream<AppNotification> watch() => _remote.changes().transform(
-    StreamTransformer.fromHandlers(
-      handleData: (row, sink) {
-        final AppNotification notification;
-        try {
-          notification = AppNotification.fromJson(row);
-        } catch (e) {
-          debugPrint('Unreadable notification from the feed: $e');
-          return;
-        }
-        sink.add(notification);
-        unawaited(_remember(row, notification.id));
-      },
-    ),
-  );
+  Stream<AppNotification> watch({void Function()? onResync}) => _remote
+      .changes(onResubscribed: onResync)
+      .transform(
+        StreamTransformer.fromHandlers(
+          handleData: (row, sink) {
+            final AppNotification notification;
+            try {
+              notification = AppNotification.fromJson(row);
+            } catch (e) {
+              debugPrint('Unreadable notification from the feed: $e');
+              return;
+            }
+            sink.add(notification);
+            unawaited(_remember(row, notification.id));
+          },
+        ),
+      );
 
   /// Puts a feed row into the cached inbox: newest first, replacing an
   /// older copy of the same row.

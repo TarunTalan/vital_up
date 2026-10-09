@@ -31,13 +31,20 @@ class RemindersService {
 
   /// Re-arms reminders skipped yesterday when the app is reopened on a new
   /// day (needed on iOS, where a skipped reminder becomes a one-off).
+  /// Also resyncs when the time zone changed while away, so reminders keep
+  /// their wall-clock times after travelling.
   void resyncOnNewDay() {
-    var day = dayKey(DateTime.now());
+    String stamp() {
+      final now = DateTime.now();
+      return '${dayKey(now)}|${now.timeZoneOffset.inMinutes}|${now.timeZoneName}';
+    }
+
+    var last = stamp();
     _lifecycle ??= AppLifecycleListener(
       onResume: () {
-        final today = dayKey(DateTime.now());
-        if (today == day) return;
-        day = today;
+        final current = stamp();
+        if (current == last) return;
+        last = current;
         resync();
       },
     );
@@ -79,11 +86,19 @@ class RemindersService {
   List<Reminder> load() => _local.load();
 
   Future<bool> notificationsEnabled() async {
-    final result = await _settings.getSettings();
-    return result.fold((_) => true, (s) => s.notificationsEnabled);
+    try {
+      final result = await _settings.getSettings();
+      return result.fold((_) => true, (s) => s.notificationsEnabled);
+    } catch (e) {
+      debugPrint('Settings unreadable, assuming notifications on: $e');
+      return true;
+    }
   }
 
   Future<bool> requestPermission() => _scheduler.requestPermission();
+
+  /// Null when unknown; see [ReminderScheduler.permissionGranted].
+  Future<bool?> permissionGranted() => _scheduler.permissionGranted();
 
   /// Saves [reminders] and reschedules. Returns how many notifications were
   /// left out to stay under the system limit.

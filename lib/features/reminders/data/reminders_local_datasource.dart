@@ -20,16 +20,24 @@ class RemindersLocalDataSource {
   List<Reminder> load() {
     final raw = _prefs.getString(_keyReminders);
     if (raw == null) return mergeWithPresets(const []);
+    final Object? list;
     try {
-      final list = jsonDecode(raw) as List;
-      return mergeWithPresets([
-        for (final item in list)
-          Reminder.fromJson(Map<String, dynamic>.from(item as Map)),
-      ]);
+      list = jsonDecode(raw);
     } catch (e) {
       debugPrint('Saved reminders unreadable, using defaults: $e');
       return mergeWithPresets(const []);
     }
+    if (list is! List) return mergeWithPresets(const []);
+    // One bad entry is skipped; the rest of the user's reminders are kept.
+    final reminders = <Reminder>[];
+    for (final item in list) {
+      try {
+        reminders.add(Reminder.fromJson(Map<String, dynamic>.from(item as Map)));
+      } catch (e) {
+        debugPrint('Skipped an unreadable reminder: $e');
+      }
+    }
+    return mergeWithPresets(reminders);
   }
 
   Future<void> save(List<Reminder> reminders) => _prefs.setString(
@@ -56,12 +64,14 @@ class RemindersLocalDataSource {
     final raw = _prefs.getString(_keySkipped);
     if (raw == null) return {};
     try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final map = jsonDecode(raw);
+      if (map is! Map<String, dynamic>) return {};
       return {
         for (final e in map.entries)
           if (e.value == day) e.key,
       };
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Skipped reminders unreadable: $e');
       return {};
     }
   }
