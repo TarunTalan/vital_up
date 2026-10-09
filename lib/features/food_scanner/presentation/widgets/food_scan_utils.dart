@@ -19,6 +19,29 @@ class FoodScanUtils {
     return 'Low';
   }
 
+  /// Plain text for sharing a meal, e.g.
+  /// "Lunch: Dal tadka, Rice\n620 kcal · Protein 22 g · Carbs 90 g\n
+  /// Tracked with VitalUp". [macros] are (name, grams); zero amounts and
+  /// blank names are left out.
+  static String shareText({
+    required String mealLabel,
+    required List<String> dishNames,
+    required int calories,
+    List<(String, int)> macros = const [],
+  }) {
+    final names = [
+      for (final name in dishNames)
+        if (name.trim().isNotEmpty) name.trim(),
+    ];
+    final title = names.isEmpty ? mealLabel : '$mealLabel: ${names.join(', ')}';
+    final figures = [
+      '${calories < 0 ? 0 : calories} kcal',
+      for (final (name, grams) in macros)
+        if (grams > 0) '$name $grams g',
+    ];
+    return '$title\n${figures.join(' · ')}\nTracked with VitalUp';
+  }
+
   static double calculateTotalCalories(List<NutritionInfo> nutritionList) {
     return nutritionList.fold<double>(0, (sum, nut) => sum + nut.calories);
   }
