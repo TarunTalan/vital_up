@@ -1,24 +1,28 @@
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 
 /// Parses the scan-food edge function's nutrition payload (the `get_nutrition`
 /// response and the inline `nutrition` block of each recognized item).
 ///
 /// The payload only carries numbers, never the item it describes, so the
-/// [item] this lookup was for is attached directly.
+/// [item] this lookup was for is attached directly. Every value is clamped
+/// to [NutritionLimits]: numeric strings are read, and negative, NaN or
+/// absurd values from the AI never reach the log.
 NutritionInfo parseNutritionResponse(Map<String, dynamic> data, FoodItem item) {
-  double num_(String key) => (data[key] as num?)?.toDouble() ?? 0.0;
+  double num_(String key) => saneAmount(data[key]);
 
-  final additionalNutrients = (data['additional_nutrients'] as List<dynamic>?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((e) => AdditionalNutrient(
-                id: e['id']?.toString(),
-                name: e['name'] as String? ?? '',
-                unit: e['unit'] as String? ?? '',
-                value: (e['value'] as num?)?.toDouble() ?? 0.0,
-              ))
-          .toList() ??
-      const <AdditionalNutrient>[];
+  final additionalNutrients = (data['additional_nutrients'] is List
+          ? (data['additional_nutrients'] as List)
+          : const <dynamic>[])
+      .whereType<Map<dynamic, dynamic>>()
+      .map((e) => AdditionalNutrient(
+            id: e['id']?.toString(),
+            name: e['name']?.toString() ?? '',
+            unit: e['unit']?.toString() ?? '',
+            value: saneAmount(e['value']),
+          ))
+      .toList();
 
   double calories = num_('calories');
 
@@ -32,7 +36,7 @@ NutritionInfo parseNutritionResponse(Map<String, dynamic> data, FoodItem item) {
     calories = calories / 4.184;
   }
 
-  return NutritionInfo(
+  return sanitizeNutrition(NutritionInfo(
     calories: calories,
     proteinG: num_('protein_g'),
     carbsG: num_('carbs_g'),
@@ -67,5 +71,5 @@ NutritionInfo parseNutritionResponse(Map<String, dynamic> data, FoodItem item) {
     polyunsaturatedFatG: num_('polyunsaturated_fat_g'),
     additionalNutrients: additionalNutrients,
     per: item,
-  );
+  ));
 }

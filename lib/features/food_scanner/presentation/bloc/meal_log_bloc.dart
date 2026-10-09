@@ -37,17 +37,36 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
 
   Future<void> _onDelete(DeleteMealLogEntry event, Emitter<MealLogState> emit) async {
     final result = await deleteMealLog(event.id);
-    result.fold(
-      (failure) => emit(MealLogError(failure.message)),
-      (_) async => await _fetchAndEmit(emit),
-    );
+    // The fold's async branch was never awaited, so the reload emitted after
+    // the handler had finished. Await it here instead.
+    final failure = result.fold<Failure?>((f) => f, (_) => null);
+    if (failure != null) {
+      // Keep showing the list; only report the failed delete.
+      final current = state;
+      if (current is MealLogLoaded) {
+        emit(MealLogLoaded(
+          entries: current.entries,
+          totalCalories: current.totalCalories,
+          totalProteinG: current.totalProteinG,
+          totalCarbsG: current.totalCarbsG,
+          totalFatG: current.totalFatG,
+          dailyCalorieGoal: current.dailyCalorieGoal,
+          notice: "Couldn't delete this meal. Try again.",
+        ));
+      } else {
+        emit(MealLogError(failure.message));
+      }
+      return;
+    }
+    await _fetchAndEmit(emit);
   }
 
   Future<void> _fetchAndEmit(Emitter<MealLogState> emit) async {
     final Either<Failure, List<MealLogEntry>> result;
     try {
       result = await getMealLogHistory(DateTime.now()).withLoadTimeout();
-    } catch (_) {
+    } catch (e) {
+      addError(e);
       emit(const MealLogError(kLoadErrorMessage));
       return;
     }

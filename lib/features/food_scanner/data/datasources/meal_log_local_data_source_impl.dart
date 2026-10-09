@@ -7,6 +7,7 @@ import 'package:vital_up/features/food_scanner/data/datasources/meal_log_local_d
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/core/events/habit_events.dart';
 
 class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
@@ -104,32 +105,43 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
       ..createdAt = DateTime.now();
   }
 
+  /// Rows synced from another device or an older app version can have
+  /// parallel lists of different lengths, an unknown meal type or non-finite
+  /// numbers; read them defensively instead of throwing a RangeError.
   MealLogEntry _toDomain(MealLogCache cache) {
+    T at<T>(List<T> list, int i, T fallback) => i < list.length ? list[i] : fallback;
+
     final items = List.generate(
       cache.itemIds.length,
       (index) => FoodItem(
         id: cache.itemIds[index],
-        name: cache.itemNames[index],
-        confidenceScore: cache.itemConfidences[index],
-        servingDescription: cache.itemServingDescriptions[index],
-        quantity: cache.itemQuantities[index],
-        unit: cache.itemUnits[index],
+        name: at(cache.itemNames, index, 'Food'),
+        confidenceScore: at(cache.itemConfidences, index, 1.0),
+        servingDescription: at(cache.itemServingDescriptions, index, ''),
+        quantity: saneQuantity(at(cache.itemQuantities, index, 1.0)),
+        unit: at(cache.itemUnits, index, 'serving'),
       ),
     );
 
+    // One nutrition row per item; a row without an item is dropped.
+    final nutritionCount = cache.nutritionCalories.length < items.length ? cache.nutritionCalories.length : items.length;
     final nutrition = List.generate(
-      cache.nutritionCalories.length,
-      (index) => NutritionInfo(
+      nutritionCount,
+      (index) => sanitizeNutrition(NutritionInfo(
         calories: cache.nutritionCalories[index],
-        proteinG: cache.nutritionProteinG[index],
-        carbsG: cache.nutritionCarbsG[index],
-        fatG: cache.nutritionFatG[index],
-        fiberG: cache.nutritionFiberG[index],
-        sugarG: cache.nutritionSugarG[index],
-        sodiumMg: cache.nutritionSodiumMg[index],
+        proteinG: at(cache.nutritionProteinG, index, 0.0),
+        carbsG: at(cache.nutritionCarbsG, index, 0.0),
+        fatG: at(cache.nutritionFatG, index, 0.0),
+        fiberG: at(cache.nutritionFiberG, index, 0.0),
+        sugarG: at(cache.nutritionSugarG, index, 0.0),
+        sodiumMg: at(cache.nutritionSodiumMg, index, 0.0),
         per: items[index],
-      ),
+      )),
     );
+
+    final mealType = cache.mealType >= 0 && cache.mealType < MealType.values.length
+        ? MealType.values[cache.mealType]
+        : MealType.snack;
 
     return MealLogEntry(
       id: cache.mealLogId,
@@ -137,8 +149,8 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
       imagePath: cache.imagePath,
       items: items,
       nutrition: nutrition,
-      totalCalories: cache.totalCalories,
-      mealType: MealType.values[cache.mealType],
+      totalCalories: saneAmount(cache.totalCalories, max: NutritionLimits.caloriesMax * 10),
+      mealType: mealType,
       userConfirmed: cache.userConfirmed,
     );
   }

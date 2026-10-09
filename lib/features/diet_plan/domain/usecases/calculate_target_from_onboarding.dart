@@ -23,7 +23,7 @@ class CalculateTargetFromOnboarding {
     } else if (goal == 'gain') {
       tdee += 500;
     }
-    
+
     int calories = tdee.round();
     if (calories < 1200) calories = 1200; // safety floor
 
@@ -51,24 +51,42 @@ class CalculateTargetFromOnboarding {
     );
   }
 
-  double _parseWeight(String weight, String unit) {
-    final w = double.tryParse(weight) ?? 70.0;
-    if (unit.toLowerCase() == 'lbs' || unit.toLowerCase() == 'lb') return w * 0.453592;
-    return w;
+  /// Body weight in kg from the stored text ("70", "70,5", "154" lbs).
+  /// Missing or out-of-range values fall back to 70 kg rather than
+  /// producing a negative or absurd calorie target.
+  static double parseWeightKg(String weight, String unit) {
+    final w = double.tryParse(weight.trim().replaceAll(',', '.'));
+    if (w == null || !w.isFinite) return 70.0;
+    final u = unit.toLowerCase();
+    final kg = u == 'lbs' || u == 'lb' ? w * 0.453592 : w;
+    return kg < 20 || kg > 350 ? 70.0 : kg;
   }
 
+  double _parseWeight(String weight, String unit) => parseWeightKg(weight, unit);
+
   double _parseHeight(String height, String unit) {
-    final h = double.tryParse(height) ?? 170.0;
-    if (unit.toLowerCase() == 'ft') {
-      return h * 30.48; 
-    }
-    return h;
+    final h = double.tryParse(height.trim().replaceAll(',', '.'));
+    if (h == null || !h.isFinite) return 170.0;
+    final u = unit.toLowerCase();
+    final cm = u == 'ft'
+        ? h * 30.48
+        : u == 'in'
+            ? h * 2.54
+            : h;
+    return cm < 50 || cm > 272 ? 170.0 : cm;
   }
 
   int _calculateAge(String dob) {
     // Expected formats: DD/MM/YYYY or YYYY-MM-DD
     try {
       if (dob.isEmpty) return 30;
+      // Profile stores ddMMyyyy without separators.
+      if (RegExp(r'^\d{8}$').hasMatch(dob)) {
+        final first4 = int.parse(dob.substring(0, 4));
+        final year = first4 > 1900 ? first4 : int.parse(dob.substring(4));
+        final age = DateTime.now().year - year;
+        return age < 0 || age > 120 ? 30 : age;
+      }
       List<String> parts = dob.contains('/') ? dob.split('/') : dob.split('-');
       if (parts.length == 3) {
         final yearPart = parts.firstWhere((p) => p.length == 4, orElse: () => '');

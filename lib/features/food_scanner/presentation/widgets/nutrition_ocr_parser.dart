@@ -17,7 +17,9 @@ class NutritionOcrParser {
     };
 
     final lines = text.split('\n');
-    final numberRegExp = RegExp(r'(\d+(?:\.\d+)?)');
+    // Labels print decimals as "12.5" or "12,5".
+    final numberRegExp = RegExp(r'(\d+(?:[.,]\d+)?)');
+    double? toNumber(String raw) => double.tryParse(raw.replaceAll(',', '.'));
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i].trim();
@@ -29,7 +31,7 @@ class NutritionOcrParser {
         // Try current line
         var match = numberRegExp.firstMatch(lines[currentIndex]);
         if (match != null) {
-          return double.tryParse(match.group(1)!);
+          return toNumber(match.group(1)!);
         }
         // Try next line (lookahead) if current line has no number
         if (currentIndex + 1 < lines.length) {
@@ -38,9 +40,9 @@ class NutritionOcrParser {
           if (match != null) {
             // Ensure next line is just a number/unit, not another nutrient name
             final isNutrient = nextLine.toLowerCase().contains(RegExp(
-                r'energy|calor|protein|carb|fat|sugar|fiber|sodium|salt'));
+                r'energy|calor|protein|carb|fat|sugar|fiber|fibre|sodium|salt'));
             if (!isNutrient) {
-              return double.tryParse(match.group(1)!);
+              return toNumber(match.group(1)!);
             }
           }
         }
@@ -99,7 +101,7 @@ class NutritionOcrParser {
         }
       }
       // 6. Fiber
-      else if (lowerLine.contains('fiber')) {
+      else if (lowerLine.contains('fiber') || lowerLine.contains('fibre')) {
         final val = findNumber(i);
         if (val != null && values['fiber'] == 0.0) {
           values['fiber'] = val;
@@ -114,8 +116,9 @@ class NutritionOcrParser {
             // Salt to Sodium conversion: Sodium (mg) = Salt (g) * 1000 / 2.5
             values['sodium'] = (val * 1000.0) / 2.5;
           } else {
-            // If sodium is explicitly labeled in grams
-            if (lowerLine.contains(' g') || lowerLine.endsWith('g')) {
+            // If sodium is explicitly labeled in grams ("450mg" also ends
+            // in "g", so milligrams are checked first).
+            if (!lowerLine.contains('mg') && (lowerLine.contains(' g') || lowerLine.endsWith('g'))) {
               values['sodium'] = val * 1000.0;
             } else {
               values['sodium'] = val; // default is mg

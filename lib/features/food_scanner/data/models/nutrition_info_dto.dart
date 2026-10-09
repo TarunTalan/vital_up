@@ -1,4 +1,5 @@
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
+import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'food_item_dto.dart';
 
 class NutritionInfoDto {
@@ -155,7 +156,7 @@ class NutritionInfoDto {
   }
 
   NutritionInfo toDomain() {
-    return NutritionInfo(
+    return sanitizeNutrition(NutritionInfo(
       calories: calories,
       proteinG: proteinG,
       carbsG: carbsG,
@@ -190,7 +191,7 @@ class NutritionInfoDto {
       polyunsaturatedFatG: polyunsaturatedFatG,
       additionalNutrients: additionalNutrients.map((e) => e.toDomain()).toList(),
       per: per.toDomain(),
-    );
+    ));
   }
 
   static NutritionInfoDto fromDomain(NutritionInfo nutritionInfo) {

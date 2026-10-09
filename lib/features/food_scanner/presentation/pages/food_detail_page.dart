@@ -33,17 +33,15 @@ class FoodDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
       listenWhen: (previous, current) =>
-          current is MealLogSaved || current is RecognitionFailed,
+          current is MealLogSaved || current is RecognitionFailed || current is ScanActionFailed,
       listener: (context, state) {
         if (state is MealLogSaved) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Meal saved to your log.')),
-          );
+          showSuccessSnackBar(context, 'Meal saved to your log.');
           Navigator.of(context).maybePop();
         } else if (state is RecognitionFailed) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.failure.message)));
+          showErrorSnackBar(context, state.failure.message);
+        } else if (state is ScanActionFailed) {
+          showErrorSnackBar(context, state.failure.message);
         }
       },
       builder: (context, state) {
@@ -97,7 +95,7 @@ class FoodDetailPage extends StatelessWidget {
             Expanded(
               child: Center(
                 child: Text(
-                  'No nutrition data available.',
+                  'No food to show. Go back and scan again.',
                   style: context.text.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -114,6 +112,8 @@ class FoodDetailPage extends StatelessWidget {
         label: 'Add to Log',
         isLoading: state is SavingMealLog,
         onTap: () {
+          // The bloc also ignores repeats, but don't queue them at all.
+          if (state is SavingMealLog || state is LoadingNutrition) return;
           context.read<FoodScanBloc>().add(
             ConfirmAndSaveRequested(data.mealType),
           );
@@ -239,12 +239,17 @@ class _FoodDetailData {
       image = state.image;
       items = state.items;
       nutrition = state.nutrition;
+    } else if (state is SavingMealLog) {
+      // Keep the meal on screen while it saves.
+      image = state.image;
+      items = state.items;
+      nutrition = state.nutrition;
     } else {
       return null;
     }
 
     if (items.isEmpty || nutrition.isEmpty) return null;
-    
+
     // Handle null image case for manual entry without image
     if (image == null) {
       // For manual entries without an image, we'll skip the image display
@@ -309,7 +314,7 @@ class _FoodDetailData {
     }).toList();
 
     final macroDetails = <MacroDetail>[];
-    
+
     // --- 1. Common Healthy Macros/Nutrients ---
     if (totalFiber > 0) {
       macroDetails.add(MacroDetail(name: 'Dietary Fiber', grams: totalFiber, unit: 'g'));
@@ -564,12 +569,12 @@ int _computeHealthScore({
   // - High essential + Low bad => High rating (>= 80)
   // - Low essential + Low bad => Medium rating (55 to 70)
   // - High bad (or low essential + high bad) => Low rating (< 50)
-  
+
   double score = 65.0; // Start at a neutral medium base
-  
+
   // Add positive influence from essential macros
   score += essentialScore * 0.4;
-  
+
   // Subtract negative influence from bad macros (heavier weight to make sure bad items drop to low rating)
   score -= badScore * 1.1;
 
@@ -584,9 +589,9 @@ int _computeHealthScore({
       return false;
     }
     final keywords = [
-      'fried', 'samosa', 'fries', 'gulab jamun', 'ice cream', 
-      'burger', 'pizza', 'donut', 'crisps', 'chips', 'soda', 'coke', 
-      'candy', 'sweet', 'cake', 'waffle', 'chocolate', 'nugget', 
+      'fried', 'samosa', 'fries', 'gulab jamun', 'ice cream',
+      'burger', 'pizza', 'donut', 'crisps', 'chips', 'soda', 'coke',
+      'candy', 'sweet', 'cake', 'waffle', 'chocolate', 'nugget',
       'hot dog', 'hotdog', 'milkshake', 'cookie', 'brownie', 'pastry',
       'syrup', 'jalebi', 'ladoo', 'barfi'
     ];

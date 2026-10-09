@@ -76,7 +76,7 @@ class MealRecommendationRepositoryImpl implements MealRecommendationRepository {
   String _headline(String tag, {required double sodium}) {
     switch (tag) {
       case 'post_workout_window':
-        return 'Great post-workout meal! The protein here supports muscle recovery.';
+        return 'Great post-workout meal. The protein here supports muscle recovery.';
       case 'high_sodium':
         return 'This meal is high in salt (~${sodium.round()} mg sodium). Go easy on pickle, papad and added salt for the rest of the day.';
       case 'high_sugar':
@@ -105,7 +105,7 @@ class MealRecommendationRepositoryImpl implements MealRecommendationRepository {
   String _balancedMessage(MealType mealType) {
     switch (mealType) {
       case MealType.breakfast:
-        return 'Good breakfast choice! A balanced start to your day.';
+        return 'Good breakfast choice. A balanced start to your day.';
       case MealType.lunch:
         return 'Balanced lunch to keep you energized for the afternoon.';
       case MealType.dinner:

@@ -20,6 +20,10 @@ class MealLogLoaded extends MealLogState {
   final double totalFatG;
   final int? dailyCalorieGoal;
 
+  /// Short message about an action that failed (e.g. a delete) while the
+  /// list itself is still valid; the history page shows it as a snackbar.
+  final String? notice;
+
   const MealLogLoaded({
     required this.entries,
     required this.totalCalories,
@@ -27,6 +31,7 @@ class MealLogLoaded extends MealLogState {
     required this.totalCarbsG,
     required this.totalFatG,
     this.dailyCalorieGoal,
+    this.notice,
   });
 
   /// Convenience: meals grouped by MealType (for the dashboard slot row).
@@ -43,6 +48,7 @@ class MealLogLoaded extends MealLogState {
   List<Object?> get props => [
         entries, totalCalories, totalProteinG, totalCarbsG, totalFatG,
         dailyCalorieGoal,
+        notice,
       ];
 }
 

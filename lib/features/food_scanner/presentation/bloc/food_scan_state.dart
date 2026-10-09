@@ -108,8 +108,33 @@ class NutritionLoaded extends FoodScanState {
   List<Object?> get props => [image, items, nutrition];
 }
 
+/// Saving the reviewed meal. Carries the items so the detail page keeps
+/// showing them (with a busy button) while the save runs.
 class SavingMealLog extends FoodScanState {
-  const SavingMealLog();
+  final File? image;
+  final List<FoodItem> items;
+  final List<NutritionInfo> nutrition;
+
+  const SavingMealLog({
+    this.image,
+    this.items = const [],
+    this.nutrition = const [],
+  });
+
+  @override
+  List<Object?> get props => [image, items, nutrition];
+}
+
+/// An action on the reviewed meal (save, edit, add) failed. Shown as a
+/// snackbar by the detail page; the bloc then returns to the previous
+/// content state, so the user keeps their items.
+class ScanActionFailed extends FoodScanState {
+  final Failure failure;
+
+  const ScanActionFailed(this.failure);
+
+  @override
+  List<Object?> get props => [failure];
 }
 
 class MealLogSaved extends FoodScanState {
