@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- PLACEHOLDER: replace before release; keep in sync with
+         LegalLinks.privacyPolicy (lib/core/config/legal_links.dart). Shown
+         from Health Connect's permission screens. -->
+    <string name="privacy_policy_url" translatable="false">https://vitalup.example/privacy</string>
+
     <!-- Home screen widgets -->
     <string name="wg_today_title">Today</string>
     <string name="wg_today_description">Activity, calories, water and sleep against your goals.</string>
