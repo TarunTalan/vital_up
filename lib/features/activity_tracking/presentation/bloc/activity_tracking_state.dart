@@ -31,6 +31,9 @@ class TrackingInProgress extends ActivityTrackingState {
   /// Current Doppler speed in m/s; drops to 0 when fixes stop arriving.
   final double currentSpeedMps;
 
+  /// No usable GPS fix for a while (location off, indoors, tunnel).
+  final bool gpsSignalLost;
+
   const TrackingInProgress({
     required super.activityType,
     required this.elapsed,
@@ -42,6 +45,7 @@ class TrackingInProgress extends ActivityTrackingState {
     required this.routePoints,
     this.elevationGainMeters = 0.0,
     this.currentSpeedMps = 0.0,
+    this.gpsSignalLost = false,
   });
 
   @override
@@ -56,6 +60,7 @@ class TrackingInProgress extends ActivityTrackingState {
         routePoints,
         elevationGainMeters,
         currentSpeedMps,
+        gpsSignalLost,
       ];
 }
 
@@ -109,15 +114,20 @@ class TrackingCompleted extends ActivityTrackingState {
   /// False when writing the session to the local database failed.
   final bool saved;
 
+  /// True when the session was too short to keep and was not saved.
+  final bool discarded;
+
   const TrackingCompleted({
     required super.activityType,
     required this.session,
     this.elevationGainMeters = 0.0,
     this.saved = true,
+    this.discarded = false,
   });
 
   @override
-  List<Object?> get props => [activityType, session, elevationGainMeters, saved];
+  List<Object?> get props =>
+      [activityType, session, elevationGainMeters, saved, discarded];
 }
 
 class TrackingPermissionDenied extends ActivityTrackingState {

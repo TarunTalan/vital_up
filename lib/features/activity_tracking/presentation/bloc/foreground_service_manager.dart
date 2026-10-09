@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
 
@@ -87,11 +88,8 @@ class ForegroundServiceManager {
       await FlutterForegroundTask.requestNotificationPermission();
     }
 
-    final ignoringBatteryOptimizations =
-        await FlutterForegroundTask.isIgnoringBatteryOptimizations;
-    if (!ignoringBatteryOptimizations) {
-      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
-    }
+    // No battery-optimisation exemption: a location foreground service
+    // keeps GPS running under Doze, and Play restricts that permission.
 
     if (await FlutterForegroundTask.isRunningService) {
       // Already up for a download — take over its notification.
@@ -172,8 +170,14 @@ class ForegroundServiceManager {
     // the text hasn't changed.
     if (statsText == _lastStatsText) return;
     _lastStatsText = statsText;
-    if (await FlutterForegroundTask.isRunningService) {
-      FlutterForegroundTask.sendDataToTask(statsText);
+    // Callers don't await this; a failed notification update must never
+    // surface as an uncaught error mid-workout.
+    try {
+      if (await FlutterForegroundTask.isRunningService) {
+        FlutterForegroundTask.sendDataToTask(statsText);
+      }
+    } catch (e) {
+      debugPrint('Workout notification update failed: $e');
     }
   }
 

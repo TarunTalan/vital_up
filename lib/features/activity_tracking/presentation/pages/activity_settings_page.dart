@@ -220,7 +220,11 @@ class ActivitySettingsPage extends StatelessWidget {
                             );
                         if (result != null) {
                           final (WorkoutTargetType type, double val) = result;
-                          await prefsNotifier.setDailyTarget(type, val);
+                          if (type == WorkoutTargetType.none) {
+                            await prefsNotifier.clearDailyTarget();
+                          } else {
+                            await prefsNotifier.setDailyTarget(type, val);
+                          }
                         }
                       },
                     ),

@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -76,8 +77,15 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
 
   Future<void> _loadFavoritesAndDownloads() async {
     final isar = _isarService.isar;
-    final favs = await isar.favoriteAudios.where().findAll();
-    final dls = await isar.downloadedTracks.where().findAll();
+    final List<FavoriteAudio> favs;
+    final List<DownloadedTrack> dls;
+    try {
+      favs = await isar.favoriteAudios.where().findAll();
+      dls = await isar.downloadedTracks.where().findAll();
+    } catch (e) {
+      debugPrint('Loading saved tracks failed: $e');
+      return;
+    }
     if (mounted) {
       setState(() {
         _favorites = favs;
@@ -93,24 +101,31 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     String source,
   ) async {
     final isar = _isarService.isar;
-    final existing = await isar.favoriteAudios
-        .filter()
-        .trackIdEqualTo(trackId)
-        .findFirst();
+    try {
+      final existing = await isar.favoriteAudios
+          .filter()
+          .trackIdEqualTo(trackId)
+          .findFirst();
 
-    await isar.writeTxn(() async {
-      if (existing != null) {
-        await isar.favoriteAudios.delete(existing.id);
-      } else {
-        final fav = FavoriteAudio()
-          ..trackId = trackId
-          ..title = title
-          ..subtitle = subtitle
-          ..audioSource = source
-          ..favoritedAt = DateTime.now();
-        await isar.favoriteAudios.put(fav);
+      await isar.writeTxn(() async {
+        if (existing != null) {
+          await isar.favoriteAudios.delete(existing.id);
+        } else {
+          final fav = FavoriteAudio()
+            ..trackId = trackId
+            ..title = title
+            ..subtitle = subtitle
+            ..audioSource = source
+            ..favoritedAt = DateTime.now();
+          await isar.favoriteAudios.put(fav);
+        }
+      });
+    } catch (e) {
+      debugPrint('Updating favourites failed: $e');
+      if (mounted) {
+        showErrorSnackBar(context, "Couldn't update favourites. Try again.");
       }
-    });
+    }
 
     _loadFavoritesAndDownloads();
   }
@@ -129,6 +144,8 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     String title,
     String subtitle,
   ) async {
+    // One download per track: a second tap would write the same file.
+    if (_downloadProgress.containsKey(trackId)) return;
     setState(() => _downloadProgress[trackId] = 0.01);
     try {
       await _downloader.downloadTrack(
@@ -147,12 +164,16 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
       }
       _loadFavoritesAndDownloads();
       if (mounted) {
-        showSuccessSnackBar(context, 'Downloaded "$title" successfully!');
+        showSuccessSnackBar(context, '"$title" is ready to play offline.');
       }
     } catch (e) {
+      debugPrint('Audio download failed: $e');
       if (mounted) {
         setState(() => _downloadProgress.remove(trackId));
-        showErrorSnackBar(context, 'Download failed: $e');
+        showErrorSnackBar(
+          context,
+          userMessage(e, fallback: "Couldn't download this track. Try again."),
+        );
       }
     }
   }

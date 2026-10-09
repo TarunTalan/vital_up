@@ -166,7 +166,10 @@ class GoalEditorSheet extends StatefulWidget {
 class _GoalEditorSheetState extends State<GoalEditorSheet> {
   late GoalMetric _metric = widget.initial?.metric ?? _firstFree().$1;
   late GoalPeriod _period = widget.initial?.period ?? _firstFree().$2;
-  late double _target = widget.initial?.target ?? _metric.suggested(_period);
+  late double _target = _metric.clampTarget(
+    _period,
+    widget.initial?.target ?? _metric.suggested(_period),
+  );
 
   bool get _editing => widget.initial != null;
 
@@ -215,7 +218,11 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
             enabled: !taken,
             onTap: () => Navigator.pop(
               context,
-              ActivityGoal(metric: _metric, period: _period, target: _target),
+              ActivityGoal(
+                metric: _metric,
+                period: _period,
+                target: _metric.clampTarget(_period, _target),
+              ),
             ),
           ),
         ),
@@ -269,8 +276,11 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
             children: [
               IconButton.outlined(
                 tooltip: 'Decrease',
-                onPressed: _target > step
-                    ? () => setState(() => _target -= step)
+                onPressed: _target - step >= _metric.minTarget(_period)
+                    ? () => setState(
+                          () => _target =
+                              _metric.clampTarget(_period, _target - step),
+                        )
                     : null,
                 icon: const Icon(Icons.remove_rounded),
               ),
@@ -288,7 +298,12 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
               ),
               IconButton.outlined(
                 tooltip: 'Increase',
-                onPressed: () => setState(() => _target += step),
+                onPressed: _target + step <= _metric.maxTarget(_period)
+                    ? () => setState(
+                          () => _target =
+                              _metric.clampTarget(_period, _target + step),
+                        )
+                    : null,
                 icon: const Icon(Icons.add_rounded),
               ),
             ],

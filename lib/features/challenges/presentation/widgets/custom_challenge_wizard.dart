@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -16,15 +17,11 @@ import 'package:vital_up/features/community/domain/repositories/community_reposi
 import 'package:vital_up/features/community/presentation/widgets/friend_tile.dart';
 
 /// Metrics and lengths the server accepts for a challenge.
-const _metrics = [
-  ChallengeMetric.activeMinutes,
-  ChallengeMetric.distanceKm,
-  ChallengeMetric.workouts,
-];
-const _durations = [3, 7, 14];
+const _metrics = ChallengesRepository.creatableMetrics;
+const _durations = ChallengesRepository.durations;
 
 /// At most this many friends per challenge (server limit).
-const _maxFriends = 9;
+const _maxFriends = ChallengesRepository.maxFriends;
 
 /// New challenge: what to compete on, for how long, and which friends.
 /// Pops once the challenge is sent; callers reload their lists after.
@@ -60,6 +57,7 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
   });
 
   Future<void> _send() async {
+    if (_sending || _selected.isEmpty) return;
     setState(() => _sending = true);
     final navigator = Navigator.of(context);
     final rootContext = navigator.context;
@@ -69,15 +67,21 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
         days: _days,
         friendIds: _selected.toList(),
       );
-      navigator.pop();
+      if (mounted) navigator.pop();
       if (rootContext.mounted) {
         showSuccessSnackBar(rootContext, 'Challenge sent');
       }
     } catch (e) {
+      debugPrint('Sending a challenge failed: $e');
       if (mounted) {
         showErrorSnackBar(
           context,
-          e is ChallengeException ? e.message : "Couldn't send the challenge.",
+          e is ChallengeException
+              ? e.message
+              : userMessage(
+                  e,
+                  fallback: "Couldn't send the challenge. Try again.",
+                ),
         );
       }
     } finally {
@@ -138,7 +142,9 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
             builder: (context, snap) {
               if (snap.hasError) {
                 return LoadErrorView(
-                  onRetry: () => setState(() => _friends = _loadFriends()),
+                  onRetry: () => setState(() {
+                    _friends = _loadFriends();
+                  }),
                 );
               }
               final friends = snap.data;

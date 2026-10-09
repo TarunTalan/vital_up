@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/features/auth/presentation/widgets/auth_text_field.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
@@ -34,14 +36,21 @@ class _SessionDetailSheet extends StatefulWidget {
 }
 
 class _SessionDetailSheetState extends State<_SessionDetailSheet> {
-  late String _tag;
-  late String _note;
+  late final TextEditingController _tag;
+  late final TextEditingController _note;
 
   @override
   void initState() {
     super.initState();
-    _tag = widget.entry.annotation?.tag ?? '';
-    _note = widget.entry.annotation?.note ?? '';
+    _tag = TextEditingController(text: widget.entry.annotation?.tag ?? '');
+    _note = TextEditingController(text: widget.entry.annotation?.note ?? '');
+  }
+
+  @override
+  void dispose() {
+    _tag.dispose();
+    _note.dispose();
+    super.dispose();
   }
 
   @override
@@ -153,30 +162,42 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             ),
           ],
           const SizedBox(height: AppDimens.sectionGap),
-          AuthTextField(
+          AppTextField(
+            controller: _tag,
             label: 'Tag',
-            value: _tag,
-            onChange: (val) => setState(() => _tag = val),
-            placeholder: 'e.g. Morning run, Race day, Recovery',
-            reserveErrorSpace: false,
-            singleLine: true,
+            hint: 'e.g. Morning run, Race day, Recovery',
+            maxLength: SessionAnnotationLimits.tag,
+            inputFormatters: InputFormatters.text(SessionAnnotationLimits.tag),
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppDimens.space16),
-          AuthTextField(
+          AppTextField(
+            controller: _note,
             label: 'Note',
-            value: _note,
-            onChange: (val) => setState(() => _note = val),
-            placeholder: 'How did it feel?',
-            reserveErrorSpace: false,
-            singleLine: false,
+            hint: 'How did it feel?',
+            multiline: true,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: SessionAnnotationLimits.note,
+            showCounter: true,
+            inputFormatters: InputFormatters.text(
+              SessionAnnotationLimits.note,
+              multiline: true,
+            ),
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: AppDimens.sectionGap),
           AppPrimaryButton(
             label: 'Save',
             onTap: () {
               Navigator.of(context).pop((
-                _tag.trim().isEmpty ? null : _tag.trim(),
-                _note.trim().isEmpty ? null : _note.trim(),
+                sanitizeOptional(_tag.text, maxLength: SessionAnnotationLimits.tag),
+                sanitizeOptional(
+                  _note.text,
+                  maxLength: SessionAnnotationLimits.note,
+                  multiline: true,
+                ),
               ));
             },
           ),

@@ -220,8 +220,9 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
         ],
       ),
     );
-    if (ok != true) return;
-    if (await cubit.leave(widget.challenge)) navigator.pop();
+    if (ok != true || !mounted) return;
+    // The sheet may be gone by then; don't pop whatever is underneath.
+    if (await cubit.leave(widget.challenge) && mounted) navigator.pop();
   }
 
   @override
@@ -260,7 +261,9 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
                 const SizedBox(height: AppDimens.space16),
                 if (snap.hasError)
                   LoadErrorView(
-                    onRetry: () => setState(() => _standings = _fetch()),
+                    onRetry: () => setState(() {
+                      _standings = _fetch();
+                    }),
                   )
                 else if (standings == null)
                   const Padding(

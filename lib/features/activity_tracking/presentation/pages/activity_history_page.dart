@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -47,7 +48,16 @@ class _ActivityHistoryView extends StatelessWidget {
         behavior: HitTestBehavior.translucent,
         child: SafeArea(
           top: false,
-          child: BlocBuilder<ActivityHistoryBloc, ActivityHistoryState>(
+          child: BlocConsumer<ActivityHistoryBloc, ActivityHistoryState>(
+            listenWhen: (previous, current) =>
+                current is ActivityHistoryLoaded &&
+                current.actionError != null &&
+                (previous is! ActivityHistoryLoaded ||
+                    previous.actionErrorId != current.actionErrorId),
+            listener: (context, state) {
+              final message = (state as ActivityHistoryLoaded).actionError;
+              if (message != null) showErrorSnackBar(context, message);
+            },
             builder: (context, state) {
               if (state is ActivityHistoryLoading) {
                 return const Center(child: CircularProgressIndicator());

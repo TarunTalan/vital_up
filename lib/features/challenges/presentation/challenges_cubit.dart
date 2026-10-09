@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 
@@ -48,7 +49,9 @@ class ChallengesCubit extends Cubit<ChallengesState> {
     try {
       final challenges = await _repository.getChallenges();
       if (!isClosed) emit(state.copyWith(challenges: challenges));
-    } on ChallengeException {
+    } catch (e) {
+      // Includes rows that don't parse, not only server refusals.
+      debugPrint('Challenges failed to load: $e');
       if (!isClosed) emit(state.copyWith(failed: true));
     }
   }
@@ -69,17 +72,25 @@ class ChallengesCubit extends Cubit<ChallengesState> {
       return e.message;
     }
     await load();
-    if (!isClosed) emit(state.copyWith(message: 'Challenge sent!'));
+    if (!isClosed) emit(state.copyWith(message: 'Challenge sent'));
     return null;
   }
 
   Future<void> respond(Challenge challenge, {required bool accept}) async {
+    if (isClosed || state.busy.contains(challenge.id)) return;
+    if (accept && !challenge.isActiveAt(DateTime.now())) {
+      emit(state.copyWith(message: 'That challenge has already ended.'));
+      await load();
+      return;
+    }
     emit(state.copyWith(busy: {...state.busy, challenge.id}));
     try {
       await _repository.respond(challenge, accept: accept);
       await load();
     } on ChallengeException catch (e) {
       if (!isClosed) emit(state.copyWith(message: e.message));
+      // Ended or answered elsewhere: show the list as it is now.
+      await load();
     } finally {
       if (!isClosed) {
         emit(state.copyWith(busy: {...state.busy}..remove(challenge.id)));
@@ -89,6 +100,7 @@ class ChallengesCubit extends Cubit<ChallengesState> {
 
   /// Quits a running challenge. Returns true once left.
   Future<bool> leave(Challenge challenge) async {
+    if (isClosed || state.busy.contains(challenge.id)) return false;
     emit(state.copyWith(busy: {...state.busy, challenge.id}));
     try {
       await _repository.leave(challenge);
@@ -97,6 +109,7 @@ class ChallengesCubit extends Cubit<ChallengesState> {
       return true;
     } on ChallengeException catch (e) {
       if (!isClosed) emit(state.copyWith(message: e.message));
+      await load();
       return false;
     } finally {
       if (!isClosed) {

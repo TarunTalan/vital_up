@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:isar_community/isar.dart';
@@ -154,8 +155,8 @@ class WorkoutAudioService {
         await _audioPlayer.pause();
       }
     } catch (e, stack) {
-      print("VITAL_UP AUDIO PLAYBACK ERROR: $e");
-      print(stack);
+      debugPrint('Workout audio playback failed: $e');
+      debugPrintStack(stackTrace: stack);
       _currentTrack = null;
     }
   }

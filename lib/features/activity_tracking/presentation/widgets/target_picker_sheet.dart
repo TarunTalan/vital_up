@@ -6,8 +6,11 @@ import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
 
 /// Bottom sheet for selecting a workout target (distance or calories).
+/// Pops `(type, value)` on save, `(WorkoutTargetType.none, 0)` on Clear,
+/// or null when dismissed.
 class TargetPickerSheet extends StatefulWidget {
   final WorkoutPrefs current;
   final DistanceUnit distanceUnit;
@@ -31,7 +34,11 @@ class TargetPickerSheet extends StatefulWidget {
     ).then((result) {
       if (result == null) return;
       final (WorkoutTargetType type, double val) = result;
-      notifier.setTarget(type, val);
+      if (type == WorkoutTargetType.none) {
+        notifier.clearTarget();
+      } else {
+        notifier.setTarget(type, val);
+      }
     });
   }
 
@@ -59,7 +66,7 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
     // Pre-fill existing values
     if (widget.current.targetType == WorkoutTargetType.distance) {
       final displayVal = widget.distanceUnit == DistanceUnit.miles
-          ? widget.current.targetValue / 1.60934
+          ? widget.current.targetValue / ActivityTargetLimits.kmPerMile
           : widget.current.targetValue;
       _distCtrl.text = displayVal.toStringAsFixed(1);
       _tabs.animateTo(0);
@@ -82,18 +89,17 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
   }
 
   void _confirm(WorkoutTargetType type) {
-    double val = 0;
-    if (type == WorkoutTargetType.distance) {
-      val = double.tryParse(_distCtrl.text) ?? 0;
-      if (widget.distanceUnit == DistanceUnit.miles) val *= 1.60934;
-    } else {
-      val = double.tryParse(_calCtrl.text) ?? 0;
-    }
-    if (val <= 0) {
-      setState(() => _error = 'Enter a target');
+    final result = parseActivityTarget(
+      type,
+      type == WorkoutTargetType.distance ? _distCtrl.text : _calCtrl.text,
+      widget.distanceUnit,
+    );
+    final value = result.value;
+    if (value == null) {
+      setState(() => _error = result.error);
       return;
     }
-    Navigator.of(context).pop((type, val));
+    Navigator.of(context).pop((type, value));
   }
 
   @override
@@ -198,7 +204,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                 Expanded(
                   child: AppSecondaryButton(
                     label: 'Clear',
-                    onTap: () => Navigator.of(context).pop(null),
+                    // Null would read as "dismissed" and keep the target.
+                    onTap: () =>
+                        Navigator.of(context).pop((WorkoutTargetType.none, 0.0)),
                   ),
                 ),
                 const SizedBox(width: AppDimens.space12),

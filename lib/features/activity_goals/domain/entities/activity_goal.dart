@@ -4,11 +4,11 @@ import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
 /// What an activity goal measures.
 enum GoalMetric {
-  steps('Steps', 'steps', daily: 8000, weekly: 50000, step: 500),
-  distance('Distance', 'km', daily: 3, weekly: 15, step: 0.5),
-  calories('Calories burned', 'kcal', daily: 300, weekly: 2000, step: 50),
-  activeMinutes('Active minutes', 'min', daily: 30, weekly: 150, step: 5),
-  workouts('Workouts', 'workouts', daily: 1, weekly: 4, step: 1);
+  steps('Steps', 'steps', daily: 8000, weekly: 50000, step: 500, maxDaily: 100000),
+  distance('Distance', 'km', daily: 3, weekly: 15, step: 0.5, maxDaily: 100),
+  calories('Calories burned', 'kcal', daily: 300, weekly: 2000, step: 50, maxDaily: 5000),
+  activeMinutes('Active minutes', 'min', daily: 30, weekly: 150, step: 5, maxDaily: 720),
+  workouts('Workouts', 'workouts', daily: 1, weekly: 4, step: 1, maxDaily: 5);
 
   final String label;
   final String unit;
@@ -18,16 +18,32 @@ enum GoalMetric {
   final double weekly;
   final double step;
 
+  /// Highest daily target accepted; weekly allows seven times this.
+  final double maxDaily;
+
   const GoalMetric(
     this.label,
     this.unit, {
     required this.daily,
     required this.weekly,
     required this.step,
+    required this.maxDaily,
   });
 
   double suggested(GoalPeriod period) =>
       period == GoalPeriod.daily ? daily : weekly;
+
+  /// Smallest and largest target the editor allows for [period].
+  double minTarget(GoalPeriod period) => step;
+  double maxTarget(GoalPeriod period) =>
+      period == GoalPeriod.daily ? maxDaily : maxDaily * 7;
+
+  /// [value] kept within the allowed range (NaN / infinity become the
+  /// suggested target).
+  double clampTarget(GoalPeriod period, double value) {
+    if (!value.isFinite) return suggested(period);
+    return value.clamp(minTarget(period), maxTarget(period)).toDouble();
+  }
 
   /// Today's contribution of one tracked session to this metric.
   double fromSession(ActivitySession s) => switch (this) {
@@ -76,10 +92,18 @@ class ActivityGoal extends Equatable {
     final metric = GoalMetric.values.where((m) => m.name == json['m']).firstOrNull;
     final period = GoalPeriod.values.where((p) => p.name == json['p']).firstOrNull;
     final target = (json['t'] as num?)?.toDouble();
-    if (metric == null || period == null || target == null || target <= 0) {
+    if (metric == null ||
+        period == null ||
+        target == null ||
+        !target.isFinite ||
+        target <= 0) {
       return null;
     }
-    return ActivityGoal(metric: metric, period: period, target: target);
+    return ActivityGoal(
+      metric: metric,
+      period: period,
+      target: metric.clampTarget(period, target),
+    );
   }
 
   @override

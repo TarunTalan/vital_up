@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -40,6 +41,7 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
   bool _submitting = false;
 
   Future<void> _send() async {
+    if (_submitting) return;
     setState(() => _submitting = true);
     final navigator = Navigator.of(context);
     final rootContext = navigator.context;
@@ -49,7 +51,7 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
         days: _selected.days,
         friendIds: [widget.friend.userId],
       );
-      navigator.pop(true);
+      if (mounted) navigator.pop(true);
       if (rootContext.mounted) {
         showSuccessSnackBar(
           rootContext,
@@ -57,10 +59,16 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
         );
       }
     } catch (e) {
+      debugPrint('Sending a challenge failed: $e');
       if (mounted) {
         showErrorSnackBar(
           context,
-          e is ChallengeException ? e.message : "Couldn't send the challenge.",
+          e is ChallengeException
+              ? e.message
+              : userMessage(
+                  e,
+                  fallback: "Couldn't send the challenge. Try again.",
+                ),
         );
       }
     } finally {

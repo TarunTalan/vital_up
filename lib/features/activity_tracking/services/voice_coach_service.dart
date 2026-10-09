@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
@@ -21,10 +22,15 @@ class VoiceCoachService {
 
   Future<void> init() async {
     if (_initialized) return;
-    await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.48);
-    await _tts.setVolume(1.0);
-    await _tts.setPitch(1.0);
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.48);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+    } catch (e) {
+      // No speech engine on the device: the workout runs without cues.
+      debugPrint('Voice coach setup failed: $e');
+    }
 
     try {
       final List<dynamic>? voices = await _tts.getVoices;
@@ -243,7 +249,7 @@ class VoiceCoachService {
   }
 
   Future<void> announceTargetReached(String targetLabel) async {
-    await _speak('Target reached! $targetLabel. Great job!');
+    await _speak('Target reached. $targetLabel. Great job.');
   }
 
   Future<void> dispose() async {

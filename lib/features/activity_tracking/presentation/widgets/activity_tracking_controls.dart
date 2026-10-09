@@ -301,7 +301,7 @@ class StartPauseControl extends StatelessWidget {
                 () {
                   showErrorSnackBar(
                     context,
-                    'Music integration is currently unavailable',
+                    'Music is not available right now.',
                   );
                 },
             child: Icon(

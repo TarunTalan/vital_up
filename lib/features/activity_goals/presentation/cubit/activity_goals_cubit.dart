@@ -72,14 +72,30 @@ class ActivityGoalsCubit extends Cubit<ActivityGoalsState> {
 
   void select(ActivityGoal goal) => emit(state.copyWith(selectedId: goal.id));
 
-  Future<void> save(ActivityGoal goal) async {
-    await _repository.saveGoal(goal);
+  /// Returns false when the goal couldn't be stored.
+  Future<bool> save(ActivityGoal goal) async {
+    try {
+      await _repository.saveGoal(goal);
+    } catch (e) {
+      debugPrint('Saving activity goal failed: $e');
+      return false;
+    }
+    if (isClosed) return true;
     emit(state.copyWith(selectedId: goal.id));
     await load();
+    return true;
   }
 
-  Future<void> delete(ActivityGoal goal) async {
-    await _repository.deleteGoal(goal);
+  /// Returns false when the goal couldn't be removed.
+  Future<bool> delete(ActivityGoal goal) async {
+    try {
+      await _repository.deleteGoal(goal);
+    } catch (e) {
+      debugPrint('Deleting activity goal failed: $e');
+      return false;
+    }
+    if (isClosed) return true;
     await load();
+    return true;
   }
 }

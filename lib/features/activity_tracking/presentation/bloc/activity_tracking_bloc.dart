@@ -31,6 +31,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   /// No fix for this long means we can't claim the user is still moving.
   static const Duration _speedStaleAfter = Duration(seconds: 5);
 
+  /// No fix for this long (from the start or the last fix) is reported to
+  /// the user as a lost GPS signal.
+  static const Duration _gpsLostAfter = Duration(seconds: 20);
+
   /// Climb only counts once altitude moves this far from the last
   /// reference, so GPS altitude jitter isn't summed into fake gain.
   static const double _elevationThresholdMeters = 3.0;
@@ -111,7 +115,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       final hasPermission = await getLiveLocationStream.ensurePermission();
       if (!hasPermission) {
         emit(TrackingPermissionDenied(
-          'Location permission is required for tracking.',
+          'Turn on location and allow access to track.',
           activityType: activityType,
         ));
         // Back to Idle straight away so the user can retry or leave the
@@ -253,6 +257,8 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     if (s is! TrackingPaused || _isStopping) return;
 
     _activeClock.start();
+    // Fixes are ignored while paused; don't report that as a lost signal.
+    _lastFixAt = _sessionClock.elapsed;
     _ignoredPausedSteps += _lastRawSteps - _rawStepsAtPause;
     // Distance walked while paused must not count, so the first fix after
     // resuming only re-anchors the route.
@@ -307,6 +313,22 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       // overwrite the final session with endTime = null.
       await _pendingSave;
 
+      if (StopAndSaveSession.isTooShortToKeep(session)) {
+        // A checkpoint may already have stored it.
+        try {
+          await stopAndSaveSession.discard(session.id);
+        } catch (e) {
+          debugPrint('Discarding short activity session failed: $e');
+        }
+        emit(TrackingCompleted(
+          activityType: s.activityType,
+          session: session,
+          saved: false,
+          discarded: true,
+        ));
+        return;
+      }
+
       var saved = true;
       try {
         await stopAndSaveSession(session);
@@ -335,8 +357,9 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     final pace = _calculateOverallPace(elapsed, s.distanceMeters);
 
     final lastFixAt = _lastFixAt;
-    final fixIsStale = lastFixAt == null ||
-        _sessionClock.elapsed - lastFixAt > _speedStaleAfter;
+    final sinceFix = _sessionClock.elapsed - (lastFixAt ?? Duration.zero);
+    final fixIsStale = lastFixAt == null || sinceFix > _speedStaleAfter;
+    final gpsSignalLost = sinceFix > _gpsLostAfter;
 
     final next = TrackingInProgress(
       activityType: s.activityType,
@@ -349,6 +372,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       routePoints: s.routePoints,
       elevationGainMeters: s.elevationGainMeters,
       currentSpeedMps: fixIsStale ? 0.0 : s.currentSpeedMps,
+      gpsSignalLost: gpsSignalLost,
     );
     emit(next);
 
@@ -451,6 +475,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       routePoints: s.routePoints,
       elevationGainMeters: s.elevationGainMeters,
       currentSpeedMps: s.currentSpeedMps,
+      gpsSignalLost: s.gpsSignalLost,
     ));
   }
 
@@ -650,7 +675,11 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       // Leaving mid-workout (e.g. the route is torn down): keep what was
       // recorded and release the foreground service.
       _checkpoint(state);
-      await ForegroundServiceManager.stop();
+      try {
+        await ForegroundServiceManager.stop();
+      } catch (e) {
+        debugPrint('Foreground service failed to stop: $e');
+      }
     }
     await _pendingSave;
     return super.close();
