@@ -62,24 +62,34 @@ Future<void> homeWidgetCallback(Uri? uri) async {
   } catch (e) {
     debugPrint('Home widget background action failed: $e');
     // Always redraw so the spinner clears.
-    await endWidgetRefresh();
+    try {
+      await endWidgetRefresh();
+    } catch (e) {
+      debugPrint('Home widget redraw failed: $e');
+    }
   }
 }
 
 /// The app's services in this isolate (one background engine can run many
 /// widget actions, so they are set up once).
 bool _appServicesReady = false;
+bool _supabaseReady = false;
 
 /// Full refresh, as the app does it. False if it couldn't run (e.g. the
 /// session didn't restore), so the caller falls back to on-device data and
 /// the widgets never flip to "signed out" by mistake.
 Future<bool> _refreshWithAppServices() async {
   try {
-    if (!_appServicesReady) {
+    // Separate flags: if DI fails after Supabase started, the next tap must
+    // not initialise Supabase a second time.
+    if (!_supabaseReady) {
       await Supabase.initialize(
         url: SupabaseConfig.url,
         publishableKey: SupabaseConfig.publishableKey,
       );
+      _supabaseReady = true;
+    }
+    if (!_appServicesReady) {
       await di.initDependencies();
       _appServicesReady = true;
     }

@@ -39,9 +39,15 @@ ReminderSchedulePlan planReminders(
   var dropped = 0;
 
   for (final reminder in reminders.where((r) => r.enabled)) {
-    final days = reminder.weekdays.isEmpty || reminder.isDaily
+    // Only real weekdays; a reminder with no days never fires (an unknown
+    // day would also loop forever when finding the next instance).
+    final valid = reminder.weekdays
+        .where((d) => d >= DateTime.monday && d <= DateTime.sunday)
+        .toSet();
+    if (valid.isEmpty) continue;
+    final days = valid.length == 7
         ? const <int?>[null]
-        : (reminder.weekdays.toList()..sort());
+        : (valid.toList()..sort());
     for (final time in reminder.firingTimes) {
       for (final day in days) {
         if (entries.length >= limit) {
@@ -112,6 +118,15 @@ Set<String> remindersDoneBy(HabitLogged event, List<Reminder> reminders) {
     Habit.weight => {
       for (final r in reminders)
         if (ofKind(r, ReminderKind.weight)) r.id,
+    },
+    // Last night is logged: morning "how did you sleep" reminders are done;
+    // the evening wind-down still applies.
+    Habit.sleep => {
+      for (final r in reminders)
+        if (ofKind(r, ReminderKind.sleep) &&
+            r.times.isNotEmpty &&
+            r.times.every((t) => t.hour < 12))
+          r.id,
     },
   };
 }

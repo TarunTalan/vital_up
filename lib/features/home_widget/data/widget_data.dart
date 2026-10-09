@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
@@ -449,7 +450,15 @@ Future<void> endWidgetRefresh() async {
 
 class CustomWidgetConfig {
   static const maxMetrics = 4;
+  static const titleMax = 20;
   static const defaultTitle = 'My metrics';
+
+  /// The title as shown: cleaned, at most [titleMax] characters, and the
+  /// default when nothing is left.
+  static String cleanTitle(String? raw) {
+    final title = sanitizeText(raw ?? '', maxLength: titleMax);
+    return title.isEmpty ? defaultTitle : title;
+  }
   static const defaults = [WidgetMetric.water, WidgetMetric.activity];
 
   final String title;
@@ -475,7 +484,7 @@ class CustomWidgetConfig {
         .whereType<WidgetMetric>()
         .toList();
     return CustomWidgetConfig(
-      title: title == null || title.trim().isEmpty ? defaultTitle : title,
+      title: cleanTitle(title),
       metrics: metrics == null || metrics.isEmpty ? defaults : metrics,
     );
   }
@@ -485,7 +494,7 @@ class CustomWidgetConfig {
       'custom_metrics',
       metrics.map((m) => m.id).join(','),
     );
-    await HomeWidget.saveWidgetData<String>('custom_title', title.trim());
+    await HomeWidget.saveWidgetData<String>('custom_title', cleanTitle(title));
     for (final p in WidgetProviders.customAll) {
       await HomeWidget.updateWidget(qualifiedAndroidName: p);
     }

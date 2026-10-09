@@ -1,8 +1,10 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
+import 'package:vital_up/features/reminders/domain/reminder_rules.dart';
 
 class RemindersState extends Equatable {
   final bool loading;
@@ -80,26 +82,45 @@ class RemindersCubit extends Cubit<RemindersState> {
 
   Future<void> load() async {
     final enabled = await _service.notificationsEnabled();
+    final reminders = _service.load();
+    // Show the "blocked" banner when permission was revoked in system
+    // settings while reminders are on (unknown counts as allowed).
+    var denied = false;
+    if (enabled && reminders.any((r) => r.enabled)) {
+      denied = await _service.permissionGranted() == false;
+    }
+    if (isClosed) return;
     emit(
       state.copyWith(
         loading: false,
-        reminders: _service.load(),
+        reminders: reminders,
         notificationsEnabled: enabled,
+        permissionDenied: denied,
         smartSkip: _service.smartSkip(),
       ),
     );
   }
 
   Future<void> setSmartSkip(bool value) async {
+    final previous = state.smartSkip;
     emit(state.copyWith(smartSkip: value));
-    await _service.setSmartSkip(value);
+    try {
+      await _service.setSmartSkip(value);
+    } catch (e) {
+      debugPrint('Smart skip not saved: $e');
+      if (isClosed) return;
+      emit(state.copyWith(smartSkip: previous, message: _saveFailed));
+    }
   }
+
+  static const _saveFailed = "Couldn't update reminders. Try again.";
 
   Future<void> toggle(Reminder reminder, bool enabled) =>
       _replace(reminder.copyWith(enabled: enabled));
 
-  /// Saves an edited reminder (or adds it, if new).
-  Future<void> saveReminder(Reminder reminder) => _replace(reminder);
+  /// Saves an edited reminder (or adds it, if new); text is cleaned first.
+  Future<void> saveReminder(Reminder reminder) =>
+      _replace(ReminderRules.sanitize(reminder));
 
   /// A new, unsaved custom reminder for the editor.
   Reminder draftCustom() => Reminder(
@@ -134,17 +155,25 @@ class RemindersCubit extends Cubit<RemindersState> {
   }) async {
     emit(state.copyWith(reminders: reminders));
     var denied = state.permissionDenied;
-    if (turningOn && state.notificationsEnabled) {
-      denied = !await _service.requestPermission();
+    final int dropped;
+    try {
+      if (turningOn && state.notificationsEnabled) {
+        denied = !await _service.requestPermission();
+      }
+      dropped = await _service.save(reminders);
+    } catch (e) {
+      debugPrint('Saving reminders failed: $e');
+      if (isClosed) return;
+      // Show what is actually stored rather than the unsaved change.
+      emit(state.copyWith(reminders: _service.load(), message: _saveFailed));
+      return;
     }
-    final dropped = await _service.save(reminders);
     if (isClosed) return;
     emit(
       state.copyWith(
         permissionDenied: denied,
         message: dropped > 0
-            ? 'Too many reminders — $dropped won\'t be delivered. '
-                  'Turn some off or space them out.'
+            ? "Too many reminders: $dropped won't ring. Turn some off."
             : null,
       ),
     );

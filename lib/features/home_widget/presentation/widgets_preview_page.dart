@@ -87,7 +87,9 @@ Future<void> pinWidget(BuildContext context, String provider) async {
       await HomeWidget.requestPinWidget(qualifiedAndroidName: provider);
       return;
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('Pin widget request failed: $e');
+  }
   if (!context.mounted) return;
   await showSmoothDialog<void>(
     context: context,
@@ -132,6 +134,7 @@ class _WidgetsPreviewPageState extends State<WidgetsPreviewPage> {
   }
 
   Future<void> _refresh() async {
+    if (_refreshing) return;
     setState(() => _refreshing = true);
     try {
       if (HomeWidgetService.supported) {

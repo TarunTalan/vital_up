@@ -176,7 +176,10 @@ class PushService {
     if (payload == null) return;
     try {
       _handleOpen(Map<String, dynamic>.from(jsonDecode(payload) as Map));
-    } catch (_) {}
+    } catch (e) {
+      // Not a push payload (e.g. a reminder without a link).
+      debugPrint('Unreadable notification payload: $e');
+    }
   }
 
   /// Asks for notification permission (Android 13+), then registers.
@@ -267,30 +270,37 @@ class PushService {
     final n = message.notification;
     if (n == null) return;
     final id = int.tryParse('${message.data['notification_id']}');
-    await _local.show(
-      id: id ?? message.hashCode,
-      title: n.title,
-      body: n.body,
-      payload: jsonEncode(message.data),
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channel.id,
-          _channel.name,
-          channelDescription: _channel.description,
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _local.show(
+        // Android ids are 32-bit; the row id (bigint) or hash may not be.
+        id: (id ?? message.hashCode) & 0x7fffffff,
+        title: n.title,
+        body: n.body,
+        payload: jsonEncode(message.data),
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channel.id,
+            _channel.name,
+            channelDescription: _channel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      // Notifications blocked or the plugin unavailable: the inbox still
+      // gets the row.
+      debugPrint('Showing a foreground push failed: $e');
+    }
   }
 
   void _handleOpen(Map<String, dynamic> data) {
     final open = PushOpen.fromData(data);
     final id = open.notificationId;
     if (id != null) {
-      _notifications.markRead([id]).catchError(
-        (Object e) => debugPrint('Mark push read failed: $e'),
-      );
+      _notifications
+          .markRead([id])
+          .catchError((Object e) => debugPrint('Mark push read failed: $e'));
     }
     if (_opens.hasListener) {
       _opens.add(open);

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/sync/pending_writes.dart';
 
@@ -54,11 +55,16 @@ class NotificationsRemoteDataSource {
   /// The new row of each insert and update on the caller's notifications.
   /// Deletes can't be filtered per user, so the app applies its own deletes
   /// locally instead.
-  Stream<Map<String, dynamic>> changes() {
+  ///
+  /// Rows sent while the connection was down are not replayed: the channel
+  /// rejoins on its own, and [onResubscribed] runs each time it does so the
+  /// caller can refetch what it missed.
+  Stream<Map<String, dynamic>> changes({void Function()? onResubscribed}) {
     final user = userId;
     if (user == null) return const Stream.empty();
 
     RealtimeChannel? channel;
+    var joined = false;
     late final StreamController<Map<String, dynamic>> controller;
     void onChange(PostgresChangePayload payload) {
       if (payload.newRecord.isNotEmpty) controller.add(payload.newRecord);
@@ -88,7 +94,14 @@ class NotificationsRemoteDataSource {
               filter: filter,
               callback: onChange,
             )
-            .subscribe();
+            .subscribe((status, error) {
+              if (status == RealtimeSubscribeStatus.subscribed) {
+                if (joined) onResubscribed?.call();
+                joined = true;
+              } else if (error != null) {
+                debugPrint('Notifications feed $status: $error');
+              }
+            });
       },
       onCancel: () async {
         final c = channel;

@@ -285,12 +285,17 @@ class HomeWidgetService {
   /// Opens [route] above Home; signed-out users go to sign-in.
   static void open(String route) {
     final router = AppRouter.router;
-    final signedIn = Supabase.instance.client.auth.currentUser != null;
-    if (!signedIn) {
-      router.goNamed('login');
-      return;
+    try {
+      final signedIn = Supabase.instance.client.auth.currentUser != null;
+      if (!signedIn) {
+        router.goNamed('login');
+        return;
+      }
+      router.goNamed('dashboard');
+      if (route != 'dashboard' && route != 'login') router.pushNamed(route);
+    } catch (e) {
+      // A route missing from the router: stay on Home rather than crash.
+      debugPrint('Widget link to "$route" failed: $e');
     }
-    router.goNamed('dashboard');
-    if (route != 'dashboard' && route != 'login') router.pushNamed(route);
   }
 }

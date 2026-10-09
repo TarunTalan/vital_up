@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -52,6 +53,9 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
         _metrics = [...data.custom.metrics];
         _title.text = data.custom.title;
       });
+    }).catchError((Object e) {
+      debugPrint('Widget data unreadable: $e');
+      if (mounted) showErrorSnackBar(context, "Couldn't load the widget. Try again.");
     });
   }
 
@@ -62,9 +66,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
   }
 
   CustomWidgetConfig get _config => CustomWidgetConfig(
-    title: _title.text.trim().isEmpty
-        ? CustomWidgetConfig.defaultTitle
-        : _title.text.trim(),
+    title: CustomWidgetConfig.cleanTitle(_title.text),
     metrics: _metrics,
   );
 
@@ -88,7 +90,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
   }
 
   Future<bool> _save() async {
-    if (_metrics.isEmpty) return false;
+    if (_metrics.isEmpty || _saving) return false;
     setState(() => _saving = true);
     try {
       final config = _config;
@@ -97,7 +99,8 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
       setState(() => _saved = config);
       showSuccessSnackBar(context, 'Widget saved');
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Custom widget not saved: $e');
       if (mounted) {
         showErrorSnackBar(context, "Couldn't save the widget. Try again.");
       }
@@ -204,7 +207,9 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
           AppTextField(
             controller: _title,
             hint: CustomWidgetConfig.defaultTitle,
-            maxLength: 20,
+            maxLength: CustomWidgetConfig.titleMax,
+            inputFormatters: InputFormatters.text(CustomWidgetConfig.titleMax),
+            textInputAction: TextInputAction.done,
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: AppDimens.sectionGap),
