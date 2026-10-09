@@ -5,6 +5,9 @@ import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 
 class WaterIntakeService {
   final IsarService _isarService;
@@ -24,18 +27,27 @@ class WaterIntakeService {
 
   Isar get _isar => _isarService.isar;
 
-  /// Get the current daily goal
-  int getDailyGoal() {
-    return _prefs.getInt(_dailyGoalKey) ?? _defaultGoalMl;
-  }
+  /// The daily goal in ml; the default when unset or out of range.
+  int getDailyGoal() => sanitizeWaterGoal(
+    _prefs.getInt(_dailyGoalKey),
+    fallback: _defaultGoalMl,
+  );
 
-  /// Update the daily goal
+  /// Saves the daily goal, kept within the allowed range.
   Future<void> setDailyGoal(int goal) async {
-    await _prefs.setInt(_dailyGoalKey, goal);
+    await _prefs.setInt(
+      _dailyGoalKey,
+      goal.clamp(InputLimits.waterGoalMlMin, InputLimits.waterGoalMlMax),
+    );
   }
 
-  /// Add a new water intake entry
+  /// Add a new water intake entry. Throws [ArgumentError] for an amount
+  /// outside [InputLimits.waterMlMin]..[InputLimits.waterMlMax].
   Future<WaterLogCache> addWaterLog(String userId, int amountMl) async {
+    if (amountMl < InputLimits.waterMlMin ||
+        amountMl > InputLimits.waterMlMax) {
+      throw ArgumentError.value(amountMl, 'amountMl', 'out of range');
+    }
     final log = WaterLogCache()
       ..userId = userId
       ..amountMl = amountMl
@@ -86,15 +98,7 @@ class WaterIntakeService {
 
   /// Get all water logs for today for a specific user
   Future<List<WaterLogCache>> getTodayLogs(String userId) async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
-
-    return await _isar.waterLogCaches
-        .filter()
-        .userIdEqualTo(userId)
-        .timestampBetween(startOfDay, endOfDay)
-        .sortByTimestamp()
-        .findAll();
+    final today = startOfDay(DateTime.now());
+    return getLogsBetween(userId, today, nextDay(today));
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -13,10 +14,25 @@ import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+
+/// Swipe-to-delete for a detail page's history: removes [log] at once,
+/// deletes it, reloads, and says so if it couldn't be deleted.
+Future<void> deleteTrackerLog<L>(
+  BuildContext context,
+  TrendCubit<L> cubit,
+  L log,
+  Future<void> Function() delete,
+) async {
+  final ok = await cubit.deleteLog(log, delete);
+  if (!ok && context.mounted) {
+    showErrorSnackBar(context, "Couldn't delete that entry. Try again.");
+  }
+}
 
 /// Today's readout on a detail page hero.
 class TrackerToday {
@@ -123,9 +139,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     return TrackerToday(
       value: value == null ? '—' : format(value),
       caption: goal == null ? null : 'of ${format(goal)}',
-      fraction: value == null || goal == null || goal <= 0
-          ? null
-          : value / goal,
+      fraction: safeFraction(value, goal),
       status: TrackerStatus.of(
         value: value,
         goal: goal,
@@ -240,7 +254,9 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
-    final fraction = today.fraction;
+    final raw = today.fraction;
+    // NaN / infinity would throw when rounded for the ring label.
+    final fraction = raw != null && raw.isFinite ? raw : null;
     return AppCard(
       width: double.infinity,
       padding: AppDimens.cardPaddingCompact,

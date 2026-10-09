@@ -11,6 +11,8 @@ import 'package:vital_up/core/widgets/circular_sleep_clock.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_sheet.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
+import 'package:vital_up/features/dashboard/domain/entities/sleep_session_info.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/mood_widgets.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
@@ -28,10 +30,11 @@ const waterPresets = [
 ];
 
 /// Log water: tap a preset to add it straight away, or type an amount.
-/// Returns the millilitres added, or null.
+/// [onAdd] returns whether the drink was saved (a throw counts as not
+/// saved). Returns the millilitres added, or null.
 Future<int?> showWaterLogSheet(
   BuildContext context, {
-  required Future<void> Function(int ml) onAdd,
+  required Future<bool> Function(int ml) onAdd,
 }) {
   return showAppBottomSheet<int>(
     context: context,
@@ -40,7 +43,7 @@ Future<int?> showWaterLogSheet(
 }
 
 class _WaterLogSheet extends StatefulWidget {
-  final Future<void> Function(int ml) onAdd;
+  final Future<bool> Function(int ml) onAdd;
 
   const _WaterLogSheet({required this.onAdd});
 
@@ -60,17 +63,34 @@ class _WaterLogSheetState extends State<_WaterLogSheet> {
   }
 
   Future<void> _add(int ml) async {
+    // One drink per tap, however fast the taps come.
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     HapticFeedback.mediumImpact();
-    await widget.onAdd(ml);
-    if (mounted) Navigator.pop(context, ml);
+    var saved = false;
+    try {
+      saved = await widget.onAdd(ml);
+    } catch (e) {
+      debugPrint('Water not saved: $e');
+    }
+    if (!mounted) return;
+    if (saved) {
+      Navigator.pop(context, ml);
+    } else {
+      setState(() {
+        _saving = false;
+        _error = "Couldn't add water. Try again.";
+      });
+    }
   }
 
   void _addCustom() {
-    final ml = int.tryParse(_custom.text);
-    if (ml == null || ml <= 0 || ml > 3000) {
-      setState(() => _error = 'Enter an amount between 1 and 3000 ml');
+    final ml = parseWaterAmount(_custom.text);
+    if (ml == null) {
+      setState(() => _error = waterAmountError);
       return;
     }
     _add(ml);
@@ -104,11 +124,18 @@ class _WaterLogSheetState extends State<_WaterLogSheet> {
             ],
           ),
           const SizedBox(height: AppDimens.sectionGap),
-          AppTextField.integer(
+          AppTextField(
             label: 'Custom amount',
             controller: _custom,
             hint: 'e.g. 350',
             suffixText: 'ml',
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(waterAmountMaxDigits),
+            ],
+            textInputAction: TextInputAction.done,
+            enabled: !_saving,
             error: _error,
             onSubmitted: (_) => _addCustom(),
             onChanged: (_) {
@@ -156,16 +183,27 @@ class _MoodLogSheetState extends State<_MoodLogSheet> {
   late int? _level = widget.initialLevel;
   late final Set<StressTag> _tags = {...widget.initialTags};
   bool _saving = false;
+  String? _error;
 
   Future<void> _save() async {
     final level = _level;
-    if (level == null) return;
+    if (level == null || _saving) return;
     setState(() => _saving = true);
     HapticFeedback.mediumImpact();
-    await sl<VitaRepository>().saveStressCheckIn(
-      level,
-      tags: StressTag.values.where(_tags.contains).toList(),
-    );
+    try {
+      await sl<VitaRepository>().saveStressCheckIn(
+        level,
+        tags: StressTag.values.where(_tags.contains).toList(),
+      );
+    } catch (e) {
+      debugPrint('Mood check-in not saved: $e');
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = "Couldn't save your check-in. Try again.";
+      });
+      return;
+    }
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -203,6 +241,16 @@ class _MoodLogSheetState extends State<_MoodLogSheet> {
               if (!_tags.remove(tag)) _tags.add(tag);
             }),
           ),
+          if (_error case final error?) ...[
+            const SizedBox(height: AppDimens.space12),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -298,68 +346,105 @@ class StressTagPicker extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 /// Log a night on the bedtime / wake-up dial, for last night or an earlier
-/// one. Returns true once saved.
-Future<bool> showSleepLogSheet(BuildContext context) async {
+/// one, starting from [initial] (e.g. the phone's estimate) when given.
+/// Returns true once saved.
+Future<bool> showSleepLogSheet(
+  BuildContext context, {
+  SleepSessionInfo? initial,
+}) async {
   final saved = await showAppBottomSheet<bool>(
     context: context,
-    builder: (_) => const _SleepLogSheet(),
+    builder: (_) => _SleepLogSheet(initial: initial),
   );
   return saved == true;
 }
 
 class _SleepLogSheet extends StatefulWidget {
-  const _SleepLogSheet();
+  final SleepSessionInfo? initial;
+
+  const _SleepLogSheet({this.initial});
 
   @override
   State<_SleepLogSheet> createState() => _SleepLogSheetState();
 }
 
 class _SleepLogSheetState extends State<_SleepLogSheet> {
-  TimeOfDay _bed = const TimeOfDay(hour: 23, minute: 0);
-  TimeOfDay _wake = const TimeOfDay(hour: 7, minute: 0);
+  late TimeOfDay _bed;
+  late TimeOfDay _wake;
 
   /// Day the night ended (woke up).
-  DateTime _wakeDay = startOfDay(DateTime.now());
+  late DateTime _wakeDay;
   bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _bed = initial == null
+        ? const TimeOfDay(hour: 23, minute: 0)
+        : TimeOfDay.fromDateTime(initial.bedTime);
+    _wake = initial == null
+        ? const TimeOfDay(hour: 7, minute: 0)
+        : TimeOfDay.fromDateTime(initial.wakeTime);
+    _wakeDay = startOfDay(initial?.wakeTime ?? DateTime.now());
+  }
 
   Duration get _duration {
-    final bed = _bed.hour * 60 + _bed.minute;
-    final wake = _wake.hour * 60 + _wake.minute;
-    final minutes = wake > bed ? wake - bed : wake + 24 * 60 - bed;
-    return Duration(minutes: minutes);
+    final (:bed, :wake) = _times;
+    return wake.difference(bed);
   }
 
   Future<void> _pickDay() async {
     final today = startOfDay(DateTime.now());
+    final first = DateTime(today.year, today.month, today.day - 30);
     final picked = await showDatePicker(
       context: context,
-      initialDate: _wakeDay,
-      firstDate: today.subtract(const Duration(days: 30)),
+      // The picker asserts its initial date is within range.
+      initialDate: _wakeDay.isBefore(first)
+          ? first
+          : _wakeDay.isAfter(today)
+          ? today
+          : _wakeDay,
+      firstDate: first,
       lastDate: today,
       helpText: 'Night ending on',
     );
-    if (picked != null) setState(() => _wakeDay = startOfDay(picked));
+    if (picked != null && mounted) {
+      setState(() {
+        _wakeDay = startOfDay(picked);
+        _error = null;
+      });
+    }
   }
 
+  ({DateTime bed, DateTime wake}) get _times => sleepEntryTimes(
+    _wakeDay,
+    bedMinutes: _bed.hour * 60 + _bed.minute,
+    wakeMinutes: _wake.hour * 60 + _wake.minute,
+  );
+
   Future<void> _save() async {
+    if (_saving) return;
+    final (:bed, :wake) = _times;
+    final error = sleepEntryError(bed, wake, now: DateTime.now());
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
     setState(() => _saving = true);
     HapticFeedback.mediumImpact();
-    final wake = DateTime(
-      _wakeDay.year,
-      _wakeDay.month,
-      _wakeDay.day,
-      _wake.hour,
-      _wake.minute,
-    );
-    var bed = DateTime(
-      _wakeDay.year,
-      _wakeDay.month,
-      _wakeDay.day,
-      _bed.hour,
-      _bed.minute,
-    );
-    if (!bed.isBefore(wake)) bed = bed.subtract(const Duration(days: 1));
-    await sl<SleepService>().saveManualEntry(bed, wake);
+    try {
+      await sl<SleepService>().saveManualEntry(bed, wake);
+    } catch (e) {
+      debugPrint('Sleep entry not saved: $e');
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = "Couldn't save your sleep. Try again.";
+      });
+      return;
+    }
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -398,8 +483,19 @@ class _SleepLogSheetState extends State<_SleepLogSheet> {
             onChanged: (b, w) => setState(() {
               _bed = b;
               _wake = w;
+              _error = null;
             }),
           ),
+          if (_error case final error?) ...[
+            const SizedBox(height: AppDimens.space8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
+            ),
+          ],
         ],
       ),
     );

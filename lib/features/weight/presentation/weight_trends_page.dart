@@ -111,10 +111,12 @@ class WeightTrendsPage extends StatelessWidget {
                   subtitle:
                       '${DateFormat('EEE d MMM · h:mm a').format(log.timestamp)}'
                       ' · ${log.source == 'health' ? 'Synced' : 'Manual'}',
-                  onDelete: () async {
-                    await service.delete(log);
-                    cubit.load();
-                  },
+                  onDelete: () => deleteTrackerLog(
+                    context,
+                    cubit,
+                    log,
+                    () => service.delete(log),
+                  ),
                 ),
               );
             },

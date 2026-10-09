@@ -30,7 +30,37 @@ class SleepLoadedManual extends SleepState {
   List<Object?> get props => [session];
 }
 
-class SleepNeedsManualEntry extends SleepState {}
+/// Nothing for last night yet. [canDetect] is false when usage access (for
+/// estimating sleep from screen time) could be turned on.
+class SleepNeedsManualEntry extends SleepState {
+  final bool canDetect;
+
+  const SleepNeedsManualEntry({this.canDetect = true});
+
+  @override
+  List<Object?> get props => [canDetect];
+}
+
+/// Last night estimated from screen-off time, waiting for the user to
+/// confirm or adjust it.
+class SleepNeedsConfirmation extends SleepState {
+  final SleepSessionInfo estimate;
+
+  const SleepNeedsConfirmation(this.estimate);
+
+  @override
+  List<Object?> get props => [estimate];
+}
+
+/// The user tapped "Going to bed" at [since] and hasn't said "I'm up" yet.
+class SleepInBed extends SleepState {
+  final DateTime since;
+
+  const SleepInBed(this.since);
+
+  @override
+  List<Object?> get props => [since];
+}
 
 class SleepNeedsHealthConnectInstall extends SleepState {}
 

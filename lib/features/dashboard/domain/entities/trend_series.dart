@@ -62,7 +62,11 @@ class TrendSeries extends Equatable {
         for (final day in lastNDays(days))
           DailyPoint(
             day,
-            buckets[day]?.fold<double>(0, (sum, i) => sum + valueOf(i)) ??
+            // A NaN / infinite entry (bad import) counts as nothing.
+            buckets[day]?.fold<double>(0, (sum, i) {
+              final v = valueOf(i);
+              return v.isFinite ? sum + v : sum;
+            }) ??
                 (zeroWhenEmpty ? 0 : null),
           ),
       ],
@@ -71,7 +75,10 @@ class TrendSeries extends Equatable {
     );
   }
 
-  Iterable<double> get _values => points.map((p) => p.value).whereType<double>();
+  Iterable<double> get _values => points
+      .map((p) => p.value)
+      .whereType<double>()
+      .where((v) => v.isFinite);
 
   double? get today => points.isEmpty ? null : points.last.value;
 

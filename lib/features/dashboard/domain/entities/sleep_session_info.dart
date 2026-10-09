@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 
-enum SleepDataSource { healthStore, manual }
+/// Where a night came from: a health store (watch, Samsung Health...), the
+/// user, or the phone's screen-off time (an estimate the user confirmed).
+enum SleepDataSource { healthStore, manual, phone }
 
 class SleepSessionInfo extends Equatable {
   final DateTime bedTime;

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
@@ -12,6 +11,7 @@ import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart'
 import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
 import '../cubit/water_intake_cubit.dart';
 import '../cubit/water_intake_state.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'tracker_log_sheets.dart';
 
 const _metric = TrackerMetric.water;
@@ -29,11 +29,6 @@ class WaterIntakeCard extends StatelessWidget {
     trend.load();
   }
 
-  void _add(BuildContext context, int ml) {
-    HapticFeedback.mediumImpact();
-    context.read<WaterIntakeCubit>().addWater(ml);
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<WaterIntakeCubit, WaterIntakeState>(
@@ -47,14 +42,19 @@ class WaterIntakeCard extends StatelessWidget {
           context.read<TrendCubit<WaterLogCache>>().load(),
       child: BlocConsumer<WaterIntakeCubit, WaterIntakeState>(
         listenWhen: (previous, current) =>
-            previous is WaterIntakeLoaded &&
             current is WaterIntakeLoaded &&
-            current.todayLogs.length > previous.todayLogs.length,
+            previous != current &&
+            (current.addedMl != null || current.notice != null),
         listener: (context, state) {
-          final added = (state as WaterIntakeLoaded).todayLogs.last.amountMl;
+          final loaded = state as WaterIntakeLoaded;
+          final notice = loaded.notice;
+          if (notice != null) {
+            showErrorSnackBar(context, notice);
+            return;
+          }
           showSuccessSnackBar(
             context,
-            'Added $added ml of water',
+            'Added ${loaded.addedMl} ml of water',
             action: SnackBarAction(
               label: 'Undo',
               textColor: context.colors.primary,
@@ -88,10 +88,7 @@ class WaterIntakeCard extends StatelessWidget {
                 color: _metric.color,
                 filled: true,
                 semanticLabel: 'Log water',
-                onTap: () => showWaterLogSheet(
-                  context,
-                  onAdd: (ml) => cubit.addWater(ml),
-                ),
+                onTap: () => showWaterLogSheet(context, onAdd: cubit.addWater),
               ),
             ],
             child: Expanded(
@@ -101,7 +98,7 @@ class WaterIntakeCard extends StatelessWidget {
                   TrackerProgress(
                     value: WaterTrendsPage.formatMl(current.toDouble()),
                     goal: WaterTrendsPage.formatMl(goal.toDouble()),
-                    fraction: goal > 0 ? current / goal : null,
+                    fraction: safeFraction(current, goal),
                     color: _metric.color,
                     caption: left > 0
                         ? '${WaterTrendsPage.formatMl(left.toDouble())} to go · '

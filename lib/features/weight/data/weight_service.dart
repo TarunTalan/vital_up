@@ -11,6 +11,7 @@ import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
@@ -37,6 +38,31 @@ enum WeightUnit {
   /// "72.4 kg"
   String format(double kg, {int decimals = 1}) =>
       '${fromKg(kg).toStringAsFixed(decimals)} $label';
+
+  /// Allowed weight range in this unit, whole numbers rounded inwards
+  /// (20-350 kg, 45-771 lbs).
+  int get minValue => fromKg(WeightService.minKg).ceil();
+  int get maxValue => fromKg(WeightService.maxKg).floor();
+}
+
+/// Characters allowed in the weight field ("771.6").
+const weightInputMaxLength = 6;
+
+/// A typed weight in [unit], converted to kg, or the inline error to show.
+({double? kg, String? error}) parseWeightEntry(String text, WeightUnit unit) {
+  if (text.trim().isEmpty) return (kg: null, error: 'Enter your weight.');
+  final value = parseNumberInRange(
+    text,
+    min: unit.minValue,
+    max: unit.maxValue,
+  );
+  if (value == null) {
+    return (
+      kg: null,
+      error: 'Enter ${unit.minValue} to ${unit.maxValue} ${unit.label}.',
+    );
+  }
+  return (kg: unit.toKg(value), error: null);
 }
 
 /// Body weight log: stored locally (always kg), backed up by SyncService,
@@ -71,8 +97,8 @@ class WeightService {
   /// The goal only changes in onboarding / goal setup, which update the
   /// cache directly, so the chart rarely needs to ask the server.
   static const _targetMaxAge = Duration(hours: 12);
-  static const minKg = 20.0;
-  static const maxKg = 400.0;
+  static const minKg = InputLimits.weightKgMin;
+  static const maxKg = InputLimits.weightKgMax;
 
   Isar get _isar => _db.isar;
 
@@ -86,7 +112,8 @@ class WeightService {
     );
   }
 
-  /// Saves an entry; returns null, or an error message for invalid input.
+  /// Saves an entry; returns null, or a short message for the user when
+  /// the input is invalid or it couldn't be saved.
   Future<String?> add(
     double kg, {
     DateTime? at,
@@ -94,16 +121,27 @@ class WeightService {
   }) async {
     final userId = _userId;
     if (userId == null) return 'Sign in to log your weight.';
-    if (kg < minKg || kg > maxKg)
-      return 'Enter a weight between 20 and 400 kg.';
+    // NaN fails every comparison, so check it first.
+    if (!kg.isFinite || kg < minKg || kg > maxKg) {
+      return 'Enter a weight between ${minKg.round()} and ${maxKg.round()} kg.';
+    }
+    final now = DateTime.now();
+    final timestamp = at ?? now;
+    if (timestamp.isAfter(now.add(const Duration(minutes: 5)))) {
+      return "Weight can't be logged in the future.";
+    }
     final log = WeightLogCache()
       ..userId = userId
       ..weightKg = kg
-      ..timestamp = at ?? DateTime.now()
+      ..timestamp = timestamp
       ..source = source;
-    await _isar.writeTxn(() => _isar.weightLogCaches.put(log));
+    try {
+      await _isar.writeTxn(() => _isar.weightLogCaches.put(log));
+    } catch (e) {
+      debugPrint('Weight not saved: $e');
+      return "Couldn't save your weight. Try again.";
+    }
     _sync?.schedule();
-    final now = DateTime.now();
     if (log.timestamp.year == now.year &&
         log.timestamp.month == now.month &&
         log.timestamp.day == now.day) {
@@ -190,7 +228,9 @@ class WeightService {
 
   /// Saves the goal weight: cached right away (so charts update offline)
   /// and written to the profile, queued when offline.
-  Future<void> setTargetKg(double kg) async {
+  Future<void> setTargetKg(double value) async {
+    if (!value.isFinite) return;
+    final kg = value.clamp(minKg, maxKg);
     await _prefs.setDouble(_keyTargetKg, kg);
     final userId = _userId;
     if (userId == null) return;

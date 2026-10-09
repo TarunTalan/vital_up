@@ -1,15 +1,24 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:health/health.dart';
 import 'package:isar_community/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import '../../../../core/database/isar_service.dart';
 import '../../../../core/database/collections/sleep_log_cache.dart';
+import '../../../../core/events/habit_events.dart';
 import '../../../../core/sync/sync_hooks.dart';
+import '../../../reminders/data/reminder_scheduler.dart';
 import '../../domain/entities/sleep_session_info.dart';
+import '../../domain/sleep_detection.dart';
+import 'sleep_bedtime.dart' as bedtime;
 
 class SleepStats {
   final int averageScore;
@@ -31,13 +40,29 @@ class SleepService {
   final IsarService _isarService;
   final SharedPreferences _prefs;
   final SyncHooks? _sync;
+
+  /// Shows / clears the in-bed notification.
+  final FlutterLocalNotificationsPlugin? _notifications;
+
+  /// Told when last night is logged, so morning sleep reminders go quiet.
+  final HabitEvents? _events;
   late final Health _health;
+
+  final _changes = StreamController<void>.broadcast();
+
+  /// Fires when a night is saved or a bedtime is set or cleared.
+  Stream<void> get changes => _changes.stream;
 
   static const _goalKey = 'daily_sleep_goal_min';
   static const defaultGoalMinutes = 480;
 
   /// Manual logs written before entries were tied to the signed-in user.
   static const _legacyUserId = 'current_user';
+
+  /// Shared with `ScreenTimeService`; also serves screen on/off events.
+  static const _usageChannel = MethodChannel(
+    'com.example.vital_up/usage_stats',
+  );
 
   static const _allSleepTypes = [
     HealthDataType.SLEEP_ASLEEP,
@@ -48,19 +73,39 @@ class SleepService {
     HealthDataType.SLEEP_AWAKE,
   ];
 
-  SleepService(this._isarService, this._prefs, [this._sync]) {
+  static const _stageOf = {
+    HealthDataType.SLEEP_ASLEEP: SleepStage.asleep,
+    HealthDataType.SLEEP_IN_BED: SleepStage.inBed,
+    HealthDataType.SLEEP_DEEP: SleepStage.deep,
+    HealthDataType.SLEEP_REM: SleepStage.rem,
+    HealthDataType.SLEEP_LIGHT: SleepStage.light,
+    HealthDataType.SLEEP_AWAKE: SleepStage.awake,
+  };
+
+  SleepService(
+    this._isarService,
+    this._prefs, [
+    this._sync,
+    this._notifications,
+    this._events,
+  ]) {
     _health = Health();
   }
 
   String get _userId =>
       Supabase.instance.client.auth.currentUser?.id ?? _legacyUserId;
 
-  int getGoalMinutes() => _prefs.getInt(_goalKey) ?? defaultGoalMinutes;
+  /// Nightly goal; the default when unset or out of range.
+  int getGoalMinutes() =>
+      sanitizeSleepGoal(_prefs.getInt(_goalKey), fallback: defaultGoalMinutes);
 
-  Future<void> setGoalMinutes(int minutes) => _prefs.setInt(_goalKey, minutes);
+  Future<void> setGoalMinutes(int minutes) => _prefs.setInt(
+    _goalKey,
+    minutes.clamp(InputLimits.sleepGoalMinMin, InputLimits.sleepGoalMinMax),
+  );
 
   /// Sleep sessions that ended in [from, to), newest first. Health Connect
-  /// nights win over manual entries for the same wake-up day.
+  /// nights win over saved entries for the same wake-up day.
   Future<List<SleepSessionInfo>> getSleepBetween(
     DateTime from,
     DateTime to,
@@ -79,7 +124,7 @@ class SleepService {
         bedTime: log.startTime,
         wakeTime: log.endTime,
         duration: Duration(minutes: log.durationMinutes),
-        source: SleepDataSource.manual,
+        source: _sourceOf(log.source),
       );
     }
 
@@ -103,66 +148,12 @@ class SleepService {
           if (entry.key.isBefore(startOfDay(from)) || !entry.key.isBefore(to)) {
             continue;
           }
-
-          var totalMinutes = 0;
-          var deepMin = 0;
-          var remMin = 0;
-          var lightMin = 0;
-          var awakeMin = 0;
-
-          var bed = entry.value.first.dateFrom;
-          var wake = entry.value.first.dateTo;
-
-          for (final p in entry.value) {
-            final diff = p.dateTo.difference(p.dateFrom).inMinutes;
-            if (p.dateFrom.isBefore(bed)) bed = p.dateFrom;
-            if (p.dateTo.isAfter(wake)) wake = p.dateTo;
-
-            switch (p.type) {
-              case HealthDataType.SLEEP_DEEP:
-                deepMin += diff;
-                totalMinutes += diff;
-                break;
-              case HealthDataType.SLEEP_REM:
-                remMin += diff;
-                totalMinutes += diff;
-                break;
-              case HealthDataType.SLEEP_LIGHT:
-                lightMin += diff;
-                totalMinutes += diff;
-                break;
-              case HealthDataType.SLEEP_AWAKE:
-                awakeMin += diff;
-                break;
-              case HealthDataType.SLEEP_ASLEEP:
-                if (deepMin == 0 && remMin == 0 && lightMin == 0) {
-                  totalMinutes += diff;
-                }
-                break;
-              case HealthDataType.SLEEP_IN_BED:
-                if (totalMinutes == 0) {
-                  totalMinutes += diff;
-                }
-                break;
-              default:
-                break;
-            }
-          }
-
-          if (totalMinutes == 0) {
-            totalMinutes = wake.difference(bed).inMinutes;
-          }
-
-          byDay[entry.key] = SleepSessionInfo(
-            bedTime: bed,
-            wakeTime: wake,
-            duration: Duration(minutes: totalMinutes),
-            source: SleepDataSource.healthStore,
-            deepSleepMinutes: deepMin > 0 ? deepMin : null,
-            remSleepMinutes: remMin > 0 ? remMin : null,
-            lightSleepMinutes: lightMin > 0 ? lightMin : null,
-            awakeMinutes: awakeMin > 0 ? awakeMin : null,
-          );
+          final night = buildHealthNight([
+            for (final p in entry.value)
+              if (_stageOf[p.type] case final stage?)
+                SleepSample(stage, p.dateFrom, p.dateTo),
+          ]);
+          if (night != null) byDay[entry.key] = night;
         }
       }
     } catch (e) {
@@ -193,41 +184,21 @@ class SleepService {
     var totalMinutes = 0;
     var totalScore = 0;
     var debtMinutes = 0;
-    final bedMinutesList = <int>[];
 
     for (final s in sessions) {
       totalMinutes += s.duration.inMinutes;
       totalScore += s.sleepScore;
       final diff = goalMinutes - s.duration.inMinutes;
       if (diff > 0) debtMinutes += diff;
-
-      // Bedtime in minutes from midnight (treating 20:00 - 24:00 as negative / offset)
-      var bedM = s.bedTime.hour * 60 + s.bedTime.minute;
-      if (bedM > 12 * 60) bedM -= 24 * 60; // 23:00 -> -60
-      bedMinutesList.add(bedM);
-    }
-
-    final avgMin = totalMinutes ~/ sessions.length;
-    final avgScore = (totalScore / sessions.length).round();
-
-    // Bedtime consistency: standard deviation of bedtimes
-    int consistency = 90;
-    if (bedMinutesList.length > 1) {
-      final mean = bedMinutesList.reduce((a, b) => a + b) / bedMinutesList.length;
-      final variance = bedMinutesList
-              .map((x) => (x - mean) * (x - mean))
-              .reduce((a, b) => a + b) /
-          bedMinutesList.length;
-      final stdDev = variance > 0 ? (variance) : 0;
-      // stdDev in minutes: < 30min -> 95%, 60min -> 80%, > 120min -> 50%
-      consistency = (100 - (stdDev / 3)).round().clamp(40, 100);
     }
 
     return SleepStats(
-      averageScore: avgScore,
-      averageDuration: Duration(minutes: avgMin),
+      averageScore: (totalScore / sessions.length).round(),
+      averageDuration: Duration(minutes: totalMinutes ~/ sessions.length),
       totalSleepDebt: Duration(minutes: debtMinutes),
-      consistencyScore: consistency,
+      consistencyScore: bedtimeConsistency([
+        for (final s in sessions) s.bedTime,
+      ]),
       nightsLogged: sessions.length,
     );
   }
@@ -238,7 +209,7 @@ class SleepService {
     }
     return null;
   }
-  
+
   Future<void> installHealthConnect() async {
      if (Platform.isAndroid) {
        await _health.installHealthConnect();
@@ -262,147 +233,161 @@ class SleepService {
     return hasPermissions;
   }
 
-  /// Last night from Health Connect / HealthKit, else a manual entry.
+  /// The night that ended today (before 4 am, the one that ended
+  /// yesterday): Health Connect / HealthKit first, else a saved entry.
   /// Pass [requestPermission] false where a permission screen would be
-  /// unexpected (e.g. home screen widget refreshes).
+  /// unexpected (e.g. home screen widget refreshes, app resume).
   Future<SleepSessionInfo?> getSleepDataForLastNight({
     bool requestPermission = true,
   }) async {
-    try {
-      if (await hasPermission(request: requestPermission)) {
-        final now = DateTime.now();
-        // Query last 24 hours
-        final yesterday = now.subtract(const Duration(hours: 24));
-        
-        List<HealthDataPoint> healthData = await _health
-            .getHealthDataFromTypes(
-              startTime: yesterday,
-              endTime: now,
-              types: _allSleepTypes,
-            )
-            .orFallback(const []);
-
-        if (healthData.isNotEmpty) {
-          healthData = Health().removeDuplicates(healthData);
-          
-          if (healthData.isEmpty) return null;
-          
-          DateTime earliestBedTime = now;
-          DateTime latestWakeTime = yesterday;
-          int deepMin = 0;
-          int remMin = 0;
-          int lightMin = 0;
-          int awakeMin = 0;
-          int totalMin = 0;
-
-          for (var point in healthData) {
-            if (point.dateFrom.isBefore(earliestBedTime)) {
-              earliestBedTime = point.dateFrom;
-            }
-            if (point.dateTo.isAfter(latestWakeTime)) {
-              latestWakeTime = point.dateTo;
-            }
-            
-            final diff = point.dateTo.difference(point.dateFrom).inMinutes;
-            switch (point.type) {
-              case HealthDataType.SLEEP_DEEP:
-                deepMin += diff;
-                totalMin += diff;
-                break;
-              case HealthDataType.SLEEP_REM:
-                remMin += diff;
-                totalMin += diff;
-                break;
-              case HealthDataType.SLEEP_LIGHT:
-                lightMin += diff;
-                totalMin += diff;
-                break;
-              case HealthDataType.SLEEP_AWAKE:
-                awakeMin += diff;
-                break;
-              case HealthDataType.SLEEP_ASLEEP:
-                if (deepMin == 0 && remMin == 0 && lightMin == 0) {
-                  totalMin += diff;
-                }
-                break;
-              default:
-                break;
-            }
-          }
-
-          if (totalMin == 0) {
-            totalMin = latestWakeTime.difference(earliestBedTime).inMinutes;
-          }
-
-          return SleepSessionInfo(
-            bedTime: earliestBedTime,
-            wakeTime: latestWakeTime,
-            duration: Duration(minutes: totalMin),
-            source: SleepDataSource.healthStore,
-            deepSleepMinutes: deepMin > 0 ? deepMin : null,
-            remSleepMinutes: remMin > 0 ? remMin : null,
-            lightSleepMinutes: lightMin > 0 ? lightMin : null,
-            awakeMinutes: awakeMin > 0 ? awakeMin : null,
-          );
-        }
+    if (requestPermission) {
+      try {
+        await hasPermission();
+      } catch (e) {
+        debugPrint('Sleep permission request failed: $e');
       }
-    } catch (e) {
-      debugPrint("Error fetching health sleep data: $e");
     }
-    
-    // Fallback to manual entry from Isar
-    return _getManualSleepData();
-  }
-
-  Future<SleepSessionInfo?> _getManualSleepData() async {
     final now = DateTime.now();
-    final yesterday = now.subtract(const Duration(hours: 24));
-    
-    final logs = await _isarService.isar.sleepLogCaches
-        .filter()
-        .group((q) => q.userIdEqualTo(_userId).or().userIdEqualTo(_legacyUserId))
-        .startTimeGreaterThan(yesterday)
-        .sortByStartTimeDesc()
-        .findAll();
-        
-    if (logs.isNotEmpty) {
-      final log = logs.first;
-      return SleepSessionInfo(
-        bedTime: log.startTime,
-        wakeTime: log.endTime,
-        duration: Duration(minutes: log.durationMinutes),
-        source: SleepDataSource.manual,
-      );
-    }
-    
-    return null;
+    final today = startOfDay(now);
+    // Calendar maths, not 24h steps, so DST days keep their boundaries.
+    final from = now.hour < 4
+        ? DateTime(today.year, today.month, today.day - 1)
+        : today;
+    final nights = await getSleepBetween(from, nextDay(today));
+    return nights.firstOrNull;
   }
 
-  Future<SleepSessionInfo> saveManualEntry(DateTime bedTime, DateTime wakeTime) async {
+  /// Whether nights can be estimated from screen activity (Android with
+  /// usage access granted).
+  Future<bool> canEstimateFromPhone() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _usageChannel.invokeMethod<bool>(
+            'checkUsageStatsPermission',
+          ) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Last night guessed from when the screen was off, for the user to
+  /// confirm. Null off Android, without usage access, or when nothing
+  /// looks like a night yet.
+  Future<SleepSessionInfo?> estimateLastNight() async {
+    if (!Platform.isAndroid) return null;
+    final now = DateTime.now();
+    final today = startOfDay(now);
+    try {
+      final raw = await _usageChannel.invokeListMethod<Map>('getScreenEvents', {
+        'start': today.subtract(const Duration(hours: 8)).millisecondsSinceEpoch,
+        'end': now.millisecondsSinceEpoch,
+      });
+      final events = [
+        for (final e in raw ?? const <Map>[])
+          ScreenEvent(
+            DateTime.fromMillisecondsSinceEpoch((e['t'] as num).toInt()),
+            on: e['on'] == true,
+          ),
+      ];
+      return estimateSleepFromScreen(events, wakeDay: today);
+    } catch (e) {
+      debugPrint('Sleep estimate from screen activity unavailable: $e');
+      return null;
+    }
+  }
+
+  /// The "Going to bed" time still waiting for "I'm up", if any. Re-reads
+  /// storage since a notification action may have set it in the background.
+  Future<DateTime?> pendingBedtime() async {
+    await _prefs.reload();
+    return bedtime.readBedtime(_prefs, _userId, DateTime.now());
+  }
+
+  /// "Going to bed": remembers now and shows the in-bed notification.
+  Future<void> markBedtime() async {
+    final now = DateTime.now();
+    await bedtime.writeBedtime(_prefs, _userId, now);
+    if (_notifications case final plugin?) {
+      await ReminderScheduler.showInBed(plugin, since: now, userId: _userId);
+    }
+    _changes.add(null);
+  }
+
+  /// Drops a bedtime tapped by mistake.
+  Future<void> cancelBedtime() async {
+    await _clearBedtime();
+    _changes.add(null);
+  }
+
+  /// "I'm up": saves the night from the pending bedtime until now.
+  Future<SleepSessionInfo?> wakeUp() async {
+    final bed = await pendingBedtime();
+    if (bed == null) return null;
+    final now = DateTime.now();
+    if (now.difference(bed) < bedtime.minTimeInBed) {
+      await cancelBedtime();
+      return null;
+    }
+    return saveManualEntry(bed, now);
+  }
+
+  Future<void> _clearBedtime() async {
+    await bedtime.clearBedtime(_prefs, _userId);
+    if (_notifications case final plugin?) {
+      await ReminderScheduler.cancelInBed(plugin);
+    }
+  }
+
+  static SleepDataSource _sourceOf(String source) =>
+      source == 'phone' ? SleepDataSource.phone : SleepDataSource.manual;
+
+  /// Saves a night the user entered, or confirmed from a phone estimate
+  /// when [source] is [SleepDataSource.phone]. [asleep] defaults to the
+  /// whole bed-to-wake span.
+  Future<SleepSessionInfo> saveManualEntry(
+    DateTime bedTime,
+    DateTime wakeTime, {
+    SleepDataSource source = SleepDataSource.manual,
+    Duration? asleep,
+  }) async {
     if (wakeTime.isBefore(bedTime)) {
       wakeTime = wakeTime.add(const Duration(days: 1));
     }
-    
-    final duration = wakeTime.difference(bedTime);
-    
+    if (!wakeTime.isAfter(bedTime)) {
+      throw ArgumentError('Wake-up time must be after bedtime');
+    }
+
+    var duration = asleep ?? wakeTime.difference(bedTime);
+    if (duration.isNegative) duration = Duration.zero;
+
     final log = SleepLogCache()
       ..userId = _userId
       ..startTime = bedTime
       ..endTime = wakeTime
       ..durationMinutes = duration.inMinutes
-      ..source = 'manual'
+      ..source = source == SleepDataSource.phone ? 'phone' : 'manual'
       ..isSynced = false;
-      
+
     await _isarService.isar.writeTxn(() async {
       await _isarService.isar.sleepLogCaches.put(log);
     });
     _sync?.schedule();
-    
+
+    // This night closes an open "Going to bed".
+    final now = DateTime.now();
+    final bed = bedtime.readBedtime(_prefs, _userId, now);
+    if (bed != null && !bed.isAfter(wakeTime)) await _clearBedtime();
+    if (isSameDay(wakeTime, now)) {
+      _events?.logged(const HabitLogged(Habit.sleep));
+    }
+    _changes.add(null);
+
     return SleepSessionInfo(
       bedTime: bedTime,
       wakeTime: wakeTime,
       duration: duration,
-      source: SleepDataSource.manual,
+      source: source,
     );
   }
 }
