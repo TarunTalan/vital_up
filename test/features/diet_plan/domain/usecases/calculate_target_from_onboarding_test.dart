@@ -72,4 +72,23 @@ void main() {
     final result = usecase(data);
     expect(result.calories, 1200);
   });
+
+  test('Reads height in inches and a ddMMyyyy date of birth', () {
+    final year = DateTime.now().year - 30;
+    final cm = OnboardingData(
+      weight: '70', weightUnit: 'kg', height: '175', heightUnit: 'cm',
+      dob: '01/01/$year', gender: 'Male', activity: 'Moderate',
+    );
+    final inches = OnboardingData(
+      weight: '70', weightUnit: 'kg', height: '68.9', heightUnit: 'in',
+      dob: '0101$year', gender: 'Male', activity: 'Moderate',
+    );
+    expect((usecase(inches).calories - usecase(cm).calories).abs(), lessThan(5));
+  });
+
+  test('Falls back to defaults for absurd weights', () {
+    expect(CalculateTargetFromOnboarding.parseWeightKg('-5', 'kg'), 70);
+    expect(CalculateTargetFromOnboarding.parseWeightKg('154', 'lbs'), closeTo(69.85, 0.01));
+    expect(CalculateTargetFromOnboarding.parseWeightKg('70,5', 'kg'), 70.5);
+  });
 }

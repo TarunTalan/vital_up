@@ -348,4 +348,11 @@ void main() {
       expect(cubit.state.custom, isEmpty);
     });
   });
+
+  test('logging last night quiets only morning sleep reminders', () {
+    final on = [for (final p in reminderPresets) p.copyWith(enabled: true)];
+    expect(remindersDoneBy(const HabitLogged(Habit.sleep), on), {
+      'preset_morning_sleep',
+    });
+  });
 }
