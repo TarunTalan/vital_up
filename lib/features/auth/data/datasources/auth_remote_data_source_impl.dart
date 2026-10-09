@@ -15,11 +15,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   /// Auth calls fail with a timeout instead of hanging on a bad network.
   static const _timeout = Duration(seconds: 20);
 
-  /// Exact, case-insensitive match for an email in an `ilike` filter.
-  static String _likeExact(String value) => value.trim().replaceAllMapped(
-        RegExp(r'[\\%_]'),
-        (m) => '\\${m[0]}',
-      );
+  /// Whether an account uses [email]. Runs signed out, so it goes through
+  /// the `email_registered` RPC (profiles are hidden from signed-out users).
+  Future<bool> _emailRegistered(String email) async =>
+      await _supabaseClient
+          .rpc('email_registered', params: {'p_email': email.trim()})
+          .timeout(_timeout) ==
+      true;
+
+  /// Whether [username] is free for a new account. `signup_username_available`
+  /// applies the server's username rules and case-insensitive uniqueness.
+  Future<bool> _usernameAvailable(String username) async =>
+      await _supabaseClient
+          .rpc('signup_username_available', params: {'p_username': username.trim()})
+          .timeout(_timeout) ==
+      true;
 
   @override
   Future<LoginResponse> login(LoginRequest request) async {
@@ -58,21 +68,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UsernameCheckResponse> checkUsername(String username) async {
     try {
-      // Usernames are unique regardless of case. `_` is a LIKE wildcard,
-      // so escape it (and `%`, `\`) to match the name exactly.
-      final pattern = username.replaceAllMapped(
-        RegExp(r'[\\%_]'),
-        (m) => '\\${m[0]}',
-      );
-      final response = await _supabaseClient
-          .from('profiles')
-          .select('username')
-          .ilike('username', pattern)
-          .limit(1)
-          .maybeSingle()
-          .timeout(_timeout);
-
-      final isAvailable = response == null;
+      final isAvailable = await _usernameAvailable(username);
       return UsernameCheckResponse(
         available: isAvailable,
         message: isAvailable ? 'Username is available' : 'Username is already taken',
@@ -86,29 +82,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<RegistrationResponse> register(RegistrationRequest request) async {
     try {
-      // 1. Check if the email is already registered in profiles
-      final existingEmail = await _supabaseClient
-          .from('profiles')
-          .select('email')
-          .ilike('email', _likeExact(request.email))
-          .limit(1)
-          .maybeSingle()
-          .timeout(_timeout);
-
-      if (existingEmail != null) {
+      if (await _emailRegistered(request.email)) {
         throw const AuthException('This email is already registered.');
       }
-
-      // 2. Check if the username is already taken (extra safety guard)
-      final existingUsername = await _supabaseClient
-          .from('profiles')
-          .select('username')
-          .ilike('username', _likeExact(request.username))
-          .limit(1)
-          .maybeSingle()
-          .timeout(_timeout);
-
-      if (existingUsername != null) {
+      // Checked again here: the name may have been taken since the field's
+      // availability check.
+      if (!await _usernameAvailable(request.username)) {
         throw const AuthException('Username is already taken.');
       }
 
@@ -144,11 +123,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final userId = authResponse.user?.id;
       final username = authResponse.user?.userMetadata?['username'] as String?;
       if (userId != null && username != null) {
-        await _supabaseClient.from('profiles').upsert({
-          'id': userId,
-          'username': username,
-          'email': request.email,
-        });
+        // The server's sign-up trigger normally creates it already (with a
+        // generated name if this one was taken meanwhile), so a failure here
+        // must not fail a confirmed sign-up.
+        try {
+          await _supabaseClient
+              .from('profiles')
+              .upsert({
+                'id': userId,
+                'username': username,
+                'email': request.email,
+              }, ignoreDuplicates: true)
+              .timeout(_timeout);
+        } catch (e) {
+          _logger.w('Profile upsert after sign-up skipped: $e');
+        }
       }
 
       return OTPValidationResponse(
@@ -206,20 +195,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) async {
     try {
-      // 1. Check if the email exists in profiles table
-      final profile = await _supabaseClient
-          .from('profiles')
-          .select('email')
-          .ilike('email', _likeExact(request.email))
-          .limit(1)
-          .maybeSingle()
-          .timeout(_timeout);
-
-      if (profile == null) {
+      if (!await _emailRegistered(request.email)) {
         throw const AuthException('Email is not registered. Please sign up.');
       }
 
-      // 2. Proceed with resetPasswordForEmail
       await _supabaseClient.auth
           .resetPasswordForEmail(request.email)
           .timeout(_timeout);
