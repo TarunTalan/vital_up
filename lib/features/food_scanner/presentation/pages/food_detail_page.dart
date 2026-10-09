@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -66,11 +67,42 @@ class FoodDetailPage extends StatelessWidget {
     );
   }
 
+  /// True while the share sheet is opening, so a double tap opens one.
+  static bool _sharing = false;
+
+  Future<void> _shareMeal(BuildContext context, _FoodDetailData data) async {
+    if (_sharing) return;
+    _sharing = true;
+    try {
+      final text = FoodScanUtils.shareText(
+        mealLabel: _mealTypeLabel(data.mealType),
+        dishNames: [for (final dish in data.dishes) dish.name],
+        calories: data.totalCalories,
+        macros: [for (final m in data.macros) (m.name, m.grams)],
+      );
+      final path = data.imagePath;
+      final hasPhoto = path != null && path.isNotEmpty && await File(path).exists();
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text,
+          files: hasPhoto ? [XFile(path)] : null,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Meal share failed: $e');
+      if (context.mounted) {
+        showErrorSnackBar(context, "Couldn't share this meal. Try again.");
+      }
+    } finally {
+      _sharing = false;
+    }
+  }
+
   Widget _buildContent(BuildContext context, FoodScanState state) {
     final data = _FoodDetailData.fromState(state);
     final topBar = _DetailTopBar(
       onBack: () => Navigator.of(context).maybePop(),
-      onShare: () {},
+      onShare: data == null ? null : () => _shareMeal(context, data),
       onInfo: () {
         showSmoothDialog(
           context: context,
@@ -611,7 +643,8 @@ Color _accentText(BuildContext context) =>
 /// Top row — back button plus circular share / info actions.
 class _DetailTopBar extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback onShare;
+  /// Null hides the share button (nothing to share yet).
+  final VoidCallback? onShare;
   final VoidCallback onInfo;
 
   const _DetailTopBar({
@@ -626,12 +659,14 @@ class _DetailTopBar extends StatelessWidget {
       children: [
         BackIcon(onClick: onBack),
         const Spacer(),
-        _CircleIconButton(
-          asset: 'assets/icons/share.svg',
-          tooltip: 'Share',
-          onTap: onShare,
-        ),
-        const SizedBox(width: AppDimens.space12),
+        if (onShare case final share?) ...[
+          _CircleIconButton(
+            asset: 'assets/icons/share.svg',
+            tooltip: 'Share',
+            onTap: share,
+          ),
+          const SizedBox(width: AppDimens.space12),
+        ],
         _CircleIconButton(
           asset: 'assets/icons/info_icon.svg',
           tooltip: 'How accurate is this?',

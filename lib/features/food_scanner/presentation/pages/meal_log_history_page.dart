@@ -128,6 +128,32 @@ class _MealLogTile extends StatelessWidget {
 
   const _MealLogTile({required this.entry});
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final bloc = context.read<MealLogBloc>();
+    final delete = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this meal?'),
+        content: const Text('It will be removed from your log and totals.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: dialogContext.colors.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (delete != true || bloc.isClosed) return;
+    bloc.add(DeleteMealLogEntry(entry.id));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -152,9 +178,7 @@ class _MealLogTile extends StatelessWidget {
               IconButton(
                 tooltip: 'Delete',
                 visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  context.read<MealLogBloc>().add(DeleteMealLogEntry(entry.id));
-                },
+                onPressed: () => _confirmDelete(context),
                 icon: Icon(
                   Icons.delete_outline_rounded,
                   size: AppDimens.iconMd,
