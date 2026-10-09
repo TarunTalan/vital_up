@@ -166,7 +166,8 @@ Route names are GoRouter `name`s.
 - **auth:** routes `splash`, `onboarding` (intro carousel), `login`,
   `forgot-password`, `verify-otp`, `reset-password`, `reset-completed`.
   Sign in by email or username (`get_email_by_username` RPC), sign up with
-  email OTP, password reset by OTP, Google (`signInWithIdToken`); no Apple.
+  email OTP (taken email/username checked via `email_registered` /
+  `signup_username_available` RPCs, never by reading `profiles`), password reset by OTP, Google (`signInWithIdToken`); no Apple.
   Splash -> `dashboard` / `health-onboarding` (by `hasCompletedOnboarding`:
   local flag, then `user_health_data.onboarding_completed`, 8 s timeout,
   offline defaults to true) / `onboarding`. Sign out runs
@@ -224,7 +225,12 @@ Route names are GoRouter `name`s.
 - **activity_tracking:** `activity-tracking`, `activity-history`.
   `ActivityTrackingBloc` / `ActivityHistoryBloc` per page; sessions in Drift;
   notes/tags pref `activity_annotations`; workout prefs
-  `core/preferences/workout_prefs_notifier.dart`. GPS runs in a
+  `core/preferences/workout_prefs_notifier.dart`. The bloc checkpoints the
+  open session to Drift every 30 s / on pause / on hide and marks it in pref
+  `activity_in_progress_v1`; after an app kill the tracking page offers
+  Resume / Save / Discard (`WorkoutRecoveryService`, pure rules in
+  `domain/services/workout_checkpoint.dart`; older than 12 h is saved at
+  startup). GPS runs in a
   `flutter_foreground_task` location service (no battery exemption).
   Mapbox map with offline packs, pedometer with glitch filtering, BLE
   heart-rate straps (`flutter_blue_plus`), TTS voice coach, music/local
@@ -303,7 +309,9 @@ Route names are GoRouter `name`s.
   summary (cron `weekly-summaries`); challenges (scored from
   `activity_sessions`); user backups; leave challenge; friend profiles and
   cheers; private profiles; streak rest days + badge progress (cron
-  `use-streak-freezes`); input constraints (`20261016_input_constraints.sql`).
+  `use-streak-freezes`); input constraints (`20261016_input_constraints.sql`);
+  signed-out sign-up checks (`signup_username_available`, `email_registered`;
+  anon can't read `profiles`).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
