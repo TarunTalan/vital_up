@@ -61,6 +61,12 @@ app.*.map.json
 
 # Sensitive config files
 lib/core/config/supabase_config.dart
+.env
+.env.*
+*.env
+local.properties
+**/local.properties
+supabase/.temp/
 
 # Flutter plugin generated files
 .flutter-plugins
