@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — VitalUp</title>
+  <meta name="description" content="Terms of Service and Conditions of Use for VitalUp Health & Fitness mobile application.">
+  <link rel="canonical" href="https://vitalup.live/terms">
+  <link rel="icon" type="image/png" href="assets/vitalup_light_logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-card: #162032;
+      --border: #1F293D;
+      --primary: #38BDF8;
+      --accent: #10B981;
+      --badge-bg: rgba(56, 189, 248, 0.1);
+      --badge-border: rgba(56, 189, 248, 0.25);
+      --warning-bg: rgba(245, 158, 11, 0.1);
+      --warning-border: rgba(245, 158, 11, 0.3);
+      --warning-text: #FBBF24;
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --radius: 12px;
+      --max-width: 960px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1.7;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+      overflow-x: hidden;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0.85rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      object-fit: cover;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.2s ease;
+      background: #FFFFFF;
+    }
+    .logo-container:hover .brand-logo {
+      transform: scale(1.05);
+    }
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 101;
+    }
+    .nav-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+    }
+    .hamburger-bar {
+      width: 20px;
+      height: 2px;
+      background-color: var(--text);
+      border-radius: 2px;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(2) {
+      opacity: 0;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .nav-links a.active {
+      color: var(--primary);
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: clamp(1.5rem, 4vw, 2.5rem) auto clamp(3rem, 6vw, 5rem);
+      width: 100%;
+    }
+    .hero-banner {
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 3.5vw, 2rem);
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: clamp(1.75rem, 5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      color: #FFF;
+      line-height: 1.25;
+      text-wrap: balance;
+    }
+    h2 {
+      font-size: clamp(1.25rem, 3.5vw, 1.45rem);
+      font-weight: 700;
+      color: #FFF;
+      margin: 2rem 0 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      line-height: 1.35;
+    }
+    p { color: var(--text-muted); margin-bottom: 1rem; overflow-wrap: break-word; }
+    ul, ol { color: var(--text-muted); padding-left: 1.35rem; margin-bottom: 1.25rem; overflow-wrap: break-word; }
+    li { margin-bottom: 0.5rem; }
+    strong { color: var(--text); }
+
+    .content-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3.5vw, 2.25rem);
+      margin-bottom: 2rem;
+      overflow-wrap: break-word;
+    }
+    .disclaimer-box {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      border-left: 4px solid var(--warning-text);
+      padding: clamp(1rem, 3vw, 1.5rem);
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .disclaimer-box h3 { color: var(--warning-text); margin-bottom: 0.5rem; font-size: clamp(1.05rem, 2.5vw, 1.2rem); }
+    .disclaimer-box p { color: #E2E8F0; margin-bottom: 0; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .nav-toggle {
+        display: flex;
+      }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        background: rgba(17, 24, 39, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+        gap: 0.35rem;
+        z-index: 1000;
+      }
+      .nav-links.is-open {
+        display: flex;
+        animation: navSlideDown 0.2s ease-out forwards;
+      }
+      .nav-links a {
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+      }
+      @keyframes navSlideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+
+    @media (max-width: 480px) {
+      body { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <a href="https://vitalup.live" class="logo-container">
+        <img src="assets/vitalup_light_logo.png" alt="VitalUp Logo" class="brand-logo" width="36" height="36">
+        <span class="brand-title">VitalUp</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <nav class="nav-links" id="navMenu">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html" class="active">Terms of Service</a>
+        <a href="delete-account.html">Account Deletion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero-banner">
+      <h1>Terms of Service</h1>
+      <p style="color:var(--text-dim);">Last Updated: October 13, 2026 &bull; Domain: vitalup.live</p>
+    </div>
+
+    <div class="content-section">
+      <div class="disclaimer-box">
+        <h3>Medical & Health Disclaimer</h3>
+        <p>
+          <strong>VitalUp is not a certified medical device and does not offer medical diagnoses or treatment.</strong> The metrics, AI coaching responses (from Vita), and nutritional estimates provided are strictly for general wellness and fitness informational purposes. Always consult a licensed healthcare professional before starting an intensive exercise regimen or altering your clinical diet.
+        </p>
+      </div>
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>
+        By downloading, installing, accessing, or using the <strong>VitalUp</strong> mobile application or related web services, you agree to be bound by these Terms of Service. If you do not agree, do not use the application.
+      </p>
+
+      <h2>2. Use of the App</h2>
+      <ul>
+        <li>You must be at least 13 years old (or 16 in the European Union) to create an account.</li>
+        <li>You are responsible for maintaining the confidentiality of your login credentials.</li>
+        <li>You agree not to reverse engineer, disrupt, or exploit the services or APIs provided by VitalUp.</li>
+      </ul>
+
+      <h2>3. Health & Fitness Tracking</h2>
+      <p>
+        Data synchronized through Google Health Connect or gathered via built-in sensors (GPS, pedometer, BLE heart rate monitors) depends on hardware accuracy and user input. VitalUp disclaims all warranties regarding exact biometric precision.
+      </p>
+
+      <h2>4. Intellectual Property</h2>
+      <p>
+        All original software code, UI interfaces, logos, visual assets, and content within VitalUp are the intellectual property of the VitalUp Team.
+      </p>
+
+      <h2>5. Limitation of Liability</h2>
+      <p>
+        To the maximum extent permitted by applicable law, VitalUp and its developers shall not be liable for any injuries, health complications, or indirect damages resulting from workout activities, dietary adjustments, or reliance on information presented in the app.
+      </p>
+
+      <h2>6. Governing Law & Contact</h2>
+      <p>
+        For inquiries regarding these Terms, contact our legal/support team at <strong><a href="mailto:support@vitalup.live" style="color:var(--primary);">support@vitalup.live</a></strong>.
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container" style="margin: 0 auto; padding: 0;">
+      <p>&copy; 2026 VitalUp. All rights reserved.</p>
+      <p style="margin-top: 0.5rem;">
+        <a href="privacy.html">Privacy Policy</a> &bull;
+        <a href="terms.html">Terms of Service</a> &bull;
+        <a href="delete-account.html">Account &amp; Data Deletion</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenu.classList.toggle('is-open');
+        navToggle.classList.toggle('is-open', isOpen);
+        navToggle.setAttribute('aria-expanded', isOpen);
+      });
+      document.addEventListener('click', (e) => {
+        if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navMenu.classList.contains('is-open')) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

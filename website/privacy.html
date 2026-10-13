@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — VitalUp</title>
+  <meta name="description" content="Privacy Policy for VitalUp Health & Fitness mobile application, compliant with Google Play Store and Health Connect developer policies.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://vitalup.live/privacy">
+  <link rel="icon" type="image/png" href="assets/vitalup_light_logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-card: #162032;
+      --border: #1F293D;
+      --border-accent: #2563EB;
+      --primary: #38BDF8;
+      --primary-glow: rgba(56, 189, 248, 0.15);
+      --accent: #10B981;
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --badge-bg: rgba(56, 189, 248, 0.1);
+      --badge-border: rgba(56, 189, 248, 0.25);
+      --warning-bg: rgba(245, 158, 11, 0.1);
+      --warning-border: rgba(245, 158, 11, 0.3);
+      --warning-text: #FBBF24;
+      --radius: 12px;
+      --max-width: 960px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+      overflow-x: hidden;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0.85rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      object-fit: cover;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.2s ease;
+      background: #FFFFFF;
+    }
+
+    .logo-container:hover .brand-logo {
+      transform: scale(1.05);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 101;
+    }
+    .nav-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+    }
+    .hamburger-bar {
+      width: 20px;
+      height: 2px;
+      background-color: var(--text);
+      border-radius: 2px;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(2) {
+      opacity: 0;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-links a.active {
+      color: var(--primary);
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: clamp(1.5rem, 4vw, 2.5rem) auto clamp(3rem, 6vw, 5rem);
+      width: 100%;
+    }
+
+    .hero-banner {
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 3.5vw, 2rem);
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-banner::before {
+      content: "";
+      position: absolute;
+      top: -50px;
+      right: -50px;
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: var(--primary);
+      margin-bottom: 1rem;
+      max-width: 100%;
+      word-break: break-word;
+    }
+
+    h1 {
+      font-size: clamp(1.75rem, 5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      color: #FFFFFF;
+      line-height: 1.25;
+      text-wrap: balance;
+    }
+
+    .meta-info {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      word-break: break-word;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1.25rem, 3.5vw, 2rem);
+      margin-bottom: 2rem;
+    }
+
+    .toc-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.6rem 1.5rem;
+      list-style-type: none;
+    }
+
+    .toc-grid a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      transition: color 0.15s;
+      display: inline-block;
+      padding: 0.2rem 0;
+      word-break: break-word;
+    }
+
+    .toc-grid a:hover {
+      color: var(--primary);
+    }
+
+    .content-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3.5vw, 2.25rem);
+      margin-bottom: 2rem;
+      overflow-wrap: break-word;
+    }
+
+    h2 {
+      font-size: clamp(1.25rem, 3.5vw, 1.45rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      margin-bottom: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      line-height: 1.35;
+    }
+
+    h3 {
+      font-size: clamp(1.05rem, 2.5vw, 1.15rem);
+      font-weight: 600;
+      color: #E2E8F0;
+      margin: 1.5rem 0 0.5rem;
+      line-height: 1.4;
+    }
+
+    p {
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      overflow-wrap: break-word;
+    }
+
+    ul, ol {
+      color: var(--text-muted);
+      padding-left: 1.35rem;
+      margin-bottom: 1.25rem;
+      overflow-wrap: break-word;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 0.15rem 0.35rem;
+      border-radius: 4px;
+      color: var(--primary);
+      word-break: break-word;
+    }
+
+    .highlight-box {
+      background: var(--surface-card);
+      border-left: 4px solid var(--primary);
+      padding: 1.25rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.25rem 0;
+    }
+
+    .highlight-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .health-connect-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3vw, 1.75rem);
+      margin: 1.5rem 0;
+    }
+
+    .health-connect-card h3 {
+      color: var(--accent);
+      margin-top: 0;
+    }
+
+    .badge-strict {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34D399;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      font-weight: 600;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    /* Responsive Table Styles */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-card);
+    }
+
+    table {
+      width: 100%;
+      min-width: 540px;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      padding: 0.8rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: rgba(11, 15, 25, 0.6);
+      color: #FFFFFF;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: var(--primary);
+      color: #0B0F19;
+      font-weight: 700;
+      padding: 0.8rem 1.4rem;
+      border-radius: 8px;
+      text-decoration: none;
+      margin-top: 0.5rem;
+      transition: transform 0.15s, opacity 0.15s;
+      max-width: 100%;
+      text-align: center;
+    }
+
+    .action-btn:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    @media (max-width: 768px) {
+      .nav-toggle {
+        display: flex;
+      }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        background: rgba(17, 24, 39, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+        gap: 0.35rem;
+        z-index: 1000;
+      }
+      .nav-links.is-open {
+        display: flex;
+        animation: navSlideDown 0.2s ease-out forwards;
+      }
+      .nav-links a {
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+      }
+      @keyframes navSlideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .meta-info {
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .action-btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        font-size: 15px;
+      }
+      .toc-grid {
+        grid-template-columns: 1fr;
+      }
+      th, td {
+        padding: 0.65rem 0.75rem;
+        font-size: 0.85rem;
+      }
+    }
+
+    @media print {
+      body { background: white; color: black; }
+      .hero-banner, .content-section, .toc { border: 1px solid #ccc; background: white; color: black; }
+      h1, h2, h3, strong { color: black; }
+      p, ul, li { color: #333; }
+      header, footer, .action-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <a href="https://vitalup.live" class="logo-container">
+        <img src="assets/vitalup_light_logo.png" alt="VitalUp Logo" class="brand-logo" width="36" height="36">
+        <span class="brand-title">VitalUp</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <nav class="nav-links" id="navMenu">
+        <a href="privacy.html" class="active">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+        <a href="delete-account.html">Account & Data Deletion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="hero-banner">
+      <div class="badge">Google Play Store & Health Connect Compliant</div>
+      <h1>Privacy Policy</h1>
+      <div class="meta-info">
+        <div class="meta-item">
+          <strong>Application:</strong> VitalUp
+        </div>
+        <div class="meta-item">
+          <strong>Effective Date:</strong> October 13, 2026
+        </div>
+        <div class="meta-item">
+          <strong>Official Domain:</strong> <a href="https://vitalup.live" style="color:var(--primary);text-decoration:none;">vitalup.live</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="toc">
+      <div class="toc-title">Table of Contents</div>
+      <ul class="toc-grid">
+        <li><a href="#introduction">1. Introduction & Overview</a></li>
+        <li><a href="#health-connect">2. Google Health Connect Limited Use</a></li>
+        <li><a href="#data-collected">3. Information We Collect & Why</a></li>
+        <li><a href="#hardware-permissions">4. Device Hardware & Permissions</a></li>
+        <li><a href="#ai-processing">5. AI Vision & Coaching Processing</a></li>
+        <li><a href="#third-parties">6. Third-Party Services & Subprocessors</a></li>
+        <li><a href="#security-storage">7. Data Storage, Sync & Security</a></li>
+        <li><a href="#retention-deletion">8. Retention & Deletion Rights</a></li>
+        <li><a href="#children">9. Children's Privacy</a></li>
+        <li><a href="#changes">10. Policy Changes</a></li>
+        <li><a href="#contact">11. Developer Contact Information</a></li>
+      </ul>
+    </div>
+
+    <!-- Section 1 -->
+    <section id="introduction" class="content-section">
+      <h2>1. Introduction & Overview</h2>
+      <p>
+        Welcome to <strong>VitalUp</strong> ("we", "us", "our", or the "Application"). VitalUp is a holistic health, fitness, and lifestyle companion designed to help you monitor physical activity, sleep hygiene, nutrition, hydration, and cardiovascular wellbeing through smart tracking, offline-first data synchronization, and personalized wellness coaching.
+      </p>
+      <p>
+        Your privacy and biological data integrity are our highest priority. This Privacy Policy discloses in full transparency what data we collect, why we need it, how it is processed and protected, and your rights over your data.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>Core Privacy Principle:</strong> VitalUp is engineered with an <strong>offline-first architecture</strong>. Your raw data is saved locally on your device in secure sandboxed storage. We do not sell your personal data or health statistics to advertisers, brokers, or marketing networks.
+        </p>
+      </div>
+    </section>
+
+    <!-- Section 2: CRITICAL FOR HEALTH CONNECT -->
+    <section id="health-connect" class="content-section">
+      <h2>
+        2. Google Health Connect Policy Compliance
+        <span class="badge-strict">Limited Use Requirement</span>
+      </h2>
+      <p>
+        VitalUp integrates with <strong>Google Health Connect</strong> to read and sync fitness and biometric metrics recorded by your Android device and compatible wearables.
+      </p>
+
+      <div class="health-connect-card">
+        <h3>Google Health Connect Limited Use Commitment</h3>
+        <p>
+          VitalUp's use of information received from Google Health Connect adheres strictly to the <strong><a href="https://support.google.com/googleplay/android-developer/answer/9888379" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-weight:600;">Health Connect Permissions Policy</a></strong>, including the Limited Use requirements:
+        </p>
+        <ol>
+          <li><strong>Sole Purpose:</strong> Health Connect data is accessed exclusively to provide and improve user-facing health, workout, and wellness tracking features inside VitalUp (such as daily ring summaries, macro calculations, trend analytics, and workout dashboards).</li>
+          <li><strong>No Sale of Health Data:</strong> We will <strong>NEVER</strong> sell, rent, lease, or monetize Health Connect data to any third party, data broker, health insurance firm, or advertiser.</li>
+          <li><strong>No Advertising Usage:</strong> We will <strong>NEVER</strong> transfer or use Health Connect data to serve personalized, contextual, or retargeted advertisements.</li>
+          <li><strong>No Foundation Model Training:</strong> Health Connect data is <strong>NEVER</strong> used to train or refine generalized artificial intelligence foundation models.</li>
+          <li><strong>Minimal Data Access:</strong> VitalUp only requests read permissions for the specific metric types you explicitly authorize. We do not write data to Health Connect without your consent.</li>
+        </ol>
+      </div>
+
+      <p><strong>Health Connect Data Types Read by VitalUp:</strong></p>
+      <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Health Connect Permission</th>
+            <th>Data Read</th>
+            <th>Purpose inside VitalUp</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>READ_STEPS</code> & <code>READ_DISTANCE</code></td>
+            <td>Daily step count, distance traveled</td>
+            <td>Calculate daily movement rings, distance stats, and active streaks.</td>
+          </tr>
+          <tr>
+            <td><code>READ_TOTAL_CALORIES_BURNED</code> & <code>READ_EXERCISE</code></td>
+            <td>Active energy expended, workout sessions</td>
+            <td>Adjust macronutrient targets and track exercise progression.</td>
+          </tr>
+          <tr>
+            <td><code>READ_SLEEP</code></td>
+            <td>Sleep session duration and sleep stages</td>
+            <td>Calculate sleep hygiene score and recovery recommendations.</td>
+          </tr>
+          <tr>
+            <td><code>READ_HEART_RATE</code>, <code>READ_RESTING_HEART_RATE</code>, <code>READ_HEART_RATE_VARIABILITY</code></td>
+            <td>Heart rate (BPM), resting BPM, HRV</td>
+            <td>Monitor cardiovascular intensity during workouts and physiological stress.</td>
+          </tr>
+          <tr>
+            <td><code>READ_OXYGEN_SATURATION</code> & <code>READ_BLOOD_PRESSURE</code></td>
+            <td>SpO2 levels, systolic/diastolic BP</td>
+            <td>Generate user-requested health trend summaries and clinician-ready reports.</td>
+          </tr>
+          <tr>
+            <td><code>READ_WEIGHT</code></td>
+            <td>Body weight measurements</td>
+            <td>Calibrate personalized BMR and nutritional calorie budgets.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- Section 3 -->
+    <section id="data-collected" class="content-section">
+      <h2>3. Information We Collect & Why</h2>
+      <p>Depending on which features you use, we collect the following categories of data:</p>
+
+      <h3>A. Account & Profile Information</h3>
+      <ul>
+        <li><strong>Credentials:</strong> Email address and hashed password, or Google Sign-In profile (handled via Supabase Auth).</li>
+        <li><strong>Profile Metrics:</strong> Age, biological sex, height, weight, activity level, and dietary preferences (e.g., keto, balanced, high protein) provided during onboarding to calculate your personalized nutritional goals.</li>
+      </ul>
+
+      <h3>B. Activity, Hydration & Wellness Logs</h3>
+      <ul>
+        <li><strong>Manual Logs:</strong> Water consumption logs, food intake logs, custom workout notes, and daily mood/stress check-ins.</li>
+        <li><strong>Gamification Data:</strong> Earned achievements, streak counts, arena points, and friendly challenge participation.</li>
+      </ul>
+
+      <h3>C. Image Data (Meal Photos & Barcodes)</h3>
+      <ul>
+        <li>When you use the AI Food Scanner, you can take a picture of your plate or scan a food barcode.</li>
+        <li>The image is processed to recognize food items and compute nutritional values against USDA FoodData Central and Open Food Facts. Images are not retained for facial recognition or surveillance.</li>
+      </ul>
+
+      <h3>D. Technical & Crash Diagnostics</h3>
+      <ul>
+        <li>App version, operating system version, device model, and anonymous crash telemetry (via Firebase Crashlytics) to resolve performance bugs and errors.</li>
+      </ul>
+    </section>
+
+    <!-- Section 4 -->
+    <section id="hardware-permissions" class="content-section">
+      <h2>4. Device Hardware & Android Permissions</h2>
+      <p>VitalUp requests runtime permissions only when you interact with specific features:</p>
+      <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Permission</th>
+            <th>Type</th>
+            <th>Functional Need</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Location (Fine / Coarse)</strong><br><code>ACCESS_FINE_LOCATION</code>, <code>FOREGROUND_SERVICE_LOCATION</code></td>
+            <td>Sensitive</td>
+            <td>
+              Required <strong>only during active GPS workout tracking</strong> (outdoor run/walk/cycle) to plot your route on offline maps, calculate pace, and elevation. A persistent notification is shown during active recording.<br>
+              <em>We do NOT track background location when a workout is not running.</em>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Camera</strong><br><code>CAMERA</code></td>
+            <td>Runtime</td>
+            <td>Allows capturing meal photos for AI nutritional identification and scanning food product barcodes.</td>
+          </tr>
+          <tr>
+            <td><strong>Physical Activity</strong><br><code>ACTIVITY_RECOGNITION</code></td>
+            <td>Runtime</td>
+            <td>Enables real-time pedometer step counting when not actively syncing with Health Connect.</td>
+          </tr>
+          <tr>
+            <td><strong>Bluetooth LE</strong><br><code>BLUETOOTH_CONNECT</code>, <code>BLUETOOTH_SCAN</code></td>
+            <td>Runtime</td>
+            <td>Used exclusively to discover and pair standard Bluetooth Low Energy chest straps and optical Heart Rate Monitors (with <code>neverForLocation</code> flag).</td>
+          </tr>
+          <tr>
+            <td><strong>Notifications</strong><br><code>POST_NOTIFICATIONS</code></td>
+            <td>Runtime</td>
+            <td>Delivers optional scheduled water reminders, daily goal summaries, and active workout status controls.</td>
+          </tr>
+          <tr>
+            <td><strong>Biometrics</strong><br><code>USE_BIOMETRIC</code></td>
+            <td>System</td>
+            <td>Used for local app lock (Fingerprint / Face ID). Biometric verification is processed 100% on-device by Android OS hardware and is never accessible to VitalUp or our servers.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- Section 5 -->
+    <section id="ai-processing" class="content-section">
+      <h2>5. AI Vision & Coaching Processing</h2>
+      <p>VitalUp incorporates artificial intelligence to deliver meal detection and coaching assistance:</p>
+      <ul>
+        <li><strong>AI Food Vision (Google Gemini Flash & Groq Vision):</strong> When you scan a meal, the cropped food picture is transmitted over an encrypted TLS connection to our vision API endpoint to identify meal items, volume estimates, and macronutrients. These photos are processed ephemerally and discarded once recognized.</li>
+        <li><strong>Vita AI Health Coach:</strong> Vita answers wellness questions based on contextual guidelines. Vita does not replace certified professional medical advice, diagnosis, or emergency healthcare services.</li>
+      </ul>
+    </section>
+
+    <!-- Section 6 -->
+    <section id="third-parties" class="content-section">
+      <h2>6. Third-Party Services & Subprocessors</h2>
+      <p>We work only with reputable cloud infrastructure providers bound by strict confidentiality and data protection agreements:</p>
+      <ul>
+        <li><strong>Supabase (Authentication, PostgreSQL Database, Storage):</strong> Houses your encrypted cloud backups under Row-Level Security (RLS). Hosted in secure tier-4 data centers.</li>
+        <li><strong>Google Firebase (Firebase Messaging, Crashlytics):</strong> Used to deliver push notifications and capture non-identifiable crash stacks.</li>
+        <li><strong>Google Health Connect:</strong> Android platform API for health synchronization.</li>
+        <li><strong>Mapbox / OpenStreetMap:</strong> Provides map tiles for route rendering during outdoor running/cycling.</li>
+        <li><strong>USDA FoodData Central / Open Food Facts:</strong> Public databases for ingredient and nutrient verification.</li>
+      </ul>
+    </section>
+
+    <!-- Section 7 -->
+    <section id="security-storage" class="content-section">
+      <h2>7. Data Storage, Sync & Security</h2>
+      <p>We implement layered technical and organizational safeguards:</p>
+      <ul>
+        <li><strong>Encryption in Transit:</strong> All communication between VitalUp and remote endpoints is encrypted using modern Transport Layer Security (TLS 1.3 / HTTPS).</li>
+        <li><strong>Encryption at Rest:</strong> Cloud databases utilize AES-256 encryption. Sensitive local credentials (tokens, keys) are stored in the Android Keystore via <code>flutter_secure_storage</code>.</li>
+        <li><strong>Row-Level Security (RLS):</strong> In Supabase, database tables enforce RLS policies, ensuring each authenticated user can query only their own rows.</li>
+        <li><strong>Local Autonomy:</strong> An offline-first local database (Isar) allows you to log vitals and workouts even without an active internet connection.</li>
+      </ul>
+    </section>
+
+    <!-- Section 8 -->
+    <section id="retention-deletion" class="content-section">
+      <h2>8. Data Retention & Deletion Rights</h2>
+      <p>
+        You have complete ownership and control over your personal and biological data. You may exercise the following rights at any time without penalty:
+      </p>
+
+      <h3>How to Delete Your Data</h3>
+      <ol>
+        <li>
+          <strong>In-App Self-Service:</strong> Navigate to <strong>Profile &gt; Settings &gt; Account &gt; Delete Account &amp; Data</strong>. Confirming deletion immediately wipes your local database and schedules your cloud account and all associated records for permanent deletion.
+        </li>
+        <li>
+          <strong>Web Request:</strong> You can submit a deletion request directly at our dedicated portal:
+          <br>
+          <a href="delete-account.html" class="action-btn">Open Account &amp; Data Deletion Page &rarr;</a>
+        </li>
+        <li>
+          <strong>Email Request:</strong> Send an email to <strong><a href="mailto:privacy@vitalup.live" style="color:var(--primary);">privacy@vitalup.live</a></strong> with the subject line <em>"Delete My VitalUp Account"</em> from your registered account email. We will process and permanently purge your records within 30 days.
+        </li>
+      </ol>
+      <p style="margin-top: 1rem;">
+        Upon confirmed deletion, all your profile details, historical health sync data, workout maps, and meal logs are irrevocably erased from our primary and backup databases.
+      </p>
+    </section>
+
+    <!-- Section 9 -->
+    <section id="children" class="content-section">
+      <h2>9. Children's Privacy</h2>
+      <p>
+        VitalUp is designed for adults and young adults seeking fitness and lifestyle tracking. We do not knowingly collect personal or health information from children under 13 years of age (or under 16 in the EEA/UK). If you believe a child has provided us with their information without parental consent, please contact us immediately, and we will promptly purge the data.
+      </p>
+    </section>
+
+    <!-- Section 10 -->
+    <section id="changes" class="content-section">
+      <h2>10. Changes to This Privacy Policy</h2>
+      <p>
+        We may periodically update this Privacy Policy to reflect app enhancements, new Health Connect APIs, or statutory regulations. When material changes occur, we will update the "Effective Date" at the top of this page and post a prominent notice inside the application.
+      </p>
+    </section>
+
+    <!-- Section 11 -->
+    <section id="contact" class="content-section">
+      <h2>11. Developer Contact Information</h2>
+      <p>If you have any questions, concerns, or requests regarding this Privacy Policy or your data, please reach out to us:</p>
+      <ul>
+        <li><strong>App Developer / Team:</strong> VitalUp Development Team</li>
+        <li><strong>Lead Developer:</strong> Tarun Talan</li>
+        <li><strong>Official Privacy Email:</strong> <a href="mailto:privacy@vitalup.live" style="color:var(--primary);">privacy@vitalup.live</a></li>
+        <li><strong>General Support:</strong> <a href="mailto:support@vitalup.live" style="color:var(--primary);">support@vitalup.live</a></li>
+        <li><strong>Official Web:</strong> <a href="https://vitalup.live" style="color:var(--primary);">https://vitalup.live</a></li>
+      </ul>
+      <p>We commit to acknowledging and responding to all privacy inquiries within 48 business hours.</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container" style="margin: 0 auto; padding: 0;">
+      <p>&copy; 2026 VitalUp. All rights reserved.</p>
+      <p style="margin-top: 0.5rem;">
+        <a href="privacy.html">Privacy Policy</a> &bull;
+        <a href="terms.html">Terms of Service</a> &bull;
+        <a href="delete-account.html">Account &amp; Data Deletion</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenu.classList.toggle('is-open');
+        navToggle.classList.toggle('is-open', isOpen);
+        navToggle.setAttribute('aria-expanded', isOpen);
+      });
+      document.addEventListener('click', (e) => {
+        if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navMenu.classList.contains('is-open')) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

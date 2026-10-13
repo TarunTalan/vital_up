@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account & Data Deletion Request — VitalUp</title>
+  <meta name="description" content="Request deletion of your VitalUp account and all associated health, activity, and personal data as per Google Play Store data safety guidelines.">
+  <link rel="canonical" href="https://vitalup.live/delete-account">
+  <link rel="icon" type="image/png" href="assets/vitalup_light_logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-card: #162032;
+      --border: #1F293D;
+      --primary: #38BDF8;
+      --danger: #EF4444;
+      --accent: #10B981;
+      --badge-bg: rgba(56, 189, 248, 0.1);
+      --badge-border: rgba(56, 189, 248, 0.25);
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --radius: 12px;
+      --max-width: 800px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1.7;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+      overflow-x: hidden;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0.85rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      object-fit: cover;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.2s ease;
+      background: #FFFFFF;
+    }
+    .logo-container:hover .brand-logo {
+      transform: scale(1.05);
+    }
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 101;
+    }
+    .nav-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+    }
+    .hamburger-bar {
+      width: 20px;
+      height: 2px;
+      background-color: var(--text);
+      border-radius: 2px;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(2) {
+      opacity: 0;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .nav-links a.active {
+      color: var(--primary);
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: clamp(1.5rem, 4vw, 2.5rem) auto clamp(3rem, 6vw, 5rem);
+      width: 100%;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3.5vw, 2.25rem);
+      margin-bottom: 2rem;
+      overflow-wrap: break-word;
+    }
+    h1 {
+      font-size: clamp(1.6rem, 4.5vw, 2.1rem);
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+      color: #FFF;
+      line-height: 1.25;
+      text-wrap: balance;
+    }
+    h2 {
+      font-size: clamp(1.2rem, 3.5vw, 1.35rem);
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #FFF;
+      line-height: 1.35;
+    }
+    p { color: var(--text-muted); margin-bottom: 1rem; overflow-wrap: break-word; }
+    ul, ol { color: var(--text-muted); padding-left: 1.35rem; margin-bottom: 1.25rem; overflow-wrap: break-word; }
+    li { margin-bottom: 0.5rem; }
+    strong { color: var(--text); }
+
+    .warning-box {
+      background: rgba(239, 68, 68, 0.08);
+      border-left: 4px solid var(--danger);
+      padding: clamp(1rem, 3vw, 1.25rem);
+      border-radius: 0 8px 8px 0;
+      margin: 1.5rem 0;
+      overflow-wrap: break-word;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    input[type="email"], select, textarea {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #FFF;
+      font-size: 16px;
+      font-family: inherit;
+      min-height: 44px;
+    }
+    input[type="email"]:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--danger);
+      color: white;
+      font-weight: 700;
+      padding: 0.85rem 1.75rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      min-height: 48px;
+    }
+    .submit-btn:hover {
+      opacity: 0.9;
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .nav-toggle {
+        display: flex;
+      }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        background: rgba(17, 24, 39, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+        gap: 0.35rem;
+        z-index: 1000;
+      }
+      .nav-links.is-open {
+        display: flex;
+        animation: navSlideDown 0.2s ease-out forwards;
+      }
+      .nav-links a {
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+      }
+      @keyframes navSlideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .submit-btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <a href="https://vitalup.live" class="logo-container">
+        <img src="assets/vitalup_light_logo.png" alt="VitalUp Logo" class="brand-logo" width="36" height="36">
+        <span class="brand-title">VitalUp</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <nav class="nav-links" id="navMenu">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+        <a href="delete-account.html" class="active">Account Deletion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h1>Account & Data Deletion</h1>
+      <p>
+        In accordance with Google Play Store Data Safety policies and GDPR/CCPA regulations, you have the right to permanently delete your <strong>VitalUp</strong> account and all personal, biological, workout, and nutritional records associated with it.
+      </p>
+
+      <div class="warning-box">
+        <strong>Warning:</strong> Deletion is irreversible. Once processed, all historical workout routes, step records, macro logs, Vita coach conversation history, streak badges, and biometric sync records will be permanently expunged.
+      </div>
+
+      <h2>Method 1: Direct In-App Deletion (Instant)</h2>
+      <p>For immediate deletion without waiting for manual verification:</p>
+      <ol>
+        <li>Open the <strong>VitalUp</strong> app on your device.</li>
+        <li>Tap <strong>Profile</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Account</strong>.</li>
+        <li>Scroll to the bottom and select <strong>Delete Account &amp; Data</strong>.</li>
+        <li>Confirm your choice. Your local database is wiped immediately and your cloud account is purged.</li>
+      </ol>
+
+      <h2 style="margin-top: 2rem;">Method 2: Web Deletion Request</h2>
+      <p>
+        If you have uninstalled the application or cannot access your device, submit your request using the form below, or send an email to <strong><a href="mailto:privacy@vitalup.live" style="color:var(--primary);">privacy@vitalup.live</a></strong>:
+      </p>
+
+      <form action="mailto:privacy@vitalup.live" method="post" enctype="text/plain" style="margin-top: 1.5rem;">
+        <input type="hidden" name="Subject" value="VitalUp Account Deletion Request">
+        
+        <div class="form-group">
+          <label for="email">Account Email Address:</label>
+          <input type="email" id="email" name="Email" placeholder="your-email@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="scope">Deletion Scope:</label>
+          <select id="scope" name="Scope">
+            <option value="complete_account">Complete Account &amp; All Data (Permanent Wipe)</option>
+            <option value="health_history_only">Health &amp; Workout History Only (Keep Account Active)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reason">Optional Reason / Notes:</label>
+          <textarea id="reason" name="Notes" rows="3" placeholder="Tell us if something went wrong or how we could improve..."></textarea>
+        </div>
+
+        <button type="submit" class="submit-btn">Submit Deletion Request &rarr;</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Data Retention Timeline</h2>
+      <ul>
+        <li><strong>Verification:</strong> A confirmation verification link will be sent to your account email to prevent unauthorized requests.</li>
+        <li><strong>Processing:</strong> Upon confirmation, all active database records are wiped within 72 hours.</li>
+        <li><strong>Backups:</strong> Any residual database snapshot archives will be purged within 30 days.</li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container" style="margin: 0 auto; padding: 0;">
+      <p>&copy; 2026 VitalUp. All rights reserved.</p>
+      <p style="margin-top: 0.5rem;">
+        <a href="privacy.html">Privacy Policy</a> &bull;
+        <a href="terms.html">Terms of Service</a> &bull;
+        <a href="delete-account.html">Account &amp; Data Deletion</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenu.classList.toggle('is-open');
+        navToggle.classList.toggle('is-open', isOpen);
+        navToggle.setAttribute('aria-expanded', isOpen);
+      });
+      document.addEventListener('click', (e) => {
+        if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navMenu.classList.contains('is-open')) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

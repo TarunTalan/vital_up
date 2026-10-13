@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 /// is also in `android/app/src/main/res/values/strings.xml`
 /// (`privacy_policy_url`); keep them the same.
 abstract final class LegalLinks {
-  static const privacyPolicy = 'https://vitalup.example/privacy';
-  static const terms = 'https://vitalup.example/terms';
+  static const privacyPolicy = 'https://vitalup.live/privacy';
+  static const terms = 'https://vitalup.live/terms';
 
   /// Opens [url] in the browser. False when no app could open it.
   static Future<bool> open(String url) async {
