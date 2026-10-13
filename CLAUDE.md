@@ -197,7 +197,7 @@ Route names are GoRouter `name`s.
   `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`), notification
   and health-sync flags.
 - **about:** rate (Play id from `PackageInfo.packageName`), feedback mailto
-  `support@vitalup.app`, Legal links (`LegalLinks`).
+  `support@vitalup.live`, Legal links (`LegalLinks`).
 - **goals:** `my-goals` gathers every goal (plan, weight, activity, water,
   sleep, screen time).
 - **dashboard trackers:** routes `water-trends`, `sleep-trends`,
@@ -317,11 +317,58 @@ Route names are GoRouter `name`s.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
   `scan-food` (image / search / nutrition / barcode), `vita-chat`
   (chat or insights), `generate-diet-plan` (429 at the daily limit, 422 for
-  allergy failures), `send-push` (secret header, FCM v1), `delete-account`,
+  allergy failures), `send-push` (secret header, FCM v1), `send-email`
+  (Resend API, transactional, support tickets, web deletion requests),
+  `delete-account` (purges auth.users, avatar files, cascades DB rows,
+  audits to privacy@vitalup.live & support@vitalup.live),
   `revenuecat-webhook` (table `subscriptions`; fails closed without its
   secret); `fatsecret-proxy` is an unused stub that returns 501. All
   validate input with `_shared/validate.ts` and return short JSON errors.
   No deno locally: type-check with tsc + shims.
+
+## Website & Legal Suite (vitalup.live)
+
+- **Static Pages:** `website/` hosted on Cloudflare Pages (or Vercel) at `https://vitalup.live`:
+  - `index.html`: Product landing page showcasing offline-first, Health Connect, and AI features.
+  - `privacy.html`: Comprehensive privacy policy compliant with Google Play Store & Google Health Connect developer requirements.
+  - `terms.html`: Terms of Service.
+  - `delete-account.html`: Google Play-compliant account deletion portal with in-app instructions and direct web deletion request form with AppCard glass modal confirmation.
+- **Routing & Clean URLs:** Cloudflare Pages natively maps clean URLs (e.g., `/privacy` -> `privacy.html`). Do not use `_redirects` mapping to `.html` (causes a 307 redirect loop). `vercel.json` uses `"cleanUrls": true`.
+- **Assets & Favicons:**
+  - Header logo: `assets/vitalup_light_logo.png` with embedded SVG fallback and no glowing shadow.
+  - Favicon suite: `favicon.ico`, `favicon-32x32.png`, `favicon-16x16.png`, `apple-touch-icon.png`, and embedded inline base64 SVG data URI in `<head>` for instant rendering offline or in `file://`.
+
+## Email & Support Infrastructure (Resend)
+
+- **Service:** `EmailService` (`lib/core/services/email_service.dart`) calls `send-email` Edge Function. Registered in DI (`initDependencies`).
+- **Provider:** Resend REST API (secret `RESEND_API_KEY` stored in Supabase secrets).
+- **Domains & Senders:**
+  - `support@vitalup.live`: In-app support tickets (from `ContactSupportPage`) delivered to support desk with user diagnostics, and branded confirmation email sent to user.
+  - `privacy@vitalup.live`: Receives audit alerts for all mobile and web account deletion requests.
+  - `noreply@vitalup.live`: Transactional authentication emails (signup confirmation, magic link, password recovery in `supabase/email_templates/`).
+- **Inbox Avatars:** Custom domain Google Accounts configured for `support@vitalup.live` and `privacy@vitalup.live` to show the VitalUp app logo as sender profile picture in Gmail.
+- **Account Deletion Flow:**
+  - In-App: `Profile` -> `Settings` -> `Account` -> `Delete Account`. Invokes `delete-account` Edge Function: removes user avatar storage objects, deletes `auth.users` (cascading all RLS-bound records), emails user confirmation, and dispatches audit log to both `privacy@vitalup.live` and `support@vitalup.live`.
+  - Web: Form on `vitalup.live/delete-account` submits to `send-email` Edge Function, dispatches receipt to user, and delivers deletion action item to privacy desk.
+
+## What is Done & Remaining
+
+### Completed:
+1. **Autonomous Support Desk:** In-app ticket form with diagnostic attachment, direct Resend email delivery to `support@vitalup.live`, and user confirmation receipt.
+2. **End-to-End Account Deletion:** Mobile app database purge + avatar cleanup + dual audit email dispatch; web deletion portal with modal confirmation and API/mailto failover.
+3. **Legal Compliance Suite:** Published Privacy Policy, Terms of Service, and Account Deletion portal at `vitalup.live`.
+4. **Branded Email Suite:** Modern dark-glass HTML templates for Supabase Auth, support receipts, and deletion confirmations.
+5. **Favicon & Asset Fixes:** Multi-resolution icons, embedded SVG data URI fallback, removed logo glow shadow, fixed Cloudflare Pages 307 redirect loops.
+6. **Security & Secrets:** Verified zero secrets or API keys in git history or client code; `RESEND_API_KEY` secured in Supabase server secrets.
+
+### Remaining:
+1. **Google Account Avatar Propagation:** Wait for Google CDN cache propagation (2-24h) for `support@vitalup.live` and `privacy@vitalup.live` profile pictures. Create Google Account for `noreply@vitalup.live` for auth email avatars.
+2. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
+3. **Google Play Console Submission:**
+   - Add Privacy Policy URL: `https://vitalup.live/privacy`
+   - Add Account Deletion URL: `https://vitalup.live/delete-account`
+   - Complete Health Connect read-only declarations in Play Console.
+
 
 ## Native Android
 
