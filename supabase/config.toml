@@ -19,3 +19,8 @@ verify_jwt = false
 enabled = true
 # Called by the signed-in user; the JWT identifies whose account to delete.
 verify_jwt = true
+
+[functions.send-email]
+enabled = true
+# Handles both Supabase Auth Send-Email hooks and authenticated client calls.
+verify_jwt = false
