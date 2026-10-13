@@ -196,7 +196,10 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                 ),
               ),
           const SizedBox(height: AppDimens.sectionGap),
-          _StillNeedHelpCard(onEmail: _sendDirectEmail),
+          _StillNeedHelpCard(
+            onContact: _contactSupport,
+            onEmail: _sendDirectEmail,
+          ),
         ],
       ),
     );
@@ -538,9 +541,13 @@ class _EmptySearchResults extends StatelessWidget {
 }
 
 class _StillNeedHelpCard extends StatelessWidget {
+  final VoidCallback onContact;
   final VoidCallback onEmail;
 
-  const _StillNeedHelpCard({required this.onEmail});
+  const _StillNeedHelpCard({
+    required this.onContact,
+    required this.onEmail,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +572,7 @@ class _StillNeedHelpCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppDimens.space2),
                     Text(
-                      'Email our support team directly for fast assistance.',
+                      'Submit a ticket or email our support desk directly.',
                       style: context.text.bodySmall?.copyWith(
                         color: context.vColors.grayText,
                       ),
@@ -576,13 +583,43 @@ class _StillNeedHelpCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppDimens.space16),
-          AppSecondaryButton(
-            label: 'Contact Support via Email',
-            leadingIcon: const Icon(Icons.mail_outline_rounded),
+          AppPrimaryButton(
+            label: 'Open Contact Form',
+            leadingIcon: const Icon(Icons.edit_note_rounded),
+            onTap: onContact,
+          ),
+          const SizedBox(height: AppDimens.space10),
+          InkWell(
             onTap: onEmail,
+            borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space12,
+                vertical: AppDimens.space6,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.mail_outline_rounded,
+                    size: AppDimens.iconSm,
+                    color: context.colors.primary,
+                  ),
+                  const SizedBox(width: AppDimens.space6),
+                  Text(
+                    'Direct contact: $kSupportEmail',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
+

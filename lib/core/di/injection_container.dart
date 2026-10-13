@@ -12,6 +12,7 @@ import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
+import 'package:vital_up/core/services/email_service.dart';
 import 'package:vital_up/features/health_report/data/services/health_report_service.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
@@ -222,6 +223,7 @@ Future<void> initDependencies() async {
 
   // 6. Auth Clean Architecture Layers
   sl.registerLazySingleton<SupabaseClient>(() => Supabase.instance.client);
+  sl.registerLazySingleton<EmailService>(() => EmailService(supabase: sl<SupabaseClient>()));
   
   sl.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSourceImpl(secureStorage: sl<FlutterSecureStorage>()),

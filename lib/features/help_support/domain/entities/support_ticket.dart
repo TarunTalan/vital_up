@@ -92,7 +92,7 @@ class SupportTicket {
   }
 }
 
-const kSupportEmail = 'support@vitalup.app';
+const kSupportEmail = 'support@vitalup.live';
 
 /// `mailto:` link to support. Built by hand so spaces encode as `%20`:
 /// `Uri(queryParameters:)` uses `+`, which many mail apps show literally.
