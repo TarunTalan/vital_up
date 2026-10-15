@@ -92,6 +92,7 @@ class _FriendsViewState extends State<_FriendsView> {
     username: f.username,
     level: f.level,
     avatarUrl: f.avatarUrl,
+    userId: f.userId,
   );
 
   @override
@@ -155,23 +156,46 @@ class _FriendsViewState extends State<_FriendsView> {
                     message:
                         'No friends yet. Add someone by username to compare '
                         'progress and start challenges.',
-                  ),
-                for (final f in state.accepted) ...[
-                  FriendTile(
-                    friend: f,
-                    busy: state.busy.contains(f.userId),
-                    onTap: () => PlayerInspectSheet.show(
-                      context,
-                      friend: f,
-                      onRemove: () => _confirmRemove(f),
-                    ),
-                    trailing: TextButton(
-                      onPressed: () =>
-                          QuickChallengeSheet.show(context, friend: f),
-                      child: const Text('Challenge'),
-                    ),
-                  ),
-                  gap(),
+                  )
+                else ...[
+                  for (final item in state.rankedFriendsAndSelf) ...[
+                    if (item.isMe) ...[
+                      FriendTile(
+                        friend: Friend(
+                          userId: item.userId,
+                          username: item.username,
+                          fullName: item.displayName,
+                          avatarUrl: item.avatarUrl,
+                          level: item.level,
+                          status: FriendStatus.accepted,
+                        ),
+                        rank: item.rank,
+                        points: item.points,
+                        isMe: true,
+                      ),
+                      gap(),
+                    ] else if (item.friend != null) ...[
+                      FriendTile(
+                        friend: item.friend!,
+                        rank: item.rank,
+                        points: item.points,
+                        busy: state.busy.contains(item.friend!.userId),
+                        onTap: () => PlayerInspectSheet.show(
+                          context,
+                          friend: item.friend!,
+                          onRemove: () => _confirmRemove(item.friend!),
+                        ),
+                        trailing: TextButton(
+                          onPressed: () => QuickChallengeSheet.show(
+                            context,
+                            friend: item.friend!,
+                          ),
+                          child: const Text('Challenge'),
+                        ),
+                      ),
+                      gap(),
+                    ],
+                  ],
                 ],
                 if (state.outgoing.isNotEmpty) ...[
                   const SizedBox(height: AppDimens.space12),

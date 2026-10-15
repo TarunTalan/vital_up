@@ -7,6 +7,7 @@ import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// Arena section: pending friend requests, then a scrolling strip of
 /// friends (tap to inspect) ending in an Add tile. "Manage" opens the
@@ -226,12 +227,24 @@ class _FriendChip extends StatelessWidget {
                 color: context.colors.onSurface,
               ),
             ),
-            Text(
-              'Level ${friend.level}',
-              maxLines: 1,
-              style: context.text.labelSmall?.copyWith(
-                color: context.vColors.grayText,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GameIcon(
+                  GamificationIcons.levelHexagon(friend.level),
+                  fallback: Icons.shield_rounded,
+                  size: AppDimens.iconXs,
+                  color: context.colors.primary,
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  'Lv ${friend.level}',
+                  maxLines: 1,
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

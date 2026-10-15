@@ -96,6 +96,7 @@ class CommunityLeaderboardsSection extends StatelessWidget {
                           dimension: AppDimens.iconMd,
                           child: CircularProgressIndicator(
                             strokeWidth: AppDimens.borderThick,
+                            strokeCap: StrokeCap.round,
                           ),
                         )
                       : TextButton(

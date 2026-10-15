@@ -10,6 +10,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -181,10 +182,12 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
               const SizedBox(height: AppDimens.sectionGap),
               if (entries == null)
                 Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space24),
-                  child: state.failed
-                      ? LoadErrorView(onRetry: cubit.load)
-                      : const Center(child: CircularProgressIndicator()),
+                  padding: const EdgeInsets.symmetric(vertical: AppDimens.space32),
+                  child: Center(
+                    child: state.failed
+                        ? LoadErrorView(onRetry: cubit.load)
+                        : const VitalUpLoader(),
+                  ),
                 )
               else if (community.type == CommunityType.friends &&
                   entries.length <= 1)
@@ -284,6 +287,9 @@ class _PodiumPlace extends StatelessWidget {
             username: e.username,
             level: e.level,
             avatarUrl: e.avatarUrl,
+            userId: e.userId,
+            points: e.points,
+            rank: e.rank,
           );
         }
       },
@@ -331,10 +337,17 @@ class _PodiumPlace extends StatelessWidget {
                 top: Radius.circular(AppDimens.radiusSm),
               ),
             ),
-            child: Text(
-              '${e.rank}',
-              style: context.text.headlineSmall?.copyWith(color: color),
-            ),
+            child: e.rank != null && e.rank! <= 3
+                ? GameIcon(
+                    GamificationIcons.leaderboardRank(e.rank!)!,
+                    fallback: Icons.military_tech_rounded,
+                    size: 28,
+                    color: color,
+                  )
+                : Text(
+                    '${e.rank}',
+                    style: context.text.headlineSmall?.copyWith(color: color),
+                  ),
           ),
         ],
       ),
@@ -352,6 +365,7 @@ class _RankRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = entry;
     final onSurface = context.colors.onSurface;
+    final rank = e.rank;
     return GestureDetector(
       onTap: () {
         if (!e.isMe) {
@@ -360,6 +374,9 @@ class _RankRow extends StatelessWidget {
             username: e.username,
             level: e.level,
             avatarUrl: e.avatarUrl,
+            userId: e.userId,
+            points: e.points,
+            rank: e.rank,
           );
         }
       },
@@ -371,12 +388,23 @@ class _RankRow extends StatelessWidget {
           children: [
             SizedBox(
               width: AppDimens.rankColumnWidth,
-              child: Text(
-                e.rank == null ? '–' : '${e.rank}',
-                style: context.text.titleSmall?.copyWith(color: onSurface),
-              ),
+              child: rank != null && rank <= 3
+                  ? GameIcon(
+                      GamificationIcons.leaderboardRank(rank)!,
+                      fallback: Icons.military_tech_rounded,
+                      size: AppDimens.iconLg,
+                      color: _rankColor(rank),
+                    )
+                  : Text(
+                      rank == null ? '–' : '$rank',
+                      style: context.text.titleSmall?.copyWith(color: onSurface),
+                    ),
             ),
-            UserAvatar(username: e.username, url: e.avatarUrl),
+            UserAvatar(
+              username: e.username,
+              url: e.avatarUrl,
+              ringColor: e.isMe ? context.colors.primary : null,
+            ),
             const SizedBox(width: AppDimens.space12),
             Expanded(
               child: Column(
@@ -388,13 +416,27 @@ class _RankRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: context.text.titleSmall?.copyWith(color: onSurface),
                   ),
-                  Text(
-                    pinned && e.rank == null
-                        ? 'Earn points to get ranked'
-                        : 'Level ${e.level}',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
+                  const SizedBox(height: AppDimens.space2),
+                  Row(
+                    children: [
+                      if (!(pinned && e.rank == null)) ...[
+                        GameIcon(
+                          GamificationIcons.levelHexagon(e.level),
+                          fallback: Icons.shield_rounded,
+                          size: AppDimens.iconXs,
+                          color: context.colors.primary,
+                        ),
+                        const SizedBox(width: AppDimens.space4),
+                      ],
+                      Text(
+                        pinned && e.rank == null
+                            ? 'Earn points to get ranked'
+                            : 'Level ${e.level}',
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.vColors.grayText,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

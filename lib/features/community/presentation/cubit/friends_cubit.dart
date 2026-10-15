@@ -3,11 +3,54 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
+import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
+import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
+
+/// A friend or the current user in the ranked friends list.
+class RankedFriendItem extends Equatable {
+  final int? rank;
+  final String userId;
+  final String username;
+  final String? displayName;
+  final String? avatarUrl;
+  final int points;
+  final int level;
+  final bool isMe;
+  final Friend? friend;
+
+  const RankedFriendItem({
+    required this.rank,
+    required this.userId,
+    required this.username,
+    this.displayName,
+    this.avatarUrl,
+    required this.points,
+    required this.level,
+    required this.isMe,
+    this.friend,
+  });
+
+  @override
+  List<Object?> get props => [
+    rank,
+    userId,
+    username,
+    displayName,
+    avatarUrl,
+    points,
+    level,
+    isMe,
+    friend,
+  ];
+}
 
 class FriendsState extends Equatable {
   final List<Friend>? friends;
+  final List<LeaderboardEntry> rankedMembers;
+  final PlayerProfile? myProfile;
   final bool failed;
   final bool sending;
 
@@ -21,6 +64,8 @@ class FriendsState extends Equatable {
 
   const FriendsState({
     this.friends,
+    this.rankedMembers = const [],
+    this.myProfile,
     this.failed = false,
     this.sending = false,
     this.busy = const {},
@@ -37,14 +82,167 @@ class FriendsState extends Equatable {
   List<Friend> get incoming => _with(FriendStatus.incoming);
   List<Friend> get outgoing => _with(FriendStatus.outgoing);
 
+  /// Returns all accepted friends and the current user ordered rankwise.
+  List<RankedFriendItem> get rankedFriendsAndSelf {
+    final acceptedFriends = accepted;
+    if (acceptedFriends.isEmpty && myProfile == null) return const [];
+
+    if (rankedMembers.isNotEmpty) {
+      final items = <RankedFriendItem>[];
+      final seenUserIds = <String>{};
+
+      for (final e in rankedMembers) {
+        seenUserIds.add(e.userId);
+        if (e.isMe) {
+          items.add(
+            RankedFriendItem(
+              rank: e.rank,
+              userId: e.userId,
+              username: e.username,
+              displayName: e.displayName ?? myProfile?.displayName,
+              avatarUrl: e.avatarUrl ?? myProfile?.avatarUrl,
+              points: e.points,
+              level: e.level,
+              isMe: true,
+            ),
+          );
+        } else {
+          final f = acceptedFriends
+              .where((friend) => friend.userId == e.userId)
+              .firstOrNull;
+          items.add(
+            RankedFriendItem(
+              rank: e.rank,
+              userId: e.userId,
+              username: e.username,
+              displayName: e.displayName ?? f?.fullName,
+              avatarUrl: e.avatarUrl ?? f?.avatarUrl,
+              points: e.points,
+              level: e.level,
+              isMe: false,
+              friend: f ??
+                  Friend(
+                    userId: e.userId,
+                    username: e.username,
+                    fullName: e.displayName,
+                    avatarUrl: e.avatarUrl,
+                    level: e.level,
+                    status: FriendStatus.accepted,
+                  ),
+            ),
+          );
+        }
+      }
+
+      // Include accepted friends not yet indexed in points
+      for (final f in acceptedFriends) {
+        if (!seenUserIds.contains(f.userId)) {
+          items.add(
+            RankedFriendItem(
+              rank: null,
+              userId: f.userId,
+              username: f.username,
+              displayName: f.fullName,
+              avatarUrl: f.avatarUrl,
+              points: 0,
+              level: f.level,
+              isMe: false,
+              friend: f,
+            ),
+          );
+        }
+      }
+
+      // Include caller if not yet on leaderboard
+      if (myProfile != null && !seenUserIds.contains(myProfile!.userId)) {
+        items.add(
+          RankedFriendItem(
+            rank: null,
+            userId: myProfile!.userId,
+            username: myProfile!.username,
+            displayName: myProfile!.displayName,
+            avatarUrl: myProfile!.avatarUrl,
+            points: myProfile!.totalPoints,
+            level: myProfile!.level,
+            isMe: true,
+          ),
+        );
+      }
+
+      return items;
+    }
+
+    // Fallback when leaderboard is offline or unranked
+    final list = <RankedFriendItem>[];
+    if (myProfile != null) {
+      list.add(
+        RankedFriendItem(
+          rank: null,
+          userId: myProfile!.userId,
+          username: myProfile!.username,
+          displayName: myProfile!.displayName,
+          avatarUrl: myProfile!.avatarUrl,
+          points: myProfile!.totalPoints,
+          level: myProfile!.level,
+          isMe: true,
+        ),
+      );
+    }
+    for (final f in acceptedFriends) {
+      list.add(
+        RankedFriendItem(
+          rank: null,
+          userId: f.userId,
+          username: f.username,
+          displayName: f.fullName,
+          avatarUrl: f.avatarUrl,
+          points: 0,
+          level: f.level,
+          isMe: false,
+          friend: f,
+        ),
+      );
+    }
+
+    list.sort((a, b) {
+      final pCmp = b.points.compareTo(a.points);
+      if (pCmp != 0) return pCmp;
+      return b.level.compareTo(a.level);
+    });
+
+    final withRanks = <RankedFriendItem>[];
+    for (var i = 0; i < list.length; i++) {
+      final item = list[i];
+      withRanks.add(
+        RankedFriendItem(
+          rank: item.points > 0 ? (i + 1) : null,
+          userId: item.userId,
+          username: item.username,
+          displayName: item.displayName,
+          avatarUrl: item.avatarUrl,
+          points: item.points,
+          level: item.level,
+          isMe: item.isMe,
+          friend: item.friend,
+        ),
+      );
+    }
+
+    return withRanks;
+  }
+
   FriendsState copyWith({
     List<Friend>? friends,
+    List<LeaderboardEntry>? rankedMembers,
+    PlayerProfile? myProfile,
     bool? failed,
     bool? sending,
     Set<String>? busy,
     String? message,
   }) => FriendsState(
     friends: friends ?? this.friends,
+    rankedMembers: rankedMembers ?? this.rankedMembers,
+    myProfile: myProfile ?? this.myProfile,
     failed: failed ?? this.failed,
     sending: sending ?? this.sending,
     busy: busy ?? this.busy,
@@ -55,6 +253,8 @@ class FriendsState extends Equatable {
   @override
   List<Object?> get props => [
     friends,
+    rankedMembers,
+    myProfile,
     failed,
     sending,
     busy,
@@ -72,8 +272,31 @@ class FriendsCubit extends Cubit<FriendsState> {
     emit(state.copyWith(failed: false));
     try {
       final friends = await _repository.getFriends().withLoadTimeout();
+      PlayerProfile? myProfile;
+      try {
+        myProfile = await _repository.getMyProfile();
+      } catch (_) {}
+
+      List<LeaderboardEntry> ranked = [];
+      try {
+        final acceptedCount =
+            friends.where((f) => f.status == FriendStatus.accepted).length;
+        ranked = await _repository.getLeaderboard(
+          Community.friendsOf(acceptedCount),
+          period: LeaderboardPeriod.all,
+        );
+      } catch (e) {
+        debugPrint('Friends leaderboard fetch: $e');
+      }
+
       if (isClosed) return;
-      emit(state.copyWith(friends: friends));
+      emit(
+        state.copyWith(
+          friends: friends,
+          rankedMembers: ranked,
+          myProfile: myProfile,
+        ),
+      );
     } catch (e) {
       debugPrint('Friends failed to load: $e');
       if (isClosed) return;

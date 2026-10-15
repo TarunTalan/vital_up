@@ -1,3 +1,4 @@
+import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
@@ -74,4 +75,10 @@ abstract class CommunityRepository {
     required LeaderboardPeriod period,
     ScoreCategory? category,
   });
+
+  /// Returns all common communities shared between the caller and [friendUserId],
+  /// along with both the friend's rank and the caller's rank in each community.
+  Future<List<CommonCommunityRank>> getCommonCommunityRanks(
+    String friendUserId,
+  ) async => const [];
 }

@@ -28,6 +28,33 @@ IconData communityFallbackIcon(Community c) => switch (c.type) {
   },
 };
 
+String communityIconAsset(Community c) {
+  if (c.slug.toLowerCase().contains('weight') ||
+      c.iconKey.toLowerCase().contains('weight') ||
+      c.name.toLowerCase().contains('weight')) {
+    return 'assets/icons/trackers/weight_icon.svg';
+  }
+  if (c.slug.toLowerCase().contains('step') ||
+      c.iconKey.toLowerCase().contains('step') ||
+      c.name.toLowerCase().contains('step') ||
+      c.slug.toLowerCase().contains('walk') ||
+      c.iconKey.toLowerCase().contains('walk') ||
+      c.name.toLowerCase().contains('walk')) {
+    return 'assets/icons/trackers/step.svg';
+  }
+  if (c.slug.toLowerCase().contains('activity') ||
+      c.iconKey.toLowerCase().contains('activity') ||
+      c.name.toLowerCase().contains('activity') ||
+      c.slug.toLowerCase().contains('workout') ||
+      c.iconKey.toLowerCase().contains('workout') ||
+      c.name.toLowerCase().contains('workout') ||
+      c.slug.toLowerCase().contains('runner') ||
+      c.slug.toLowerCase().contains('jogger')) {
+    return 'assets/icons/trackers/activity.svg';
+  }
+  return GamificationIcons.communityIcon(c.iconKey);
+}
+
 /// A community row: icon, name, what it ranks on and member count, with an
 /// optional trailing action.
 class CommunityTile extends StatelessWidget {
@@ -54,7 +81,7 @@ class CommunityTile extends StatelessWidget {
           AppIconBadge(
             color: context.colors.primary,
             icon: GameIcon(
-              GamificationIcons.communityIcon(community.iconKey),
+              communityIconAsset(community),
               fallback: communityFallbackIcon(community),
               size: AppDimens.iconMd,
             ),
@@ -125,7 +152,7 @@ class CommunityGridCard extends StatelessWidget {
               AppIconBadge(
                 color: context.colors.primary,
                 icon: GameIcon(
-                  GamificationIcons.communityIcon(community.iconKey),
+                  communityIconAsset(community),
                   fallback: communityFallbackIcon(community),
                   size: AppDimens.iconSm,
                 ),

@@ -71,12 +71,9 @@ class _ArenaHubView extends StatelessWidget {
             ),
           ),
           body: state.communities == null
-              ? Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space48),
-                  child: state.failed
-                      ? LoadErrorView(onRetry: cubit.load)
-                      : const Center(child: VitalUpLoader()),
-                )
+              ? state.failed
+                  ? LoadErrorView(onRetry: cubit.load)
+                  : const Center(child: VitalUpLoader())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

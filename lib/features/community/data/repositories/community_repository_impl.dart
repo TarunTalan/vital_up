@@ -5,6 +5,7 @@ import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/community/data/datasources/community_remote_datasource.dart';
+import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
@@ -334,6 +335,68 @@ class CommunityRepositoryImpl implements CommunityRepository {
             if (r['user_id'] != friend.userId) r,
         ],
       );
+    }
+  }
+
+  @override
+  Future<List<CommonCommunityRank>> getCommonCommunityRanks(
+    String friendUserId,
+  ) async {
+    try {
+      final allCommunities = await getCommunities();
+      final myJoined = allCommunities.where((c) {
+        return c.type == CommunityType.global ||
+            c.type == CommunityType.local ||
+            c.isMember;
+      }).toList();
+
+      final friends = await getFriends();
+      final acceptedCount =
+          friends.where((f) => f.status == FriendStatus.accepted).length;
+      final friendsCommunity = Community.friendsOf(acceptedCount);
+
+      // Prioritize Friends board and Global board, followed by joined communities
+      final targets = [
+        friendsCommunity,
+        ...myJoined,
+      ];
+
+      final results = await Future.wait(
+        targets.map((c) async {
+          try {
+            final entries = await getLeaderboard(
+              c,
+              period: LeaderboardPeriod.all,
+              limit: 100,
+            );
+            final friendEntry = entries
+                .where((e) => e.userId == friendUserId)
+                .firstOrNull;
+            final myEntry = entries.where((e) => e.isMe).firstOrNull;
+
+            // Global and Friends communities are always shared/common between accepted friends
+            final isCommon = c.type == CommunityType.global ||
+                c.type == CommunityType.friends ||
+                friendEntry != null;
+
+            if (!isCommon) return null;
+
+            return CommonCommunityRank(
+              community: c,
+              friendRank: friendEntry?.rank,
+              friendPoints: friendEntry?.points ?? 0,
+              myRank: myEntry?.rank,
+              myPoints: myEntry?.points ?? 0,
+            );
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+
+      return results.whereType<CommonCommunityRank>().toList();
+    } catch (_) {
+      return const [];
     }
   }
 }

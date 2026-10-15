@@ -11,6 +11,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
+import 'package:vital_up/features/community/presentation/widgets/common_communities_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 
@@ -79,10 +80,7 @@ class _HeadToHeadComparisonPageState extends State<HeadToHeadComparisonPage> {
           }
           final data = snap.data;
           if (data == null) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppDimens.space48),
-              child: Center(child: VitalUpLoader()),
-            );
+            return const Center(child: VitalUpLoader());
           }
           final (me, them) = data;
           if (them.isPrivate) {
@@ -168,6 +166,10 @@ class _HeadToHeadComparisonPageState extends State<HeadToHeadComparisonPage> {
               const SizedBox(height: AppDimens.sectionGap),
               const AppSectionHeader('Points by category'),
               _StatsCard(stats: categories),
+              CommonCommunitiesSection(
+                friendUserId: widget.friend.userId,
+                friendUsername: widget.friend.username,
+              ),
             ],
           );
         },

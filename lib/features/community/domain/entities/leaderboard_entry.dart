@@ -14,6 +14,7 @@ class LeaderboardEntry extends Equatable {
   final int? rank;
   final String userId;
   final String username;
+  final String? displayName;
   final String? avatarUrl;
   final int points;
   final int level;
@@ -23,6 +24,7 @@ class LeaderboardEntry extends Equatable {
     required this.rank,
     required this.userId,
     required this.username,
+    this.displayName,
     required this.points,
     required this.level,
     this.avatarUrl,
@@ -34,6 +36,8 @@ class LeaderboardEntry extends Equatable {
         rank: (json['rank'] as num?)?.toInt(),
         userId: json['user_id'] as String,
         username: json['username'] as String? ?? 'VitalUp user',
+        displayName:
+            json['display_name'] as String? ?? json['full_name'] as String?,
         avatarUrl: json['avatar_url'] as String?,
         points: (json['points'] as num?)?.toInt() ?? 0,
         level: (json['level'] as num?)?.toInt() ?? 1,
@@ -45,6 +49,7 @@ class LeaderboardEntry extends Equatable {
     rank,
     userId,
     username,
+    displayName,
     avatarUrl,
     points,
     level,
