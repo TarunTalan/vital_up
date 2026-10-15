@@ -145,11 +145,11 @@ class _DashboardPageState extends State<DashboardPage> {
   static const _arenaTab = 3;
 
   static const _items = [
-    AppBottomNavItem('Home', 'assets/icons/home.svg'),
-    AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
-    AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
+    AppBottomNavItem('Home', 'assets/icons/nav/home.svg'),
+    AppBottomNavItem('Scan', 'assets/icons/nav/scanner.svg'),
+    AppBottomNavItem('Vita', 'assets/icons/nav/vita.svg'),
     AppBottomNavItem('Arena', GamificationIcons.community),
-    AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
+    AppBottomNavItem('Profile', 'assets/icons/nav/profile.svg'),
   ];
 
   void _selectTab(int index) {
@@ -588,7 +588,19 @@ class _HomeTabState extends State<_HomeTab> {
                         DashboardInsightCard(onLog: _logMetric),
                         const SizedBox(height: AppDimens.sectionGap),
 
-                        _buildSectionTitle(context, 'Nutrition'),
+                        _buildSectionTitle(
+                          context,
+                          'Nutrition',
+                          actionLabel: 'Diet Plan',
+                          onAction: () async {
+                            final state = context.read<DietPlanCubit>().state;
+                            if (state is DietPlanLoaded) {
+                              await _push('vita-diet-plan');
+                            } else {
+                              await _push('diet-plan-prefs');
+                            }
+                          },
+                        ),
                         BlocListener<MealLogBloc, MealLogState>(
                           // A newly logged meal moves today's calories bar.
                           listenWhen: (_, state) => state is MealLogLoaded,
@@ -604,6 +616,7 @@ class _HomeTabState extends State<_HomeTab> {
                                   _push(TrackerMetric.nutrition.route),
                               onScanMeal: onScanMeal,
                               onCreatePlan: () => _push('diet-plan-prefs'),
+                              onOpenDietPlan: () => _push('vita-diet-plan'),
                             ),
                           ),
                         ),

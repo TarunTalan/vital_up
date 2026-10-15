@@ -154,7 +154,7 @@ class SleepTrendsPage extends StatelessWidget {
     ).add(Duration(minutes: avg.round()));
     return [
       TrackerInsight(
-        Icons.nightlight_round,
+        Icons.bedtime_rounded,
         'You usually go to bed around ${DateFormat.jm().format(typical)}'
         '${spread > 45 ? ', but it varies by about ${spread.round()} min. '
                   'A steadier bedtime improves deep sleep.' : ' — nice and consistent.'}',

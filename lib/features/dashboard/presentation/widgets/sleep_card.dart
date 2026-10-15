@@ -92,8 +92,7 @@ class SleepCard extends StatelessWidget {
                     title: 'How did you sleep?',
                     message: canDetect
                         ? 'Log sleep to track your rest.'
-                        : 'Log sleep, or allow usage access to detect it '
-                              'from when your phone is idle.',
+                        : 'Log sleep or enable auto-detect.',
                     color: AppColors.trackSleep,
                   ),
                 ],
@@ -121,7 +120,7 @@ class SleepCard extends StatelessWidget {
                   TrackerPrompt(
                     icon: Icons.health_and_safety_rounded,
                     title: 'Sync sleep',
-                    message: 'Install Health Connect to sync your watch.',
+                    message: 'Connect Health Connect to sync.',
                     color: AppColors.trackSleep,
                   ),
                 ],
@@ -219,9 +218,7 @@ class SleepCard extends StatelessWidget {
             TrackerPrompt(
               icon: Icons.bedtime_rounded,
               title: justNow ? 'Sleep well' : 'Good morning',
-              message: justNow
-                  ? 'In bed since $at.'
-                  : "In bed since $at. Tap I'm up to save the night.",
+              message: 'In bed since $at.',
               color: AppColors.trackSleep,
             ),
           ],
@@ -275,8 +272,7 @@ class SleepCard extends StatelessWidget {
               title: 'Slept ${formatDashboardDuration(estimate.duration)}?',
               message:
                   '${time.format(estimate.bedTime)} – '
-                  '${time.format(estimate.wakeTime)}, '
-                  'from when your phone was idle.',
+                  '${time.format(estimate.wakeTime)}',
               color: AppColors.trackSleep,
             ),
           ],

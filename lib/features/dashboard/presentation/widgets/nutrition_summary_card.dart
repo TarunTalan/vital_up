@@ -60,7 +60,10 @@ class NutritionSummaryCard extends StatelessWidget {
   /// Opens the nutrition detail page.
   final VoidCallback? onOpenProgress;
 
-  /// Starts the diet plan flow (shown when there's no plan).
+  /// Opens the active diet plan or generator.
+  final VoidCallback? onOpenDietPlan;
+
+  /// Creates a new diet plan.
   final VoidCallback? onCreatePlan;
 
   const NutritionSummaryCard({
@@ -70,6 +73,7 @@ class NutritionSummaryCard extends StatelessWidget {
     this.plan,
     this.onOpenProgress,
     this.onCreatePlan,
+    this.onOpenDietPlan,
   });
 
   @override
@@ -111,20 +115,14 @@ class NutritionSummaryCard extends StatelessWidget {
           filled: true,
           onTap: onScanMeal,
         ),
-        if (plan == null && onCreatePlan != null)
-          TrackerQuickAction(
-            label: 'Get a plan',
-            icon: Icons.auto_awesome_rounded,
-            color: _metric.color,
-            onTap: onCreatePlan,
-          )
-        else
-          TrackerQuickAction(
-            label: 'History',
-            icon: Icons.history_rounded,
-            color: _metric.color,
-            onTap: onViewAll,
-          ),
+        TrackerQuickAction(
+          label: plan != null ? 'Diet plan' : 'Get a plan',
+          svgAsset: 'assets/icons/nav/vita.svg',
+          color: _metric.color,
+          onTap: plan != null
+              ? (onOpenDietPlan ?? onOpenProgress)
+              : onCreatePlan,
+        ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

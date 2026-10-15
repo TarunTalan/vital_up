@@ -338,7 +338,7 @@ class _HeroCard extends StatelessWidget {
                   icon: goal == null
                       ? const Icon(Icons.add_rounded, size: AppDimens.iconSm)
                       : SvgPicture.asset(
-                          'assets/icons/edit.svg',
+                          'assets/icons/ui/edit.svg',
                           width: AppDimens.iconSm,
                           height: AppDimens.iconSm,
                           colorFilter: ColorFilter.mode(

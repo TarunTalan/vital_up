@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -69,7 +71,10 @@ class DietProgressPage extends StatelessWidget {
               if (await editNutritionGoal(context)) reload();
             },
             insights: (data) => _mealInsights(data.logs),
-            sections: (context, data) => [const _MacrosCard()],
+            sections: (context, data) => [
+              _DietPlanActionCard(onReload: reload),
+              const _MacrosCard(),
+            ],
             logsTitle: 'Meals',
             emptyLogs: 'No meals logged in this period yet.',
             logsActionLabel: 'All meals',
@@ -177,7 +182,7 @@ class _MacrosCard extends StatelessWidget {
                       TrackerFigure(
                         label: 'Sugar',
                         value: '${sugar.toStringAsFixed(1)}g',
-                        icon: Icons.icecream_rounded,
+                        iconAsset: 'assets/icons/ui/sugar.svg',
                       ),
                       TrackerFigure(
                         label: 'Sat. fat',
@@ -190,6 +195,116 @@ class _MacrosCard extends StatelessWidget {
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// Direct shortcut to view active diet plan or launch the AI diet generator.
+class _DietPlanActionCard extends StatelessWidget {
+  final Future<void> Function() onReload;
+
+  const _DietPlanActionCard({required this.onReload});
+
+  @override
+  Widget build(BuildContext context) {
+    const metric = TrackerMetric.nutrition;
+    return BlocBuilder<DietPlanCubit, DietPlanState>(
+      builder: (context, state) {
+        final plan = state is DietPlanLoaded ? state.mealPlan : null;
+        return AppCard(
+          width: double.infinity,
+          padding: AppDimens.cardPaddingCompact,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: AppDimens.iconLg,
+                    height: AppDimens.iconLg,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: metric.color.withValues(alpha: 0.15),
+                      borderRadius:
+                          BorderRadius.circular(AppDimens.radiusSm),
+                    ),
+                    child: SvgPicture.asset(
+                      'assets/icons/nav/vita.svg',
+                      width: AppDimens.iconSm,
+                      height: AppDimens.iconSm,
+                      colorFilter: ColorFilter.mode(
+                        metric.color,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.space12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          plan != null
+                              ? 'Active Diet Plan'
+                              : 'AI Diet Plan Generator',
+                          style: context.text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: AppDimens.space2),
+                        Text(
+                          plan != null
+                              ? '${plan.meals.length} meals · ${plan.totalCalories.round()} kcal daily target'
+                              : 'Create a tailored meal plan with Vita AI based on your goals',
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.vColors.grayText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.space12),
+              if (plan != null)
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppPrimaryButton(
+                        label: 'View plan',
+                        onTap: () async {
+                          await context.pushNamed('vita-diet-plan');
+                          onReload();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppDimens.space8),
+                    Expanded(
+                      child: AppSecondaryButton(
+                        label: 'Edit plan',
+                        onTap: () async {
+                          final saved =
+                              await context.pushNamed<bool>('diet-plan-edit');
+                          if (saved == true) onReload();
+                        },
+                      ),
+                    ),
+                  ],
+                )
+              else
+                AppPrimaryButton(
+                  label: 'Generate diet plan',
+                  showRightArrow: true,
+                  onTap: () async {
+                    await context.pushNamed('diet-plan-prefs');
+                    onReload();
+                  },
+                ),
+            ],
+          ),
         );
       },
     );

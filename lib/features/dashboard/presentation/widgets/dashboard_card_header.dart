@@ -118,6 +118,7 @@ class DashboardCardLoading extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           color: context.colors.primary,
+          strokeCap: StrokeCap.round,
         ),
       ),
     );

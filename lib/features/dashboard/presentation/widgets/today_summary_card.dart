@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -93,6 +94,7 @@ class _ActivityItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final goal = _headlineGoal(context.watch<ActivityGoalsCubit>().state);
     final metric = goal?.goal.metric;
+    final isSteps = metric == null || metric == GoalMetric.steps;
     return _SummaryItem(
       metric: TrackerMetric.activity,
       label: metric?.label ?? TrackerMetric.activity.label,
@@ -101,6 +103,7 @@ class _ActivityItem extends StatelessWidget {
           ? TrackerStatus.noGoal.label
           : 'of ${metric!.formatWithUnit(goal.goal.target)}',
       fraction: goal?.fraction,
+      iconAsset: isSteps ? 'assets/icons/trackers/step.svg' : null,
       onTap: () => onOpen(TrackerMetric.activity),
     );
   }
@@ -189,6 +192,7 @@ class _SummaryItem extends StatelessWidget {
   final String goal;
   final double? fraction;
   final VoidCallback onTap;
+  final String? iconAsset;
 
   const _SummaryItem({
     required this.metric,
@@ -197,6 +201,7 @@ class _SummaryItem extends StatelessWidget {
     required this.goal,
     required this.fraction,
     required this.onTap,
+    this.iconAsset,
   });
 
   @override
@@ -216,7 +221,18 @@ class _SummaryItem extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  TrackerIcon(metric, size: AppDimens.iconXs),
+                  if (iconAsset != null)
+                    SvgPicture.asset(
+                      iconAsset!,
+                      width: AppDimens.iconXs,
+                      height: AppDimens.iconXs,
+                      colorFilter: ColorFilter.mode(
+                        metric.color,
+                        BlendMode.srcIn,
+                      ),
+                    )
+                  else
+                    TrackerIcon(metric, size: AppDimens.iconXs),
                   const SizedBox(width: AppDimens.space4),
                   Expanded(
                     child: Text(

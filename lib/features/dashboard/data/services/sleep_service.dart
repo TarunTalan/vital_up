@@ -64,9 +64,9 @@ class SleepService {
     'com.example.vital_up/usage_stats',
   );
 
-  static const _allSleepTypes = [
+  static final _allSleepTypes = [
     HealthDataType.SLEEP_ASLEEP,
-    HealthDataType.SLEEP_IN_BED,
+    if (Platform.isIOS) HealthDataType.SLEEP_IN_BED,
     HealthDataType.SLEEP_DEEP,
     HealthDataType.SLEEP_REM,
     HealthDataType.SLEEP_LIGHT,
