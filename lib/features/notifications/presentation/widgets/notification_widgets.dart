@@ -266,6 +266,7 @@ class NotificationTile extends StatelessWidget {
                   dimension: AppDimens.iconLg,
                   child: CircularProgressIndicator(
                     strokeWidth: AppDimens.borderThick,
+                    strokeCap: StrokeCap.round,
                   ),
                 ),
               )
@@ -318,7 +319,7 @@ class _NotificationLeading extends StatelessWidget {
       ),
       NotificationType.levelUp => (
         AppColors.scoreBonus,
-        GamificationIcons.trophy,
+        GamificationIcons.levelUp,
         Icons.emoji_events_rounded,
       ),
       NotificationType.streak => (

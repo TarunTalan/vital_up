@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -217,7 +218,7 @@ class _SupportActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assistant = _ActionCard(
-      icon: Icons.smart_toy_rounded,
+      svgAsset: 'assets/icons/nav/vita.svg',
       title: 'Vital Assistant',
       subtitle: 'Chat for instant AI guidance & diagnostics',
       highlighted: true,
@@ -255,19 +256,21 @@ class _SupportActions extends StatelessWidget {
 }
 
 class _ActionCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String title;
   final String subtitle;
   final bool highlighted;
   final VoidCallback onTap;
 
   const _ActionCard({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.title,
     required this.subtitle,
     required this.onTap,
     this.highlighted = false,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +281,19 @@ class _ActionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppIconBadge(icon: Icon(icon)),
+          AppIconBadge(
+            icon: svgAsset != null
+                ? SvgPicture.asset(
+                    svgAsset!,
+                    width: AppDimens.iconSm,
+                    height: AppDimens.iconSm,
+                    colorFilter: ColorFilter.mode(
+                      highlighted ? VitaColors.accent : context.colors.primary,
+                      BlendMode.srcIn,
+                    ),
+                  )
+                : Icon(icon),
+          ),
           const SizedBox(height: AppDimens.space12),
           Text(title, style: context.text.titleSmall),
           const SizedBox(height: AppDimens.space4),
@@ -531,7 +546,15 @@ class _EmptySearchResults extends StatelessWidget {
           const SizedBox(height: AppDimens.space16),
           AppPrimaryButton(
             label: 'Ask Vital Assistant',
-            leadingIcon: const Icon(Icons.smart_toy_rounded),
+            leadingIcon: SvgPicture.asset(
+              'assets/icons/nav/vita.svg',
+              width: AppDimens.iconSm,
+              height: AppDimens.iconSm,
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
+            ),
             onTap: onAssistant,
           ),
         ],

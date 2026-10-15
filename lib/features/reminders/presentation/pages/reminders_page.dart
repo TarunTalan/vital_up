@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -8,6 +9,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/widgets/reminder_editor_sheet.dart';
@@ -45,9 +47,11 @@ class RemindersPage extends StatelessWidget {
       padBody: false,
       body: BlocConsumer<RemindersCubit, RemindersState>(
         listenWhen: (prev, next) => next.messageId != prev.messageId,
-        listener: (context, s) => ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(s.message!))),
+        listener: (context, s) {
+          if (s.message != null && s.message!.isNotEmpty) {
+            showSuccessSnackBar(context, s.message!);
+          }
+        },
         builder: (context, state) {
           if (state.loading) return const Center(child: VitalUpLoader());
           final cubit = context.read<RemindersCubit>();
@@ -82,8 +86,16 @@ class RemindersPage extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const AppIconBadge(
-                          icon: Icon(Icons.auto_awesome_rounded),
+                        AppIconBadge(
+                          icon: SvgPicture.asset(
+                            'assets/icons/nav/vita.svg',
+                            width: AppDimens.iconSm,
+                            height: AppDimens.iconSm,
+                            colorFilter: ColorFilter.mode(
+                              VitaColors.accent,
+                              BlendMode.srcIn,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: AppDimens.space12),
                         Expanded(
@@ -165,7 +177,7 @@ class _Banner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppInfoNote(message: message, icon: Icons.notifications_off_outlined),
+          AppInfoNote(message: message, icon: Icons.notifications_off_rounded),
           if (actionLabel != null)
             TextButton(onPressed: onAction, child: Text(actionLabel!)),
         ],
@@ -235,7 +247,20 @@ class _ReminderRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
         child: Row(
           children: [
-            AppIconBadge(icon: Icon(kind.icon), color: kind.color),
+            AppIconBadge(
+              icon: kind.svgAsset != null
+                  ? SvgPicture.asset(
+                      kind.svgAsset!,
+                      width: AppDimens.iconSm,
+                      height: AppDimens.iconSm,
+                      colorFilter: ColorFilter.mode(
+                        kind.color ?? context.colors.primary,
+                        BlendMode.srcIn,
+                      ),
+                    )
+                  : Icon(kind.icon),
+              color: kind.color,
+            ),
             const SizedBox(width: AppDimens.space12),
             Expanded(
               child: Column(

@@ -7,6 +7,8 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
@@ -34,9 +36,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     return BlocConsumer<NotificationsCubit, NotificationsState>(
       listenWhen: (prev, next) => next.messageId != prev.messageId,
-      listener: (context, s) => ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(s.message!))),
+      listener: (context, s) {
+        if (s.message != null && s.message!.isNotEmpty) {
+          showSuccessSnackBar(context, s.message!);
+        }
+      },
       builder: (context, state) {
         final cubit = context.read<NotificationsCubit>();
         final items = state.items;
@@ -89,7 +93,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 child: items == null
                     ? state.failed
                           ? LoadErrorView(onRetry: cubit.load)
-                          : const Center(child: CircularProgressIndicator())
+                          : const Center(child: VitalUpLoader())
                     : RefreshIndicator(
                         onRefresh: cubit.refresh,
                         child: ListView.separated(

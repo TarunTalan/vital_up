@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -269,6 +270,7 @@ class _HealthReportPageState extends State<HealthReportPage> {
               label: 'Recorded Body Weight',
               value: _unit.format(kg),
               icon: Icons.monitor_weight_rounded,
+              svgAsset: 'assets/icons/trackers/weight_icon.svg',
               color: AppColors.primary,
             ),
           ],
@@ -318,7 +320,7 @@ class _HealthReportPageState extends State<HealthReportPage> {
                     s.avgSleepHours,
                     (v) => '${(v as double).toStringAsFixed(1)} hrs',
                   ),
-                  icon: Icons.nightlight_round,
+                  icon: Icons.bedtime_rounded,
                   color: AppColors.sleep,
                 ),
               ),
@@ -451,7 +453,8 @@ class _HealthReportPageState extends State<HealthReportPage> {
     BuildContext context, {
     required String label,
     required String value,
-    required IconData icon,
+    IconData? icon,
+    String? svgAsset,
     required Color color,
   }) {
     final v = context.vColors;
@@ -468,7 +471,15 @@ class _HealthReportPageState extends State<HealthReportPage> {
         children: [
           Row(
             children: [
-              Icon(icon, size: AppDimens.iconXs, color: color),
+              if (svgAsset != null)
+                SvgPicture.asset(
+                  svgAsset,
+                  width: AppDimens.iconXs,
+                  height: AppDimens.iconXs,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              else if (icon != null)
+                Icon(icon, size: AppDimens.iconXs, color: color),
               const SizedBox(width: AppDimens.space4),
               Expanded(
                 child: Text(

@@ -23,6 +23,17 @@ extension ReminderKindStyle on ReminderKind {
     ReminderKind.weight => AppColors.teal,
     ReminderKind.custom => null,
   };
+
+  /// Tracker SVG asset matching the app design system.
+  String? get svgAsset => switch (this) {
+    ReminderKind.activity => 'assets/icons/trackers/activity.svg',
+    ReminderKind.meal => 'assets/icons/trackers/fork_knife.svg',
+    ReminderKind.water => 'assets/icons/trackers/drop.svg',
+    ReminderKind.sleep => 'assets/icons/trackers/moon_stars.svg',
+    ReminderKind.mood => 'assets/icons/trackers/mood.svg',
+    ReminderKind.weight => 'assets/icons/trackers/weight_icon.svg',
+    ReminderKind.custom => null,
+  };
 }
 
 /// Screens a custom reminder can open, as (label, route name).

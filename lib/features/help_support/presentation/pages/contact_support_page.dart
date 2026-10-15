@@ -311,7 +311,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
             controller: _emailController,
             label: 'Your Contact Email',
             hint: 'e.g., name@example.com',
-            prefixIcon: Icons.email_outlined,
+            prefixIcon: Icons.email_rounded,
             keyboardType: TextInputType.emailAddress,
             error: _emailError,
             onChanged: (_) {
