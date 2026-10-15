@@ -63,12 +63,9 @@ class ChallengesPage extends StatelessWidget {
                 CustomChallengeWizard.show(context).then((_) => cubit.load()),
           ),
           body: challenges == null
-              ? Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space48),
-                  child: state.failed
-                      ? LoadErrorView(onRetry: cubit.load)
-                      : const Center(child: VitalUpLoader()),
-                )
+              ? state.failed
+                  ? LoadErrorView(onRetry: cubit.load)
+                  : const Center(child: VitalUpLoader())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -78,7 +75,7 @@ class ChallengesPage extends StatelessWidget {
                             'Challenge friends to the most active minutes, '
                             'distance or workouts over 3, 7 or 14 days. '
                             'Workouts count once they are backed up.',
-                        icon: Icons.flag_outlined,
+                        icon: Icons.flag_rounded,
                       ),
                     for (final (title, items) in sections)
                       if (items.isNotEmpty) ...[

@@ -98,7 +98,7 @@ class _Summary extends StatelessWidget {
         ),
         const SizedBox(height: AppDimens.sectionGap),
         _MetricCard(
-          icon: Icons.directions_run_rounded,
+          iconAsset: 'assets/icons/trackers/activity.svg',
           color: AppColors.activitySteps,
           title: 'Workouts',
           value: '${now.workouts}',
@@ -139,6 +139,7 @@ class _Summary extends StatelessWidget {
         ),
         _MetricCard(
           icon: Icons.monitor_weight_rounded,
+          iconAsset: 'assets/icons/trackers/weight_icon.svg',
           color: AppColors.teal,
           title: 'Weight change',
           value: now.weightChangeKg == null
@@ -165,7 +166,8 @@ class _Summary extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final Color color;
   final String title;
   final String value;
@@ -176,14 +178,15 @@ class _MetricCard extends StatelessWidget {
   final String changeUnit;
 
   const _MetricCard({
-    required this.icon,
+    this.icon,
+    this.iconAsset,
     required this.color,
     required this.title,
     required this.value,
     required this.detail,
     this.change,
     this.changeUnit = '',
-  });
+  }) : assert(icon != null || iconAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -199,6 +202,7 @@ class _MetricCard extends StatelessWidget {
             DashboardCardHeader(
               title: title,
               icon: icon,
+              iconAsset: iconAsset,
               badgeColor: color,
               trailing: change == null || change == 0
                   ? null

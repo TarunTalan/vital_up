@@ -9,6 +9,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
@@ -108,7 +109,7 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
             );
           }
           final goals = snap.data;
-          if (goals == null) return const TrackerLoading();
+          if (goals == null) return const Center(child: VitalUpLoader());
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -179,7 +180,7 @@ class _GoalRow extends StatelessWidget {
               : goal == null
               ? Icon(Icons.add_circle_outline_rounded, size: AppDimens.iconMd, color: metric.color)
               : SvgPicture.asset(
-                  'assets/icons/edit.svg', 
+                  'assets/icons/ui/edit.svg', 
                   width: AppDimens.iconMd, 
                   height: AppDimens.iconMd, 
                   colorFilter: ColorFilter.mode(grey!, BlendMode.srcIn),

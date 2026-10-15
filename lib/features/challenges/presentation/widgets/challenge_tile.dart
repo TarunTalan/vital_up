@@ -12,6 +12,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 IconData challengeMetricIcon(ChallengeMetric m) => switch (m) {
   ChallengeMetric.activeMinutes => Icons.timer_rounded,
@@ -121,13 +122,31 @@ class ChallengeTile extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '#${c.myRank}',
-                      style: context.text.titleMedium?.copyWith(
-                        color: c.myRank == 1
-                            ? AppColors.rankGold
-                            : context.colors.onSurface,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (c.myRank! <= 3) ...[
+                          GameIcon(
+                            GamificationIcons.leaderboardRank(c.myRank!)!,
+                            fallback: Icons.military_tech_rounded,
+                            size: AppDimens.iconSm,
+                            color: c.myRank == 1
+                                ? AppColors.rankGold
+                                : c.myRank == 2
+                                    ? AppColors.rankSilver
+                                    : AppColors.rankBronze,
+                          ),
+                          const SizedBox(width: AppDimens.space4),
+                        ],
+                        Text(
+                          '#${c.myRank}',
+                          style: context.text.titleMedium?.copyWith(
+                            color: c.myRank == 1
+                                ? AppColors.rankGold
+                                : context.colors.onSurface,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       c.metric.format(c.myScore ?? 0),
@@ -280,10 +299,21 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
                         children: [
                           SizedBox(
                             width: AppDimens.rankColumnWidth,
-                            child: Text(
-                              s.rank == null ? '–' : '#${s.rank}',
-                              style: context.text.titleSmall,
-                            ),
+                            child: s.rank != null && s.rank! <= 3
+                                ? GameIcon(
+                                    GamificationIcons.leaderboardRank(s.rank!)!,
+                                    fallback: Icons.military_tech_rounded,
+                                    size: AppDimens.iconLg,
+                                    color: s.rank == 1
+                                        ? AppColors.rankGold
+                                        : s.rank == 2
+                                            ? AppColors.rankSilver
+                                            : AppColors.rankBronze,
+                                  )
+                                : Text(
+                                    s.rank == null ? '–' : '#${s.rank}',
+                                    style: context.text.titleSmall,
+                                  ),
                           ),
                           UserAvatar(username: s.username, url: s.avatarUrl),
                           const SizedBox(width: AppDimens.space12),

@@ -11,6 +11,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/music_visualizer.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/database/isar_service.dart';
@@ -368,6 +369,7 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                       child: CircularProgressIndicator(
                         value: downloadingProgress,
                         strokeWidth: AppDimens.borderThick,
+                        strokeCap: StrokeCap.round,
                       ),
                     )
                   else if (isDownloadedOffline)
@@ -416,7 +418,7 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     final v = context.vColors;
 
     if (_isLoadingLocal) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: VitalUpLoader());
     }
 
     if (_localSongs.isEmpty) {
@@ -738,6 +740,7 @@ class AudioTrackLeadingIcon extends StatelessWidget {
                       child: CircularProgressIndicator(
                         strokeWidth: AppDimens.borderThick,
                         valueColor: AlwaysStoppedAnimation(defaultColor),
+                        strokeCap: StrokeCap.round,
                       ),
                     )
                   : MusicVisualizer(color: defaultColor, isPlaying: isPlaying),

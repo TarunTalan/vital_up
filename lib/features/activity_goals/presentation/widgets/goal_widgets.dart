@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -14,6 +15,12 @@ extension GoalMetricStyle on GoalMetric {
     GoalMetric.calories => Icons.local_fire_department_rounded,
     GoalMetric.activeMinutes => Icons.timer_rounded,
     GoalMetric.workouts => Icons.fitness_center_rounded,
+  };
+
+  /// SVG asset when available (e.g. step.svg for steps).
+  String? get svgAsset => switch (this) {
+    GoalMetric.steps => 'assets/icons/trackers/step.svg',
+    _ => null,
   };
 
   Color get color => switch (this) {
@@ -58,7 +65,20 @@ class GoalProgressRow extends StatelessWidget {
     final grey = context.vColors.grayText;
     final row = Row(
       children: [
-        AppIconBadge(color: metric.color, icon: Icon(metric.icon)),
+        AppIconBadge(
+          color: metric.color,
+          icon: metric.svgAsset != null
+              ? SvgPicture.asset(
+                  metric.svgAsset!,
+                  width: AppDimens.iconSm,
+                  height: AppDimens.iconSm,
+                  colorFilter: ColorFilter.mode(
+                    metric.color,
+                    BlendMode.srcIn,
+                  ),
+                )
+              : Icon(metric.icon),
+        ),
         const SizedBox(width: AppDimens.space12),
         Expanded(
           child: Column(
@@ -246,11 +266,21 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
               children: [
                 for (final m in GoalMetric.values)
                   ChoiceChip(
-                    avatar: Icon(
-                      m.icon,
-                      size: AppDimens.iconXs,
-                      color: m.color,
-                    ),
+                    avatar: m.svgAsset != null
+                        ? SvgPicture.asset(
+                            m.svgAsset!,
+                            width: AppDimens.iconXs,
+                            height: AppDimens.iconXs,
+                            colorFilter: ColorFilter.mode(
+                              m.color,
+                              BlendMode.srcIn,
+                            ),
+                          )
+                        : Icon(
+                            m.icon,
+                            size: AppDimens.iconXs,
+                            color: m.color,
+                          ),
                     label: Text(m.label),
                     selected: _metric == m,
                     showCheckmark: false,

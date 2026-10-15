@@ -61,7 +61,7 @@ class ActivityTargetResultCard extends StatelessWidget {
           ),
           const SizedBox(width: AppDimens.space8),
           Icon(
-            achieved ? Icons.check_circle_rounded : Icons.cancel_outlined,
+            achieved ? Icons.check_circle_rounded : Icons.cancel_rounded,
             size: AppDimens.iconLg,
             color: accent,
           ),

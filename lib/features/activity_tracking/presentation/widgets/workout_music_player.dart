@@ -66,6 +66,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
                       dimension: AppDimens.iconXs,
                       child: CircularProgressIndicator(
                         strokeWidth: AppDimens.borderThick,
+                        strokeCap: StrokeCap.round,
                       ),
                     )
                   : (isPlaying

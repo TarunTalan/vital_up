@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -143,7 +144,7 @@ class _CompletionStats extends StatelessWidget {
             const SizedBox(width: AppDimens.cardGap),
             Expanded(
               child: _CompletionStatCard(
-                icon: Icons.directions_walk_rounded,
+                svgAsset: 'assets/icons/trackers/step.svg',
                 label: 'Steps',
                 value: '${session.steps}',
               ),
@@ -166,15 +167,17 @@ class _CompletionStats extends StatelessWidget {
 }
 
 class _CompletionStatCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String label;
   final String value;
 
   const _CompletionStatCard({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.label,
     required this.value,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +186,19 @@ class _CompletionStatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppIconBadge(icon: Icon(icon)),
+          AppIconBadge(
+            icon: svgAsset != null
+                ? SvgPicture.asset(
+                    svgAsset!,
+                    width: AppDimens.iconSm,
+                    height: AppDimens.iconSm,
+                    colorFilter: ColorFilter.mode(
+                      context.colors.primary,
+                      BlendMode.srcIn,
+                    ),
+                  )
+                : Icon(icon!),
+          ),
           const SizedBox(height: AppDimens.space12),
           FittedBox(
             fit: BoxFit.scaleDown,

@@ -230,7 +230,7 @@ class ActivitySettingsPage extends StatelessWidget {
                     ),
 
                     _SettingsTile(
-                      icon: Icons.run_circle_outlined,
+                      icon: Icons.run_circle_rounded,
                       title: 'Default activity type',
                       subtitle: prefs.defaultActivityType.label,
                       trailing: chevron,
@@ -414,7 +414,7 @@ class _ClearButton extends StatelessWidget {
       tooltip: 'Clear',
       visualDensity: VisualDensity.compact,
       icon: Icon(
-        Icons.cancel_outlined,
+        Icons.cancel_rounded,
         color: context.vColors.grayText,
         size: AppDimens.iconMd,
       ),

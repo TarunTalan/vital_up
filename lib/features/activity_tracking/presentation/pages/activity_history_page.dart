@@ -10,6 +10,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
@@ -60,7 +61,7 @@ class _ActivityHistoryView extends StatelessWidget {
             },
             builder: (context, state) {
               if (state is ActivityHistoryLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: VitalUpLoader());
               }
 
               if (state is ActivityHistoryError) {

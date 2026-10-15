@@ -9,6 +9,7 @@ import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/challenge_tile.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/custom_challenge_wizard.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// Arena section: open invites first, then up to [_maxActive] running
 /// challenges and a way to start a new one, then the latest
@@ -117,7 +118,11 @@ class _EmptyChallenges extends StatelessWidget {
           Row(
             children: [
               AppIconBadge(
-                icon: const Icon(Icons.flag_rounded),
+                icon: const GameIcon(
+                  GamificationIcons.quest,
+                  fallback: Icons.flag_rounded,
+                  size: AppDimens.iconMd,
+                ),
                 color: context.colors.primary,
               ),
               const SizedBox(width: AppDimens.space12),
