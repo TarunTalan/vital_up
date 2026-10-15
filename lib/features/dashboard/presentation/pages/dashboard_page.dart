@@ -591,15 +591,8 @@ class _HomeTabState extends State<_HomeTab> {
                         _buildSectionTitle(
                           context,
                           'Nutrition',
-                          actionLabel: 'Diet Plan',
-                          onAction: () async {
-                            final state = context.read<DietPlanCubit>().state;
-                            if (state is DietPlanLoaded) {
-                              await _push('vita-diet-plan');
-                            } else {
-                              await _push('diet-plan-prefs');
-                            }
-                          },
+                          actionLabel: 'History',
+                          onAction: () => _push('meal-log-history'),
                         ),
                         BlocListener<MealLogBloc, MealLogState>(
                           // A newly logged meal moves today's calories bar.

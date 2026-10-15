@@ -100,7 +100,6 @@ class NutritionSummaryCard extends StatelessWidget {
     final left = goal == null ? null : goal - kcal;
     return TrackerCard(
       metric: _metric,
-      title: plan != null ? 'Diet plan' : null,
       status: TrackerStatus.of(
         value: state.entries.isEmpty ? null : kcal,
         goal: goal,
