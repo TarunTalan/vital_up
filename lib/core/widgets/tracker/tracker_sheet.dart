@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -341,10 +342,14 @@ class _GoalSheetState extends State<_GoalSheet> {
               onTap: () => _set(recommended),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.auto_awesome_rounded,
-                    size: AppDimens.iconMd,
-                    color: color,
+                  SvgPicture.asset(
+                    'assets/icons/nav/vita.svg',
+                    width: AppDimens.iconMd,
+                    height: AppDimens.iconMd,
+                    colorFilter: ColorFilter.mode(
+                      color,
+                      BlendMode.srcIn,
+                    ),
                   ),
                   const SizedBox(width: AppDimens.space12),
                   Expanded(

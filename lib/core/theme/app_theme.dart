@@ -680,11 +680,12 @@ class AppTheme {
         backgroundColor: scheme.inverseSurface,
         elevation: 6.0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(100), // Pill shape for modern toast look
+          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
           fontWeight: FontWeight.w500,
+          height: 1.35,
         ),
       ),
     );

@@ -1,8 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
-/// Avatar from a URL, falling back to the name's initial. Round by default;
-/// pass [borderRadius] for the rounded-square profile avatar.
+/// Avatar from a URL, falling back to the name's initial. Circular by design
+/// across all screens in the app.
 class UserAvatar extends StatelessWidget {
   final String username;
   final String? url;
@@ -34,30 +36,61 @@ class UserAvatar extends StatelessWidget {
         ),
       ),
     );
-    final rounded = borderRadius == null
-        ? null
-        : BorderRadius.circular(borderRadius!);
+
+    Widget imageWidget;
+    final trimmedUrl = url?.trim();
+    if (trimmedUrl == null || trimmedUrl.isEmpty) {
+      imageWidget = fallback;
+    } else if (trimmedUrl.startsWith('http://') ||
+        trimmedUrl.startsWith('https://')) {
+      imageWidget = Image.network(
+        trimmedUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (trimmedUrl.startsWith('assets/')) {
+      imageWidget = Image.asset(
+        trimmedUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else {
+      imageWidget = Image.file(
+        File(trimmedUrl.replaceFirst('file://', '')),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: rounded == null ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: rounded,
+        shape: BoxShape.circle,
         color: context.colors.primary.withValues(alpha: 0.15),
-        border: ringColor == null
-            ? null
-            : Border.all(color: ringColor!, width: AppDimens.borderThick),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: url == null || url!.isEmpty
-          ? fallback
-          : Image.network(
-              url!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => fallback,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipOval(child: imageWidget),
+          if (ringColor != null)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: ringColor!,
+                  width: AppDimens.borderThick,
+                ),
+              ),
             ),
+        ],
+      ),
     );
   }
 }

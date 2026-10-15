@@ -250,7 +250,7 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
           children: [
             Expanded(
               child: _ScheduleTimeCard(
-                icon: Icons.nightlight_round,
+                icon: Icons.bedtime_rounded,
                 iconColor: AppColors.sleep,
                 title: 'Bedtime',
                 time: _bedTime,
@@ -375,7 +375,7 @@ class _ScheduleTimeCard extends StatelessWidget {
                 ),
               ),
               SvgPicture.asset(
-                'assets/icons/edit.svg',
+                'assets/icons/ui/edit.svg',
                 width: AppDimens.iconXs,
                 height: AppDimens.iconXs,
                 colorFilter: ColorFilter.mode(v.grayText!, BlendMode.srcIn),
@@ -506,7 +506,7 @@ class _SleepClockPainter extends CustomPainter {
       canvas,
       bedPos,
       AppColors.sleep,
-      Icons.nightlight_round,
+      Icons.bedtime_rounded,
       Colors.white,
     );
 

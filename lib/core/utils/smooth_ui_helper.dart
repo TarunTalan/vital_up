@@ -84,26 +84,52 @@ void showSmoothSnackBar(
   // Never show an empty bubble.
   if (message.trim().isEmpty) message = 'Something went wrong. Try again.';
 
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final bgColor = isDark ? const Color(0xFF162032) : const Color(0xFF0F172A);
+
   messenger.clearSnackBars();
   final controller = messenger.showSnackBar(
     SnackBar(
       behavior: SnackBarBehavior.floating,
       dismissDirection: DismissDirection.horizontal,
       duration: duration,
+      backgroundColor: bgColor,
+      elevation: 6.0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        side: BorderSide(
+          color: iconColor.withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+      ),
       margin: const EdgeInsets.symmetric(
         horizontal: AppDimens.gutter,
         vertical: AppDimens.space16,
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimens.space16,
-        vertical: AppDimens.space12,
+        vertical: 14.0,
       ),
       action: action,
       content: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: AppDimens.iconMd),
+          Padding(
+            padding: const EdgeInsets.only(top: 2.0),
+            child: Icon(icon, color: iconColor, size: AppDimens.iconMd),
+          ),
           const SizedBox(width: AppDimens.space12),
-          Expanded(child: Text(message)),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFFF8FAFC),
+                fontSize: 14.0,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     ),

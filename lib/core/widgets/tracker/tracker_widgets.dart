@@ -348,6 +348,7 @@ class TrackerFigure extends StatelessWidget {
   final String label;
   final String value;
   final IconData? icon;
+  final String? iconAsset;
   final Color? color;
 
   const TrackerFigure({
@@ -355,6 +356,7 @@ class TrackerFigure extends StatelessWidget {
     required this.label,
     required this.value,
     this.icon,
+    this.iconAsset,
     this.color,
   });
 
@@ -363,7 +365,15 @@ class TrackerFigure extends StatelessWidget {
     final grey = context.vColors.grayText;
     return Row(
       children: [
-        if (icon != null) ...[
+        if (iconAsset != null) ...[
+          SvgPicture.asset(
+            iconAsset!,
+            width: AppDimens.iconSm,
+            height: AppDimens.iconSm,
+            colorFilter: ColorFilter.mode(color ?? grey!, BlendMode.srcIn),
+          ),
+          const SizedBox(width: AppDimens.space6),
+        ] else if (icon != null) ...[
           Icon(icon, size: AppDimens.iconSm, color: color ?? grey),
           const SizedBox(width: AppDimens.space6),
         ],
@@ -606,6 +616,7 @@ class TrackerLoading extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           color: color ?? context.colors.primary,
+          strokeCap: StrokeCap.round,
         ),
       ),
     );
@@ -646,6 +657,7 @@ class TrackerPrompt extends StatelessWidget {
   final Color color;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final int? maxLines;
 
   const TrackerPrompt({
     super.key,
@@ -655,12 +667,14 @@ class TrackerPrompt extends StatelessWidget {
     required this.color,
     this.actionLabel,
     this.onAction,
+    this.maxLines = 3,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,14 +686,22 @@ class TrackerPrompt extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title, style: context.text.titleSmall),
+                  Text(
+                    title,
+                    style: context.text.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: AppDimens.space4),
                   Text(
                     message,
                     style: context.text.bodyMedium?.copyWith(
                       color: context.vColors.grayText,
                     ),
+                    maxLines: maxLines,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

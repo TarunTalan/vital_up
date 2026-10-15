@@ -216,9 +216,9 @@ class AppDimens {
   static const double levelRing = 72.0;
   static const double levelRingStroke = 7.0;
   static const double badgeTile = 56.0;
-  static const double badgeGridMinWidth = 104.0;
-  // Tall enough for a locked badge's progress bar and "7 of 10".
-  static const double badgeTileAspect = 0.68;
+  static const double badgeGridMinWidth = 150.0;
+  // Aspect ratio for responsive 2-column flip cards on mobile with single-line titles.
+  static const double badgeTileAspect = 0.72;
   static const double badgeProgressHeight = 4.0;
   static const double badgeLockedOpacity = 0.35;
   static const double podiumAvatarFirst = 64.0;
