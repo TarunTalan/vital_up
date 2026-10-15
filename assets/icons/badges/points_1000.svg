@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="p1k_gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4" />
+      <stop offset="35%" stop-color="#FFD54F" />
+      <stop offset="70%" stop-color="#FFB300" />
+      <stop offset="100%" stop-color="#FF8F00" />
+    </linearGradient>
+    <linearGradient id="p1k_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#282210" />
+      <stop offset="100%" stop-color="#0E0C05" />
+    </linearGradient>
+    <linearGradient id="p1k_cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8ECF5" />
+      <stop offset="100%" stop-color="#19C3E0" />
+    </linearGradient>
+    <filter id="p1k_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#FFD54F" flood-opacity="0.6" />
+    </filter>
+  </defs>
+  <!-- Multi-faceted Gold Gem Hexagon -->
+  <polygon points="60,4 106,24 106,82 60,116 14,82 14,24" fill="url(#p1k_bg)" stroke="url(#p1k_gold)" stroke-width="4.5" stroke-linejoin="round" />
+  <polygon points="60,12 98,30 98,76 60,106 22,76 22,30" fill="none" stroke="#FFD54F" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Corner Cyan Sparkles -->
+  <polygon points="30,28 32,32 36,33 32,35 30,39 28,35 24,33 28,32" fill="url(#p1k_cyan)" />
+  <polygon points="90,28 92,32 96,33 92,35 90,39 88,35 84,33 88,32" fill="url(#p1k_cyan)" />
+  <!-- Golden Token Coin -->
+  <g filter="url(#p1k_glow)">
+    <circle cx="60" cy="56" r="26" fill="#1A1507" stroke="url(#p1k_gold)" stroke-width="3" />
+    <circle cx="60" cy="56" r="21" fill="none" stroke="#FFE082" stroke-width="1.5" stroke-dasharray="6 3" />
+    <!-- VitalUp "V" Crown Symbol -->
+    <path d="M50 44 L60 62 L70 44" fill="none" stroke="url(#p1k_cyan)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="60" cy="42" r="3" fill="#B8ECF5" />
+  </g>
+  <!-- 1,000 PTS Ribbon -->
+  <path d="M26 84 L94 84 L88 102 L32 102 Z" fill="#201806" stroke="url(#p1k_gold)" stroke-width="2" />
+  <text x="60" y="97" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="url(#p1k_gold)" text-anchor="middle" letter-spacing="1">1,000 POINTS</text>
+</svg>

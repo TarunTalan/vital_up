@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="st20_rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD54F" />
+      <stop offset="40%" stop-color="#19C3E0" />
+      <stop offset="100%" stop-color="#00838F" />
+    </linearGradient>
+    <linearGradient id="st20_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0F2826" />
+      <stop offset="100%" stop-color="#061211" />
+    </linearGradient>
+    <linearGradient id="st20_gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4" />
+      <stop offset="50%" stop-color="#FFC233" />
+      <stop offset="100%" stop-color="#FF8F00" />
+    </linearGradient>
+    <filter id="st20_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#FFC233" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <!-- Outer Starburst Hexagon -->
+  <polygon points="60,4 104,20 116,60 104,100 60,116 16,100 4,60 16,20" fill="url(#st20_bg)" stroke="url(#st20_rim)" stroke-width="4" stroke-linejoin="round" />
+  <circle cx="60" cy="60" r="44" fill="none" stroke="#19C3E0" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Marathon Crown & Wings -->
+  <g filter="url(#st20_glow)" fill="url(#st20_gold)">
+    <!-- Crown -->
+    <path d="M46 38 L52 28 L60 34 L68 28 L74 38 L72 44 L48 44 Z" />
+    <!-- Running Figure with Speed Streaks -->
+    <circle cx="60" cy="50" r="5" fill="#FFF9C4" />
+    <path d="M56 56 L64 56 L68 66 L62 66 L59 60 L54 68 L48 66 Z" fill="#FFF9C4" />
+  </g>
+  <!-- 20K Plaque -->
+  <rect x="28" y="78" width="64" height="24" rx="12" fill="#0A1D1C" stroke="url(#st20_rim)" stroke-width="2" />
+  <text x="60" y="94" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="url(#st20_gold)" text-anchor="middle" letter-spacing="0.5">20K MARATHON</text>
+</svg>

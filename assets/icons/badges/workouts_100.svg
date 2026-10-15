@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="w100_gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4" />
+      <stop offset="35%" stop-color="#FFD54F" />
+      <stop offset="70%" stop-color="#FFB300" />
+      <stop offset="100%" stop-color="#E65100" />
+    </linearGradient>
+    <linearGradient id="w100_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2B1E0C" />
+      <stop offset="100%" stop-color="#120A03" />
+    </linearGradient>
+    <filter id="w100_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#FFB300" flood-opacity="0.6" />
+    </filter>
+  </defs>
+  <!-- Grand Hexagonal Shield -->
+  <polygon points="60,4 108,24 108,82 60,116 12,82 12,24" fill="url(#w100_bg)" stroke="url(#w100_gold)" stroke-width="4.5" stroke-linejoin="round" />
+  <polygon points="60,12 100,29 100,77 60,107 20,77 20,29" fill="none" stroke="#FFD54F" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Athletic Trophy Cup -->
+  <g filter="url(#w100_glow)" fill="url(#w100_gold)">
+    <!-- Trophy body -->
+    <path d="M42 32 L78 32 C78 48 70 56 60 56 C50 56 42 48 42 32 Z" />
+    <!-- Handles -->
+    <path d="M42 34 C34 34 32 46 44 48 Z" fill="none" stroke="url(#w100_gold)" stroke-width="3" />
+    <path d="M78 34 C86 34 88 46 76 48 Z" fill="none" stroke="url(#w100_gold)" stroke-width="3" />
+    <!-- Stem and Base -->
+    <rect x="57" y="56" width="6" height="8" />
+    <rect x="50" y="64" width="20" height="4" rx="2" />
+    <!-- Crown Stars -->
+    <polygon points="60,20 62,25 67,25 63,28 65,33 60,30 55,33 57,28 53,25 58,25" fill="#FFF9C4" />
+  </g>
+  <!-- Laurels on sides -->
+  <circle cx="30" cy="54" r="3" fill="#FFD54F" />
+  <circle cx="28" cy="66" r="3" fill="#FFD54F" />
+  <circle cx="90" cy="54" r="3" fill="#FFD54F" />
+  <circle cx="92" cy="66" r="3" fill="#FFD54F" />
+  <!-- Athlete Plaque -->
+  <rect x="28" y="80" width="64" height="24" rx="12" fill="#1C1004" stroke="url(#w100_gold)" stroke-width="2" />
+  <text x="60" y="96" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="#FFF9C4" text-anchor="middle" letter-spacing="1">100 ATHLETE</text>
+</svg>

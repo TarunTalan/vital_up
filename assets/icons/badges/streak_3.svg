@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="s3_border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB74D" />
+      <stop offset="50%" stop-color="#FF7A3D" />
+      <stop offset="100%" stop-color="#E64A19" />
+    </linearGradient>
+    <linearGradient id="s3_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2A1B12" />
+      <stop offset="100%" stop-color="#120D0A" />
+    </linearGradient>
+    <linearGradient id="s3_fire" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#E64A19" />
+      <stop offset="50%" stop-color="#FF7A3D" />
+      <stop offset="100%" stop-color="#FFD54F" />
+    </linearGradient>
+    <filter id="s3_glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#FF7A3D" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  <!-- Outer Beveled Shield -->
+  <polygon points="60,6 106,28 106,82 60,112 14,82 14,28" fill="url(#s3_bg)" stroke="url(#s3_border)" stroke-width="4" stroke-linejoin="round" />
+  <!-- Inner Rim -->
+  <polygon points="60,14 98,33 98,78 60,103 22,78 22,33" fill="none" stroke="#FF7A3D" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- 3 Stars at Top -->
+  <path d="M60 22 l2 4 4.5.5 -3.3 3 1 4.5 -4.2-2.3 -4.2 2.3 1-4.5 -3.3-3 4.5-.5z" fill="#FFD54F" />
+  <circle cx="44" cy="27" r="2.2" fill="#FFB74D" />
+  <circle cx="76" cy="27" r="2.2" fill="#FFB74D" />
+  <!-- 3 Rising Flame Tongues -->
+  <g filter="url(#s3_glow)">
+    <path d="M60 38 C68 48 78 56 78 72 C78 84 70 94 60 94 C50 94 42 84 42 72 C42 56 52 48 60 38 Z" fill="url(#s3_fire)" />
+    <!-- Inner Core Flame -->
+    <path d="M60 52 C64 58 70 65 70 75 C70 82 65 88 60 88 C55 88 50 82 50 75 C50 65 56 58 60 52 Z" fill="#FFF9C4" />
+  </g>
+  <!-- Flame Count Pill -->
+  <rect x="44" y="90" width="32" height="15" rx="7.5" fill="#1C140E" stroke="#FF7A3D" stroke-width="1.5" />
+  <text x="60" y="101" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="900" fill="#FFD54F" text-anchor="middle">3 DAYS</text>
+</svg>

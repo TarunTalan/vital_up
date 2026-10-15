@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="shieldBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141E28"/>
+      <stop offset="60%" stop-color="#0B1218"/>
+      <stop offset="100%" stop-color="#05080C"/>
+    </linearGradient>
+    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF2A0"/>
+      <stop offset="25%" stop-color="#FFC233"/>
+      <stop offset="60%" stop-color="#FF8F00"/>
+      <stop offset="85%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#FF8F00"/>
+    </linearGradient>
+    <linearGradient id="cyanInnerRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#19C3E0"/>
+      <stop offset="100%" stop-color="#0D47A1"/>
+    </linearGradient>
+    <linearGradient id="crownGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8E1"/>
+      <stop offset="25%" stop-color="#FFE082"/>
+      <stop offset="65%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#E65100"/>
+    </linearGradient>
+    <linearGradient id="cyanGem" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#80E8FF"/>
+      <stop offset="100%" stop-color="#00838F"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#19C3E0" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#19C3E0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ribbonBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFC233"/>
+      <stop offset="40%" stop-color="#FF8F00"/>
+      <stop offset="100%" stop-color="#E65100"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Aura Glow -->
+  <circle cx="128" cy="118" r="96" fill="url(#aura)"/>
+
+  <!-- Outer Grand Wings / Rays Behind Shield -->
+  <g opacity="0.65">
+    <path d="M 50 100 L 22 75 L 48 120 L 16 110 L 46 142 L 18 145 L 56 168" stroke="url(#goldRim)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 206 100 L 234 75 L 208 120 L 240 110 L 210 142 L 238 145 L 200 168" stroke="url(#goldRim)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Outer Shield Rim (Gold) -->
+  <path d="M 128 20 
+           C 168 20, 204 36, 218 56 
+           C 218 124, 188 186, 128 220 
+           C 68 186, 38 124, 38 56 
+           C 52 36, 88 20, 128 20 Z" 
+        fill="url(#goldRim)" 
+        stroke="#FFE082" stroke-width="2"/>
+
+  <!-- Inner Cyan Accent Rim -->
+  <path d="M 128 28 
+           C 164 28, 196 42, 208 60 
+           C 208 120, 180 178, 128 210 
+           C 76 178, 48 120, 48 60 
+           C 60 42, 92 28, 128 28 Z" 
+        fill="url(#cyanInnerRim)"/>
+
+  <!-- Dark Obsidian Inner Shield -->
+  <path d="M 128 34 
+           C 160 34, 190 47, 200 64 
+           C 200 118, 174 170, 128 200 
+           C 82 170, 56 118, 56 64 
+           C 66 47, 96 34, 128 34 Z" 
+        fill="url(#shieldBg)"/>
+
+  <!-- Shield Texture Rays -->
+  <g opacity="0.18" stroke="#19C3E0" stroke-width="1.5">
+    <line x1="128" y1="110" x2="68" y2="50"/>
+    <line x1="128" y1="110" x2="90" y2="40"/>
+    <line x1="128" y1="110" x2="128" y2="36"/>
+    <line x1="128" y1="110" x2="166" y2="40"/>
+    <line x1="128" y1="110" x2="188" y2="50"/>
+    <line x1="128" y1="110" x2="198" y2="82"/>
+    <line x1="128" y1="110" x2="196" y2="120"/>
+    <line x1="128" y1="110" x2="176" y2="156"/>
+    <line x1="128" y1="110" x2="128" y2="196"/>
+    <line x1="128" y1="110" x2="80" y2="156"/>
+    <line x1="128" y1="110" x2="60" y2="120"/>
+    <line x1="128" y1="110" x2="58" y2="82"/>
+  </g>
+
+  <!-- Laurel Wreath in Shield Interior -->
+  <g fill="none" stroke="url(#goldRim)" stroke-width="3" stroke-linecap="round" opacity="0.85">
+    <path d="M 72 136 C 70 98, 86 68, 102 54"/>
+    <path d="M 184 136 C 186 98, 170 68, 154 54"/>
+    <!-- Leaves -->
+    <path d="M 76 118 C 70 114, 66 122, 74 126" fill="url(#goldRim)"/>
+    <path d="M 77 96 C 70 93, 68 101, 77 104" fill="url(#goldRim)"/>
+    <path d="M 85 76 C 79 73, 79 81, 87 84" fill="url(#goldRim)"/>
+    <path d="M 97 60 C 91 57, 93 65, 100 67" fill="url(#goldRim)"/>
+    <path d="M 180 118 C 186 114, 190 122, 182 126" fill="url(#goldRim)"/>
+    <path d="M 179 96 C 186 93, 188 101, 179 104" fill="url(#goldRim)"/>
+    <path d="M 171 76 C 177 73, 177 81, 169 84" fill="url(#goldRim)"/>
+    <path d="M 159 60 C 165 57, 163 65, 156 67" fill="url(#goldRim)"/>
+  </g>
+
+  <!-- Grand Crown of Excellence -->
+  <g filter="url(#glow)">
+    <!-- Crown Base Band -->
+    <path d="M 84 122 C 100 125, 156 125, 172 122 L 168 132 C 152 135, 104 135, 88 132 Z" fill="#FFA000"/>
+    <path d="M 86 120 C 102 123, 154 123, 170 120 L 168 126 C 152 129, 104 129, 88 126 Z" fill="url(#goldRim)"/>
+    
+    <!-- Crown Peaks (5 points) -->
+    <path d="M 86 120 
+             L 82 82 
+             L 102 102 
+             L 128 64 
+             L 154 102 
+             L 174 82 
+             L 170 120 
+             C 154 124, 102 124, 86 120 Z" 
+          fill="url(#crownGrad)" 
+          stroke="#FFF9C4" stroke-width="1.8" stroke-linejoin="round"/>
+          
+    <!-- Crown Jewels / Orbs at peaks -->
+    <circle cx="82" cy="80" r="5" fill="url(#cyanGem)" stroke="#FFF" stroke-width="1"/>
+    <circle cx="102" cy="100" r="4" fill="url(#goldRim)" stroke="#FFF" stroke-width="0.8"/>
+    <circle cx="128" cy="62" r="7" fill="url(#cyanGem)" stroke="#FFF" stroke-width="1.5"/>
+    <circle cx="154" cy="100" r="4" fill="url(#goldRim)" stroke="#FFF" stroke-width="0.8"/>
+    <circle cx="174" cy="80" r="5" fill="url(#cyanGem)" stroke="#FFF" stroke-width="1"/>
+
+    <!-- Central Diamond Gem on Crown Body -->
+    <polygon points="128,88 135,98 128,108 121,98" fill="url(#cyanGem)" stroke="#E0F7FA" stroke-width="1"/>
+    <circle cx="104" cy="114" r="3" fill="url(#cyanGem)"/>
+    <circle cx="152" cy="114" r="3" fill="url(#cyanGem)"/>
+  </g>
+
+  <!-- Number 10 Emblazoned on Shield -->
+  <text x="128" y="165" 
+        text-anchor="middle" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="34" 
+        font-weight="900" 
+        letter-spacing="1"
+        fill="#FFFFFF"
+        stroke="#0A1218"
+        stroke-width="2"
+        paint-order="stroke fill">10</text>
+
+  <!-- Bottom Ribbon with ELITE text -->
+  <g>
+    <!-- Ribbon shadow -->
+    <path d="M 58 190 L 80 178 L 176 178 L 198 190 L 188 202 L 128 208 L 68 202 Z" fill="#000" opacity="0.45"/>
+    <!-- Ribbon tails -->
+    <path d="M 52 196 L 72 178 L 74 196 L 46 206 Z" fill="#B26A00"/>
+    <path d="M 204 196 L 184 178 L 182 196 L 210 206 Z" fill="#B26A00"/>
+    <!-- Ribbon body -->
+    <path d="M 64 180 L 192 180 L 184 204 L 128 212 L 72 204 Z" 
+          fill="url(#ribbonBg)" 
+          stroke="#FFE082" stroke-width="1.5"/>
+    <!-- Ribbon fold highlight -->
+    <path d="M 66 182 L 190 182" stroke="#FFF9C4" stroke-width="1" opacity="0.7"/>
+    <!-- Ribbon Text -->
+    <text x="128" y="198" 
+          text-anchor="middle" 
+          font-family="system-ui, -apple-system, sans-serif" 
+          font-size="13" 
+          font-weight="900" 
+          letter-spacing="3" 
+          fill="#101820">ELITE</text>
+  </g>
+
+  <!-- Sparkles -->
+  <path d="M 70 45 Q 70 52 63 52 Q 70 52 70 59 Q 70 52 77 52 Q 70 52 70 45 Z" fill="#FFF" opacity="0.9"/>
+  <path d="M 186 45 Q 186 52 179 52 Q 186 52 186 59 Q 186 52 193 52 Q 186 52 186 45 Z" fill="#FFF" opacity="0.9"/>
+  <path d="M 128 12 Q 128 17 123 17 Q 128 17 128 22 Q 128 17 133 17 Q 128 17 128 12 Z" fill="#19C3E0"/>
+</svg>

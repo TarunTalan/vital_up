@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="d7_emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A7FFEB" />
+      <stop offset="40%" stop-color="#00BFA5" />
+      <stop offset="100%" stop-color="#00695C" />
+    </linearGradient>
+    <linearGradient id="d7_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B2620" />
+      <stop offset="100%" stop-color="#04120F" />
+    </linearGradient>
+    <filter id="d7_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00BFA5" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <!-- Organic Leaf-Contoured Shield -->
+  <polygon points="60,4 106,24 106,82 60,116 14,82 14,24" fill="url(#d7_bg)" stroke="url(#d7_emerald)" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="60,12 98,30 98,76 60,106 22,76 22,30" fill="none" stroke="#00BFA5" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Central Diet Plate with Sprout Leaf -->
+  <g filter="url(#d7_glow)">
+    <circle cx="60" cy="54" r="24" fill="#0E332B" stroke="url(#d7_emerald)" stroke-width="3" />
+    <circle cx="60" cy="54" r="19" fill="none" stroke="#A7FFEB" stroke-width="1" stroke-dasharray="3 3" />
+    <!-- Sprout leaf & fork -->
+    <path d="M60 40 C68 40 72 48 68 56 C62 56 58 50 60 40 Z" fill="#67FFAB" />
+    <path d="M60 46 C52 46 48 54 52 62 C58 62 62 56 60 46 Z" fill="#00BFA5" />
+    <path d="M60 54 L60 68" stroke="#A7FFEB" stroke-width="2.5" stroke-linecap="round" />
+  </g>
+  <!-- 7 Days Ribbon -->
+  <rect x="28" y="84" width="64" height="20" rx="10" fill="#071F1A" stroke="url(#d7_emerald)" stroke-width="2" />
+  <text x="60" y="98" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#A7FFEB" text-anchor="middle" letter-spacing="1">PLAN 7 DAYS</text>
+</svg>

@@ -136,6 +136,17 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/icons/app/
+    - assets/icons/auth/
+    - assets/icons/badges/
+    - assets/icons/gamification/
+    - assets/icons/leaderboard_ranks/
+    - assets/icons/levels/
+    - assets/icons/nav/
+    - assets/icons/onboarding/
+    - assets/icons/trackers/
+    - assets/icons/ui/
+    - assets/icons/vita/
     - assets/audio/
     - assets/data/
 
@@ -163,9 +174,9 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icons/app_icon_launcher.png"
+  image_path: "assets/icons/app/app_icon_launcher.png"
   remove_alpha_ios: true
   min_sdk_android: 21
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icons/app_icon_launcher_foreground.png"
+  adaptive_icon_foreground: "assets/icons/app/app_icon_launcher_foreground.png"
   adaptive_icon_foreground_inset: 0

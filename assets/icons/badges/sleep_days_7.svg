@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sl7_violet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EDE7F6" />
+      <stop offset="40%" stop-color="#7C83FD" />
+      <stop offset="100%" stop-color="#3F51B5" />
+    </linearGradient>
+    <linearGradient id="sl7_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#191A36" />
+      <stop offset="100%" stop-color="#0B0C18" />
+    </linearGradient>
+    <linearGradient id="sl7_moon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4" />
+      <stop offset="100%" stop-color="#FFD54F" />
+    </linearGradient>
+    <filter id="sl7_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7C83FD" flood-opacity="0.6" />
+    </filter>
+  </defs>
+  <!-- Celestial Rounded Arch Shield -->
+  <path d="M60 4 C88 4 106 20 106 50 C106 82 60 114 60 114 C60 114 14 82 14 50 C14 20 32 4 60 4 Z" fill="url(#sl7_bg)" stroke="url(#sl7_violet)" stroke-width="4" stroke-linejoin="round" />
+  <path d="M60 12 C82 12 98 26 98 50 C98 76 60 104 60 104 C60 104 22 76 22 50 C22 26 38 12 60 12 Z" fill="none" stroke="#7C83FD" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Twinkling Constellation Stars -->
+  <circle cx="36" cy="38" r="2.5" fill="#FFF9C4" />
+  <circle cx="82" cy="34" r="2" fill="#EDE7F6" />
+  <circle cx="78" cy="62" r="2.5" fill="#FFF9C4" />
+  <polygon points="40,24 41,27 44,27 42,29 43,32 40,30 37,32 38,29 36,27 39,27" fill="#EDE7F6" />
+  <!-- Golden Crescent Moon -->
+  <g filter="url(#sl7_glow)">
+    <path d="M64 30 C50 30 40 42 40 56 C40 70 52 82 66 82 C74 82 80 78 84 74 C72 74 62 64 62 50 C62 40 68 34 74 32 C71 31 68 30 64 30 Z" fill="url(#sl7_moon)" />
+    <!-- Dreamy Cloud -->
+    <path d="M38 72 C34 72 32 68 35 65 C35 60 40 58 44 60 C47 56 54 56 57 60 C60 58 65 60 65 64 C68 64 70 67 68 70 C68 72 65 72 65 72 Z" fill="#7C83FD" opacity="0.6" />
+  </g>
+  <!-- Rested Ribbon -->
+  <rect x="26" y="86" width="68" height="18" rx="9" fill="#14152A" stroke="url(#sl7_violet)" stroke-width="1.5" />
+  <text x="60" y="99" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="900" fill="#EDE7F6" text-anchor="middle" letter-spacing="1">WELL RESTED</text>
+</svg>

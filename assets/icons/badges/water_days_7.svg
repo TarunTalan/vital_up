@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="w7_blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E1F5FE" />
+      <stop offset="40%" stop-color="#42A5F5" />
+      <stop offset="100%" stop-color="#0D47A1" />
+    </linearGradient>
+    <linearGradient id="w7_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E2336" />
+      <stop offset="100%" stop-color="#061019" />
+    </linearGradient>
+    <filter id="w7_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#42A5F5" flood-opacity="0.6" />
+    </filter>
+  </defs>
+  <!-- Aqua Hexagon -->
+  <polygon points="60,6 106,26 106,80 60,114 14,80 14,26" fill="url(#w7_bg)" stroke="url(#w7_blue)" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="60,14 98,32 98,74 60,104 22,74 22,32" fill="none" stroke="#42A5F5" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Radiant Water Droplet -->
+  <g filter="url(#w7_glow)">
+    <!-- Droplet Body -->
+    <path d="M60 28 C60 28 78 52 78 64 C78 74 70 82 60 82 C50 82 42 74 42 64 C42 52 60 28 60 28 Z" fill="url(#w7_blue)" />
+    <!-- Droplet Glint -->
+    <path d="M52 56 C52 50 56 42 60 38 C56 46 54 52 56 60 C54 60 52 58 52 56 Z" fill="#FFFFFF" opacity="0.8" />
+    <!-- Ripple Waves inside -->
+    <path d="M48 68 C54 72 66 72 72 68" stroke="#E1F5FE" stroke-width="2" fill="none" stroke-linecap="round" />
+  </g>
+  <!-- Hydrated Plaque -->
+  <rect x="30" y="86" width="60" height="18" rx="9" fill="#0A1D2D" stroke="url(#w7_blue)" stroke-width="1.5" />
+  <text x="60" y="99" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#E1F5FE" text-anchor="middle" letter-spacing="1">HYDRATED</text>
+</svg>

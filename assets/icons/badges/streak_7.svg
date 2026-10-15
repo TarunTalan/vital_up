@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="s7_border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082" />
+      <stop offset="50%" stop-color="#FF7A3D" />
+      <stop offset="100%" stop-color="#D84315" />
+    </linearGradient>
+    <linearGradient id="s7_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2D150A" />
+      <stop offset="100%" stop-color="#140804" />
+    </linearGradient>
+    <linearGradient id="s7_gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF59D" />
+      <stop offset="50%" stop-color="#FFC233" />
+      <stop offset="100%" stop-color="#FF8F00" />
+    </linearGradient>
+    <filter id="s7_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#FF7A3D" flood-opacity="0.6" />
+    </filter>
+  </defs>
+  <!-- Background Shield -->
+  <path d="M60 4 L108 24 C108 76 60 114 60 114 C60 114 12 76 12 24 Z" fill="url(#s7_bg)" stroke="url(#s7_border)" stroke-width="4" stroke-linejoin="round" />
+  <!-- Inner Border -->
+  <path d="M60 12 L100 29 C100 70 60 104 60 104 C60 104 20 70 20 29 Z" fill="none" stroke="#FFC233" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Wings behind flame -->
+  <path d="M26 44 C34 40 44 44 50 50 C44 58 32 60 22 54 Z" fill="#FF7A3D" opacity="0.6" />
+  <path d="M94 44 C86 40 76 44 70 50 C76 58 88 60 98 54 Z" fill="#FF7A3D" opacity="0.6" />
+  <!-- Roaring Flame -->
+  <g filter="url(#s7_glow)">
+    <path d="M60 22 C64 34 76 42 76 60 C76 74 68 84 60 84 C52 84 44 74 44 60 C44 42 56 34 60 22 Z" fill="#FF7A3D" />
+    <path d="M60 36 C63 45 70 52 70 64 C70 73 65 79 60 79 C55 79 50 73 50 64 C50 52 57 45 60 36 Z" fill="url(#s7_gold)" />
+    <path d="M60 50 C62 55 65 60 65 66 C65 71 62 75 60 75 C58 75 55 71 55 66 C55 60 58 55 60 50 Z" fill="#FFFFFF" />
+  </g>
+  <!-- Badge Label Ribbon -->
+  <path d="M36 84 L84 84 L80 102 L40 102 Z" fill="#201108" stroke="#FFC233" stroke-width="1.5" />
+  <text x="60" y="98" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="url(#s7_gold)" text-anchor="middle" letter-spacing="0.5">7 DAYS</text>
+</svg>

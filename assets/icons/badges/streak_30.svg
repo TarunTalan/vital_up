@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="s30_border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#19C3E0" />
+      <stop offset="50%" stop-color="#FFC233" />
+      <stop offset="100%" stop-color="#FF7A3D" />
+    </linearGradient>
+    <linearGradient id="s30_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E232B" />
+      <stop offset="50%" stop-color="#151E22" />
+      <stop offset="100%" stop-color="#090E10" />
+    </linearGradient>
+    <linearGradient id="s30_cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8ECF5" />
+      <stop offset="100%" stop-color="#19C3E0" />
+    </linearGradient>
+    <filter id="s30_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#19C3E0" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <!-- Faceted Octagonal Diamond Shield -->
+  <polygon points="60,4 102,18 114,60 102,102 60,116 18,102 6,60 18,18" fill="url(#s30_bg)" stroke="url(#s30_border)" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="60,12 94,24 104,60 94,96 60,108 26,96 16,60 26,24" fill="none" stroke="#19C3E0" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Radiant Diamond Flares -->
+  <path d="M60 14 L62 26 L74 28 L62 30 L60 42 L58 30 L46 28 L58 26 Z" fill="#B8ECF5" opacity="0.8" />
+  <!-- Central Streak Flame with Cyan Aura -->
+  <g filter="url(#s30_glow)">
+    <!-- Cyan Energy Ring -->
+    <circle cx="60" cy="58" r="26" fill="none" stroke="url(#s30_cyan)" stroke-width="2.5" stroke-dasharray="8 4" />
+    <!-- Roaring Fire Core -->
+    <path d="M60 36 C66 46 74 52 74 65 C74 76 67 83 60 83 C53 83 46 76 46 65 C46 52 54 46 60 36 Z" fill="#FF7A3D" />
+    <path d="M60 47 C63 53 68 58 68 67 C68 73 64 78 60 78 C56 78 52 73 52 67 C52 58 57 53 60 47 Z" fill="#FFC233" />
+    <path d="M60 58 C62 62 64 65 64 70 C64 73 62 75 60 75 C58 75 56 73 56 70 C56 65 58 62 60 58 Z" fill="#FFFFFF" />
+  </g>
+  <!-- 30 Days Crest Banner -->
+  <rect x="34" y="86" width="52" height="18" rx="9" fill="#0C1B20" stroke="url(#s30_cyan)" stroke-width="2" />
+  <text x="60" y="99" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="#B8ECF5" text-anchor="middle" letter-spacing="1">30 DAYS</text>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="w1_rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFAB91" />
+      <stop offset="50%" stop-color="#FF7043" />
+      <stop offset="100%" stop-color="#D84315" />
+    </linearGradient>
+    <linearGradient id="w1_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#261814" />
+      <stop offset="100%" stop-color="#120A08" />
+    </linearGradient>
+    <linearGradient id="w1_kettle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFCCBC" />
+      <stop offset="50%" stop-color="#FF7043" />
+      <stop offset="100%" stop-color="#BF360C" />
+    </linearGradient>
+    <filter id="w1_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#FF7043" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <!-- Sturdy Iron Hexagon Plate -->
+  <polygon points="60,6 106,28 106,82 60,112 14,82 14,28" fill="url(#w1_bg)" stroke="url(#w1_rim)" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="60,14 98,33 98,78 60,103 22,78 22,33" fill="none" stroke="#FF7043" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Kettlebell Graphic with Lightning bolt -->
+  <g filter="url(#w1_glow)">
+    <!-- Handle -->
+    <path d="M48 40 C48 30 72 30 72 40 L72 46 L48 46 Z" fill="none" stroke="url(#w1_kettle)" stroke-width="6" stroke-linecap="round" />
+    <!-- Ball body -->
+    <circle cx="60" cy="62" r="22" fill="url(#w1_kettle)" />
+    <!-- Lightning Cutout / Energy Flash -->
+    <polygon points="62,48 53,61 61,61 58,74 69,59 61,59" fill="#FFF9C4" />
+  </g>
+  <!-- Milestone Ribbon -->
+  <rect x="34" y="88" width="52" height="16" rx="8" fill="#1C0E0A" stroke="#FF7043" stroke-width="1.5" />
+  <text x="60" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="900" fill="#FFCCBC" text-anchor="middle" letter-spacing="1">1ST WORKOUT</text>
+</svg>

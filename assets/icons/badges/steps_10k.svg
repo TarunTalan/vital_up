@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="st10_cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E0F7FA" />
+      <stop offset="30%" stop-color="#19C3E0" />
+      <stop offset="100%" stop-color="#00838F" />
+    </linearGradient>
+    <linearGradient id="st10_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#092026" />
+      <stop offset="100%" stop-color="#051014" />
+    </linearGradient>
+    <filter id="st10_glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#19C3E0" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <!-- Winged Hexagon Shield -->
+  <polygon points="60,6 106,26 106,80 60,114 14,80 14,26" fill="url(#st10_bg)" stroke="url(#st10_cyan)" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="60,14 98,31 98,75 60,105 22,75 22,31" fill="none" stroke="#19C3E0" stroke-opacity="0.3" stroke-width="1.5" />
+  <!-- Speed Chevron Wings -->
+  <g fill="url(#st10_cyan)" opacity="0.6">
+    <path d="M22 40 L38 34 L32 46 L20 48 Z" />
+    <path d="M18 52 L36 46 L30 58 L18 60 Z" />
+    <path d="M98 40 L82 34 L88 46 L100 48 Z" />
+    <path d="M102 52 L84 46 L90 58 L102 60 Z" />
+  </g>
+  <!-- Running Sneaker / Footprint Wings in Center -->
+  <g filter="url(#st10_glow)" fill="url(#st10_cyan)">
+    <!-- Speed shoe outline -->
+    <path d="M42 66 C42 62 46 54 58 52 C68 50 78 44 80 40 C80 40 82 50 76 58 C86 58 88 64 86 68 C84 72 74 74 62 74 C48 74 42 70 42 66 Z" />
+    <rect x="44" y="70" width="38" height="4" rx="2" fill="#E0F7FA" />
+  </g>
+  <!-- "10K STEPS" Pill -->
+  <rect x="30" y="84" width="60" height="20" rx="10" fill="#06191E" stroke="url(#st10_cyan)" stroke-width="2" />
+  <text x="60" y="98" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="#E0F7FA" text-anchor="middle" letter-spacing="0.5">10,000 STEPS</text>
+</svg>
