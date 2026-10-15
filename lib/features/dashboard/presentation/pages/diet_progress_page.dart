@@ -75,9 +75,9 @@ class DietProgressPage extends StatelessWidget {
               _DietPlanActionCard(onReload: reload),
               const _MacrosCard(),
             ],
-            logsTitle: 'Meals',
-            emptyLogs: 'No meals logged in this period yet.',
-            logsActionLabel: 'All meals',
+            logsTitle: "Today's meals",
+            emptyLogs: 'No meals logged today.',
+            dateOf: (meal) => meal.capturedAt,
             onLogsAction: () => context.pushNamed('meal-log-history'),
             onRefresh: reload,
             onLog: () async {
@@ -227,8 +227,7 @@ class _DietPlanActionCard extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: metric.color.withValues(alpha: 0.15),
-                      borderRadius:
-                          BorderRadius.circular(AppDimens.radiusSm),
+                      borderRadius: BorderRadius.circular(AppDimens.radiusSm),
                     ),
                     child: SvgPicture.asset(
                       'assets/icons/nav/vita.svg',
@@ -286,8 +285,9 @@ class _DietPlanActionCard extends StatelessWidget {
                       child: AppSecondaryButton(
                         label: 'Edit plan',
                         onTap: () async {
-                          final saved =
-                              await context.pushNamed<bool>('diet-plan-edit');
+                          final saved = await context.pushNamed<bool>(
+                            'diet-plan-edit',
+                          );
                           if (saved == true) onReload();
                         },
                       ),

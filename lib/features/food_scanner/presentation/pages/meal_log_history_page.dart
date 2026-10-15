@@ -22,7 +22,7 @@ class MealLogHistoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+      create: (_) => sl<MealLogBloc>()..add(const LoadAllMealLogs()),
       child: const _MealLogHistoryView(),
     );
   }
@@ -35,7 +35,7 @@ class _MealLogHistoryView extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       header: AppPageHeader(
-        title: "Today's Meals",
+        title: "All Meals",
         onBack: () => context.pop(),
       ),
       scrollable: false,
@@ -44,7 +44,7 @@ class _MealLogHistoryView extends StatelessWidget {
         top: false,
         child: RefreshIndicator(
           onRefresh: () async {
-            context.read<MealLogBloc>().add(const LoadTodaysMeals());
+            context.read<MealLogBloc>().add(const LoadAllMealLogs());
           },
           child: BlocConsumer<MealLogBloc, MealLogState>(
             listenWhen: (_, state) => state is MealLogLoaded && state.notice != null,
@@ -66,7 +66,7 @@ class _MealLogHistoryView extends StatelessWidget {
                     padding: context.pagePadding,
                     child: LoadErrorView(
                       message: state.message,
-                      onRetry: () => context.read<MealLogBloc>().add(const LoadTodaysMeals()),
+                      onRetry: () => context.read<MealLogBloc>().add(const LoadAllMealLogs()),
                     ),
                   ),
                 );
@@ -88,7 +88,7 @@ class _MealLogHistoryView extends StatelessWidget {
                           ),
                           const SizedBox(height: AppDimens.space16),
                           Text(
-                            'No meals logged today.',
+                            'No meals logged yet.',
                             style: context.text.bodyLarge?.copyWith(
                               color: context.vColors.grayText,
                             ),
@@ -155,10 +155,24 @@ class _MealLogTile extends StatelessWidget {
     bloc.add(DeleteMealLogEntry(entry.id));
   }
 
+  String _formatDateTime(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(dt.year, dt.month, dt.day);
+    final timeStr = DateFormat('h:mm a').format(dt);
+    if (date == today) {
+      return 'Today · $timeStr';
+    }
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == yesterday) {
+      return 'Yesterday · $timeStr';
+    }
+    return '${DateFormat('EEE, MMM d').format(dt)} · $timeStr';
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final timeFormat = DateFormat('h:mm a');
 
     return AppCard(
       padding: AppDimens.cardPaddingCompact,
@@ -170,7 +184,7 @@ class _MealLogTile extends StatelessWidget {
               _MealTypeBadge(mealType: entry.mealType),
               const Spacer(),
               Text(
-                timeFormat.format(entry.capturedAt),
+                _formatDateTime(entry.capturedAt),
                 style: context.text.bodySmall?.copyWith(
                   color: context.vColors.grayText,
                 ),

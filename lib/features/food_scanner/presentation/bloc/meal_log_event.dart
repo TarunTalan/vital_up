@@ -12,6 +12,11 @@ class LoadTodaysMeals extends MealLogEvent {
   const LoadTodaysMeals();
 }
 
+/// Load all meal logs history across all dates.
+class LoadAllMealLogs extends MealLogEvent {
+  const LoadAllMealLogs();
+}
+
 /// Triggered after FoodScanBloc saves a meal — refreshes today's totals.
 class RefreshAfterSave extends MealLogEvent {
   const RefreshAfterSave();

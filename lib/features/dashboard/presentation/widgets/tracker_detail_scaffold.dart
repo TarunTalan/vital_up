@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -66,7 +68,8 @@ class TrackerToday {
 /// 2. Trend — 7D / 30D chart with a dashed goal line and stats.
 /// 3. Insights — plain-language patterns.
 /// 4. Metric-specific [sections] (macros, tags, top apps…).
-/// 5. History — every entry in the range, swipe to delete.
+/// 5. Today's log — today's entries (swipe to delete) and "See all", which
+///    opens [TrackerLogsPage] with every entry ([allLogs]).
 ///
 /// The pinned bottom button is always the metric's log action.
 /// Needs a [TrendCubit<L>] above it.
@@ -97,9 +100,21 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
 
   final String logsTitle;
   final String emptyLogs;
+
+  /// Builds one entry. Deletes should use the [TrendCubit<L>] read from
+  /// this context: on [TrackerLogsPage] it is that page's own list.
   final Widget Function(BuildContext context, L log) logBuilder;
-  final String? logsActionLabel;
+
+  /// Day an entry belongs to; the detail page lists today's entries.
+  final DateTime Function(L log) dateOf;
+
+  /// Every entry, newest first, for "See all". Ignored when
+  /// [onLogsAction] opens a page of its own.
+  final Future<List<L>> Function()? allLogs;
+
+  /// Opens a page of its own instead of [TrackerLogsPage].
   final VoidCallback? onLogsAction;
+  final String logsActionLabel;
 
   /// Primary bottom action; defaults to the metric's log label.
   final VoidCallback? onLog;
@@ -112,6 +127,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     required this.metric,
     required this.format,
     required this.logBuilder,
+    required this.dateOf,
     required this.noun,
     this.title,
     this.axisFormat,
@@ -122,10 +138,11 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     this.onEditGoal,
     this.insights,
     this.sections,
-    this.logsTitle = 'History',
-    this.emptyLogs = 'Nothing logged in this period yet.',
-    this.logsActionLabel,
+    this.logsTitle = "Today's log",
+    this.emptyLogs = 'Nothing logged today.',
+    this.allLogs,
     this.onLogsAction,
+    this.logsActionLabel = 'See all',
     this.onLog,
     this.logLabel,
     this.headerAction,
@@ -149,6 +166,24 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
             : null,
       ),
     );
+  }
+
+  Future<void> _openAll(BuildContext context, TrendCubit<L> cubit) async {
+    final load = allLogs;
+    if (load == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TrackerLogsPage<L>(
+          metric: metric,
+          title: '${title ?? metric.label} history',
+          load: load,
+          dateOf: dateOf,
+          logBuilder: logBuilder,
+        ),
+      ),
+    );
+    // Entries deleted there change today's numbers here.
+    if (!cubit.isClosed) await cubit.load();
   }
 
   @override
@@ -188,6 +223,14 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
             ...extraInsights,
             ...seriesInsights(data.series, format: format, noun: noun),
           ].take(4).toList();
+          final todayNow = DateTime.now();
+          final todays = [
+            for (final log in data.logs)
+              if (isSameDay(dateOf(log), todayNow)) log,
+          ];
+          final seeAll =
+              onLogsAction ??
+              (allLogs == null ? null : () => _openAll(context, cubit));
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -217,14 +260,14 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
               const SizedBox(height: AppDimens.sectionGap),
               TrackerSectionTitle(
                 logsTitle,
-                actionLabel: logsActionLabel,
-                onAction: onLogsAction,
+                actionLabel: seeAll == null ? null : logsActionLabel,
+                onAction: seeAll,
               ),
               const SizedBox(height: AppDimens.cardGap),
-              if (data.logs.isEmpty)
+              if (todays.isEmpty)
                 AppInfoNote(message: emptyLogs)
               else
-                for (final log in data.logs) ...[
+                for (final log in todays) ...[
                   logBuilder(context, log),
                   const SizedBox(height: AppDimens.space8),
                 ],
@@ -406,6 +449,113 @@ class _TrendCard<L> extends StatelessWidget {
           const SizedBox(height: AppDimens.cardInnerGap),
           TrendStatsRow(series: data.series, format: format),
         ],
+      ),
+    );
+  }
+}
+
+/// Every entry of one tracker, newest first, grouped by day. Opened from
+/// "See all" on a detail page; swipe to delete works as there.
+class TrackerLogsPage<L> extends StatefulWidget {
+  final TrackerMetric metric;
+  final String title;
+  final Future<List<L>> Function() load;
+  final DateTime Function(L log) dateOf;
+  final Widget Function(BuildContext context, L log) logBuilder;
+
+  const TrackerLogsPage({
+    super.key,
+    required this.metric,
+    required this.title,
+    required this.load,
+    required this.dateOf,
+    required this.logBuilder,
+  });
+
+  @override
+  State<TrackerLogsPage<L>> createState() => _TrackerLogsPageState<L>();
+}
+
+class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
+  /// Entries shown before "Show more", so years of logs build quickly.
+  static const _pageSize = 60;
+
+  late final TrendCubit<L> _cubit = TrendCubit<L>(
+    (_) async => TrendData<L>(const TrendSeries([]), await widget.load()),
+  )..load();
+  int _shown = _pageSize;
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  String _dayLabel(DateTime day, DateTime now) {
+    if (isSameDay(day, now)) return 'Today';
+    if (isSameDay(day, now.subtract(const Duration(days: 1)))) {
+      return 'Yesterday';
+    }
+    return DateFormat(
+      day.year == now.year ? 'EEEE d MMM' : 'EEEE d MMM y',
+    ).format(day);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider<TrendCubit<L>>.value(
+      value: _cubit,
+      child: AppScaffold(
+        header: AppPageHeader(title: widget.title),
+        onRefresh: _cubit.load,
+        body: BlocBuilder<TrendCubit<L>, TrendState<L>>(
+          builder: (context, state) {
+            final logs = state.data?.logs;
+            if (logs == null) {
+              return SizedBox(
+                height: AppDimens.trendChartHeight * 2,
+                child: state.error != null
+                    ? LoadErrorView(onRetry: _cubit.load)
+                    : TrackerLoading(color: widget.metric.color),
+              );
+            }
+            if (logs.isEmpty) {
+              return const AppInfoNote(message: 'Nothing logged yet.');
+            }
+            final now = DateTime.now();
+            final visible = logs.take(_shown).toList();
+            final children = <Widget>[];
+            DateTime? day;
+            for (final log in visible) {
+              final d = startOfDay(widget.dateOf(log));
+              if (d != day) {
+                day = d;
+                if (children.isNotEmpty) {
+                  children.add(const SizedBox(height: AppDimens.space8));
+                }
+                children
+                  ..add(TrackerSectionTitle(_dayLabel(d, now)))
+                  ..add(const SizedBox(height: AppDimens.space8));
+              }
+              children
+                ..add(widget.logBuilder(context, log))
+                ..add(const SizedBox(height: AppDimens.space8));
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...children,
+                if (logs.length > visible.length) ...[
+                  const SizedBox(height: AppDimens.space8),
+                  AppSecondaryButton(
+                    label: 'Show more',
+                    onTap: () => setState(() => _shown += _pageSize),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }

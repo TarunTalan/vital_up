@@ -16,17 +16,27 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
   final DeleteMealLog deleteMealLog;
   final IsarService isarService;
 
+  bool _loadAll = false;
+
   MealLogBloc({
     required this.getMealLogHistory,
     required this.deleteMealLog,
     required this.isarService,
   }) : super(const MealLogLoading()) {
     on<LoadTodaysMeals>(_onLoad);
+    on<LoadAllMealLogs>(_onLoadAll);
     on<RefreshAfterSave>(_onRefresh);
     on<DeleteMealLogEntry>(_onDelete);
   }
 
   Future<void> _onLoad(LoadTodaysMeals event, Emitter<MealLogState> emit) async {
+    _loadAll = false;
+    emit(const MealLogLoading());
+    await _fetchAndEmit(emit);
+  }
+
+  Future<void> _onLoadAll(LoadAllMealLogs event, Emitter<MealLogState> emit) async {
+    _loadAll = true;
     emit(const MealLogLoading());
     await _fetchAndEmit(emit);
   }
@@ -64,7 +74,9 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
   Future<void> _fetchAndEmit(Emitter<MealLogState> emit) async {
     final Either<Failure, List<MealLogEntry>> result;
     try {
-      result = await getMealLogHistory(DateTime.now()).withLoadTimeout();
+      result = _loadAll
+          ? await getMealLogHistory.callAll().withLoadTimeout()
+          : await getMealLogHistory(DateTime.now()).withLoadTimeout();
     } catch (e) {
       addError(e);
       emit(const MealLogError(kLoadErrorMessage));

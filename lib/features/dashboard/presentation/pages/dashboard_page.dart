@@ -588,12 +588,7 @@ class _HomeTabState extends State<_HomeTab> {
                         DashboardInsightCard(onLog: _logMetric),
                         const SizedBox(height: AppDimens.sectionGap),
 
-                        _buildSectionTitle(
-                          context,
-                          'Nutrition',
-                          actionLabel: 'History',
-                          onAction: () => _push('meal-log-history'),
-                        ),
+                        _buildSectionTitle(context, 'Nutrition'),
                         BlocListener<MealLogBloc, MealLogState>(
                           // A newly logged meal moves today's calories bar.
                           listenWhen: (_, state) => state is MealLogLoaded,
@@ -604,7 +599,6 @@ class _HomeTabState extends State<_HomeTab> {
                               plan: state is DietPlanLoaded
                                   ? state.mealPlan
                                   : null,
-                              onViewAll: () => _push('meal-log-history'),
                               onOpenProgress: () =>
                                   _push(TrackerMetric.nutrition.route),
                               onScanMeal: onScanMeal,
