@@ -54,6 +54,7 @@ class ScoreStreakCard extends StatelessWidget {
             children: [
               DashboardCardHeader(
                 title: 'Level ${stats.level.level} · ${stats.level.title}',
+                iconAsset: GamificationIcons.levelHexagon(stats.level.level),
                 icon: Icons.emoji_events_rounded,
                 badgeColor: AppColors.scoreBonus,
                 trailing: CardLink(
@@ -104,19 +105,22 @@ class ScoreStreakCard extends StatelessWidget {
                   TrackerFigure(
                     label: 'Streak',
                     value: days(stats.streak),
+                    iconAsset: GamificationIcons.streakFlame,
                     icon: Icons.local_fire_department_rounded,
                     color: stats.streak > 0 ? AppColors.streak : grey,
                   ),
                   TrackerFigure(
                     label: 'Best',
                     value: days(stats.longestStreak),
-                    icon: Icons.emoji_events_outlined,
+                    iconAsset: GamificationIcons.trophy,
+                    icon: Icons.emoji_events_rounded,
                     color: grey,
                   ),
                   TrackerFigure(
                     label: 'Today',
                     value: '+${_points.format(state.todayTotal)}',
-                    icon: Icons.add_circle_outline_rounded,
+                    iconAsset: GamificationIcons.points,
+                    icon: Icons.star_rounded,
                     color: context.colors.primary,
                   ),
                 ],
@@ -192,20 +196,11 @@ class LevelRing extends StatelessWidget {
               strokeCap: StrokeCap.round,
             ),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LV',
-                style: context.text.labelSmall?.copyWith(
-                  color: context.vColors.grayText,
-                ),
-              ),
-              Text(
-                '${stats.level.level}',
-                style: context.text.headlineSmall?.copyWith(color: color),
-              ),
-            ],
+          GameIcon(
+            GamificationIcons.levelHexagon(stats.level.level),
+            fallback: Icons.shield_rounded,
+            size: size * 0.48,
+            color: color,
           ),
         ],
       ),

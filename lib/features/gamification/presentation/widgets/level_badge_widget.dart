@@ -42,7 +42,7 @@ class LevelTierConfig {
           gradientColors: const [Color(0xFF795548), Color(0xFFA1887F), Color(0xFFD7CCC8)],
           borderColor: AppColors.rankBronze,
           glowColor: const Color(0x668D6E63),
-          icon: Icons.shield_outlined,
+          icon: Icons.shield_rounded,
           stars: 1,
         );
       case 2:
@@ -138,7 +138,7 @@ class LevelTierConfig {
           gradientColors: const [Color(0xFF1B5E20), AppColors.success, Color(0xFFC8E6C9)],
           borderColor: const Color(0xFF81C784),
           glowColor: const Color(0x8843A047),
-          icon: Icons.diamond_outlined,
+          icon: Icons.diamond_rounded,
           stars: 3,
         );
       case 10:

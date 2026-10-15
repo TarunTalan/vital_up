@@ -8,6 +8,7 @@ import 'package:vital_up/features/gamification/domain/entities/player_stats.dart
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// A rich GitHub/fitness-style activity calendar heatmap displaying daily XP
 /// achievements, streak progression, and daily & weekly progress metrics.
@@ -443,6 +444,7 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
                 children: [
                   Expanded(
                     child: _HeatmapStatPill(
+                      iconAsset: GamificationIcons.streakFlame,
                       icon: Icons.local_fire_department_rounded,
                       iconColor: AppColors.streak,
                       value: '${stats.streak} Days',
@@ -452,6 +454,7 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
                   const SizedBox(width: AppDimens.space8),
                   Expanded(
                     child: _HeatmapStatPill(
+                      iconAsset: GamificationIcons.points,
                       icon: Icons.electric_bolt_rounded,
                       iconColor: context.colors.primary,
                       value: '$thisWeekXp XP',
@@ -461,6 +464,7 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
                   const SizedBox(width: AppDimens.space8),
                   Expanded(
                     child: _HeatmapStatPill(
+                      iconAsset: GamificationIcons.trophy,
                       icon: Icons.emoji_events_rounded,
                       iconColor: AppColors.rankGold,
                       value: '${stats.longestStreak} Days',
@@ -521,12 +525,14 @@ class _LegendBox extends StatelessWidget {
 
 class _HeatmapStatPill extends StatelessWidget {
   final IconData icon;
+  final String? iconAsset;
   final Color iconColor;
   final String value;
   final String label;
 
   const _HeatmapStatPill({
     required this.icon,
+    this.iconAsset,
     required this.iconColor,
     required this.value,
     required this.label,
@@ -554,7 +560,14 @@ class _HeatmapStatPill extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppDimens.iconXs, color: iconColor),
+              iconAsset != null
+                  ? GameIcon(
+                      iconAsset!,
+                      fallback: icon,
+                      size: AppDimens.iconXs,
+                      color: iconColor,
+                    )
+                  : Icon(icon, size: AppDimens.iconXs, color: iconColor),
               const SizedBox(width: AppDimens.space4),
               Flexible(
                 child: Text(

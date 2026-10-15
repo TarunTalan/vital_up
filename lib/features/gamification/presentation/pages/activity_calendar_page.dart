@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -127,7 +128,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
                 onToggle: () => setState(() => _moveExpanded = !_moveExpanded),
                 children: [
                   _MetricRow(
-                    icon: Icons.directions_run_rounded,
+                    svgAsset: 'assets/icons/trackers/activity.svg',
                     iconBgColor: AppColors.success.withValues(alpha: 0.15),
                     iconColor: AppColors.success,
                     label: 'Activity',
@@ -137,7 +138,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
                   ),
                   const SizedBox(height: AppDimens.space12),
                   _MetricRow(
-                    icon: Icons.directions_walk_rounded,
+                    svgAsset: 'assets/icons/trackers/step.svg',
                     iconBgColor: AppColors.success.withValues(alpha: 0.15),
                     iconColor: AppColors.success,
                     label: 'Steps',
@@ -496,7 +497,8 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
 }
 
 class _MetricRow extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final Color iconBgColor;
   final Color iconColor;
   final String label;
@@ -505,14 +507,15 @@ class _MetricRow extends StatelessWidget {
   final Color progressColor;
 
   const _MetricRow({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.iconBgColor,
     required this.iconColor,
     required this.label,
     required this.value,
     required this.progress,
     required this.progressColor,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -543,7 +546,17 @@ class _MetricRow extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: iconBgColor,
                 ),
-                child: Icon(icon, size: AppDimens.iconSm, color: iconColor),
+                child: Center(
+                  child: svgAsset != null
+                      ? SvgPicture.asset(
+                          svgAsset!,
+                          width: AppDimens.iconSm,
+                          height: AppDimens.iconSm,
+                          colorFilter:
+                              ColorFilter.mode(iconColor, BlendMode.srcIn),
+                        )
+                      : Icon(icon, size: AppDimens.iconSm, color: iconColor),
+                ),
               ),
               const SizedBox(width: AppDimens.space10),
               Expanded(

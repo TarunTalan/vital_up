@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/point_event.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
@@ -59,10 +60,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
           }
           final data = snapshot.data;
           if (data == null) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppDimens.space48),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            return const Center(child: VitalUpLoader());
           }
           final (stats, events, rules) = data;
           final names = {for (final r in rules) r.source: r.name};
@@ -84,11 +82,22 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                           '${_points.format(stats.totalPoints)} pts',
                           style: context.text.headlineSmall,
                         ),
-                        Text(
-                          'Level ${stats.level.level} · ${stats.level.title}',
-                          style: context.text.bodyMedium?.copyWith(
-                            color: context.vColors.grayText,
-                          ),
+                        Row(
+                          children: [
+                            GameIcon(
+                              GamificationIcons.levelHexagon(stats.level.level),
+                              fallback: Icons.shield_rounded,
+                              size: AppDimens.iconSm,
+                              color: context.colors.primary,
+                            ),
+                            const SizedBox(width: AppDimens.space6),
+                            Text(
+                              'Level ${stats.level.level} · ${stats.level.title}',
+                              style: context.text.bodyMedium?.copyWith(
+                                color: context.vColors.grayText,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: AppDimens.space8),
                         StreakPill(streak: stats.streak),
