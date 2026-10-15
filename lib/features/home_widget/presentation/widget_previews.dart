@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/home_widget/data/widget_data.dart';
@@ -182,6 +183,7 @@ class _Header extends StatelessWidget {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: context.colors.primary,
+                      strokeCap: StrokeCap.round,
                     ),
                   )
                 : Icon(
@@ -198,21 +200,30 @@ class _Header extends StatelessWidget {
 
 /// Tinted circle with an icon, as in the native badges.
 class _Badge extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final Color color;
   final double size;
   final double? iconSize;
-  const _Badge(this.icon, this.color, this.size, {this.iconSize});
+  const _Badge(this.icon, this.color, this.size, {this.svgAsset, this.iconSize});
 
   @override
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
+    alignment: Alignment.center,
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.2),
       shape: BoxShape.circle,
     ),
-    child: Icon(icon, size: iconSize ?? size / 2 + 2, color: color),
+    child: svgAsset != null
+        ? SvgPicture.asset(
+            svgAsset!,
+            width: iconSize ?? size / 2 + 2,
+            height: iconSize ?? size / 2 + 2,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          )
+        : Icon(icon, size: iconSize ?? size / 2 + 2, color: color),
   );
 }
 
@@ -265,13 +276,15 @@ IconData _metricIcon(MetricTile t, WidgetInputs inputs) =>
     : t.metric.icon;
 
 class _Action extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String label;
   final bool primary;
   final double height;
   const _Action(
     this.icon,
     this.label, {
+    this.svgAsset,
     this.primary = false,
     this.height = 36,
   });
@@ -291,7 +304,15 @@ class _Action extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 16, color: fg),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 16,
+              height: 16,
+              colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+            )
+          else if (icon != null)
+            Icon(icon, size: 16, color: fg),
           const SizedBox(width: 4),
           Flexible(
             child: _Text(
@@ -377,7 +398,12 @@ class MetricsWidgetPreview extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        _Badge(_metricIcon(t, inputs), t.color, 24),
+                        _Badge(
+                          _metricIcon(t, inputs),
+                          t.color,
+                          24,
+                          svgAsset: t.metric.svgAsset,
+                        ),
                         _gap(8),
                         Expanded(
                           child: Column(
@@ -466,7 +492,12 @@ class MetricsWidgetPreview extends StatelessWidget {
           children: [
             Row(
               children: [
-                _Badge(_metricIcon(t, inputs), t.color, 24),
+                _Badge(
+                  _metricIcon(t, inputs),
+                  t.color,
+                  24,
+                  svgAsset: t.metric.svgAsset,
+                ),
                 _gap(8),
                 Expanded(
                   child: _Text(t.label, _t(context, 12, secondary: true)),
@@ -514,7 +545,11 @@ class MetricsWidgetPreview extends StatelessWidget {
                 ),
                 SizedBox(width: 6),
                 Expanded(
-                  child: _Action(Icons.auto_awesome_rounded, 'Ask Vita'),
+                  child: _Action(
+                    null,
+                    'Ask Vita',
+                    svgAsset: 'assets/icons/nav/vita.svg',
+                  ),
                 ),
               ],
             ),
@@ -754,10 +789,10 @@ class ShortcutsWidgetPreview extends StatelessWidget {
   const ShortcutsWidgetPreview({super.key, required this.size});
 
   static const _items = [
-    (Icons.photo_camera_rounded, 'Scan', AppColors.primary),
-    (Icons.water_drop_rounded, 'Water', AppColors.trackWater),
-    (Icons.directions_run_rounded, 'Workout', AppColors.trackActivity),
-    (Icons.auto_awesome_rounded, 'Vita', AppColors.trackMood),
+    (Icons.photo_camera_rounded, null, 'Scan', AppColors.primary),
+    (Icons.water_drop_rounded, null, 'Water', AppColors.trackWater),
+    (null, 'assets/icons/trackers/activity.svg', 'Workout', AppColors.trackActivity),
+    (null, 'assets/icons/nav/vita.svg', 'Vita', AppColors.trackMood),
   ];
 
   @override
@@ -772,12 +807,12 @@ class ShortcutsWidgetPreview extends StatelessWidget {
       padding: 8,
       child: Row(
         children: [
-          for (final (icon, label, color) in _items.take(count))
+          for (final (icon, svgAsset, label, color) in _items.take(count))
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _Badge(icon, color, 36, iconSize: 20),
+                  _Badge(icon, color, 36, svgAsset: svgAsset, iconSize: 20),
                   const SizedBox(height: 4),
                   _Text(label, _t(context, 11, weight: FontWeight.w500)),
                 ],
@@ -799,7 +834,7 @@ class SignedOutPreview extends StatelessWidget {
     size: size,
     child: Row(
       children: [
-        Image.asset('assets/icons/app_icon.png', width: 32, height: 32),
+        Image.asset('assets/icons/app/app_icon.png', width: 32, height: 32),
         _gap(10),
         Expanded(
           child: Column(

@@ -85,6 +85,13 @@ enum WidgetMetric {
     weight => Icons.monitor_weight_rounded,
   };
 
+  /// SVG asset for widget rendering when available.
+  String? get svgAsset => switch (this) {
+    activity => 'assets/icons/trackers/step.svg',
+    weight => 'assets/icons/trackers/weight_icon.svg',
+    _ => null,
+  };
+
   static WidgetMetric? byId(String id) =>
       values.where((m) => m.id == id).firstOrNull;
 

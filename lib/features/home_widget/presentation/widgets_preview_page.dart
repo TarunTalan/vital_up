@@ -167,10 +167,7 @@ class _WidgetsPreviewPageState extends State<WidgetsPreviewPage> {
         builder: (context, snap) {
           final data = snap.data;
           if (data == null) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppDimens.space48),
-              child: Center(child: VitalUpLoader()),
-            );
+            return const Center(child: VitalUpLoader());
           }
           final i = data.inputs;
           final at = data.updatedAt;

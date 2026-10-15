@@ -128,10 +128,7 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
     if (data == null) {
       return const AppScaffold(
         header: header,
-        body: Padding(
-          padding: EdgeInsets.only(top: AppDimens.space48),
-          child: Center(child: VitalUpLoader()),
-        ),
+        body: Center(child: VitalUpLoader()),
       );
     }
     final full = _metrics.length >= CustomWidgetConfig.maxMetrics;
@@ -271,7 +268,8 @@ class _MetricOption extends StatelessWidget {
     return Opacity(
       opacity: enabled || picked ? 1 : AppDimens.disabledOpacity,
       child: AppListTile(
-        icon: metric.icon,
+        icon: metric.svgAsset != null ? null : metric.icon,
+        svgAsset: metric.svgAsset,
         iconColor: metric.color,
         title: metric.title,
         subtitle: _subtitle,
