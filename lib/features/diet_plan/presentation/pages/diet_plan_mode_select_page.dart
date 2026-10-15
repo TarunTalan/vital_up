@@ -26,7 +26,15 @@ class DietPlanModeSelectPage extends StatelessWidget {
           _ModeCard(
             title: 'Smart Mode',
             subtitle: 'Uses your health profile to calculate the perfect maintenance plan.',
-            icon: const Icon(Icons.auto_awesome),
+            icon: SvgPicture.asset(
+              'assets/icons/nav/vita.svg',
+              width: AppDimens.iconMd,
+              height: AppDimens.iconMd,
+              colorFilter: ColorFilter.mode(
+                VitaColors.accent,
+                BlendMode.srcIn,
+              ),
+            ),
             onTap: () {
               context.pushNamed(
                 'diet-plan-result',
@@ -41,7 +49,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
           _ModeCard(
             title: 'Goal Mode',
             subtitle: 'Set a weight goal and timeframe. We calculate the optimal deficit/surplus.',
-            icon: const Icon(Icons.track_changes),
+            icon: const Icon(Icons.track_changes_rounded),
             onTap: () {
               context.pushNamed(
                 'diet-plan-goal',
@@ -54,7 +62,7 @@ class DietPlanModeSelectPage extends StatelessWidget {
             title: 'Manual Mode',
             subtitle: 'I know exactly what I want. Let me enter my macros directly.',
             icon: SvgPicture.asset(
-              'assets/icons/edit.svg',
+              'assets/icons/ui/edit.svg',
               width: AppDimens.iconMd,
               height: AppDimens.iconMd,
               colorFilter: ColorFilter.mode(

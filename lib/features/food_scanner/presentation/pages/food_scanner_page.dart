@@ -440,8 +440,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Center(
-          child: CircularProgressIndicator(color: context.colors.primary),
+        return const Center(
+          child: VitalUpLoader(),
         );
       },
     );
@@ -562,7 +562,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
               const SizedBox(height: AppDimens.space24),
               AppPrimaryButton(
                 label: 'Scan Nutrition Label',
-                leadingIcon: const Icon(Icons.document_scanner_outlined),
+                leadingIcon: const Icon(Icons.document_scanner_rounded),
                 onTap: () {
                   Navigator.of(context).pop();
                   setState(() {
@@ -581,7 +581,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
               AppSecondaryButton(
                 label: 'Enter Details Manually',
                 leadingIcon: SvgPicture.asset(
-                  'assets/icons/edit.svg',
+                  'assets/icons/ui/edit.svg',
                   width: AppDimens.iconMd,
                   height: AppDimens.iconMd,
                   colorFilter: ColorFilter.mode(
@@ -804,7 +804,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                           ),
                           const Spacer(),
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/info_icon.svg',
+                            iconAsset: 'assets/icons/ui/info_icon.svg',
                             onTap: () {
                               showSmoothDialog(
                                 context: context,
@@ -831,7 +831,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/gallery_add.svg',
+                            iconAsset: 'assets/icons/ui/gallery_add.svg',
                             onTap: isRecognizing ? () {} : _pickFromGallery,
                           ),
                           const Flexible(
@@ -845,7 +845,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                             child: SizedBox(width: AppDimens.scanBarGap),
                           ),
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/flash.svg',
+                            iconAsset: 'assets/icons/ui/flash.svg',
                             active: _torchEnabled,
                             onTap: _toggleFlash,
                           ),
@@ -1081,7 +1081,7 @@ class _NutritionLabelHint extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                Icons.document_scanner_outlined,
+                Icons.document_scanner_rounded,
                 color: primary,
                 size: AppDimens.iconLg,
               ),
@@ -1189,7 +1189,7 @@ class _CaptureButton extends StatelessWidget {
                     ),
                   )
                 : SvgPicture.asset(
-                    'assets/icons/camera.svg',
+                    'assets/icons/ui/camera.svg',
                     width: AppDimens.iconLg,
                     height: AppDimens.iconLg,
                     colorFilter: const ColorFilter.mode(
@@ -1274,8 +1274,8 @@ class FoodImageActionPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          action('assets/icons/edit.svg', onEdit),
-          if (onAdd != null) action('assets/icons/plus.svg', onAdd!),
+          action('assets/icons/ui/edit.svg', onEdit),
+          if (onAdd != null) action('assets/icons/ui/plus.svg', onAdd!),
         ],
       ),
     );

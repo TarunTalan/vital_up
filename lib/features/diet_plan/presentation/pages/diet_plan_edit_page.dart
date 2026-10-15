@@ -10,6 +10,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
@@ -122,15 +123,9 @@ class _DietPlanEditPageState extends State<DietPlanEditPage> {
               onTap: _save,
             ),
       body: _failed
-          ? Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: LoadErrorView(onRetry: _load),
-            )
+          ? LoadErrorView(onRetry: _load)
           : meals == null
-              ? const Padding(
-                  padding: EdgeInsets.only(top: AppDimens.space48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
+              ? const Center(child: VitalUpLoader())
               : meals.isEmpty
                   ? const AppInfoNote(
                       message: 'No active plan to edit. Create one first.',

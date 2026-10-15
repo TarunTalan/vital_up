@@ -10,6 +10,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_scanner_models.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
@@ -55,7 +56,7 @@ class FoodDetailPage extends StatelessWidget {
                 child: ColoredBox(
                   color: AppColors.black.withValues(alpha: 0.54),
                   child: const Center(
-                    child: CircularProgressIndicator(color: AppColors.white),
+                    child: VitalUpLoader(),
                   ),
                 ),
               ),
@@ -661,14 +662,14 @@ class _DetailTopBar extends StatelessWidget {
         const Spacer(),
         if (onShare case final share?) ...[
           _CircleIconButton(
-            asset: 'assets/icons/share.svg',
+            asset: 'assets/icons/ui/share.svg',
             tooltip: 'Share',
             onTap: share,
           ),
           const SizedBox(width: AppDimens.space12),
         ],
         _CircleIconButton(
-          asset: 'assets/icons/info_icon.svg',
+          asset: 'assets/icons/ui/info_icon.svg',
           tooltip: 'How accurate is this?',
           onTap: onInfo,
         ),
@@ -1000,13 +1001,13 @@ class _DishInfoCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppDimens.space8),
                     _RowIconButton(
-                      asset: 'assets/icons/edit.svg',
+                      asset: 'assets/icons/ui/edit.svg',
                       tooltip: 'Edit',
                       onTap: () => _showEditDialog(context, dish),
                     ),
                     const SizedBox(width: AppDimens.space8),
                     _RowIconButton(
-                      asset: 'assets/icons/delete.svg',
+                      asset: 'assets/icons/ui/delete.svg',
                       tooltip: 'Remove',
                       onTap: () => onRemove(dish.id),
                     ),
@@ -1195,9 +1196,22 @@ class _MacroDetailRow extends StatelessWidget {
     final gramsStr = detail.grams == detail.grams.roundToDouble()
         ? detail.grams.round().toString()
         : detail.grams.toStringAsFixed(1);
+    final isSugar = detail.name.toLowerCase().contains('sugar');
 
     return Row(
       children: [
+        if (isSugar) ...[
+          SvgPicture.asset(
+            'assets/icons/ui/sugar.svg',
+            width: AppDimens.iconXs,
+            height: AppDimens.iconXs,
+            colorFilter: ColorFilter.mode(
+              context.vColors.grayText ?? Colors.grey,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: AppDimens.space6),
+        ],
         Expanded(child: Text(detail.name, style: context.text.bodyMedium)),
         const SizedBox(width: AppDimens.space8),
         Text('$gramsStr ${detail.unit}', style: context.text.bodyMedium),

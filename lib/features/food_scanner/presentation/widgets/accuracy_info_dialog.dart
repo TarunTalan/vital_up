@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -30,7 +31,7 @@ class AccuracyInfoDialog extends StatelessWidget {
               Row(
                 children: [
                   AppIconBadge(
-                    icon: Icon(Icons.verified_outlined, color: primary),
+                    icon: Icon(Icons.verified_rounded, color: primary),
                   ),
                   const SizedBox(width: AppDimens.space12),
                   Expanded(
@@ -44,21 +45,22 @@ class AccuracyInfoDialog extends StatelessWidget {
               const SizedBox(height: AppDimens.space16),
               _buildInfoRow(
                 context,
-                Icons.biotech_outlined,
+                Icons.smart_toy_rounded,
                 'Dual AI Verification',
                 'Recognized using dual vision engines (Google Gemini + Groq Qwen) to prevent identification errors.',
+                svgAsset: 'assets/icons/nav/vita.svg',
               ),
               const SizedBox(height: AppDimens.space12),
               _buildInfoRow(
                 context,
-                Icons.menu_book_outlined,
+                Icons.menu_book_rounded,
                 'Laboratory Mapped',
                 'Calories and macros are pulled directly from USDA & Indian Food Composition Tables (IFCT) laboratory composition records—never guessed or hallucinated by AI.',
               ),
               const SizedBox(height: AppDimens.space12),
               _buildInfoRow(
                 context,
-                Icons.travel_explore_outlined,
+                Icons.travel_explore_rounded,
                 'Google Search Grounding',
                 'Recipes or regional dishes are double-checked using live web searches to map verified nutritional details.',
               ),
@@ -85,12 +87,24 @@ class AccuracyInfoDialog extends StatelessWidget {
     BuildContext context,
     IconData icon,
     String title,
-    String desc,
-  ) {
+    String desc, {
+    String? svgAsset,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: AppDimens.iconMd, color: context.colors.primary),
+        if (svgAsset != null)
+          SvgPicture.asset(
+            svgAsset,
+            width: AppDimens.iconMd,
+            height: AppDimens.iconMd,
+            colorFilter: ColorFilter.mode(
+              context.colors.primary,
+              BlendMode.srcIn,
+            ),
+          )
+        else
+          Icon(icon, size: AppDimens.iconMd, color: context.colors.primary),
         const SizedBox(width: AppDimens.space12),
         Expanded(
           child: Column(

@@ -10,6 +10,7 @@ import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
@@ -53,7 +54,7 @@ class _MealLogHistoryView extends StatelessWidget {
             },
             builder: (context, state) {
               if (state is MealLogLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: VitalUpLoader());
               }
 
               if (state is MealLogError) {
