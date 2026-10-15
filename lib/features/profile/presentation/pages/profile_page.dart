@@ -23,6 +23,7 @@ import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart'
 import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
 import 'package:vital_up/features/profile/presentation/widgets/health_snapshot_card.dart';
 import 'package:vital_up/features/profile/presentation/widgets/profile_photo_sheet.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -128,14 +129,11 @@ class _ProfilePageState extends State<ProfilePage> {
         if (profile == null) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is ProfileError
-                  ? LoadErrorView(
-                      onRetry: () => cubit.loadProfile(forceRefresh: true),
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is ProfileError
+                ? LoadErrorView(
+                    onRetry: () => cubit.loadProfile(forceRefresh: true),
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
 
@@ -175,7 +173,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 title: 'Health',
                 children: [
                   AppListTile(
-                    icon: Icons.monitor_heart_outlined,
+                    icon: Icons.monitor_heart_rounded,
                     iconColor: context.colors.error,
                     title: 'Health & body',
                     subtitle: 'Body, vitals, medical history',
@@ -196,7 +194,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () => context.pushNamed('reminders'),
                   ),
                   AppListTile(
-                    icon: Icons.medical_services_outlined,
+                    icon: Icons.medical_services_rounded,
                     iconColor: AppColors.teal,
                     title: 'Doctor health report',
                     subtitle: 'A summary to share with your doctor',
@@ -216,7 +214,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () => _open('account-details'),
                   ),
                   AppListTile(
-                    svgAsset: 'assets/icons/settings.svg',
+                    svgAsset: 'assets/icons/ui/settings.svg',
                     title: 'Settings',
                     subtitle: 'Theme, units, privacy',
                     onTap: () => context.pushNamed('settings'),
@@ -370,8 +368,13 @@ class _ArenaStrip extends StatelessWidget {
         const SizedBox(height: AppDimens.space12),
         Row(
           children: [
-            const AppIconBadge(
-              icon: Icon(Icons.emoji_events_rounded),
+            AppIconBadge(
+              icon: GameIcon(
+                GamificationIcons.levelHexagon(stats.level.level),
+                fallback: Icons.emoji_events_rounded,
+                size: AppDimens.iconSm,
+                color: context.colors.primary,
+              ),
               color: AppColors.scoreBonus,
               size: AppDimens.avatarSmall,
             ),

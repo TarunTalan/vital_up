@@ -120,6 +120,7 @@ class _SettingsPageState extends State<SettingsPage> {
     child: CircularProgressIndicator(
       strokeWidth: AppDimens.borderThick,
       color: context.colors.primary,
+      strokeCap: StrokeCap.round,
     ),
   );
 
@@ -135,14 +136,11 @@ class _SettingsPageState extends State<SettingsPage> {
         if (state is! SettingsLoaded) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is SettingsError
-                  ? LoadErrorView(
-                      onRetry: context.read<SettingsCubit>().loadSettings,
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is SettingsError
+                ? LoadErrorView(
+                    onRetry: context.read<SettingsCubit>().loadSettings,
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
         final s = state.settings;
@@ -178,7 +176,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   AppListTile(
-                    icon: Icons.monitor_weight_rounded,
+                    svgAsset: 'assets/icons/trackers/weight_icon.svg',
                     title: 'Weight',
                     trailing: AppSegmentedControl<String>(
                       compact: true,

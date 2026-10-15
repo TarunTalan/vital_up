@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -88,14 +89,11 @@ class _HealthDetailsPageState extends State<HealthDetailsPage> {
         if (profile == null) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is ProfileError
-                  ? LoadErrorView(
-                      onRetry: () => cubit.loadProfile(forceRefresh: true),
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is ProfileError
+                ? LoadErrorView(
+                    onRetry: () => cubit.loadProfile(forceRefresh: true),
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
         return AppScaffold(
@@ -138,22 +136,33 @@ class _HealthBody extends StatelessWidget {
         HealthSnapshotCard(
           profile: profile,
           onLogWeight: () => showWeightEntrySheet(context),
-          footer: Row(
-            children: [
-              AppIconBadge(
-                icon: const Icon(Icons.directions_run_rounded),
-                color: AppColors.trackWeight,
-                size: AppDimens.avatarSmall,
-              ),
-              const SizedBox(width: AppDimens.space12),
-              Expanded(
-                child: Text('Activity level', style: context.text.bodyMedium),
-              ),
-              Text(
-                profile.activity.isEmpty ? 'Not added' : profile.activity,
-                style: context.text.bodyMedium?.copyWith(color: v.grayText),
-              ),
-            ],
+          footer: Padding(
+            padding: const EdgeInsets.only(top: AppDimens.space12),
+            child: Row(
+              children: [
+                AppIconBadge(
+                  icon: SvgPicture.asset(
+                    'assets/icons/trackers/activity.svg',
+                    width: AppDimens.iconXs,
+                    height: AppDimens.iconXs,
+                    colorFilter: ColorFilter.mode(
+                      AppColors.trackWeight,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  color: AppColors.trackWeight,
+                  size: AppDimens.avatarSmall,
+                ),
+                const SizedBox(width: AppDimens.space12),
+                Expanded(
+                  child: Text('Activity level', style: context.text.bodyMedium),
+                ),
+                Text(
+                  profile.activity.isEmpty ? 'Not added' : profile.activity,
+                  style: context.text.bodyMedium?.copyWith(color: v.grayText),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: AppDimens.sectionGap),
@@ -172,7 +181,7 @@ class _HealthBody extends StatelessWidget {
                   : 'Not added',
             ),
             AppListTile(
-              icon: Icons.monitor_heart_outlined,
+              icon: Icons.monitor_heart_rounded,
               iconColor: heart,
               title: 'Resting heart rate',
               value: profile.bpm.isEmpty ? 'Not added' : '${profile.bpm} bpm',
@@ -232,14 +241,14 @@ class _HealthBody extends StatelessWidget {
         const SizedBox(height: AppDimens.sectionGap),
 
         const AppInfoNote(
-          icon: Icons.shield_outlined,
+          icon: Icons.shield_rounded,
           message: 'Only shared in reports you create.',
         ),
         const SizedBox(height: AppDimens.space12),
         AppSecondaryButton(
           label: 'Create doctor report',
           leadingIcon: Icon(
-            Icons.medical_services_outlined,
+            Icons.medical_services_rounded,
             size: AppDimens.iconMd,
             color: v.secondaryButtonText,
           ),
@@ -579,7 +588,7 @@ class _VitalsSheetState extends State<_VitalsSheet> {
         AppTextField.integer(
           controller: _bpm,
           label: 'Resting heart rate',
-          prefixIcon: Icons.monitor_heart_outlined,
+          prefixIcon: Icons.monitor_heart_rounded,
           suffixText: 'bpm',
           validator: _range(30, 220, 'a heart rate'),
         ),
@@ -685,7 +694,7 @@ class _MedicalSheetState extends State<_MedicalSheet> {
       title: 'Medical history',
       subtitle: 'Only shared in reports you create.',
       fields: (context) => [
-        _field(_conditions, 'Conditions', Icons.medical_services_outlined),
+        _field(_conditions, 'Conditions', Icons.medical_services_rounded),
         _fieldGap,
         _field(_allergies, 'Allergies', Icons.warning_amber_rounded),
         _fieldGap,

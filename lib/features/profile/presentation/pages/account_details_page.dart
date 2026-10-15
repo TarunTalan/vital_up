@@ -49,14 +49,11 @@ class AccountDetailsPage extends StatelessWidget {
         if (profile == null) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is ProfileError
-                  ? LoadErrorView(
-                      onRetry: () => cubit.loadProfile(forceRefresh: true),
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is ProfileError
+                ? LoadErrorView(
+                    onRetry: () => cubit.loadProfile(forceRefresh: true),
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
         return _AccountForm(profile: profile, header: header);
@@ -412,6 +409,7 @@ class _AccountFormState extends State<_AccountForm> {
                               child: CircularProgressIndicator(
                                 strokeWidth: AppDimens.borderThick,
                                 color: context.colors.primary,
+                                strokeCap: StrokeCap.round,
                               ),
                             )
                           : null,
