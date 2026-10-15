@@ -126,6 +126,10 @@ class _SignalRow extends StatelessWidget {
               VitaIcons.forSignal(signal.kind),
               width: AppDimens.iconMd,
               height: AppDimens.iconMd,
+              colorFilter: const ColorFilter.mode(
+                AppColors.teal,
+                BlendMode.srcIn,
+              ),
             ),
           ),
           const SizedBox(width: AppDimens.space20),

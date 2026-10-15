@@ -5,9 +5,10 @@ import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 class VitaIcons {
   VitaIcons._();
 
-  static const String _dir = 'assets/icons';
+  static const String _dir = 'assets/icons/vita';
 
   // Home feature tiles (24dp, primary cyan).
+  static const String vita = 'assets/icons/nav/vita.svg';
   static const String dietPlan = '$_dir/vita_carrot.svg';
   static const String healthAnalysis = '$_dir/vita_chart_pie_slice.svg';
   static const String stressGuide = '$_dir/vita_person_tai_chi.svg';
@@ -18,7 +19,7 @@ class VitaIcons {
   static const String metrics = '$_dir/vita_pulse.svg';
   static const String sleep = '$_dir/vita_moon_stars.svg';
   static const String stress = '$_dir/vita_smiley_meh.svg';
-  static const String activity = '$_dir/vita_person_run.svg';
+  static const String activity = 'assets/icons/trackers/activity.svg';
   static const String medication = '$_dir/vita_pill.svg';
 
   // Chat + buttons.

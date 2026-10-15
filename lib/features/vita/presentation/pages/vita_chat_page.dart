@@ -7,6 +7,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
@@ -122,7 +123,7 @@ class _VitaChatViewState extends State<_VitaChatView> {
                   (next.error != null && prev.error != next.error),
               builder: (context, state) {
                 if (state.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: VitalUpLoader());
                 }
                 final messages = state.messages;
                 final typing = state.isTyping ? 1 : 0;
