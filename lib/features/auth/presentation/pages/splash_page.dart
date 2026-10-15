@@ -214,7 +214,7 @@ class _SplashPageState extends State<SplashPage>
                     child: Opacity(
                       opacity: _logoBottomOpacity.value.clamp(0.0, 1.0),
                       child: SvgPicture.asset(
-                        'assets/icons/logo_bottom.svg',
+                        'assets/icons/app/logo_bottom.svg',
                         fit: BoxFit.contain,
                       ),
                     ),

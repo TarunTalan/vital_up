@@ -128,7 +128,7 @@ class _HeightContentState extends State<_HeightContent> {
               final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
               final svgHeight = physicalHeight * 0.35;
               return SvgPicture.asset(
-                'assets/icons/height.svg',
+                'assets/icons/onboarding/height.svg',
                 height: svgHeight,
                 fit: BoxFit.contain,
                 placeholderBuilder: (context) => SizedBox(height: svgHeight),

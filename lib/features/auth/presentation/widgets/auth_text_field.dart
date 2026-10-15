@@ -320,7 +320,7 @@ class _AuthTextFieldState extends State<AuthTextField>
                     if (widget.error != null && widget.showRequirementsInfo)
                       IconButton(
                         icon: Icon(
-                          Icons.info_outline,
+                          Icons.info_outline_rounded,
                           color: colors.error,
                           size: AppDimens.iconMd,
                         ),
@@ -362,6 +362,7 @@ class _AuthTextFieldState extends State<AuthTextField>
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               AppColors.primaryActive,
                             ),
+                            strokeCap: StrokeCap.round,
                           ),
                         ),
                       )
@@ -371,7 +372,7 @@ class _AuthTextFieldState extends State<AuthTextField>
                           end: AppDimens.space12,
                         ),
                         child: Icon(
-                          Icons.check_circle,
+                          Icons.check_circle_rounded,
                           color: v.success,
                           size: AppDimens.iconMd,
                         ),
@@ -470,7 +471,7 @@ class _SvgEyeIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final svgWidget = SvgPicture.asset(
-      'assets/icons/Eye.svg',
+      'assets/icons/auth/Eye.svg',
       width: AppDimens.iconMd,
       height: AppDimens.iconMd,
       colorFilter: ColorFilter.mode(color, BlendMode.srcIn),

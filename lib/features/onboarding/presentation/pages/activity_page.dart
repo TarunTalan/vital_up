@@ -27,10 +27,10 @@ class _ActivityPageState extends State<ActivityPage> {
   int selectedIndex = 0;
 
   final List<ActivityOption> options = const [
-    ActivityOption('assets/icons/resting.svg', 'Mostly resting'),
-    ActivityOption('assets/icons/light.svg', 'Light movement'),
-    ActivityOption('assets/icons/moderate.svg', 'Moderate activity'),
-    ActivityOption('assets/icons/active.svg', 'Very active'),
+    ActivityOption('assets/icons/onboarding/resting.svg', 'Mostly resting'),
+    ActivityOption('assets/icons/onboarding/light.svg', 'Light movement'),
+    ActivityOption('assets/icons/onboarding/moderate.svg', 'Moderate activity'),
+    ActivityOption('assets/icons/onboarding/active.svg', 'Very active'),
   ];
 
   @override

@@ -194,7 +194,7 @@ class _WeightContentState extends State<_WeightContent> {
               width: double.infinity,
               height: physicalHeight * 0.28,
               child: SvgPicture.asset(
-                'assets/icons/weight.svg',
+                'assets/icons/trackers/weight.svg',
                 fit: BoxFit.fitWidth,
                 alignment: Alignment.topCenter,
               ),
