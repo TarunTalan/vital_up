@@ -10,8 +10,8 @@
 // Events for other ids are acknowledged (200) and logged, so RevenueCat does
 // not retry them forever.
 
-import "@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "@supabase/supabase-js";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   errorResponse,
   handleError,
@@ -77,7 +77,7 @@ function shortString(value: unknown, max: number): string | null {
   return typeof value === "string" && value.length > 0 && value.length <= max ? value : null;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   try {
     requireMethod(req, "POST");
     if (!WEBHOOK_SECRET) {
