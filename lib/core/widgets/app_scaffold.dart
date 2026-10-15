@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart';
 
 /// Standard page shell: branded blob background, optional [header]
@@ -22,6 +23,7 @@ class AppScaffold extends StatelessWidget {
   final EdgeInsetsGeometry? bodyPadding;
   final Widget? floatingActionButton;
   final Future<void> Function()? onRefresh;
+  final bool isLoading;
 
   const AppScaffold({
     super.key,
@@ -34,6 +36,7 @@ class AppScaffold extends StatelessWidget {
     this.bodyPadding,
     this.floatingActionButton,
     this.onRefresh,
+    this.isLoading = false,
   });
 
   /// Pull-to-refresh never spins forever and never surfaces an error from
@@ -63,10 +66,20 @@ class AppScaffold extends StatelessWidget {
     );
 
     if (scrollable) {
-      content = SingleChildScrollView(
-        physics: onRefresh != null ? const AlwaysScrollableScrollPhysics() : null,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: content,
+      content = LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: onRefresh != null ? const AlwaysScrollableScrollPhysics() : null,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: ResponsiveCenter(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(padding: padding, child: body),
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -81,7 +94,11 @@ class AppScaffold extends StatelessWidget {
       children: [
         ?header,
         if (header == null) SizedBox(height: context.safePadding.top),
-        Expanded(child: content),
+        Expanded(
+          child: isLoading
+              ? const Center(child: VitalUpLoader())
+              : content,
+        ),
         if (bottomBar != null)
           SafeArea(
             top: false,

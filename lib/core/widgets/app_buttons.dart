@@ -194,6 +194,7 @@ class _ButtonContent extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           valueColor: AlwaysStoppedAnimation<Color>(color),
+          strokeCap: StrokeCap.round,
         ),
       );
     }
@@ -217,7 +218,7 @@ class _ButtonContent extends StatelessWidget {
           if (showRightArrow) ...[
             const SizedBox(width: AppDimens.buttonGap),
             SvgPicture.asset(
-              'assets/icons/right_arrow.svg',
+              'assets/icons/ui/right_arrow.svg',
               width: AppDimens.iconXs,
               height: AppDimens.iconXs,
               colorFilter: ColorFilter.mode(color, BlendMode.srcIn),

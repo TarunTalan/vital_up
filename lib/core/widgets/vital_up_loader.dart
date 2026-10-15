@@ -155,28 +155,28 @@ class _VitalUpLoaderState extends State<VitalUpLoader>
                 alignment: Alignment.center,
                 children: [
                   _LoaderIcon(
-                    assetPath: 'assets/icons/smile.svg',
+                    assetPath: 'assets/icons/ui/smile.svg',
                     size: responsiveIconSize,
                     offset: Offset(-d, -d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[0],
                   ),
                   _LoaderIcon(
-                    assetPath: 'assets/icons/Apple.svg',
+                    assetPath: 'assets/icons/ui/Apple.svg',
                     size: responsiveIconSize,
                     offset: Offset(d, -d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[1],
                   ),
                   _LoaderIcon(
-                    assetPath: 'assets/icons/flower.svg',
+                    assetPath: 'assets/icons/ui/flower.svg',
                     size: responsiveIconSize,
                     offset: Offset(-d, d),
                     offsetScale: rotationState.offsetScale,
                     turns: rotationState.iconTurns[2],
                   ),
                   _LoaderIcon(
-                    assetPath: 'assets/icons/drop.svg',
+                    assetPath: 'assets/icons/trackers/drop.svg',
                     size: responsiveIconSize,
                     offset: Offset(d, d),
                     offsetScale: rotationState.offsetScale,
