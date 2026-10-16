@@ -17,6 +17,7 @@ import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/cubit/leaderboard_cubit.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
@@ -25,7 +26,8 @@ final _points = NumberFormat.decimalPattern();
 
 /// A community's leaderboard: one line of filters, a top-3 podium and the
 /// next players, then the caller and their friends further down with their
-/// real ranks. Join shows as a banner; About and Leave sit behind the
+/// real ranks, and the period's awards (countdown to the winners, rules,
+/// last winners). Join shows as a banner; About and Leave sit behind the
 /// header's More button.
 class LeaderboardPage extends StatelessWidget {
   final Community community;
@@ -227,6 +229,22 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
                 )
               else
                 ..._board(state, entries),
+              if (entries != null &&
+                  community.type != CommunityType.friends &&
+                  state.awardPeriod != null) ...[
+                const SizedBox(height: AppDimens.space16),
+                LeaderboardAwardsCard(
+                  period: state.awardPeriod!,
+                  winners: state.pastWinners,
+                  onOpenPlayer: (w) => PublicProfileSheet.show(
+                    context,
+                    username: w.username,
+                    level: w.level,
+                    avatarUrl: w.avatarUrl,
+                    userId: w.userId,
+                  ),
+                ),
+              ],
             ],
           ),
         );

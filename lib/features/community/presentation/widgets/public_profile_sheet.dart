@@ -19,12 +19,13 @@ import 'package:vital_up/features/community/presentation/pages/head_to_head_comp
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
+import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 
 final _number = NumberFormat.decimalPattern();
 
 /// A community member preview sheet, matching the friends profile preview
-/// with circular avatar, tier badges, stats overview and friendship actions.
+/// with circular avatar, level, stats overview and friendship actions.
 class PublicProfileSheet extends StatefulWidget {
   final String username;
   final int level;
@@ -144,7 +145,6 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final tier = LevelTierConfig.forLevel(widget.level);
     final grey = context.vColors.grayText;
 
     return SafeArea(
@@ -160,7 +160,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Circular Avatar with level tier border (no glow)
+            // Circular avatar with a brand ring
             Center(
               child: Container(
                 width: AppDimens.avatarLarge,
@@ -168,7 +168,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: tier.borderColor,
+                    color: context.colors.primary,
                     width: AppDimens.borderThick + 0.5,
                   ),
                 ),
@@ -195,7 +195,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
             ),
             const SizedBox(height: AppDimens.space4),
 
-            // Level & Tier Subtitle Row (Single clean display, no duplicate capsule)
+            // Level and its title
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -207,7 +207,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                 ),
                 const SizedBox(width: AppDimens.space6),
                 Text(
-                  'Level ${widget.level} · ${tier.tierName}',
+                  'Level ${widget.level} · ${levelTitle(widget.level)}',
                   textAlign: TextAlign.center,
                   style: context.text.bodyMedium?.copyWith(
                     color: context.colors.onSurface,
@@ -283,10 +283,10 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                             color: AppColors.scoreBonus,
                           ),
                           TrackerFigure(
-                            label: widget.rank != null ? 'Rank' : 'Tier',
+                            label: widget.rank != null ? 'Rank' : 'Level',
                             value: widget.rank != null
                                 ? '#${widget.rank}'
-                                : tier.tierName,
+                                : '${widget.level}',
                             iconAsset:
                                 (widget.rank != null && widget.rank! <= 3)
                                 ? GamificationIcons.leaderboardRank(
@@ -323,6 +323,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                 );
               },
             ),
+            if (widget.userId case final uid?) PlayerAwardsSummary(userId: uid),
             const SizedBox(height: AppDimens.sectionGap),
 
             // Friendship Actions

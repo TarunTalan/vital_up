@@ -17,10 +17,11 @@ import 'package:vital_up/features/community/domain/entities/player_profile.dart'
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/pages/head_to_head_comparison_page.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
+import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
 final _number = NumberFormat.decimalPattern();
@@ -104,7 +105,6 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
     final friend = widget.friend;
     final name = friend.fullName?.trim();
     final hasName = name != null && name.isNotEmpty;
-    final tier = LevelTierConfig.forLevel(friend.level);
     final grey = context.vColors.grayText;
 
     return SafeArea(
@@ -127,7 +127,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: tier.borderColor,
+                    color: context.colors.primary,
                     width: AppDimens.borderThick + 0.5,
                   ),
                 ),
@@ -165,7 +165,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                   [
                     if (hasName) '@${friend.username}',
                     'Level ${friend.level}',
-                    tier.tierName,
+                    levelTitle(friend.level),
                   ].join(' · '),
                   textAlign: TextAlign.center,
                   style: context.text.bodyMedium?.copyWith(
@@ -228,6 +228,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                 return PlayerProfileStats(profile: profile);
               },
             ),
+            PlayerAwardsSummary(userId: friend.userId),
             const SizedBox(height: AppDimens.sectionGap),
             AppPrimaryButton(
               label: 'Challenge',

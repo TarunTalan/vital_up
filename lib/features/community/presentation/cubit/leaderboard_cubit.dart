@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
@@ -19,6 +20,10 @@ class LeaderboardState extends Equatable {
   /// The caller and their friends on this board with their real ranks,
   /// even below the loaded pages. Empty on the friends board itself.
   final List<LeaderboardEntry> friendRanks;
+
+  /// Winners of the last finished week or month (matching [period]);
+  /// empty for all time, the friends board, or too few players.
+  final List<AwardWinner> pastWinners;
   final bool loading;
   final bool loadingMore;
   final bool hasMore;
@@ -31,11 +36,19 @@ class LeaderboardState extends Equatable {
     this.entries,
     this.me,
     this.friendRanks = const [],
+    this.pastWinners = const [],
     this.loading = true,
     this.loadingMore = false,
     this.hasMore = false,
     this.failed = false,
   });
+
+  /// The award period shown with [period]; null for all time.
+  AwardPeriod? get awardPeriod => switch (period) {
+    LeaderboardPeriod.week => AwardPeriod.week,
+    LeaderboardPeriod.month => AwardPeriod.month,
+    LeaderboardPeriod.all => null,
+  };
 
   /// Ids of the caller's friends ranked here, to tag their rows.
   Set<String> get friendIds => {
@@ -57,6 +70,7 @@ class LeaderboardState extends Equatable {
     List<LeaderboardEntry>? entries,
     LeaderboardEntry? Function()? me,
     List<LeaderboardEntry>? friendRanks,
+    List<AwardWinner>? pastWinners,
     bool? loading,
     bool? loadingMore,
     bool? hasMore,
@@ -68,6 +82,7 @@ class LeaderboardState extends Equatable {
     entries: entries ?? this.entries,
     me: me != null ? me() : this.me,
     friendRanks: friendRanks ?? this.friendRanks,
+    pastWinners: pastWinners ?? this.pastWinners,
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
     hasMore: hasMore ?? this.hasMore,
@@ -82,6 +97,7 @@ class LeaderboardState extends Equatable {
     entries,
     me,
     friendRanks,
+    pastWinners,
     loading,
     loadingMore,
     hasMore,
@@ -105,7 +121,8 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
     emit(state.copyWith(loading: true, failed: false));
     try {
       final isFriendsBoard = state.community.type == CommunityType.friends;
-      final (entries, me, friendRanks) = await (
+      final awardPeriod = state.awardPeriod;
+      final (entries, me, friendRanks, pastWinners) = await (
         _repository.getLeaderboard(
           state.community,
           period: state.period,
@@ -127,6 +144,15 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
                     category: state.category,
                   )
                   .orFallback(const <LeaderboardEntry>[]),
+        // Optional too.
+        isFriendsBoard || awardPeriod == null
+            ? Future.value(const <AwardWinner>[])
+            : Future.sync(
+                () => _repository.getCommunityWinners(
+                  state.community,
+                  awardPeriod,
+                ),
+              ).orFallback(const <AwardWinner>[]),
       ).wait.withLoadTimeout();
       if (isClosed || request != _request) return;
       emit(
@@ -138,6 +164,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
           entries: entries,
           me: () => me,
           friendRanks: friendRanks,
+          pastWinners: pastWinners,
           hasMore: entries.length == pageSize,
         ),
       );

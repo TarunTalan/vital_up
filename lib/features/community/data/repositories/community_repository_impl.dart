@@ -8,6 +8,7 @@ import 'package:vital_up/features/community/data/datasources/community_remote_da
 import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
@@ -26,6 +27,9 @@ class CommunityRepositoryImpl implements CommunityRepository {
   static const _listsMaxAge = Duration(minutes: 10);
   static const _friendsMaxAge = Duration(minutes: 5);
   static const _boardMaxAge = Duration(minutes: 3);
+
+  /// Awards change at most once a week.
+  static const _awardsMaxAge = Duration(minutes: 30);
 
   /// Gives up on a hung request early enough to fall back to the cache
   /// before the screen's own load timeout.
@@ -267,6 +271,35 @@ class CommunityRepositoryImpl implements CommunityRepository {
     ))
       r['community_id'] as String: CommunityStanding.fromJson(r),
   };
+
+  @override
+  Future<List<AwardWinner>> getCommunityWinners(
+    Community community,
+    AwardPeriod period,
+  ) async {
+    if (community.type == CommunityType.friends) return const [];
+    return [
+      for (final r in await _rows(
+        '${_key('winners')}:${community.id}:${period.name}',
+        () => _remote.fetchCommunityAwards(
+          communityId: community.id,
+          period: period.name,
+        ),
+        _awardsMaxAge,
+      ))
+        AwardWinner.fromJson(r),
+    ];
+  }
+
+  @override
+  Future<List<CommunityAward>> getPlayerAwards([String? userId]) async => [
+    for (final r in await _rows(
+      '${_key('awards')}:${userId ?? 'me'}',
+      () => _remote.fetchPlayerAwards(userId),
+      _awardsMaxAge,
+    ))
+      CommunityAward.fromJson(r),
+  ];
 
   Future<List<LeaderboardEntry>> _friendsBoard(
     LeaderboardPeriod period,

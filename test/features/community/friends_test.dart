@@ -11,7 +11,9 @@ void main() {
       'No one has that username.',
     );
     expect(
-      FriendRequestException.fromServer('ERROR: already_friends (P0001)').message,
+      FriendRequestException.fromServer(
+        'ERROR: already_friends (P0001)',
+      ).message,
       "You're already friends.",
     );
     expect(

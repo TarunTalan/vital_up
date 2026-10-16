@@ -11,14 +11,18 @@ import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/arena_challenges_section.dart';
 import 'package:vital_up/features/community/presentation/cubit/community_cubit.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_celebration.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_leaderboards_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/friends_quick_row.dart';
+import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
-/// The Arena tab: your level with shortcuts, challenges, friends, and one
-/// leaderboards list, in that order. Leaderboard settings sit in the
-/// header.
+/// The Arena tab: your level with shortcuts, last month's champions,
+/// challenges, friends, and one leaderboards list, in that order.
+/// Leaderboard settings sit in the header. A new monthly trophy gets a
+/// one-time celebration.
 class CommunityHubPage extends StatelessWidget {
   const CommunityHubPage({super.key});
 
@@ -31,7 +35,7 @@ class CommunityHubPage extends StatelessWidget {
           create: (_) => ChallengesCubit(sl<ChallengesRepository>())..load(),
         ),
       ],
-      child: const _ArenaHubView(),
+      child: const AwardCelebrationHost(child: _ArenaHubView()),
     );
   }
 }
@@ -78,6 +82,18 @@ class _ArenaHubView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const ScoreStreakCard(),
+                    const SizedBox(height: AppDimens.sectionGap),
+
+                    MonthlyChampionsCard(
+                      champions: state.champions,
+                      onOpenPlayer: (w) => PublicProfileSheet.show(
+                        context,
+                        username: w.username,
+                        level: w.level,
+                        avatarUrl: w.avatarUrl,
+                        userId: w.userId,
+                      ),
+                    ),
                     const SizedBox(height: AppDimens.sectionGap),
 
                     ArenaChallengesSection(onRefresh: challengesCubit.load),

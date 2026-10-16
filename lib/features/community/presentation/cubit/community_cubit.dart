@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
@@ -22,6 +23,9 @@ class CommunityState extends Equatable {
 
   /// The caller's rank this week in each community, by community id.
   final Map<String, CommunityStanding> standings;
+
+  /// Last month's winners: Global first, then the caller's city.
+  final List<CommunityWinners> champions;
   final bool failed;
 
   /// Community ids with a join/leave in flight.
@@ -37,6 +41,7 @@ class CommunityState extends Equatable {
     this.friends = const [],
     this.friendsRanking = const [],
     this.standings = const {},
+    this.champions = const [],
     this.failed = false,
     this.busy = const {},
     this.message,
@@ -71,6 +76,7 @@ class CommunityState extends Equatable {
     List<Friend>? friends,
     List<LeaderboardEntry>? friendsRanking,
     Map<String, CommunityStanding>? standings,
+    List<CommunityWinners>? champions,
     bool? failed,
     Set<String>? busy,
     String? message,
@@ -81,6 +87,7 @@ class CommunityState extends Equatable {
     friends: friends ?? this.friends,
     friendsRanking: friendsRanking ?? this.friendsRanking,
     standings: standings ?? this.standings,
+    champions: champions ?? this.champions,
     failed: failed ?? this.failed,
     busy: busy ?? this.busy,
     message: message,
@@ -94,6 +101,7 @@ class CommunityState extends Equatable {
     friends,
     friendsRanking,
     standings,
+    champions,
     failed,
     busy,
     message,
@@ -138,10 +146,34 @@ class CommunityCubit extends Cubit<CommunityState> {
           standings: standings,
         ),
       );
+      await _loadChampions();
     } catch (e) {
       debugPrint('Communities failed to load: $e');
       if (isClosed) return;
       emit(state.copyWith(loading: false, failed: true));
+    }
+  }
+
+  /// Optional: the Arena shows without it, keeping the last copy.
+  Future<void> _loadChampions() async {
+    final boards = [?state.global, ?state.local];
+    try {
+      final champions = await Future.wait([
+        for (final c in boards)
+          _repository
+              .getCommunityWinners(c, AwardPeriod.month)
+              .then(
+                (w) => CommunityWinners(
+                  community: c,
+                  period: AwardPeriod.month,
+                  winners: w,
+                ),
+              ),
+      ]).withLoadTimeout();
+      if (isClosed) return;
+      emit(state.copyWith(champions: champions));
+    } catch (e) {
+      debugPrint('Monthly champions failed to load: $e');
     }
   }
 

@@ -94,9 +94,7 @@ void main() {
     });
   }
 
-  testWidgets('level card fits a narrow phone with large text', (
-    tester,
-  ) async {
+  testWidgets('level card fits a narrow phone with large text', (tester) async {
     tester.view.physicalSize = const Size(320, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -179,10 +177,7 @@ void main() {
         ),
         child: _host(
           FriendsQuickRow(
-            friends: [
-              friend('a', 'longest_username_20c'),
-              friend('b', 'bo'),
-            ],
+            friends: [friend('a', 'longest_username_20c'), friend('b', 'bo')],
             ranking: const [
               LeaderboardEntry(
                 rank: 1,

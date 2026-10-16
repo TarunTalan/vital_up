@@ -1,5 +1,6 @@
 import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
@@ -90,6 +91,18 @@ abstract class CommunityRepository {
   Future<Map<String, CommunityStanding>> getMyStandings({
     LeaderboardPeriod period = LeaderboardPeriod.week,
   }) async => const {};
+
+  /// Winners of [community]'s latest finished [period] (empty when it had
+  /// too few players). The friends board has no awards.
+  Future<List<AwardWinner>> getCommunityWinners(
+    Community community,
+    AwardPeriod period,
+  ) async => const [];
+
+  /// Every award [userId] won, newest first (the caller when null). Empty
+  /// for players who hide from leaderboards.
+  Future<List<CommunityAward>> getPlayerAwards([String? userId]) async =>
+      const [];
 
   /// Returns all common communities shared between the caller and [friendUserId],
   /// along with both the friend's rank and the caller's rank in each community.

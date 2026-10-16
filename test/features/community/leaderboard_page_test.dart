@@ -7,6 +7,7 @@ import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/challenge_tile.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/pages/leaderboard_page.dart';
@@ -25,9 +26,24 @@ LeaderboardEntry _entry(int rank, {String? id, bool isMe = false}) =>
 class _FakeRepo implements CommunityRepository {
   final List<LeaderboardEntry> board;
   final List<LeaderboardEntry> friends;
+  final List<AwardWinner> winners;
+  final winnersAsked = <AwardPeriod>[];
   int joins = 0;
 
-  _FakeRepo({required this.board, this.friends = const []});
+  _FakeRepo({
+    required this.board,
+    this.friends = const [],
+    this.winners = const [],
+  });
+
+  @override
+  Future<List<AwardWinner>> getCommunityWinners(
+    Community community,
+    AwardPeriod period,
+  ) async {
+    winnersAsked.add(period);
+    return winners;
+  }
 
   @override
   Future<List<LeaderboardEntry>> getLeaderboard(
@@ -195,15 +211,55 @@ void main() {
     );
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: Scaffold(body: tile(1))),
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(body: tile(1)),
+      ),
     );
     expect(find.text('#1'), findsNothing);
     expect(find.bySemanticsLabel(RegExp('Rank 1')), findsOneWidget);
     semantics.dispose();
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: Scaffold(body: tile(4))),
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(body: tile(4)),
+      ),
     );
     expect(find.text('#4'), findsOneWidget);
+  });
+
+  testWidgets("the awards card sits under the live board", (tester) async {
+    register(
+      _FakeRepo(
+        board: [for (var r = 1; r <= 3; r++) _entry(r)],
+        winners: [
+          AwardWinner(
+            place: 1,
+            userId: 'w1',
+            username: 'champ',
+            points: 700,
+            level: 4,
+            players: 20,
+            periodStart: DateTime(2026, 10, 5),
+          ),
+        ],
+      ),
+    );
+    await pump(tester, _runners);
+
+    expect(repo.winnersAsked, [AwardPeriod.week]);
+    await tester.scrollUntilVisible(
+      find.text('Weekly medals'),
+      200,
+      scrollable: find.byWidgetPredicate(
+        (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+      ),
+    );
+    expect(find.text('Last winners · Week of 5 Oct'), findsOneWidget);
+    expect(find.textContaining("week's medals"), findsOneWidget);
+    expect(find.byTooltip('How awards work'), findsOneWidget);
+    expect(find.text('@champ'), findsOneWidget);
+    expect(find.text('700 pts'), findsOneWidget);
   });
 }

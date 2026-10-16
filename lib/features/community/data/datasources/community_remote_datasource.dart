@@ -157,6 +157,21 @@ class CommunityRemoteDataSource {
     ),
   );
 
+  /// Winners of [communityId]'s latest finished week or month.
+  Future<List<Map<String, dynamic>>> fetchCommunityAwards({
+    required String communityId,
+    required String period,
+  }) async => _rows(
+    await _client.rpc(
+      'get_community_awards',
+      params: {'p_community': communityId, 'p_period': period},
+    ),
+  );
+
+  /// Every award [userId] won (the caller when null).
+  Future<List<Map<String, dynamic>>> fetchPlayerAwards(String? userId) async =>
+      _rows(await _client.rpc('get_player_awards', params: {'p_user': userId}));
+
   Future<Map<String, dynamic>?> fetchMyRank({
     required String communityId,
     required String period,

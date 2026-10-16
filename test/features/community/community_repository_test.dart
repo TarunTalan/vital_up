@@ -36,7 +36,9 @@ class _FakeRemote implements CommunityRemoteDataSource {
   Future<List<Map<String, dynamic>>> fetchFriends() async {
     friendFetches++;
     if (failWith != null) throw failWith!;
-    return [for (final f in friends) {...f}];
+    return [
+      for (final f in friends) {...f},
+    ];
   }
 
   @override
