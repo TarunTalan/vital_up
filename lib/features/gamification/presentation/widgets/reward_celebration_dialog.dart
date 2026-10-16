@@ -3,7 +3,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/features/gamification/domain/entities/award_result.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/flip_badge_card.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// One-line note for [award], shown as a snackbar. Rewards stay quiet; only
@@ -71,9 +71,9 @@ class RewardCelebrationDialog extends StatelessWidget {
                       color: AppColors.rankGold,
                     )
                   : GestureDetector(
-                      onTap: () => showBadgeGoalDialog(context, badge),
+                      onTap: () => showBadgeDetailSheet(context, badge),
                       child: Tooltip(
-                        message: '${badge.name} • Tap to view goal',
+                        message: badge.name,
                         child: GameIcon(
                           GamificationIcons.badge(badge.iconKey),
                           fallback: Icons.military_tech_rounded,
@@ -106,7 +106,7 @@ class RewardCelebrationDialog extends StatelessWidget {
                 children: [
                   for (final b in award.newBadges)
                     GestureDetector(
-                      onTap: () => showBadgeGoalDialog(context, b),
+                      onTap: () => showBadgeDetailSheet(context, b),
                       child: Chip(
                         avatar: GameIcon(
                           GamificationIcons.badge(b.iconKey),

@@ -223,10 +223,8 @@ class AppDimens {
   static const double levelRingStroke = 7.0;
   static const double badgeTile = 56.0;
   static const double badgeGridMinWidth = 150.0;
-  // Aspect ratio for responsive 2-column flip cards on mobile with single-line titles.
-  static const double badgeTileAspect = 0.72;
   static const double badgeProgressHeight = 4.0;
-  static const double badgeLockedOpacity = 0.35;
+  static const double badgeLockedOpacity = 0.45;
   static const double podiumAvatarFirst = 64.0;
   static const double podiumAvatarOther = 52.0;
   static const double podiumStepFirst = 72.0;

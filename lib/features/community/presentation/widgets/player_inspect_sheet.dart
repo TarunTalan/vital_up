@@ -19,7 +19,7 @@ import 'package:vital_up/features/community/presentation/pages/head_to_head_comp
 import 'package:vital_up/features/community/presentation/widgets/common_communities_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/flip_badge_card.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
@@ -389,9 +389,9 @@ class PlayerProfileStats extends StatelessWidget {
             children: [
               for (final b in p.recentBadges)
                 GestureDetector(
-                  onTap: () => showBadgeGoalDialog(context, b),
+                  onTap: () => showBadgeDetailSheet(context, b),
                   child: Tooltip(
-                    message: '${b.name} • Tap to view goal',
+                    message: b.name,
                     child: AppIconBadge(
                       color: AppColors.rankGold,
                       size: AppDimens.iconBadgeLarge,
