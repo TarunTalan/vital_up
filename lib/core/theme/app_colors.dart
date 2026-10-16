@@ -32,6 +32,10 @@ class AppColors {
   static const Color darker = Color(0xFF1C1C1C);
   static const Color lighter = Color(0xFFFEFEFE);
   static const Color greyText = Color(0xFF757575);
+
+  /// Secondary text on dark surfaces: #757575 only reaches ~3.9:1 on
+  /// [darker], below the 4.5:1 needed for small text.
+  static const Color greyTextDark = Color(0xFFA3A3A3);
   static const Color lightText = Color(0xFFE3E3E3);
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
@@ -106,6 +110,11 @@ class AppColors {
   static const Color warning = Color(0xFFFF9800);
   static const Color warningTint = Color(0x33FF9800);
   static const Color info = Color(0xFF2675ED);
+
+  /// [primary] as text or a small icon on light surfaces. The brand cyan is
+  /// ~2:1 on white, so light mode uses this deeper shade (~4.9:1); dark mode
+  /// keeps [primary].
+  static const Color primaryTextLight = Color(0xFF0B7C90);
 
   // ---------------------------------------------------------------------------
   // Decorative / misc

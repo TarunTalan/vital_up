@@ -116,6 +116,11 @@ class AppIconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = color ?? context.colors.primary;
+    // The brand cyan is too light for an icon on its own tint in light
+    // mode; draw the glyph in the readable shade.
+    final glyph = accent == AppColors.primary
+        ? context.vColors.accentText ?? accent
+        : accent;
     return Container(
       width: size,
       height: size,
@@ -125,7 +130,7 @@ class AppIconBadge extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: IconTheme(
-        data: IconThemeData(color: accent, size: size / 2),
+        data: IconThemeData(color: glyph, size: size / 2),
         child: icon,
       ),
     );

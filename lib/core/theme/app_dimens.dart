@@ -233,6 +233,12 @@ class AppDimens {
   static const double rankColumnWidth = 32.0;
   static const double celebrationBadge = 96.0;
 
+  /// Arena friends strip: tile width (grows with the text size), avatar and
+  /// the rank badge pinned to it.
+  static const double friendChipWidth = 116.0;
+  static const double friendChipAvatar = 52.0;
+  static const double friendChipRankBadge = 24.0;
+
   /// Notifications: unread count on the header bell, unread dot on rows.
   static const double unreadBadge = 18.0;
   static const double unreadDot = 8.0;

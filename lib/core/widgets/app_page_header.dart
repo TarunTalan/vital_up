@@ -229,7 +229,7 @@ class AppHeaderAction extends StatelessWidget {
           onTap: onTap,
           child: IconTheme(
             data: IconThemeData(
-              color: context.colors.primary,
+              color: v.accentText,
               size: AppDimens.iconLg,
             ),
             child: Center(child: icon),
