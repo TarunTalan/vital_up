@@ -4,6 +4,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 
@@ -35,7 +36,7 @@ String? notificationRoute(NotificationType type, String? route) =>
       NotificationType.friendRequest ||
       NotificationType.friendAccepted ||
       NotificationType.cheer => 'friends',
-      NotificationType.badge => 'badges',
+      NotificationType.badge || NotificationType.award => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
       NotificationType.challenge => 'challenges',
       NotificationType.announcement =>
@@ -326,6 +327,14 @@ class _NotificationLeading extends StatelessWidget {
         AppColors.streak,
         GamificationIcons.streak,
         Icons.local_fire_department_rounded,
+      ),
+      NotificationType.award => (
+        AppColors.rankGold,
+        AwardIcons.forPlace(
+          AwardPeriod.fromName(n.awardPeriod),
+          n.awardPlace ?? 1,
+        ),
+        Icons.emoji_events_rounded,
       ),
       _ => (context.colors.primary, '', Icons.campaign_rounded),
     };

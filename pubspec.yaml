@@ -138,6 +138,7 @@ flutter:
     - assets/icons/
     - assets/icons/app/
     - assets/icons/auth/
+    - assets/icons/awards/
     - assets/icons/badges/
     - assets/icons/gamification/
     - assets/icons/leaderboard_ranks/
