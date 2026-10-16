@@ -177,6 +177,32 @@ void main() {
     });
   });
 
+  group('levelTitle', () {
+    test('matches the levels seed in the gamification migration', () {
+      final sql = File(
+        'supabase/migrations/20261002_gamification.sql',
+      ).readAsStringSync();
+      final seed = sql.substring(
+        sql.indexOf('INSERT INTO levels'),
+        sql.indexOf('ON CONFLICT (level)'),
+      );
+      final rows = {
+        for (final m in RegExp(
+          r"\((\d+), \d+, '([^']+)'\)",
+        ).allMatches(seed))
+          int.parse(m.group(1)!): m.group(2)!,
+      };
+      expect(rows, hasLength(20));
+      expect(levelTitles, rows);
+    });
+
+    test('clamps out-of-range levels', () {
+      expect(levelTitle(0), 'Starter');
+      expect(levelTitle(3), 'Go-Getter');
+      expect(levelTitle(25), 'VitalUp Legend');
+    });
+  });
+
   group('effectiveStreak', () {
     final now = DateTime(2026, 10, 10, 9);
 

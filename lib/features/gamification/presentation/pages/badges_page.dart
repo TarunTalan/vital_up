@@ -8,11 +8,13 @@ import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/game_badge.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 
-/// Every badge: a summary, the closest one to unlock, then earned and locked
+/// Community awards (trophies and medals, most important first), then every
+/// badge: a summary, the closest one to unlock, then earned and locked
 /// grids. Tapping a badge opens its detail sheet.
 class BadgesPage extends StatefulWidget {
   const BadgesPage({super.key});
@@ -78,6 +80,7 @@ class _BadgesPageState extends State<BadgesPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const MyCommunityAwards(),
               _SummaryCard(earned: earned.length, total: badges.length),
               if (nextUp != null) ...[
                 const SizedBox(height: AppDimens.sectionGap),

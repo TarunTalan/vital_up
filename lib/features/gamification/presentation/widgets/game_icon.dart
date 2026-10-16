@@ -34,7 +34,8 @@ abstract final class GamificationIcons {
 
   // Bonus & Streaks
   static const bonus = 'assets/icons/gamification/bonus.svg';
-  static const bonusMultiplier = 'assets/icons/gamification/bonus_multiplier.svg';
+  static const bonusMultiplier =
+      'assets/icons/gamification/bonus_multiplier.svg';
   static const streakFlame = 'assets/icons/gamification/streak_flame.svg';
   static const shield = 'assets/icons/gamification/shield.svg';
   static const target = 'assets/icons/gamification/target.svg';
@@ -71,10 +72,11 @@ abstract final class GamificationIcons {
     return null;
   }
 
-  /// Hexagonal level number SVG (0..9). For levels >= 10, digit maps to (level % 10).
+  /// Hexagonal level number SVG (0..9). There are no two-digit hexagons, so
+  /// levels 10+ use the plain level icon rather than a misleading digit.
   static String levelHexagon(int level) {
-    final digit = (level >= 0 && level <= 9) ? level : (level % 10);
-    return 'assets/icons/levels/hexagon-number-$digit.svg';
+    if (level < 0 || level > 9) return GamificationIcons.level;
+    return 'assets/icons/levels/hexagon-number-$level.svg';
   }
 
   /// `communities.icon_key` → `assets/icons/communities/<key>.svg`.
@@ -83,10 +85,17 @@ abstract final class GamificationIcons {
     if (key == 'weight-loss' || key == 'weight' || key.contains('weight')) {
       return 'assets/icons/trackers/weight_icon.svg';
     }
-    if (key == 'step' || key == 'steps' || key.contains('step') || key.contains('walk')) {
+    if (key == 'step' ||
+        key == 'steps' ||
+        key.contains('step') ||
+        key.contains('walk')) {
       return 'assets/icons/trackers/step.svg';
     }
-    if (key == 'activity' || key.contains('activity') || key.contains('workout') || key == 'runners' || key == 'joggers') {
+    if (key == 'activity' ||
+        key.contains('activity') ||
+        key.contains('workout') ||
+        key == 'runners' ||
+        key == 'joggers') {
       return 'assets/icons/trackers/activity.svg';
     }
     return 'assets/icons/communities/$iconKey.svg';
@@ -121,12 +130,13 @@ class GameIcon extends StatelessWidget {
         errorBuilder: (_, _, _) => Icon(fallback, size: size, color: tint),
       );
     }
-    final isBadge = asset.contains('/badges/');
+    final multiColour =
+        asset.contains('/badges/') || asset.contains('/awards/');
     return SvgPicture.asset(
       asset,
       width: size,
       height: size,
-      colorFilter: isBadge || tint == null
+      colorFilter: multiColour || tint == null
           ? null
           : ColorFilter.mode(tint, BlendMode.srcIn),
       errorBuilder: (_, _, _) => Icon(fallback, size: size, color: tint),

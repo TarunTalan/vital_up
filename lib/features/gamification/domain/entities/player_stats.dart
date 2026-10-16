@@ -23,6 +23,38 @@ class GameLevel extends Equatable {
   List<Object?> get props => [level, minPoints, title];
 }
 
+/// Level titles as seeded in the `levels` table
+/// (`20261002_gamification.sql`), for screens that only get a level number
+/// (other players). Keep in sync with the seed; a test checks it.
+const levelTitles = <int, String>{
+  1: 'Starter',
+  2: 'Mover',
+  3: 'Go-Getter',
+  4: 'Achiever',
+  5: 'Committed',
+  6: 'Consistent',
+  7: 'Dedicated',
+  8: 'Strong',
+  9: 'Driven',
+  10: 'Elite',
+  11: 'Champion',
+  12: 'Hero',
+  13: 'Master',
+  14: 'Grandmaster',
+  15: 'Legend',
+  16: 'Titan',
+  17: 'Mythic',
+  18: 'Immortal',
+  19: 'Icon',
+  20: 'VitalUp Legend',
+};
+
+/// Title for [level]; levels past the table keep the top title.
+String levelTitle(int level) {
+  if (level < 1) return levelTitles[1]!;
+  return levelTitles[level] ?? levelTitles[levelTitles.length]!;
+}
+
 /// The signed-in user's lifetime score, level and streak.
 class PlayerStats extends Equatable {
   final int totalPoints;
