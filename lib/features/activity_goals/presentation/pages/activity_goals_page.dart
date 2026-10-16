@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -17,6 +18,7 @@ import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.d
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
@@ -69,6 +71,17 @@ class _ActivityGoalsView extends StatelessWidget {
         final cubit = context.read<ActivityGoalsCubit>();
         final snapshot = state.snapshot;
         final selected = state.selected;
+        final insights = selected == null
+            ? const <TrackerInsight>[]
+            : seriesInsights(
+                selected.series,
+                format: selected.goal.metric.formatWithUnit,
+                noun: 'your activity',
+              ).take(2).toList();
+        final now = DateTime.now();
+        final todays = [
+          ...?snapshot?.sessions.where((s) => isSameDay(s.startTime, now)),
+        ];
         final canAdd =
             state.goals.length <
             GoalMetric.values.length * GoalPeriod.values.length;
@@ -165,7 +178,8 @@ class _ActivityGoalsView extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: AppCaption(
-                                    '${selected.goal.metric.label} trend',
+                                    '${selected.goal.metric.label} · '
+                                    '${state.range.caption}',
                                   ),
                                 ),
                                 TrendRangeToggle(
@@ -176,7 +190,10 @@ class _ActivityGoalsView extends StatelessWidget {
                             ),
                             const SizedBox(height: AppDimens.cardInnerGap),
                             TrendBarChart(
-                              series: selected.series,
+                              series: state.range == TrendRange.month
+                                  ? selected.series.weekly()
+                                  : selected.series,
+                              weekly: state.range == TrendRange.month,
                               color: selected.goal.metric.color,
                               valueFormatter: selected.goal.metric.format,
                             ),
@@ -188,27 +205,21 @@ class _ActivityGoalsView extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: AppDimens.cardGap),
-                      TrackerInsightsCard(
-                        insights: seriesInsights(
-                          selected.series,
-                          format: selected.goal.metric.formatWithUnit,
-                          noun: 'your activity',
-                        ),
-                      ),
+                      if (insights.isNotEmpty) ...[
+                        const SizedBox(height: AppDimens.cardGap),
+                        TrackerInsightsCard(insights: insights),
+                      ],
                     ],
                     const SizedBox(height: AppDimens.sectionGap),
                     TrackerSectionTitle(
-                      'Workouts',
-                      actionLabel: 'All',
+                      "Today's log",
+                      actionLabel: 'See all',
                       onAction: () => context.pushNamed('activity-history'),
                     ),
                     const SizedBox(height: AppDimens.cardGap),
-                    if (snapshot.sessions.isEmpty)
-                      const AppInfoNote(
-                        message: 'No workouts tracked in this period yet.',
-                      ),
-                    for (final s in snapshot.sessions) ...[
+                    if (todays.isEmpty)
+                      const AppInfoNote(message: 'No workouts today.'),
+                    for (final s in todays) ...[
                       TrackerLogTile(
                         id: s.startTime.millisecondsSinceEpoch,
                         icon: _metric.icon,

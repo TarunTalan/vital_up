@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
@@ -12,8 +11,9 @@ class TrackerInsight {
   const TrackerInsight(this.icon, this.text);
 }
 
-/// Pattern-based insights any daily series supports: goal hit rate and
-/// streak, the recent trend, weekday vs weekend, and the best day.
+/// Pattern-based insights any daily series supports: a goal streak, the
+/// recent trend and weekday vs weekend. Goal-met days and the best day are
+/// left to [TrendStatsRow], which sits right above.
 /// [format] renders a value with its unit and [noun] names what's logged
 /// ("water", "your sleep"). Wording follows the series' goal direction, so
 /// "down" reads as progress for screen time and stress.
@@ -22,9 +22,11 @@ List<TrackerInsight> seriesInsights(
   required String Function(double value) format,
   required String noun,
 }) {
+  // A zero day (no steps, no water) counts as nothing logged here, so an
+  // empty period asks for data instead of reporting "steady around 0".
   final logged = [
     for (final p in series.points)
-      if (p.value != null) p,
+      if ((p.value ?? 0) > 0) p,
   ];
   if (logged.length < 2) {
     return [
@@ -37,21 +39,19 @@ List<TrackerInsight> seriesInsights(
 
   final insights = <TrackerInsight>[];
   final goal = series.goal;
-  final days = series.points.length;
   final lowerIsBetter = series.direction == GoalDirection.down;
 
-  if (goal != null && goal > 0) {
-    final met = series.daysMetGoal;
+  // A near goal (weight) is a destination, not a daily target to streak.
+  if (goal != null && goal > 0 && series.direction != GoalDirection.near) {
     final streak = _goalStreak(series);
-    insights.add(
-      TrackerInsight(
-        Icons.flag_rounded,
-        streak >= 2
-            ? '$streak-day goal streak. You met your goal on $met of the '
-                  'last $days days.'
-            : 'You met your goal on $met of the last $days days.',
-      ),
-    );
+    if (streak >= 2) {
+      insights.add(
+        TrackerInsight(
+          Icons.flag_rounded,
+          '$streak-day goal streak. Keep it going.',
+        ),
+      );
+    }
   }
 
   // Recent half vs the half before it.
@@ -97,16 +97,6 @@ List<TrackerInsight> seriesInsights(
     }
   }
 
-  final best = series.best;
-  if (best != null && insights.length < 3) {
-    final day = logged.firstWhere((p) => p.value == best).day;
-    insights.add(
-      TrackerInsight(
-        Icons.emoji_events_rounded,
-        'Best day: ${DateFormat('EEE d MMM').format(day)} at ${format(best)}.',
-      ),
-    );
-  }
   return insights;
 }
 

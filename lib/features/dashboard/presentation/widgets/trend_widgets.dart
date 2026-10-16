@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
-/// 7D / 30D switch on trend detail pages.
+/// Daily / Weekly (/ Monthly) switch on trend detail pages.
 class TrendRangeToggle extends StatelessWidget {
   final TrendRange value;
   final ValueChanged<TrendRange> onChanged;
+  final List<TrendRange> ranges;
 
   const TrendRangeToggle({
     super.key,
     required this.value,
     required this.onChanged,
+    this.ranges = TrendRange.standard,
   });
 
   @override
@@ -18,7 +20,7 @@ class TrendRangeToggle extends StatelessWidget {
     return SegmentedButton<TrendRange>(
       showSelectedIcon: false,
       segments: [
-        for (final r in TrendRange.values)
+        for (final r in ranges)
           ButtonSegment(value: r, label: Text(r.label)),
       ],
       selected: {value},
@@ -38,6 +40,21 @@ class TrendStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final avg = series.average;
     final best = series.best;
+    if (series.direction == GoalDirection.near) {
+      final values = [
+        for (final p in series.points)
+          if (p.value != null && p.value!.isFinite) p.value!,
+      ];
+      String of(double Function(double, double) pick) =>
+          values.isEmpty ? '—' : format(values.reduce(pick));
+      return Row(
+        children: [
+          Expanded(child: _Stat('Average', avg == null ? '—' : format(avg))),
+          Expanded(child: _Stat('Lowest', of((a, b) => a < b ? a : b))),
+          Expanded(child: _Stat('Highest', of((a, b) => a > b ? a : b))),
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(child: _Stat('Average', avg == null ? '—' : format(avg))),

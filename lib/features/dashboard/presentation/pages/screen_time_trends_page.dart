@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -67,15 +68,15 @@ class ScreenTimeTrendsPage extends StatelessWidget {
                     const SizedBox(height: AppDimens.space12),
                     TopAppsList(
                       apps: (data.logs.firstOrNull?.topApps ?? const [])
-                          .take(6)
+                          .take(5)
                           .toList(),
                     ),
                   ],
                 ),
               ),
-              const _BreakTipCard(),
             ],
-            logsTitle: 'Daily totals',
+            dateOf: (day) => day.date,
+            allLogs: () async => (await service.trend(TrendRange.month)).logs,
             logBuilder: (context, day) => TrackerLogTile(
               id: day.date.millisecondsSinceEpoch,
               icon: metric.icon,
@@ -115,44 +116,5 @@ class ScreenTimeTrendsPage extends StatelessWidget {
         '(${formatDashboardDuration(top.value)} in this period).',
       ),
     ];
-  }
-}
-
-class _BreakTipCard extends StatelessWidget {
-  const _BreakTipCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconBadge(
-            color: AppColors.trackMood,
-            icon: const Icon(Icons.self_improvement_rounded),
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Vita tip', style: context.text.titleSmall),
-                const SizedBox(height: AppDimens.space4),
-                Text(
-                  'Take a 5-minute eye break for every 45 minutes of '
-                  'continuous phone use to reduce fatigue and help you fall '
-                  'asleep faster.',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

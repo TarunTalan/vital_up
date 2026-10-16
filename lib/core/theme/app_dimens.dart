@@ -87,6 +87,12 @@ class AppDimens {
   /// Figma header action button (calendar etc.).
   static const double headerActionSize = 44.0;
 
+  /// Figma track/calender: weekday row and the day's score bar (day cells
+  /// fill their grid column).
+  static const double calendarWeekdayHeight = 34.0;
+  static const double calendarBarWidth = 32.0;
+  static const double calendarBarHeight = 4.0;
+
   /// Figma icon badge (coloured circle behind card icons).
   static const double iconBadge = 40.0;
   static const double iconBadgeLarge = 48.0;
@@ -175,7 +181,7 @@ class AppDimens {
   static const double waterWaveHeight = 120.0;
 
   /// Dashboard: height of a half-width tracker tile at 1x text scale.
-  static const double dashboardTileHeight = 240.0;
+  static const double dashboardTileHeight = 200.0;
 
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.

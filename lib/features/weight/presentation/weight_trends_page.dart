@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
-import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_detail_scaffold.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
@@ -59,13 +59,19 @@ class WeightTrendsPage extends StatelessWidget {
       builder: (context, snap) {
         final unit = snap.data ?? WeightUnit.kg;
         return BlocProvider(
-          create: (_) => TrendCubit<WeightLogCache>(service.trend)..load(),
+          create: (_) => TrendCubit<WeightLogCache>(
+            service.trend,
+            range: TrendRange.month,
+          )..load(),
           child: Builder(
             builder: (context) {
               final cubit = context.read<TrendCubit<WeightLogCache>>();
               return TrackerDetailScaffold<WeightLogCache>(
                 metric: _metric,
                 noun: 'your weight',
+                // Day-to-day weight is mostly noise and most days have no
+                // weigh-in, so weight shows weeks and months only.
+                ranges: const [TrendRange.month, TrendRange.halfYear],
                 format: (kg) => unit.format(kg),
                 axisFormat: (kg) => unit.fromKg(kg).toStringAsFixed(0),
                 heroLabel: 'Latest',
@@ -89,15 +95,12 @@ class WeightTrendsPage extends StatelessWidget {
                   if (await editWeightGoal(context)) cubit.load();
                 },
                 insights: (data) => _changeInsights(data.logs, unit),
-                sections: (context, data) => [
-                  _ChangeCard(
-                    logs: data.logs,
-                    goal: data.series.goal,
-                    unit: unit,
-                  ),
-                ],
-                logsTitle: 'Entries',
-                emptyLogs: 'No weight logged in this period yet.',
+                emptyLogs: 'No weight logged today.',
+                dateOf: (log) => log.timestamp,
+                allLogs: () => service.between(
+                  DateTime(2000),
+                  nextDay(startOfDay(DateTime.now())),
+                ),
                 onLog: () async {
                   if (await showWeightEntrySheet(context)) cubit.load();
                 },
@@ -113,7 +116,7 @@ class WeightTrendsPage extends StatelessWidget {
                       ' · ${log.source == 'health' ? 'Synced' : 'Manual'}',
                   onDelete: () => deleteTrackerLog(
                     context,
-                    cubit,
+                    context.read<TrendCubit<WeightLogCache>>(),
                     log,
                     () => service.delete(log),
                   ),
@@ -152,54 +155,6 @@ class WeightTrendsPage extends StatelessWidget {
         '(${_signed(unit, perWeek)} a week).',
       ),
     ];
-  }
-}
-
-/// Change over the selected period and distance to the goal weight.
-class _ChangeCard extends StatelessWidget {
-  final List<WeightLogCache> logs;
-  final double? goal;
-  final WeightUnit unit;
-
-  const _ChangeCard({
-    required this.logs,
-    required this.goal,
-    required this.unit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (logs.isEmpty) return const SizedBox.shrink();
-    final latest = logs.first.weightKg;
-    final change = latest - logs.last.weightKg;
-    final toGoal = goal == null ? null : goal! - latest;
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: TrackerFigureRow(
-        figures: [
-          TrackerFigure(
-            label: 'Change',
-            value: logs.length < 2 ? '-' : _signed(unit, change),
-            icon: Icons.swap_vert_rounded,
-          ),
-          TrackerFigure(
-            label: 'Goal',
-            value: goal == null ? 'Not set' : unit.format(goal!),
-            icon: Icons.flag_rounded,
-          ),
-          TrackerFigure(
-            label: 'To go',
-            value: toGoal == null
-                ? '—'
-                : toGoal.abs() <= _goalReachedKg
-                ? 'Reached'
-                : _signed(unit, toGoal),
-            icon: Icons.near_me_rounded,
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -254,18 +209,16 @@ class WeightCard extends StatelessWidget {
                     latest == null
                         ? TrackerPrompt(
                             title: 'No weight logged',
-                            message: 'Log weight to see trend.',
                             color: _metric.color,
                           )
                         : TrackerProgress(
                             value: unit.format(latest.weightKg),
                             goal: goal == null ? null : unit.format(goal),
                             color: _metric.color,
-                            fraction: WeightTrendsPage._progress(data.logs, goal),
-                            caption: [
-                              ?_toGoal(unit, latest.weightKg, goal),
-                              DateFormat('d MMM').format(latest.timestamp),
-                            ].join(' · '),
+                            fraction: WeightTrendsPage._progress(
+                              data.logs,
+                              goal,
+                            ),
                           ),
                   ],
                 ),

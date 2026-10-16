@@ -3,12 +3,30 @@ import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Chart window on the trend detail pages.
 enum TrendRange {
-  week(7, '7D'),
-  month(30, '30D');
+  /// Last 7 days, one bar a day.
+  week(7, 'Daily'),
+
+  /// Last 4 weeks, one bar a week ([TrendSeries.weekly]).
+  month(28, 'Weekly'),
+
+  /// Last 6 calendar months, one bar a month ([TrendSeries.monthly]). Only
+  /// offered where change shows over months (weight). 186 days always
+  /// covers the current month plus the 5 full months before it.
+  halfYear(186, 'Monthly');
 
   final int days;
   final String label;
   const TrendRange(this.days, this.label);
+
+  /// The ranges most trackers offer.
+  static const standard = [week, month];
+
+  /// Caption above the chart.
+  String get caption => switch (this) {
+    week => 'Last 7 days',
+    month => 'Last 4 weeks',
+    halfYear => 'Last 6 months',
+  };
 }
 
 /// One day's value; null means nothing was logged (drawn as a gap, ignored
@@ -108,6 +126,67 @@ class TrendSeries extends Equatable {
   }
 
   int get loggedDays => _values.length;
+
+  /// One point per 7 days, counted back from today (so the last week ends
+  /// today); leftover older days are dropped. Each point is dated to its
+  /// week's first day and holds the average of that week's logged days, so
+  /// a daily [goal] still applies. Weeks with nothing logged are null.
+  TrendSeries weekly() {
+    final weeks = <DailyPoint>[];
+    for (var end = points.length; end >= 7; end -= 7) {
+      final week = points.sublist(end - 7, end);
+      final values = week
+          .map((p) => p.value)
+          .whereType<double>()
+          .where((v) => v.isFinite)
+          .toList();
+      weeks.insert(
+        0,
+        DailyPoint(
+          week.first.day,
+          values.isEmpty
+              ? null
+              : values.reduce((a, b) => a + b) / values.length,
+        ),
+      );
+    }
+    return TrendSeries(weeks, goal: goal, direction: direction);
+  }
+
+  /// One point per calendar month, the newest [months] that the series
+  /// reaches; an older month the series only partly covers is dropped.
+  /// Each point is dated to the month's 1st and holds the average of its
+  /// logged days. Months with nothing logged are null.
+  TrendSeries monthly({int months = 6}) {
+    final byMonth = <DateTime, List<double>>{};
+    final firstDay = points.isEmpty ? null : points.first.day;
+    for (final p in points) {
+      final month = DateTime(p.day.year, p.day.month);
+      final list = byMonth.putIfAbsent(month, () => []);
+      final v = p.value;
+      if (v != null && v.isFinite) list.add(v);
+    }
+    // The oldest month is partial unless the series starts on its 1st.
+    final partial = firstDay != null && firstDay.day != 1
+        ? DateTime(firstDay.year, firstDay.month)
+        : null;
+    final keys = byMonth.keys.where((m) => m != partial).toList()..sort();
+    final kept =
+        keys.length > months ? keys.sublist(keys.length - months) : keys;
+    return TrendSeries(
+      [
+        for (final m in kept)
+          DailyPoint(
+            m,
+            byMonth[m]!.isEmpty
+                ? null
+                : byMonth[m]!.reduce((a, b) => a + b) / byMonth[m]!.length,
+          ),
+      ],
+      goal: goal,
+      direction: direction,
+    );
+  }
 
   int get daysMetGoal {
     final g = goal;

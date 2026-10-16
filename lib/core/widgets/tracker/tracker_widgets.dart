@@ -89,6 +89,14 @@ class TrackerCardHeader extends StatelessWidget {
             if (status != null && !isCompact) ...[
               const SizedBox(width: AppDimens.space8),
               TrackerStatusChip(status!, label: statusLabel, color: statusColor),
+            ] else if (status == TrackerStatus.done) ...[
+              const SizedBox(width: AppDimens.space8),
+              Icon(
+                Icons.check_circle_rounded,
+                size: AppDimens.iconSm,
+                color: statusColor ?? context.vColors.success,
+                semanticLabel: statusLabel ?? status!.label,
+              ),
             ],
             if (showChevron && !isCompact) ...[
               const SizedBox(width: AppDimens.space4),
@@ -107,7 +115,8 @@ class TrackerCardHeader extends StatelessWidget {
 
 /// Home card shell for a tracker: tapping anywhere opens its detail page;
 /// [actions] (quick logs) sit at the bottom. A met goal mutes the card a
-/// little so unfinished trackers stand out without reordering.
+/// little, adds a check to the header and turns filled actions into
+/// outlined ones, so only unfinished trackers carry a call to action.
 class TrackerCard extends StatelessWidget {
   final TrackerMetric metric;
   final TrackerStatus? status;
@@ -161,7 +170,10 @@ class TrackerCard extends StatelessWidget {
               ],
               if (actions.isNotEmpty) ...[
                 const SizedBox(height: AppDimens.cardInnerGap),
-                TrackerActionRow(actions: actions),
+                _GoalMetScope(
+                  goalMet: done,
+                  child: TrackerActionRow(actions: actions),
+                ),
               ],
             ],
           ),
@@ -169,6 +181,20 @@ class TrackerCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Tells a [TrackerCard]'s actions that its goal is met.
+class _GoalMetScope extends InheritedWidget {
+  final bool goalMet;
+
+  const _GoalMetScope({required this.goalMet, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_GoalMetScope>()?.goalMet ??
+      false;
+
+  @override
+  bool updateShouldNotify(_GoalMetScope old) => old.goalMet != goalMet;
 }
 
 /// Lays quick actions out in equal-width columns.
@@ -191,7 +217,8 @@ class TrackerActionRow extends StatelessWidget {
 }
 
 /// Compact tinted button for one-tap logging on cards and sheets
-/// ("+250 ml", "Log sleep"). [filled] marks the card's main action.
+/// ("+250 ml", "Log sleep"). [filled] marks the card's main action; on a
+/// card whose goal is met it shows outlined instead.
 class TrackerQuickAction extends StatelessWidget {
   final String label;
   final IconData? icon;
@@ -215,6 +242,7 @@ class TrackerQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppDimens.radiusButton);
+    final filled = this.filled && !_GoalMetScope.of(context);
     final actionColor = context.colors.primary; // Always use primary for actions
     final fg = filled ? context.vColors.buttonText! : actionColor;
     return Semantics(
@@ -602,6 +630,50 @@ class TrackerLogTile extends StatelessWidget {
   }
 }
 
+/// Empty screen of a tracker's history page: metric badge, title and one
+/// line, centred. Every history page uses it so they read the same.
+class TrackerEmptyState extends StatelessWidget {
+  final TrackerMetric metric;
+  final String title;
+  final String message;
+
+  const TrackerEmptyState({
+    super.key,
+    required this.metric,
+    this.title = 'Nothing logged yet',
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.space32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TrackerBadge(metric, size: AppDimens.iconBadgeLarge),
+          const SizedBox(height: AppDimens.space16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Spinner sized like a card body while a tracker loads.
 class TrackerLoading extends StatelessWidget {
   final Color? color;
@@ -638,22 +710,53 @@ class TrackerCardPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TrackerCard(
-      metric: metric,
-      title: title,
-      child: onRetry == null
-          ? TrackerLoading(color: metric.color)
-          : LoadErrorView(onRetry: onRetry!),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fixed-height Home tiles: same shape as a loaded tile, with Retry
+        // as the card's one button, so the error view can't overflow.
+        if (constraints.hasBoundedHeight) {
+          return TrackerCard(
+            metric: metric,
+            title: title,
+            actions: [
+              if (onRetry != null)
+                TrackerQuickAction(
+                  label: 'Retry',
+                  icon: Icons.refresh_rounded,
+                  color: metric.color,
+                  onTap: onRetry,
+                ),
+            ],
+            child: Expanded(
+              child: Center(
+                child: onRetry == null
+                    ? TrackerLoading(color: metric.color)
+                    : TrackerPrompt(
+                        title: "Couldn't load",
+                        color: metric.color,
+                      ),
+              ),
+            ),
+          );
+        }
+        return TrackerCard(
+          metric: metric,
+          title: title,
+          child: onRetry == null
+              ? TrackerLoading(color: metric.color)
+              : LoadErrorView(onRetry: onRetry!),
+        );
+      },
     );
   }
 }
 
-/// Inline prompt inside a card or page: icon, message and an optional
-/// action — empty states and permission requests.
+/// Inline prompt inside a card or page: icon, title, optional message and
+/// an optional action — empty states and permission requests.
 class TrackerPrompt extends StatelessWidget {
   final IconData? icon;
   final String title;
-  final String message;
+  final String? message;
   final Color color;
   final String? actionLabel;
   final VoidCallback? onAction;
@@ -663,7 +766,7 @@ class TrackerPrompt extends StatelessWidget {
     super.key,
     this.icon,
     required this.title,
-    required this.message,
+    this.message,
     required this.color,
     this.actionLabel,
     this.onAction,
@@ -694,15 +797,17 @@ class TrackerPrompt extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: AppDimens.space4),
-                  Text(
-                    message,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: context.vColors.grayText,
+                  if (message != null) ...[
+                    const SizedBox(height: AppDimens.space4),
+                    Text(
+                      message!,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: context.vColors.grayText,
+                      ),
+                      maxLines: maxLines,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: maxLines,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ],
               ),
             ),

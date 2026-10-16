@@ -60,7 +60,11 @@ class SleepTrendsPage extends StatelessWidget {
                           '${time.format(night.wakeTime)}',
                 fraction: safeFraction(hours, goal),
                 // The night is over, so judge it against the whole goal.
-                status: TrackerStatus.of(value: hours, goal: goal, paceFraction: 1),
+                status: TrackerStatus.of(
+                  value: hours,
+                  goal: goal,
+                  paceFraction: 1,
+                ),
                 ringLabel: night == null ? null : '${night.sleepScore}',
                 statusColor: night == null
                     ? null
@@ -93,7 +97,15 @@ class SleepTrendsPage extends StatelessWidget {
                 ),
               const _RecoveryCard(),
             ],
-            logsTitle: 'Nights',
+            emptyLogs: 'No sleep logged for last night.',
+            dateOf: (night) => night.wakeTime,
+            allLogs: () async {
+              final nights = await sl<SleepService>().getSleepBetween(
+                DateTime(2000),
+                nextDay(startOfDay(DateTime.now())),
+              );
+              return nights..sort((a, b) => b.wakeTime.compareTo(a.wakeTime));
+            },
             onLog: () async {
               if (await showSleepLogSheet(context)) {
                 await cubit.load();

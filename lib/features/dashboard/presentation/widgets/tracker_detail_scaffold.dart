@@ -65,8 +65,9 @@ class TrackerToday {
 ///
 /// 1. Today — value, status and a ring against the goal, with the goal
 ///    and its Edit action underneath.
-/// 2. Trend — 7D / 30D chart with a dashed goal line and stats.
-/// 3. Insights — plain-language patterns.
+/// 2. Trend — Daily (7 days) or Weekly (4 weeks, daily average per bar)
+///    chart with a dashed goal line and stats.
+/// 3. Insights — up to two plain-language patterns.
 /// 4. Metric-specific [sections] (macros, tags, top apps…).
 /// 5. Today's log — today's entries (swipe to delete) and "See all", which
 ///    opens [TrackerLogsPage] with every entry ([allLogs]).
@@ -122,6 +123,9 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
   final Widget? headerAction;
   final Future<void> Function()? onRefresh;
 
+  /// Chart ranges offered by the Daily / Weekly (/ Monthly) switch.
+  final List<TrendRange> ranges;
+
   const TrackerDetailScaffold({
     super.key,
     required this.metric,
@@ -147,6 +151,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     this.logLabel,
     this.headerAction,
     this.onRefresh,
+    this.ranges = TrendRange.standard,
   });
 
   TrackerToday _defaultToday(TrendData<L> data) {
@@ -222,7 +227,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
           final allInsights = [
             ...extraInsights,
             ...seriesInsights(data.series, format: format, noun: noun),
-          ].take(4).toList();
+          ].take(2).toList();
           final todayNow = DateTime.now();
           final todays = [
             for (final log in data.logs)
@@ -249,10 +254,13 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
                 format: format,
                 axisFormat: axisFormat,
                 colorOf: colorOf,
+                ranges: ranges,
                 onRange: cubit.load,
               ),
-              const SizedBox(height: AppDimens.cardGap),
-              TrackerInsightsCard(insights: allInsights),
+              if (allInsights.isNotEmpty) ...[
+                const SizedBox(height: AppDimens.cardGap),
+                TrackerInsightsCard(insights: allInsights),
+              ],
               for (final section in sections?.call(context, data) ?? []) ...[
                 const SizedBox(height: AppDimens.cardGap),
                 section,
@@ -407,6 +415,7 @@ class _TrendCard<L> extends StatelessWidget {
   final String Function(double value)? axisFormat;
   final Color Function(double value)? colorOf;
   final ValueChanged<TrendRange> onRange;
+  final List<TrendRange> ranges;
 
   const _TrendCard({
     required this.metric,
@@ -416,6 +425,7 @@ class _TrendCard<L> extends StatelessWidget {
     required this.axisFormat,
     required this.colorOf,
     required this.onRange,
+    required this.ranges,
   });
 
   @override
@@ -429,18 +439,24 @@ class _TrendCard<L> extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppCaption(
-                  state.range == TrendRange.week
-                      ? '7-day trend'
-                      : '30-day trend',
-                ),
+                child: AppCaption(state.range.caption),
               ),
-              TrendRangeToggle(value: state.range, onChanged: onRange),
+              TrendRangeToggle(
+                value: state.range,
+                onChanged: onRange,
+                ranges: ranges,
+              ),
             ],
           ),
           const SizedBox(height: AppDimens.cardInnerGap),
           TrendBarChart(
-            series: data.series,
+            series: switch (state.range) {
+              TrendRange.week => data.series,
+              TrendRange.month => data.series.weekly(),
+              TrendRange.halfYear => data.series.monthly(),
+            },
+            weekly: state.range == TrendRange.month,
+            monthly: state.range == TrendRange.halfYear,
             color: metric.color,
             valueFormatter: format,
             axisFormatter: axisFormat,
@@ -520,7 +536,10 @@ class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
               );
             }
             if (logs.isEmpty) {
-              return const AppInfoNote(message: 'Nothing logged yet.');
+              return TrackerEmptyState(
+                metric: widget.metric,
+                message: 'What you log will show up here.',
+              );
             }
             final now = DateTime.now();
             final visible = logs.take(_shown).toList();

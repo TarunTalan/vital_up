@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
@@ -46,7 +45,7 @@ class MoodCard extends StatelessWidget {
               label: today == null ? _metric.logLabel : 'Edit',
               icon: today == null ? _metric.logIcon : Icons.edit_rounded,
               color: _metric.color,
-              filled: today == null,
+              filled: true,
               onTap: () => _log(context),
             ),
           ],
@@ -58,7 +57,6 @@ class MoodCard extends StatelessWidget {
                 if (today == null)
                   TrackerPrompt(
                     title: 'How are you feeling?',
-                    message: 'Check in to track your mood.',
                     color: _metric.color,
                   )
                 else ...[
@@ -84,13 +82,6 @@ class MoodCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: AppDimens.space6),
-                  Text(
-                    'Checked in at ${DateFormat.jm().format(today.date)}',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
                   ),
                 ],
               ],
