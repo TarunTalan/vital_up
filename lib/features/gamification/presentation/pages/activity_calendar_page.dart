@@ -239,7 +239,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
 
   /// Custom top app bar matching the user design with Month Year and [<] [📅] [>]
   Widget _buildHeader(BuildContext context, ActivityCalendarState state) {
-    final monthTitle = DateFormat('MMM yy').format(state.focusedMonth);
+    final monthTitle = DateFormat('MMMM y').format(state.focusedMonth);
 
     return AppPageHeader(
       title: monthTitle,
@@ -271,29 +271,25 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
     );
   }
 
-  /// The month grid with weekdays, date buttons, status indicator bars, and selected highlight
+  /// Figma track/calender: Sun-first weekday row, then 44dp glass day
+  /// cells with the day's score bar. Future days are greyed with no bar;
+  /// the selected day is filled with the primary colour.
   Widget _buildCalendarView(BuildContext context, ActivityCalendarState state) {
     final v = context.vColors;
     final year = state.focusedMonth.year;
     final month = state.focusedMonth.month;
-
-    // Number of days in current focused month
     final daysInMonth = DateUtils.getDaysInMonth(year, month);
-
-    // Weekday of the first day (DateTime weekday: 1 = Mon ... 7 = Sun)
-    // Design has Sunday as the first column: 0 = Sun, 1 = Mon ... 6 = Sat
+    // Sunday is the first column: 0 = Sun ... 6 = Sat.
     final firstDayWeekday = DateTime(year, month, 1).weekday % 7;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
     const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return Column(
       children: [
-        // Weekday Labels Row
-        Padding(
-          padding: const EdgeInsets.only(
-            top: AppDimens.space8,
-            bottom: AppDimens.space16,
-          ),
+        SizedBox(
+          height: AppDimens.calendarWeekdayHeight,
           child: Row(
             children: [
               for (final label in weekdayLabels)
@@ -301,10 +297,8 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
                   child: Center(
                     child: Text(
                       label,
-                      style: context.text.labelSmall?.copyWith(
+                      style: context.text.bodySmall?.copyWith(
                         color: v.grayText,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -312,8 +306,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
             ],
           ),
         ),
-
-        // Days Grid
+        const SizedBox(height: AppDimens.space8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -322,89 +315,19 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
             crossAxisCount: 7,
             mainAxisSpacing: AppDimens.space8,
             crossAxisSpacing: AppDimens.space8,
-            childAspectRatio: 0.95,
           ),
           itemCount: firstDayWeekday + daysInMonth,
           itemBuilder: (context, index) {
-            if (index < firstDayWeekday) {
-              return const SizedBox.shrink();
-            }
-
-            final dayNumber = index - firstDayWeekday + 1;
-            final cellDate = DateTime(year, month, dayNumber);
-            final isSelected = _isSameDay(cellDate, state.selectedDate);
-            final status = _getDayStatus(cellDate, state);
-
-            // Bar indicator color based on status
-            final barColor = switch (status) {
-              0 => context.colors.onSurface.withValues(alpha: 0.15),
-              1 => AppColors.error,
-              2 => AppColors.warning,
-              3 => AppColors.success,
-              _ => Colors.transparent,
-            };
-
-            return InkWell(
-              onTap: () {
-                if (cellDate.isAfter(DateTime.now())) return;
-                context.read<ActivityCalendarCubit>().selectDate(cellDate);
-              },
-              borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? context.colors.primary
-                      : v.glassFill ?? AppColors.surfaceDarkElevated.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-                  border: isSelected
-                      ? null
-                      : Border.all(
-                          color: v.glassBorder!.withValues(alpha: 0.5),
-                          width: AppDimens.borderThin,
-                        ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$dayNumber',
-                      style: context.text.bodyMedium?.copyWith(
-                        color: isSelected
-                            ? context.colors.surface
-                            : context.colors.onSurface,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (status >= 0) ...[
-                      const SizedBox(height: 3),
-                      Stack(
-                        children: [
-                          // Background track (empty progress)
-                          Container(
-                            width: 24,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: context.colors.onSurface.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                            ),
-                          ),
-                          // Filled progress based on status (0 to 3)
-                          if (status > 0)
-                            Container(
-                              width: 24 * (status / 3.0),
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: barColor,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            if (index < firstDayWeekday) return const SizedBox.shrink();
+            final day = DateTime(year, month, index - firstDayWeekday + 1);
+            return _CalendarDay(
+              day: day,
+              selected: _isSameDay(day, state.selectedDate),
+              future: day.isAfter(today),
+              status: _getDayStatus(day, state),
+              onTap: day.isAfter(today)
+                  ? null
+                  : () => context.read<ActivityCalendarCubit>().selectDate(day),
             );
           },
         ),
@@ -640,6 +563,104 @@ class _HeaderNavButton extends StatelessWidget {
               icon,
               size: AppDimens.iconLg,
               color: isActive ? context.colors.surface : primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One day of the month grid (Figma track/calender "Button").
+class _CalendarDay extends StatelessWidget {
+  final DateTime day;
+  final bool selected;
+  final bool future;
+
+  /// -1 no bar (today/future), 0 nothing logged, 1 light, 2 moderate, 3 good.
+  final int status;
+  final VoidCallback? onTap;
+
+  const _CalendarDay({
+    required this.day,
+    required this.selected,
+    required this.future,
+    required this.status,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final primary = context.colors.primary;
+    // Figma fills: light and moderate days a short bar, good days most of it.
+    final (Color? fill, double fraction) = switch (status) {
+      1 => (AppColors.gradeBad, 0.4),
+      2 => (AppColors.gradeModerate, 0.4),
+      3 => (AppColors.gradeGood, 0.8),
+      _ => (null, 0.0),
+    };
+    final radius = BorderRadius.circular(AppDimens.radiusToast);
+
+    // The grid cell is square, so the box fills it: 44dp on a 412dp-wide
+    // Figma frame, and it grows or shrinks with the screen like the gaps.
+    return Material(
+      color: selected ? primary : v.glassFill,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: selected ? primary : v.glassBorder!,
+          width: AppDimens.borderThin,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Center(
+          // Only scales down on very narrow screens.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${day.day}',
+                  style: context.text.bodyLarge?.copyWith(
+                    // Figma: 24dp line with the text centred in it (even
+                    // leading), 4dp gap, 4dp bar.
+                    height: 1.5,
+                    leadingDistribution: TextLeadingDistribution.even,
+                    color: selected
+                        ? context.colors.onPrimary
+                        : future
+                        ? v.grayText
+                        : context.colors.onSurface,
+                  ),
+                ),
+                if (status >= 0 && !selected) ...[
+                  const SizedBox(height: AppDimens.space4),
+                  Container(
+                    width: AppDimens.calendarBarWidth,
+                    height: AppDimens.calendarBarHeight,
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      color: v.track,
+                      borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                    ),
+                    child: fill == null
+                        ? null
+                        : Container(
+                            width: AppDimens.calendarBarWidth * fraction,
+                            decoration: BoxDecoration(
+                              color: fill,
+                              borderRadius: BorderRadius.circular(
+                                AppDimens.radiusPill,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),

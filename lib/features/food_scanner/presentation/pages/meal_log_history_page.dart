@@ -10,6 +10,8 @@ import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
@@ -35,7 +37,7 @@ class _MealLogHistoryView extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       header: AppPageHeader(
-        title: "All Meals",
+        title: 'Meal history',
         onBack: () => context.pop(),
       ),
       scrollable: false,
@@ -79,21 +81,9 @@ class _MealLogHistoryView extends StatelessWidget {
                     child: Container(
                       height: MediaQuery.of(context).size.height * 0.6,
                       alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AppIconBadge(
-                            size: AppDimens.iconBadgeLarge,
-                            icon: const Icon(Icons.restaurant_menu_rounded),
-                          ),
-                          const SizedBox(height: AppDimens.space16),
-                          Text(
-                            'No meals logged yet.',
-                            style: context.text.bodyLarge?.copyWith(
-                              color: context.vColors.grayText,
-                            ),
-                          ),
-                        ],
+                      child: const TrackerEmptyState(
+                        metric: TrackerMetric.nutrition,
+                        message: 'What you log will show up here.',
                       ),
                     ),
                   );
