@@ -282,8 +282,26 @@ Route names are GoRouter `name`s.
   (`player_stats.streak_freezes`, one per 7 active days, max 2, spent by the
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
-  Rewards: snackbars via `awardMessage`; the dialog only for a level-up in
-  Arena.
+  Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
+  - **Achievement Badges (32 SVGs):** `assets/icons/badges/` contains 3D
+    photorealistic badges with transparent backgrounds across streaks (`streak_3`,
+    `streak_7`, `streak_30`, `streak_100`, `streak_365`), steps (`steps_10k`,
+    `steps_20k`, `steps_30k`), workouts (`workouts_1`, `workouts_25`,
+    `workouts_50`, `workouts_100`, `workouts_200`), nutrition/water/habits
+    (`water_days_7`, `water_days_30`, `water_days_100`, `diet_days_7`,
+    `diet_days_30`, `food_days_30`, `calorie_master`), lifestyle
+    (`sleep_days_7`, `sleep_days_30`, `checkin_days_14`, `mindful_30`,
+    `streak_shield`), and levels (`level_5`, `level_10`, `level_15`,
+    `level_20`, `points_1000`, `goal_days_30`).
+  - **Badge Architecture:** Built as standalone SVGs embedding base64 high-res
+    PNGs to preserve raytraced 3D glassmorphism, neon glows, and specular
+    lighting without path degradation. `GameIcon` (`game_icon.dart`) renders
+    SVGs and PNGs, bypassing color tint filters for `/badges/` assets.
+  - **Badge Widgets:** `lib/features/gamification/presentation/widgets/badge_widgets.dart`
+    provides `BadgeEmblem` (greyscale + reduced opacity when locked), `BadgeTile`,
+    `showBadgeDetailSheet`, and responsive `_BadgeGrid`.
+  - **Activity Calendar:** `activity_calendar_page.dart` uses `_CalendarDay` with
+    proportional multi-tier status bars and monthly navigation.
 - **help_support:** `help-support`, `support-chat` (local scripted bot),
   `contact-support` (mailto); static FAQ.
 - **home_widget (Android):** Today (4 sizes), My metrics / Custom (3 sizes,
@@ -360,6 +378,11 @@ Route names are GoRouter `name`s.
 4. **Branded Email Suite:** Modern dark-glass HTML templates for Supabase Auth, support receipts, and deletion confirmations.
 5. **Favicon & Asset Fixes:** Multi-resolution icons, embedded SVG data URI fallback, removed logo glow shadow, fixed Cloudflare Pages 307 redirect loops.
 6. **Security & Secrets:** Verified zero secrets or API keys in git history or client code; `RESEND_API_KEY` secured in Supabase server secrets.
+7. **App-Wide Loading States:** Centered loaders across all full pages in `AppScaffold` with modernized `VitalUpLoader` design.
+8. **Nutrition Navigation Split:** Dashboard Nutrition section routes to `meal-log-history` for complete chronological meal history; `DietProgressPage` focuses on today's logged meals.
+9. **Modern 3D Achievement Badges (32 SVGs):** Extracted, alpha-keyed, and deployed full 32-badge asset suite with standalone SVGs embedding base64 high-res graphics without vector distortion.
+10. **Gamification Badge UI:** Reusable `BadgeEmblem`, `BadgeTile`, `showBadgeDetailSheet`, and responsive grid integrated into `BadgesPage`, player profile sheets, and reward dialogs.
+11. **Tracker Trends & Sleep Insights:** Modernized `TrendBarChart`, detailed sleep card metrics, and proportional status bars in `ActivityCalendarPage`.
 
 ### Remaining:
 1. **Google Account Avatar Propagation:** Wait for Google CDN cache propagation (2-24h) for `support@vitalup.live` and `privacy@vitalup.live` profile pictures. Create Google Account for `noreply@vitalup.live` for auth email avatars.
