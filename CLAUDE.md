@@ -133,9 +133,13 @@ confirm a username.
   `app_theme.dart` (`VitalUpColors` extension). `design/figma_tokens.md` maps
   them to Figma. Font: SF Pro Rounded.
 - Lookups: `context.colors`, `context.text`, `context.vColors` (glassFill,
-  glassBorder, grayText, primaryFill, track, success, warning, termsLink...),
+  glassBorder, grayText, primaryFill, track, success, warning, termsLink,
+  `accentText` = primary as readable text, deeper in light mode...),
   `context.gutter` (16dp), `context.w(x)`, `context.safePadding`
   (`theme_context.dart`, `core/utils/responsive.dart`).
+- Contrast: never use `colors.primary`, `rankGold` or `streak` as text
+  (about 2:1 on light); use `vColors.accentText` / `onSurface` and keep
+  brand colours for fills, rings and icons. Dark `grayText` is #A3A3A3.
 - Rules: no hardcoded colours/sizes, 16dp gutter, no emojis (Material/SVG
   icons; icon assets are supplied by the user, never created; `GameIcon`
   falls back to a Material icon when an SVG is missing), Home is health-first
@@ -329,7 +333,9 @@ Route names are GoRouter `name`s.
   cheers; private profiles; streak rest days + badge progress (cron
   `use-streak-freezes`); input constraints (`20261016_input_constraints.sql`);
   signed-out sign-up checks (`signup_username_available`, `email_registered`;
-  anon can't read `profiles`).
+  anon can't read `profiles`); friend ranks inside communities
+  (`get_community_friend_ranks`, `get_my_community_standings`; friends who
+  hide from leaderboards are left out).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
