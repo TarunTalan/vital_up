@@ -306,6 +306,18 @@ Route names are GoRouter `name`s.
     `showBadgeDetailSheet`, and responsive `_BadgeGrid`.
   - **Activity Calendar:** `activity_calendar_page.dart` uses `_CalendarDay` with
     proportional multi-tier status bars and monthly navigation.
+  - **Levels:** 20 levels by lifetime points (`levels` table); titles mirrored
+    in `levelTitles` (`player_stats.dart`, test checks the seed). No tiers.
+  - **Community awards:** top 3 of every community win weekly medals
+    (Gold/Silver/Bronze Medal) and monthly trophies (Trophy Cup 1st, Tropy
+    Star 2nd/3rd) from `assets/icons/awards/` (multi-colour, never tinted).
+    Importance: global monthly > local monthly > interest monthly > weekly
+    (`awardPrestige`). Entities, `AwardRules` and the countdown
+    (`nextAwardCountdown`) in `community/domain/entities/community_award.dart`;
+    UI in `award_widgets.dart` (Arena `MonthlyChampionsCard`, leaderboard
+    `LeaderboardAwardsCard`, profile `PlayerAwardsSummary`, Badges page
+    section, `showAwardRulesSheet`) and `award_celebration.dart` (one-time
+    dialog for a new trophy, pref `community_award_seen_<uid>`).
 - **help_support:** `help-support`, `support-chat` (local scripted bot),
   `contact-support` (mailto); static FAQ.
 - **home_widget (Android):** Today (4 sizes), My metrics / Custom (3 sizes,
@@ -335,7 +347,12 @@ Route names are GoRouter `name`s.
   signed-out sign-up checks (`signup_username_available`, `email_registered`;
   anon can't read `profiles`); friend ranks inside communities
   (`get_community_friend_ranks`, `get_my_community_standings`; friends who
-  hide from leaderboards are left out).
+  hide from leaderboards are left out); community awards
+  (`20261019_community_awards.sql`: `community_awards`, hourly cron
+  `finalize-community-awards` at :35 UTC = :05 IST finalises a period once
+  late reports close, i.e. Wednesday / the 3rd; min 5 players; ties share a
+  place; `get_community_awards`, `get_player_awards`; notification type
+  `award`).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
