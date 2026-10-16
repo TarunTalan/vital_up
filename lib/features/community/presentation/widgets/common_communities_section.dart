@@ -3,23 +3,32 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/app_section_header.dart';
-import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
-final _points = NumberFormat.decimalPattern();
+final _rank = NumberFormat.decimalPattern();
 
-Color _rankBadgeColor(int rank) => switch (rank) {
+Color _medalColor(int rank) => switch (rank) {
   1 => AppColors.rankGold,
   2 => AppColors.rankSilver,
   _ => AppColors.rankBronze,
 };
 
-/// Displays a friend's rank in all communities shared with the caller,
-/// along with head-to-head comparison standing.
+/// Who is ahead between two all-time ranks; null when neither is ranked.
+/// Positive: the caller is ahead.
+int? compareRanks(int? mine, int? theirs) {
+  if (mine == null && theirs == null) return null;
+  if (mine == null) return -1;
+  if (theirs == null) return 1;
+  return theirs.compareTo(mine);
+}
+
+/// Compare page section: each community the caller shares with a friend,
+/// with both all-time ranks side by side and who is ahead. Shows nothing
+/// until there is something to compare.
 class CommonCommunitiesSection extends StatefulWidget {
   final String friendUserId;
   final String? friendUsername;
@@ -36,174 +45,142 @@ class CommonCommunitiesSection extends StatefulWidget {
 }
 
 class _CommonCommunitiesSectionState extends State<CommonCommunitiesSection> {
-  late final Future<List<CommonCommunityRank>> _ranksFuture;
+  late final Future<List<CommonCommunityRank>> _ranks =
+      sl<CommunityRepository>().getCommonCommunityRanks(widget.friendUserId);
 
   @override
-  void initState() {
-    super.initState();
-    _ranksFuture = sl<CommunityRepository>().getCommonCommunityRanks(
-      widget.friendUserId,
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<CommonCommunityRank>>(
+      future: _ranks,
+      builder: (context, snapshot) {
+        final ranks = snapshot.data ?? const <CommonCommunityRank>[];
+        // Nothing while loading or empty: the section only adds to the page.
+        if (ranks.isEmpty) return const SizedBox.shrink();
+        final them = widget.friendUsername == null
+            ? 'Them'
+            : '@${widget.friendUsername}';
+        return Padding(
+          padding: const EdgeInsets.only(top: AppDimens.sectionGap),
+          child: AppListGroup(
+            title: 'Communities · all time',
+            children: [
+              for (final r in ranks) _CommunityRankRow(rank: r, them: them),
+            ],
+          ),
+        );
+      },
     );
   }
+}
+
+class _CommunityRankRow extends StatelessWidget {
+  final CommonCommunityRank rank;
+  final String them;
+
+  const _CommunityRankRow({required this.rank, required this.them});
 
   @override
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
-
-    return FutureBuilder<List<CommonCommunityRank>>(
-      future: _ranksFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppDimens.space16),
-            child: Center(child: VitalUpLoader()),
-          );
-        }
-
-        final ranks = snapshot.data ?? const [];
-        if (ranks.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: AppDimens.sectionGap),
-            AppSectionHeader(
-              'Common Communities',
-              count: ranks.length,
+    final lead = compareRanks(rank.myRank, rank.friendRank);
+    final verdict = switch (lead) {
+      null => 'Neither of you is ranked yet',
+      0 => "You're tied",
+      > 0 => "You're ahead",
+      _ => '$them is ahead',
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space16,
+        vertical: AppDimens.space10,
+      ),
+      child: Row(
+        children: [
+          AppIconBadge(
+            color: context.colors.primary,
+            icon: GameIcon(
+              communityIconAsset(rank.community),
+              fallback: communityFallbackIcon(rank.community),
+              size: AppDimens.iconMd,
             ),
-            for (final r in ranks) ...[
-              AppCard(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.space12,
-                  vertical: AppDimens.space10,
+          ),
+          const SizedBox(width: AppDimens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rank.community.name,
+                  style: context.text.titleSmall?.copyWith(
+                    color: context.colors.onSurface,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    // Community icon
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: context.colors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppDimens.radiusCard,
-                        ),
-                        border: Border.all(
-                          color: context.colors.primary.withValues(alpha: 0.2),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Center(
-                        child: GameIcon(
-                          communityIconAsset(r.community),
-                          fallback: Icons.groups_rounded,
-                          size: 22,
-                          color: context.colors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.space12),
-
-                    // Community name and subtitle
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            r.community.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.text.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: context.colors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: AppDimens.space2),
-                          Text(
-                            r.friendPoints > 0
-                                ? '${_points.format(r.friendPoints)} pts'
-                                : r.community.rankedOn,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                context.text.bodySmall?.copyWith(color: grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-
-                    // Friend's rank and comparison
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (r.friendRank != null && r.friendRank! <= 3) ...[
-                              GameIcon(
-                                GamificationIcons.leaderboardRank(
-                                  r.friendRank!,
-                                )!,
-                                fallback: Icons.emoji_events_rounded,
-                                size: 18,
-                                color: _rankBadgeColor(r.friendRank!),
-                              ),
-                              const SizedBox(width: 3.5),
-                            ],
-                            Text(
-                              r.friendRank != null ? '#${r.friendRank}' : '–',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: r.friendRank != null &&
-                                        r.friendRank! <= 3
-                                    ? _rankBadgeColor(r.friendRank!)
-                                    : context.colors.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 1.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (r.myRank != null &&
-                                    r.friendRank != null &&
-                                    r.myRank! < r.friendRank!)
-                                ? AppColors.scoreBonus.withValues(alpha: 0.14)
-                                : context.vColors.grayText!
-                                    .withValues(alpha: 0.12),
-                            borderRadius:
-                                BorderRadius.circular(AppDimens.radiusPill),
-                          ),
-                          child: Text(
-                            'You: #${r.myRank ?? '–'}',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: (r.myRank != null &&
-                                      r.friendRank != null &&
-                                      r.myRank! < r.friendRank!)
-                                  ? AppColors.scoreBonus
-                                  : grey,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(height: AppDimens.space2),
+                Text(
+                  verdict,
+                  style: context.text.bodySmall?.copyWith(
+                    color: lead != null && lead > 0
+                        ? context.vColors.accentText
+                        : grey,
+                  ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppDimens.space8),
+          _RankCell(label: 'You', rank: rank.myRank),
+          const SizedBox(width: AppDimens.space12),
+          _RankCell(label: 'Them', rank: rank.friendRank),
+        ],
+      ),
+    );
+  }
+}
+
+/// A rank over its owner: medal for the top three, "#12", or "–".
+class _RankCell extends StatelessWidget {
+  final String label;
+  final int? rank;
+
+  const _RankCell({required this.label, required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = rank;
+    return Semantics(
+      label: '$label: ${r == null ? 'not ranked' : 'rank $r'}',
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: AppDimens.rankColumnWidth),
+        child: Column(
+          children: [
+            SizedBox(
+              height: AppDimens.iconLg,
+              child: r != null && r <= 3
+                  ? GameIcon(
+                      GamificationIcons.leaderboardRank(r)!,
+                      fallback: Icons.military_tech_rounded,
+                      size: AppDimens.iconLg,
+                      color: _medalColor(r),
+                    )
+                  : Center(
+                      child: Text(
+                        r == null ? '–' : '#${_rank.format(r)}',
+                        style: context.text.titleSmall?.copyWith(
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+                    ),
+            ),
+            Text(
+              label,
+              style: context.text.labelSmall?.copyWith(
+                color: context.vColors.grayText,
               ),
-              const SizedBox(height: AppDimens.cardGap),
-            ],
+            ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }

@@ -5,7 +5,6 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
-import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
@@ -17,8 +16,9 @@ import 'package:vital_up/features/community/presentation/widgets/friends_quick_r
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
-/// The Arena tab: your level and points, challenges, friends, and
-/// leaderboards, in that order. Leaderboard settings sit in the header.
+/// The Arena tab: your level with shortcuts, challenges, friends, and one
+/// leaderboards list, in that order. Leaderboard settings sit in the
+/// header.
 class CommunityHubPage extends StatelessWidget {
   const CommunityHubPage({super.key});
 
@@ -72,12 +72,11 @@ class _ArenaHubView extends StatelessWidget {
           ),
           body: state.communities == null
               ? state.failed
-                  ? LoadErrorView(onRetry: cubit.load)
-                  : const Center(child: VitalUpLoader())
+                    ? LoadErrorView(onRetry: cubit.load)
+                    : const Center(child: VitalUpLoader())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const AppSectionHeader('Your progress'),
                     const ScoreStreakCard(),
                     const SizedBox(height: AppDimens.sectionGap),
 
@@ -86,6 +85,7 @@ class _ArenaHubView extends StatelessWidget {
 
                     FriendsQuickRow(
                       friends: state.friends,
+                      ranking: state.friendsRanking,
                       incomingRequests: state.incomingRequests,
                       myUsername: state.settings.username,
                       onRefresh: cubit.load,

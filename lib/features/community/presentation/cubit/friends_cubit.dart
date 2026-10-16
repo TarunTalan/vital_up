@@ -120,7 +120,8 @@ class FriendsState extends Equatable {
               points: e.points,
               level: e.level,
               isMe: false,
-              friend: f ??
+              friend:
+                  f ??
                   Friend(
                     userId: e.userId,
                     username: e.username,
@@ -279,8 +280,9 @@ class FriendsCubit extends Cubit<FriendsState> {
 
       List<LeaderboardEntry> ranked = [];
       try {
-        final acceptedCount =
-            friends.where((f) => f.status == FriendStatus.accepted).length;
+        final acceptedCount = friends
+            .where((f) => f.status == FriendStatus.accepted)
+            .length;
         ranked = await _repository.getLeaderboard(
           Community.friendsOf(acceptedCount),
           period: LeaderboardPeriod.all,

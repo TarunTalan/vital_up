@@ -15,8 +15,8 @@ Color _rankColor(int rank) => switch (rank) {
 };
 
 /// One person in a friends list: avatar, name, "@username · Level n" (or
-/// [subtitle]) and a trailing action. Shows rank column when [rank] is provided,
-/// and highlights the tile when [isMe] is true.
+/// [subtitle]) and a trailing action. With [rank] / [points] it reads like a
+/// leaderboard row; [isMe] highlights the caller's own row.
 class FriendTile extends StatelessWidget {
   final Friend friend;
   final Widget? trailing;
@@ -50,54 +50,31 @@ class FriendTile extends StatelessWidget {
       padding: AppDimens.cardPaddingCompact,
       onTap: onTap,
       highlighted: isMe,
-      borderColor: isMe ? context.colors.primary.withValues(alpha: 0.5) : null,
-      tint: isMe ? context.colors.primary.withValues(alpha: 0.06) : null,
       child: Row(
         children: [
-          // Rank column when rank is provided or for self position
-          if (rank != null || isMe) ...[
+          if (rank != null || points != null || isMe) ...[
             SizedBox(
-              width: 30,
-              child: Center(
-                child: rank != null && rank! <= 3
-                    ? GameIcon(
-                        GamificationIcons.leaderboardRank(rank!)!,
-                        fallback: Icons.emoji_events_rounded,
-                        size: 22,
-                        color: _rankColor(rank!),
-                      )
-                    : Text(
-                        rank != null ? '#$rank' : '–',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: isMe ? context.colors.primary : grey,
-                        ),
+              width: AppDimens.rankColumnWidth,
+              child: rank != null && rank! <= 3
+                  ? GameIcon(
+                      GamificationIcons.leaderboardRank(rank!)!,
+                      fallback: Icons.military_tech_rounded,
+                      size: AppDimens.iconLg,
+                      color: _rankColor(rank!),
+                    )
+                  : Text(
+                      rank != null ? '${rank!}' : '–',
+                      style: context.text.titleSmall?.copyWith(
+                        color: isMe ? context.colors.primary : grey,
                       ),
-              ),
+                    ),
             ),
-            const SizedBox(width: AppDimens.space8),
           ],
-
-          // Avatar (strictly circular)
-          Container(
-            decoration: isMe
-                ? BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: context.colors.primary.withValues(alpha: 0.25),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  )
-                : null,
-            child: UserAvatar(
-              username: friend.username,
-              url: friend.avatarUrl,
-              size: AppDimens.iconBadge,
-            ),
+          UserAvatar(
+            username: friend.username,
+            url: friend.avatarUrl,
+            size: AppDimens.iconBadge,
+            ringColor: isMe ? context.colors.primary : null,
           ),
           const SizedBox(width: AppDimens.space12),
 
@@ -105,48 +82,17 @@ class FriendTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        hasName ? name : '@${friend.username}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.titleSmall?.copyWith(
-                          fontWeight: isMe ? FontWeight.w800 : FontWeight.w700,
-                          color: context.colors.onSurface,
-                        ),
-                      ),
-                    ),
-                    if (isMe) ...[
-                      const SizedBox(width: AppDimens.space6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5.5,
-                          vertical: 1.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: context.colors.primary.withValues(alpha: 0.16),
-                          borderRadius:
-                              BorderRadius.circular(AppDimens.radiusPill),
-                          border: Border.all(
-                            color:
-                                context.colors.primary.withValues(alpha: 0.5),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          'YOU',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            color: context.colors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  isMe
+                      ? '${hasName ? name : '@${friend.username}'} (you)'
+                      : hasName
+                      ? name
+                      : '@${friend.username}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleSmall?.copyWith(
+                    color: context.colors.onSurface,
+                  ),
                 ),
                 const SizedBox(height: AppDimens.space2),
                 Row(
@@ -191,27 +137,9 @@ class FriendTile extends StatelessWidget {
           ] else if (trailing != null) ...[
             const SizedBox(width: AppDimens.space8),
             trailing!,
-          ] else if (isMe) ...[
-            const SizedBox(width: AppDimens.space8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-              decoration: BoxDecoration(
-                color: context.colors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-              ),
-              child: Text(
-                'Standing',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: context.colors.primary,
-                ),
-              ),
-            ),
           ],
         ],
       ),
     );
   }
 }
-

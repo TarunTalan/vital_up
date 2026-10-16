@@ -16,7 +16,6 @@ import 'package:vital_up/features/community/domain/entities/player_profile.dart'
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
 import 'package:vital_up/features/community/presentation/pages/head_to_head_comparison_page.dart';
-import 'package:vital_up/features/community/presentation/widgets/common_communities_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
@@ -252,17 +251,7 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                 }
 
                 if (profile != null && !profile.isPrivate) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      PlayerProfileStats(profile: profile),
-                      if (widget.userId != null)
-                        CommonCommunitiesSection(
-                          friendUserId: widget.userId!,
-                          friendUsername: widget.username,
-                        ),
-                    ],
-                  );
+                  return PlayerProfileStats(profile: profile);
                 }
 
                 // If not friends or profile stats private, show leaderboard / overview card
@@ -271,8 +260,10 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                 final activityText = widget.activeSince != null
                     ? widget.activeSince!
                     : (streakVal > 0
-                        ? '$streakVal d streak'
-                        : (bestVal > 0 ? '${bestVal}d best' : 'Active member'));
+                          ? '$streakVal d streak'
+                          : (bestVal > 0
+                                ? '${bestVal}d best'
+                                : 'Active member'));
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,15 +287,16 @@ class _PublicProfileSheetState extends State<PublicProfileSheet> {
                             value: widget.rank != null
                                 ? '#${widget.rank}'
                                 : tier.tierName,
-                            iconAsset: (widget.rank != null && widget.rank! <= 3)
+                            iconAsset:
+                                (widget.rank != null && widget.rank! <= 3)
                                 ? GamificationIcons.leaderboardRank(
                                     widget.rank!,
                                   )
                                 : (widget.rank == null
-                                    ? GamificationIcons.levelHexagon(
-                                        widget.level,
-                                      )
-                                    : null),
+                                      ? GamificationIcons.levelHexagon(
+                                          widget.level,
+                                        )
+                                      : null),
                             icon: Icons.military_tech_rounded,
                             color: (widget.rank == 1)
                                 ? AppColors.rankGold

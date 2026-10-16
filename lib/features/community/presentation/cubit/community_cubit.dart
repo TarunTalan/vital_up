@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
+import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 
 class CommunityState extends Equatable {
@@ -14,6 +16,12 @@ class CommunityState extends Equatable {
 
   /// Friends and pending requests, for the Friends section.
   final List<Friend> friends;
+
+  /// The caller and their friends ranked on all-time points, best first.
+  final List<LeaderboardEntry> friendsRanking;
+
+  /// The caller's rank this week in each community, by community id.
+  final Map<String, CommunityStanding> standings;
   final bool failed;
 
   /// Community ids with a join/leave in flight.
@@ -27,6 +35,8 @@ class CommunityState extends Equatable {
     this.communities,
     this.settings = const CommunitySettings(),
     this.friends = const [],
+    this.friendsRanking = const [],
+    this.standings = const {},
     this.failed = false,
     this.busy = const {},
     this.message,
@@ -59,6 +69,8 @@ class CommunityState extends Equatable {
     List<Community>? communities,
     CommunitySettings? settings,
     List<Friend>? friends,
+    List<LeaderboardEntry>? friendsRanking,
+    Map<String, CommunityStanding>? standings,
     bool? failed,
     Set<String>? busy,
     String? message,
@@ -67,6 +79,8 @@ class CommunityState extends Equatable {
     communities: communities ?? this.communities,
     settings: settings ?? this.settings,
     friends: friends ?? this.friends,
+    friendsRanking: friendsRanking ?? this.friendsRanking,
+    standings: standings ?? this.standings,
     failed: failed ?? this.failed,
     busy: busy ?? this.busy,
     message: message,
@@ -78,6 +92,8 @@ class CommunityState extends Equatable {
     communities,
     settings,
     friends,
+    friendsRanking,
+    standings,
     failed,
     busy,
     message,
@@ -92,11 +108,24 @@ class CommunityCubit extends Cubit<CommunityState> {
   Future<void> load() async {
     emit(state.copyWith(loading: true, failed: false));
     try {
-      final (communities, settings, friends) = await (
+      // Friends and ranks are optional: the hub still works without them.
+      final (
+        communities,
+        settings,
+        friends,
+        friendsRanking,
+        standings,
+      ) = await (
         _repository.getCommunities(),
         _repository.getSettings(),
-        // Optional: the hub still works if friends fail to load.
         _repository.getFriends().orFallback(state.friends),
+        _repository
+            .getFriendRanks(
+              Community.friendsOf(state.friendCount),
+              period: LeaderboardPeriod.all,
+            )
+            .orFallback(state.friendsRanking),
+        _repository.getMyStandings().orFallback(state.standings),
       ).wait.withLoadTimeout();
       if (isClosed) return;
       emit(
@@ -105,6 +134,8 @@ class CommunityCubit extends Cubit<CommunityState> {
           communities: communities,
           settings: settings,
           friends: friends,
+          friendsRanking: friendsRanking,
+          standings: standings,
         ),
       );
     } catch (e) {

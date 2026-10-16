@@ -7,6 +7,7 @@ import 'package:vital_up/features/community/data/datasources/community_remote_da
 import 'package:vital_up/features/community/data/repositories/community_repository_impl.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
+import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 
 Map<String, dynamic> _friendRow(String id) => {
@@ -47,6 +48,47 @@ class _FakeRemote implements CommunityRemoteDataSource {
       {'id': 'l', 'slug': 'local-x', 'name': 'Pune', 'type': 'local'},
     ];
   }
+
+  int standingFetches = 0;
+  int friendRankFetches = 0;
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMyStandings({
+    required String period,
+  }) async {
+    standingFetches++;
+    return [
+      {
+        'community_id': 'g',
+        'rank': 12,
+        'points': 340,
+        'ranked_count': 900,
+        'friend_count': 2,
+      },
+      {'community_id': 'l', 'rank': null, 'ranked_count': 4},
+    ];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchCommunityFriendRanks({
+    required String communityId,
+    required String period,
+    String? category,
+  }) async {
+    friendRankFetches++;
+    return [
+      {'rank': 3, 'user_id': 'a', 'username': 'ann', 'points': 90},
+      {'rank': 40, 'user_id': 'me', 'username': 'me', 'is_me': true},
+    ];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchFriendsLeaderboard({
+    required String period,
+    String? category,
+  }) async => [
+    {'rank': 1, 'user_id': 'b', 'username': 'bo', 'points': 50},
+  ];
 
   @override
   Future<bool> removeFriend(String userId) async => online;
@@ -135,5 +177,69 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('standings are keyed by community and cached', () async {
+    final standings = await repo.getMyStandings();
+    expect(standings['g']!.rank, 12);
+    expect(standings['g']!.friendCount, 2);
+    expect(standings['l']!.rank, isNull);
+    await repo.getMyStandings();
+    expect(remote.standingFetches, 1);
+  });
+
+  test('a friend change refetches standings and friend ranks', () async {
+    const global = Community(
+      id: 'g',
+      slug: 'global',
+      name: 'Everyone',
+      type: CommunityType.global,
+      iconKey: 'global',
+    );
+    await repo.getMyStandings();
+    final ranks = await repo.getFriendRanks(
+      global,
+      period: LeaderboardPeriod.week,
+    );
+    expect([for (final e in ranks) e.rank], [3, 40]);
+    expect(ranks.last.isMe, isTrue);
+
+    await repo.removeFriend(
+      const Friend(
+        userId: 'a',
+        username: 'ann',
+        level: 1,
+        status: FriendStatus.accepted,
+      ),
+    );
+    await repo.getMyStandings();
+    await repo.getFriendRanks(global, period: LeaderboardPeriod.week);
+    expect(remote.standingFetches, 2);
+    expect(remote.friendRankFetches, 2);
+  });
+
+  test('friend ranks on the friends board come from that board', () async {
+    final ranks = await repo.getFriendRanks(
+      Community.friendsOf(1),
+      period: LeaderboardPeriod.all,
+    );
+    expect(ranks.single.username, 'bo');
+    expect(remote.friendRankFetches, 0);
+  });
+
+  test('common communities use real ranks for both players', () async {
+    final common = await repo.getCommonCommunityRanks('a');
+    final global = common.firstWhere(
+      (r) => r.community.type == CommunityType.global,
+    );
+    expect(global.friendRank, 3);
+    expect(global.myRank, 40);
+    // The friends board is always shared, even without the friend on it.
+    expect(
+      common.any((r) => r.community.type == CommunityType.friends),
+      isTrue,
+    );
+    // Not a member of the local board, so it isn't compared.
+    expect(common.any((r) => r.community.id == 'l'), isFalse);
   });
 }

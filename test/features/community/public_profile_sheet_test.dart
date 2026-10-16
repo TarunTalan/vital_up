@@ -5,6 +5,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/widgets/user_avatar.dart';
 import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
@@ -66,6 +67,16 @@ class _MockRepo implements CommunityRepository {
   Future<List<CommonCommunityRank>> getCommonCommunityRanks(
     String friendUserId,
   ) async => const [];
+  @override
+  Future<List<LeaderboardEntry>> getFriendRanks(
+    Community community, {
+    required LeaderboardPeriod period,
+    ScoreCategory? category,
+  }) async => const [];
+  @override
+  Future<Map<String, CommunityStanding>> getMyStandings({
+    LeaderboardPeriod period = LeaderboardPeriod.week,
+  }) async => const {};
 }
 
 void main() {

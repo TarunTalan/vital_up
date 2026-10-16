@@ -12,15 +12,14 @@ import 'package:vital_up/features/challenges/presentation/widgets/custom_challen
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// Arena section: open invites first, then up to [_maxActive] running
-/// challenges and a way to start a new one, then the latest
-/// [_maxHistory] finished or left ones. "See all" opens the full list.
+/// challenges and a way to start a new one. Finished ones live behind
+/// "See all" to keep the hub short.
 class ArenaChallengesSection extends StatelessWidget {
   final VoidCallback? onRefresh;
 
   const ArenaChallengesSection({super.key, this.onRefresh});
 
-  static const _maxActive = 3;
-  static const _maxHistory = 3;
+  static const _maxActive = 2;
 
   void _openAll(BuildContext context) {
     context.pushNamed('challenges').then((_) => onRefresh?.call());
@@ -54,10 +53,6 @@ class ArenaChallengesSection extends StatelessWidget {
             .take(_maxActive)
             .toList();
         final shown = [...invites, ...active];
-        final history = challenges
-            .where((c) => !challengeIsOpen(c, now))
-            .take(_maxHistory)
-            .toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -82,19 +77,6 @@ class ArenaChallengesSection extends StatelessWidget {
                 ),
                 onTap: () => _create(context),
               ),
-            ],
-            if (history.isNotEmpty) ...[
-              const SizedBox(height: AppDimens.sectionGap),
-              AppSectionHeader(
-                'Challenge history',
-                actionLabel: 'See all',
-                onAction: () => _openAll(context),
-              ),
-              for (final c in history) ...[
-                ChallengeTile(challenge: c),
-                if (c != history.last)
-                  const SizedBox(height: AppDimens.cardGap),
-              ],
             ],
           ],
         );

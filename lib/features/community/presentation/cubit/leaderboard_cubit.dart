@@ -15,6 +15,10 @@ class LeaderboardState extends Equatable {
   final ScoreCategory? category;
   final List<LeaderboardEntry>? entries;
   final LeaderboardEntry? me;
+
+  /// The caller and their friends on this board with their real ranks,
+  /// even below the loaded pages. Empty on the friends board itself.
+  final List<LeaderboardEntry> friendRanks;
   final bool loading;
   final bool loadingMore;
   final bool hasMore;
@@ -26,11 +30,18 @@ class LeaderboardState extends Equatable {
     this.category,
     this.entries,
     this.me,
+    this.friendRanks = const [],
     this.loading = true,
     this.loadingMore = false,
     this.hasMore = false,
     this.failed = false,
   });
+
+  /// Ids of the caller's friends ranked here, to tag their rows.
+  Set<String> get friendIds => {
+    for (final e in friendRanks)
+      if (!e.isMe) e.userId,
+  };
 
   /// Category filters offered for this community.
   List<ScoreCategory> get categories => community.scoreCategories.length == 1
@@ -45,6 +56,7 @@ class LeaderboardState extends Equatable {
     ScoreCategory? Function()? category,
     List<LeaderboardEntry>? entries,
     LeaderboardEntry? Function()? me,
+    List<LeaderboardEntry>? friendRanks,
     bool? loading,
     bool? loadingMore,
     bool? hasMore,
@@ -55,6 +67,7 @@ class LeaderboardState extends Equatable {
     category: category != null ? category() : this.category,
     entries: entries ?? this.entries,
     me: me != null ? me() : this.me,
+    friendRanks: friendRanks ?? this.friendRanks,
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
     hasMore: hasMore ?? this.hasMore,
@@ -68,6 +81,7 @@ class LeaderboardState extends Equatable {
     category,
     entries,
     me,
+    friendRanks,
     loading,
     loadingMore,
     hasMore,
@@ -90,7 +104,8 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
     final request = ++_request;
     emit(state.copyWith(loading: true, failed: false));
     try {
-      final (entries, me) = await (
+      final isFriendsBoard = state.community.type == CommunityType.friends;
+      final (entries, me, friendRanks) = await (
         _repository.getLeaderboard(
           state.community,
           period: state.period,
@@ -102,6 +117,16 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
           period: state.period,
           category: state.category,
         ),
+        // Optional: the board still shows without it.
+        isFriendsBoard
+            ? Future.value(const <LeaderboardEntry>[])
+            : _repository
+                  .getFriendRanks(
+                    state.community,
+                    period: state.period,
+                    category: state.category,
+                  )
+                  .orFallback(const <LeaderboardEntry>[]),
       ).wait.withLoadTimeout();
       if (isClosed || request != _request) return;
       emit(
@@ -112,6 +137,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
           loadingMore: false,
           entries: entries,
           me: () => me,
+          friendRanks: friendRanks,
           hasMore: entries.length == pageSize,
         ),
       );

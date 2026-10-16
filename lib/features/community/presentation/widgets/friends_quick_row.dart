@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
+import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// Arena section: pending friend requests, then a scrolling strip of
-/// friends (tap to inspect) ending in an Add tile. "Manage" opens the
-/// Friends page.
+/// friends and the caller in rank order (tap a friend to inspect) ending in
+/// an Add tile. "Manage" opens the Friends page.
 class FriendsQuickRow extends StatelessWidget {
   final List<Friend> friends;
+
+  /// The caller and their friends ranked on all-time points; empty keeps
+  /// the friends in list order.
+  final List<LeaderboardEntry> ranking;
   final int incomingRequests;
   final String? myUsername;
   final VoidCallback? onRefresh;
@@ -21,6 +27,7 @@ class FriendsQuickRow extends StatelessWidget {
   const FriendsQuickRow({
     super.key,
     required this.friends,
+    this.ranking = const [],
     this.incomingRequests = 0,
     this.myUsername,
     this.onRefresh,
@@ -37,6 +44,7 @@ class FriendsQuickRow extends StatelessWidget {
     final accepted = friends
         .where((f) => f.status == FriendStatus.accepted)
         .toList();
+    final chips = rankedFriendChips(accepted, ranking);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,14 +72,19 @@ class FriendsQuickRow extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final f in accepted) ...[
+                  for (final c in chips) ...[
                     _FriendChip(
-                      friend: f,
-                      onTap: () => PlayerInspectSheet.show(
-                        context,
-                        friend: f,
-                        onRemove: () => onRefresh?.call(),
-                      ),
+                      friend: c.friend,
+                      rank: c.rank,
+                      points: c.points,
+                      isMe: c.isMe,
+                      onTap: c.isMe
+                          ? null
+                          : () => PlayerInspectSheet.show(
+                              context,
+                              friend: c.friend,
+                              onRemove: () => onRefresh?.call(),
+                            ),
                     ),
                     const SizedBox(width: AppDimens.cardGap),
                   ],
@@ -193,61 +206,194 @@ class _EmptyFriends extends StatelessWidget {
   }
 }
 
-/// Fixed-width tile in the friends strip: avatar, name and level.
+/// One tile of the friends strip.
+typedef FriendChipData = ({Friend friend, int? rank, int? points, bool isMe});
+
+/// Friends (and the caller) in [ranking] order, then any accepted friend
+/// the ranking doesn't list yet. Without a ranking, just the friends.
+List<FriendChipData> rankedFriendChips(
+  List<Friend> accepted,
+  List<LeaderboardEntry> ranking,
+) {
+  if (accepted.isEmpty) return const [];
+  final byId = {for (final f in accepted) f.userId: f};
+  final chips = <FriendChipData>[
+    for (final e in ranking)
+      if (e.isMe)
+        (
+          friend: Friend(
+            userId: e.userId,
+            username: e.username,
+            fullName: e.displayName,
+            avatarUrl: e.avatarUrl,
+            level: e.level,
+            status: FriendStatus.accepted,
+          ),
+          rank: e.rank,
+          points: e.points,
+          isMe: true,
+        )
+      else if (byId.remove(e.userId) case final f?)
+        (friend: f, rank: e.rank, points: e.points, isMe: false),
+  ];
+  return [
+    ...chips,
+    for (final f in byId.values)
+      (friend: f, rank: null, points: null, isMe: false),
+  ];
+}
+
+/// Tile width for the strip, growing with the text size so names and
+/// figures stay whole.
+double _chipWidth(BuildContext context) => MediaQuery.textScalerOf(
+  context,
+).scale(AppDimens.friendChipWidth).clamp(AppDimens.friendChipWidth, 180.0);
+
+final _pointsFormat = NumberFormat.decimalPattern();
+
+/// Tile in the friends strip: avatar with the rank pinned to it, the name
+/// (two lines when needed), then points and level on their own lines.
 class _FriendChip extends StatelessWidget {
   final Friend friend;
-  final VoidCallback onTap;
+  final int? rank;
+  final int? points;
+  final bool isMe;
+  final VoidCallback? onTap;
 
-  const _FriendChip({required this.friend, required this.onTap});
+  const _FriendChip({
+    required this.friend,
+    required this.onTap,
+    this.rank,
+    this.points,
+    this.isMe = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final name = isMe ? 'You' : friend.username;
+    final grey = context.vColors.grayText;
     return Semantics(
-      button: true,
-      label: '@${friend.username}, level ${friend.level}',
+      button: onTap != null,
+      label: [
+        isMe ? 'You' : '@${friend.username}',
+        if (rank != null) 'rank $rank',
+        if (points != null) '${_pointsFormat.format(points)} points',
+        'level ${friend.level}',
+      ].join(', '),
       excludeSemantics: true,
       child: AppCard(
-        width: AppDimens.trackerTile,
-        padding: AppDimens.cardPaddingCompact,
+        width: _chipWidth(context),
+        padding: const EdgeInsets.fromLTRB(
+          AppDimens.space8,
+          AppDimens.space12,
+          AppDimens.space8,
+          AppDimens.space12,
+        ),
+        highlighted: isMe,
         onTap: onTap,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            UserAvatar(
-              username: friend.username,
-              url: friend.avatarUrl,
-              size: AppDimens.iconBadge,
-            ),
+            _AvatarWithRank(friend: friend, rank: rank, isMe: isMe),
             const SizedBox(height: AppDimens.space8),
             Text(
-              friend.username,
-              maxLines: 1,
+              name,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: context.text.labelMedium?.copyWith(
+              style: context.text.titleSmall?.copyWith(
                 color: context.colors.onSurface,
               ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GameIcon(
-                  GamificationIcons.levelHexagon(friend.level),
-                  fallback: Icons.shield_rounded,
-                  size: AppDimens.iconXs,
-                  color: context.colors.primary,
+            const Spacer(),
+            const SizedBox(height: AppDimens.space4),
+            if (points != null)
+              Text(
+                '${_pointsFormat.format(points)} pts',
+                textAlign: TextAlign.center,
+                style: context.text.labelLarge?.copyWith(
+                  color: context.colors.onSurface,
                 ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  'Lv ${friend.level}',
-                  maxLines: 1,
-                  style: context.text.labelSmall?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ],
+              ),
+            Text(
+              'Level ${friend.level}',
+              textAlign: TextAlign.center,
+              style: context.text.labelSmall?.copyWith(color: grey),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Avatar with a small rank badge on its lower right: the medal for the
+/// top three, otherwise the number on a solid disc.
+class _AvatarWithRank extends StatelessWidget {
+  final Friend friend;
+  final int? rank;
+  final bool isMe;
+
+  const _AvatarWithRank({
+    required this.friend,
+    required this.rank,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final r = rank;
+    const badge = AppDimens.friendChipRankBadge;
+    return SizedBox.square(
+      dimension: AppDimens.friendChipAvatar + badge / 3,
+      child: Stack(
+        children: [
+          UserAvatar(
+            username: friend.username,
+            url: friend.avatarUrl,
+            size: AppDimens.friendChipAvatar,
+            ringColor: isMe ? context.colors.primary : null,
+          ),
+          if (r != null)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: r <= 3
+                  ? GameIcon(
+                      GamificationIcons.leaderboardRank(r)!,
+                      fallback: Icons.military_tech_rounded,
+                      size: badge,
+                      color: switch (r) {
+                        1 => AppColors.rankGold,
+                        2 => AppColors.rankSilver,
+                        _ => AppColors.rankBronze,
+                      },
+                    )
+                  : Container(
+                      constraints: const BoxConstraints(
+                        minWidth: badge,
+                        minHeight: badge,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space4,
+                      ),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppDimens.radiusPill,
+                        ),
+                        border: Border.all(color: context.vColors.hairline!),
+                      ),
+                      child: Text(
+                        '$r',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.colors.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+            ),
+        ],
       ),
     );
   }
@@ -265,7 +411,7 @@ class _AddChip extends StatelessWidget {
       label: 'Add friends',
       excludeSemantics: true,
       child: AppCard(
-        width: AppDimens.trackerTile,
+        width: _chipWidth(context),
         padding: AppDimens.cardPaddingCompact,
         onTap: onTap,
         child: Column(
@@ -279,7 +425,7 @@ class _AddChip extends StatelessWidget {
             Text(
               'Add',
               style: context.text.labelMedium?.copyWith(
-                color: context.colors.primary,
+                color: context.vColors.accentText,
               ),
             ),
           ],

@@ -95,8 +95,6 @@ class ChallengeTile extends StatelessWidget {
                   children: [
                     Text(
                       challengeTitle(c),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: context.text.titleSmall?.copyWith(
                         color: context.colors.onSurface,
                       ),
@@ -104,8 +102,6 @@ class ChallengeTile extends StatelessWidget {
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       challengeSubtitle(c, now),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
                   ],
@@ -122,32 +118,29 @@ class ChallengeTile extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (c.myRank! <= 3) ...[
-                          GameIcon(
-                            GamificationIcons.leaderboardRank(c.myRank!)!,
-                            fallback: Icons.military_tech_rounded,
-                            size: AppDimens.iconSm,
-                            color: c.myRank == 1
-                                ? AppColors.rankGold
-                                : c.myRank == 2
-                                    ? AppColors.rankSilver
-                                    : AppColors.rankBronze,
-                          ),
-                          const SizedBox(width: AppDimens.space4),
-                        ],
-                        Text(
-                          '#${c.myRank}',
-                          style: context.text.titleMedium?.copyWith(
-                            color: c.myRank == 1
-                                ? AppColors.rankGold
-                                : context.colors.onSurface,
-                          ),
+                    // Top three get the medal alone; the number would
+                    // repeat it.
+                    if (c.myRank! <= 3)
+                      Semantics(
+                        label: 'Rank ${c.myRank}',
+                        child: GameIcon(
+                          GamificationIcons.leaderboardRank(c.myRank!)!,
+                          fallback: Icons.military_tech_rounded,
+                          size: AppDimens.iconLg,
+                          color: c.myRank == 1
+                              ? AppColors.rankGold
+                              : c.myRank == 2
+                              ? AppColors.rankSilver
+                              : AppColors.rankBronze,
                         ),
-                      ],
-                    ),
+                      )
+                    else
+                      Text(
+                        '#${c.myRank}',
+                        style: context.text.titleMedium?.copyWith(
+                          color: context.colors.onSurface,
+                        ),
+                      ),
                     Text(
                       c.metric.format(c.myScore ?? 0),
                       style: context.text.bodySmall?.copyWith(color: grey),
@@ -307,8 +300,8 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
                                     color: s.rank == 1
                                         ? AppColors.rankGold
                                         : s.rank == 2
-                                            ? AppColors.rankSilver
-                                            : AppColors.rankBronze,
+                                        ? AppColors.rankSilver
+                                        : AppColors.rankBronze,
                                   )
                                 : Text(
                                     s.rank == null ? '–' : '#${s.rank}',

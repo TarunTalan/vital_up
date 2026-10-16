@@ -16,7 +16,6 @@ import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/pages/head_to_head_comparison_page.dart';
-import 'package:vital_up/features/community/presentation/widgets/common_communities_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
@@ -226,16 +225,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                     icon: Icons.lock_outline_rounded,
                   );
                 }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    PlayerProfileStats(profile: profile),
-                    CommonCommunitiesSection(
-                      friendUserId: friend.userId,
-                      friendUsername: friend.username,
-                    ),
-                  ],
-                );
+                return PlayerProfileStats(profile: profile);
               },
             ),
             const SizedBox(height: AppDimens.sectionGap),

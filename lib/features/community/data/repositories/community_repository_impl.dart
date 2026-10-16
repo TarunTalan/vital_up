@@ -8,6 +8,7 @@ import 'package:vital_up/features/community/data/datasources/community_remote_da
 import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -34,6 +35,11 @@ class CommunityRepositoryImpl implements CommunityRepository {
   String get _communitiesKey => _key('communities');
   String get _settingsKey => _key('settings');
   String get _friendsKey => _key('friends');
+
+  /// Ranks that depend on who the caller's friends are or which
+  /// communities they're in.
+  String get _friendRanksPrefix => '${_key('friendranks')}:';
+  String get _standingsPrefix => '${_key('standings')}:';
 
   /// Every leaderboard key of [communityId] starts with this.
   String _boardPrefix(String communityId) => '${_key('board')}:$communityId:';
@@ -66,6 +72,8 @@ class CommunityRepositoryImpl implements CommunityRepository {
   Future<void> _invalidateFriends() async {
     await _cache.remove(_friendsKey);
     await _cache.removeWhere(_boardPrefix('friends'));
+    await _cache.removeWhere(_friendRanksPrefix);
+    await _cache.removeWhere(_standingsPrefix);
   }
 
   @override
@@ -113,6 +121,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       return rows;
     });
     await _cache.removeWhere(_boardPrefix(community.id));
+    await _cache.removeWhere(_standingsPrefix);
   }
 
   @override
@@ -143,6 +152,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       'city': c.isEmpty ? null : c,
       'country_code': cc.isEmpty ? null : cc.toUpperCase(),
     });
+    await _cache.removeWhere(_standingsPrefix);
     if (sent) {
       // Moved to another local community: refetch the list.
       await _cache.remove(_communitiesKey);
@@ -222,6 +232,41 @@ class CommunityRepositoryImpl implements CommunityRepository {
     );
     return row == null ? null : LeaderboardEntry.fromJson(row);
   }
+
+  @override
+  Future<List<LeaderboardEntry>> getFriendRanks(
+    Community community, {
+    required LeaderboardPeriod period,
+    ScoreCategory? category,
+  }) async {
+    if (community.type == CommunityType.friends) {
+      return _friendsBoard(period, category);
+    }
+    return [
+      for (final r in await _rows(
+        '$_friendRanksPrefix${community.id}:${period.name}:${category?.name}',
+        () => _remote.fetchCommunityFriendRanks(
+          communityId: community.id,
+          period: period.name,
+          category: category?.name,
+        ),
+        _boardMaxAge,
+      ))
+        LeaderboardEntry.fromJson(r),
+    ];
+  }
+
+  @override
+  Future<Map<String, CommunityStanding>> getMyStandings({
+    LeaderboardPeriod period = LeaderboardPeriod.week,
+  }) async => {
+    for (final r in await _rows(
+      '$_standingsPrefix${period.name}',
+      () => _remote.fetchMyStandings(period: period.name),
+      _boardMaxAge,
+    ))
+      r['community_id'] as String: CommunityStanding.fromJson(r),
+  };
 
   Future<List<LeaderboardEntry>> _friendsBoard(
     LeaderboardPeriod period,
@@ -338,62 +383,59 @@ class CommunityRepositoryImpl implements CommunityRepository {
     }
   }
 
+  /// Friends board, Global, the caller's city and joined communities where
+  /// the friend is ranked too, with both all-time ranks. Uses the real
+  /// ranks from [getFriendRanks]; falls back to the first 100 of each board
+  /// when that isn't available.
   @override
   Future<List<CommonCommunityRank>> getCommonCommunityRanks(
     String friendUserId,
   ) async {
     try {
-      final allCommunities = await getCommunities();
-      final myJoined = allCommunities.where((c) {
-        return c.type == CommunityType.global ||
-            c.type == CommunityType.local ||
-            c.isMember;
-      }).toList();
-
-      final friends = await getFriends();
-      final acceptedCount =
-          friends.where((f) => f.status == FriendStatus.accepted).length;
-      final friendsCommunity = Community.friendsOf(acceptedCount);
-
-      // Prioritize Friends board and Global board, followed by joined communities
+      final communities = await getCommunities();
       final targets = [
-        friendsCommunity,
-        ...myJoined,
+        Community.friendsOf(0),
+        for (final c in communities)
+          if (c.type == CommunityType.global) c,
+        for (final c in communities)
+          if (c.type != CommunityType.global && c.isMember) c,
       ];
-
       final results = await Future.wait(
         targets.map((c) async {
           try {
-            final entries = await getLeaderboard(
-              c,
-              period: LeaderboardPeriod.all,
-              limit: 100,
-            );
-            final friendEntry = entries
+            List<LeaderboardEntry> entries;
+            try {
+              entries = await getFriendRanks(c, period: LeaderboardPeriod.all);
+            } catch (_) {
+              entries = await getLeaderboard(
+                c,
+                period: LeaderboardPeriod.all,
+                limit: 100,
+              );
+            }
+            final friend = entries
                 .where((e) => e.userId == friendUserId)
                 .firstOrNull;
-            final myEntry = entries.where((e) => e.isMe).firstOrNull;
-
-            // Global and Friends communities are always shared/common between accepted friends
-            final isCommon = c.type == CommunityType.global ||
+            final me = entries.where((e) => e.isMe).firstOrNull;
+            // Global and the friends board are always shared; elsewhere
+            // only boards the friend is ranked on.
+            final shared =
+                c.type == CommunityType.global ||
                 c.type == CommunityType.friends ||
-                friendEntry != null;
-
-            if (!isCommon) return null;
-
+                friend != null;
+            if (!shared) return null;
             return CommonCommunityRank(
               community: c,
-              friendRank: friendEntry?.rank,
-              friendPoints: friendEntry?.points ?? 0,
-              myRank: myEntry?.rank,
-              myPoints: myEntry?.points ?? 0,
+              friendRank: friend?.rank,
+              friendPoints: friend?.points ?? 0,
+              myRank: me?.rank,
+              myPoints: me?.points ?? 0,
             );
           } catch (_) {
             return null;
           }
         }),
       );
-
       return results.whereType<CommonCommunityRank>().toList();
     } catch (_) {
       return const [];

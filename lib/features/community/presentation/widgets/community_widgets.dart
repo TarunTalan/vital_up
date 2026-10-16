@@ -8,11 +8,13 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 export 'package:vital_up/core/widgets/user_avatar.dart';
 
 final _count = NumberFormat.compact();
+final _rankFormat = NumberFormat.decimalPattern();
 
 IconData communityFallbackIcon(Community c) => switch (c.type) {
   CommunityType.global => Icons.public_rounded,
@@ -55,70 +57,111 @@ String communityIconAsset(Community c) {
   return GamificationIcons.communityIcon(c.iconKey);
 }
 
-/// A community row: icon, name, what it ranks on and member count, with an
-/// optional trailing action.
+/// A community row for an [AppListGroup]: icon, name, member count and
+/// what it ranks on (or how many friends are ranked there), with an
+/// optional trailing action. With a [standing], the caller's rank this week
+/// replaces the chevron. Text wraps rather than being cut off.
 class CommunityTile extends StatelessWidget {
   final Community community;
   final VoidCallback onTap;
   final Widget? trailing;
+  final CommunityStanding? standing;
 
   const CommunityTile({
     super.key,
     required this.community,
     required this.onTap,
     this.trailing,
+    this.standing,
   });
 
   @override
   Widget build(BuildContext context) {
     final members = community.memberCount;
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
+    final friends = standing?.friendCount ?? 0;
+    final rank = standing?.rank;
+    return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          AppIconBadge(
-            color: context.colors.primary,
-            icon: GameIcon(
-              communityIconAsset(community),
-              fallback: communityFallbackIcon(community),
-              size: AppDimens.iconMd,
-            ),
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  community.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall?.copyWith(
-                    color: context.colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: AppDimens.space2),
-                Text(
-                  '${_count.format(members)} ${members == 1 ? 'member' : 'members'}'
-                  ' · ${community.rankedOn}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppDimens.space8),
-          trailing ??
-              Icon(
-                Icons.chevron_right_rounded,
-                color: context.vColors.grayText,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+          vertical: AppDimens.space10,
+        ),
+        child: Row(
+          children: [
+            AppIconBadge(
+              color: context.colors.primary,
+              icon: GameIcon(
+                communityIconAsset(community),
+                fallback: communityFallbackIcon(community),
                 size: AppDimens.iconMd,
               ),
+            ),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    community.name,
+                    style: context.text.titleSmall?.copyWith(
+                      color: context.colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space2),
+                  Text(
+                    '${_count.format(members)} ${members == 1 ? 'member' : 'members'}'
+                    ' · ${friends > 0 ? '$friends ${friends == 1 ? 'friend' : 'friends'} ranked' : community.rankedOn}',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.vColors.grayText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppDimens.space8),
+            trailing ??
+                (rank != null
+                    ? _RankBadge(rank: rank)
+                    : Icon(
+                        Icons.chevron_right_rounded,
+                        color: context.vColors.grayText,
+                        size: AppDimens.iconMd,
+                      )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "#12 / this week" on a community tile.
+class _RankBadge extends StatelessWidget {
+  final int rank;
+
+  const _RankBadge({required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'You are ranked $rank this week',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '#${_rankFormat.format(rank)}',
+            style: context.text.titleSmall?.copyWith(
+              color: context.vColors.accentText,
+            ),
+          ),
+          Text(
+            'this week',
+            style: context.text.labelSmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
         ],
       ),
     );
