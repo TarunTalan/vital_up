@@ -1,0 +1,13 @@
+# Shorebird Code Push Configuration
+# Documentation: https://docs.shorebird.dev
+#
+# To link this project with your Shorebird account:
+# 1. Install Shorebird CLI: iwr -useb https://raw.githubusercontent.com/shorebirdtech/install/main/install.ps1 | iex
+# 2. Run: shorebird login
+# 3. Run: shorebird init (or replace the placeholder app_id below)
+#
+# Release builds: shorebird release android
+# Instant OTA patches: shorebird patch android
+
+app_id: YOUR_SHOREBIRD_APP_ID
+auto_update: true

@@ -1,0 +1,59 @@
+name: VitalUp CI
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, Test & Validate Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.3'
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Prepare Environment File
+        run: |
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+          elif [ -f .env.example ]; then
+            echo "Using .env.example as fallback for CI validation"
+            cp .env.example .env
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate Envied Code
+        run: dart run build_runner build --build-filter="lib/core/config/**"
+
+      - name: Analyze Dart Code
+        run: dart analyze lib/core lib/features lib/main.dart
+
+      - name: Run Tests
+        run: flutter test --no-pub
+
+      - name: Build Debug APK (Smoke Test)
+        run: flutter build apk --debug

@@ -21,9 +21,16 @@ cd android && ./gradlew.bat :app:compileDebugKotlin        # quick native check
 supabase db push               # apply new migrations (outward-facing: ask first)
 ```
 
-- `lib/core/config/supabase_config.dart` is gitignored (copy the `.example`);
-  it also holds the Mapbox token. `android/key.properties` holds release
-  signing (the build silently falls back to the debug key without it).
+- Environment variables & secrets: `.env` (copy `.env.example`); compiled
+  and XOR-obfuscated via `envied` into `lib/core/config/env.dart`.
+  `lib/core/config/supabase_config.dart` delegates to `Env`.
+  `android/key.properties` holds release signing (the build silently falls
+  back to the debug key without it).
+- Code Push: Shorebird configured in `shorebird.yaml` and `.github/workflows/shorebird_patch.yml`.
+- Analytics & Crashlytics: `lib/core/monitoring/analytics_service.dart` (Firebase Analytics)
+  and `crash_reporter.dart` (Crashlytics).
+- Release Obfuscation: R8 minification enabled in `build.gradle.kts` + Dart
+  `--obfuscate --split-debug-info`. Release guide in `docs/PLAY_STORE_PRE_RELEASE_GUIDE.md`.
 - Legal URLs are placeholders: `lib/core/config/legal_links.dart` and
   `android/app/src/main/res/values/strings.xml` (`privacy_policy_url`).
 - `dart analyze lib test` has no warnings; only info lints remain
