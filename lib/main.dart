@@ -6,6 +6,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:vital_up/core/monitoring/analytics_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/router/app_router.dart';
@@ -36,6 +37,7 @@ void main() async {
 
   // Uncaught errors go to Crashlytics (release builds, once configured).
   await CrashReporter.init();
+  await AnalyticsService.init();
 
   // A widget that fails to build shows a calm placeholder in release
   // builds instead of the grey/red error box with raw exception text.
@@ -72,6 +74,7 @@ void main() async {
     sl<RemindersService>().resyncOnNewDay();
 
     CrashReporter.watchUser(sl<SupabaseClient>());
+    AnalyticsService.watchUser(sl<SupabaseClient>());
 
     // Back up logs to the cloud and bring back ones from other devices.
     sl<SyncService>().start();

@@ -78,12 +78,14 @@ import 'package:vital_up/features/gamification/presentation/cubit/gamification_c
 import 'package:vital_up/features/gamification/presentation/cubit/activity_calendar_cubit.dart';
 import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/monitoring/analytics_service.dart';
 
 class AppRouter {
   AppRouter._();
 
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    observers: [AnalyticsService.observer],
     routes: [
       GoRoute(
         path: '/splash',
