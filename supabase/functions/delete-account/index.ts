@@ -28,7 +28,8 @@ const admin = createClient(SUPABASE_URL || "http://localhost", SERVICE_ROLE_KEY 
 
 /** Tables keyed by the user that may not cascade from auth.users. */
 const USER_TABLES: Array<{ table: string; column: string }> = [
-  { table: "user_health_data", column: "user_id" },
+  // Keyed by id (the user's id), as the app reads and writes it.
+  { table: "user_health_data", column: "id" },
   { table: "profiles", column: "id" },
 ];
 
@@ -416,8 +417,9 @@ serve(async (req) => {
 
     for (const { table, column } of USER_TABLES) {
       const { error } = await admin.from(table).delete().eq(column, userId);
-      // A missing table is fine; anything else stops the deletion.
-      if (error && error.code !== "42P01") throw error;
+      // A missing table or column is fine (the row then goes with the
+      // auth.users cascade); anything else stops the deletion.
+      if (error && !["42P01", "42703", "PGRST204", "PGRST205"].includes(error.code)) throw error;
     }
 
     const { error } = await admin.auth.admin.deleteUser(userId);

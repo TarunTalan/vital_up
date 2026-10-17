@@ -1,14 +1,14 @@
 // Per-user daily fair-use quota for AI-backed features, backed by the
 // consume_ai_quota / refund_ai_quota SQL functions (service role only).
 //
-// Fails open: if the quota check itself errors (DB hiccup, migration not yet
-// applied) the request is allowed and the error logged. The cap protects the
-// shared provider quota; it should never be the reason a scan fails.
+// Fails closed: if the quota check itself errors, the request is refused.
+// Failing open let anyone who could make the check error (or wait for a DB
+// hiccup) spend the shared provider quota without limit.
 
 // deno-lint-ignore no-explicit-any
 type Client = any;
 
-export type AiFeature = 'photo_scan' | 'diet_plan' | 'vita_chat' | 'vita_insights';
+export type AiFeature = 'photo_scan' | 'diet_plan' | 'vita_chat' | 'vita_insights' | 'nutrition_lookup';
 
 export interface QuotaResult {
   allowed: boolean;
@@ -35,14 +35,14 @@ export async function consumeDailyQuota(
       p_daily_limit: limit,
     });
     if (error) {
-      console.error(`Quota check for ${feature} failed (allowing request): ${error.message}`);
-      return { allowed: true, remaining: null, limit };
+      console.error(`Quota check for ${feature} failed (refusing request): ${error.message}`);
+      return { allowed: false, remaining: null, limit };
     }
     if (data === null || data === undefined) return { allowed: false, remaining: 0, limit };
     return { allowed: true, remaining: Number(data), limit };
   } catch (e) {
-    console.error(`Quota check for ${feature} threw (allowing request):`, e);
-    return { allowed: true, remaining: null, limit };
+    console.error(`Quota check for ${feature} threw (refusing request):`, e);
+    return { allowed: false, remaining: null, limit };
   }
 }
 

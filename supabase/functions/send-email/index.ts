@@ -5,14 +5,21 @@
 //
 // Dual-mode handler:
 // 1. Supabase Auth "Send Email" Hook (for automated signup/recovery OTPs)
-// 2. Direct API invocation for transactional notifications & announcements
+// 2. Support tickets (signed-in app users) and website deletion requests.
+//    There is no "send anything to anyone" mode: that made it an open relay.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import {
-  errorResponse,
+  bearerToken,
+  cleanText,
   handleError,
   HttpError,
   jsonResponse,
+  KB,
+  parseJsonObject,
+  readTextBody,
   requireMethod,
 } from "../_shared/validate.ts";
 
@@ -58,33 +65,38 @@ serve(async (req: Request) => {
       throw new HttpError(500, "Email service is temporarily unavailable.");
     }
 
-    const payload = await req.json().catch(() => null);
-    if (!payload || typeof payload !== "object") {
-      throw new HttpError(400, "Invalid JSON payload.");
-    }
+    // Raw text first: the auth hook signature covers the exact body.
+    const raw = await readTextBody(req, 64 * KB);
+    // deno-lint-ignore no-explicit-any
+    const payload = parseJsonObject(raw) as Record<string, any>;
 
     // ------------------------------------------------------------------------
-    // CASE 1: Supabase Auth "Send Email" Hook (Triggered by GoTrue on signUp / resetPassword)
+    // CASE 1: Supabase Auth "Send Email" Hook (signup / recovery codes)
     // ------------------------------------------------------------------------
     if (payload.user && payload.email_data) {
+      // Only GoTrue may use this path: anyone else could send "verification
+      // codes" with any content to any address.
+      verifyAuthHook(req, raw);
+
       const recipient = payload.user.email;
       const { token, email_action_type } = payload.email_data;
 
       if (!recipient || !token) {
         throw new HttpError(400, "Recipient email and OTP token are required.");
       }
+      const code = escapeHtml(String(token));
 
       const isRecovery = email_action_type === "recovery";
       const subject = isRecovery
-        ? `Reset your VitalUp password: ${token}`
-        : `Your VitalUp verification code is ${token}`;
+        ? `Reset your VitalUp password: ${code}`
+        : `Your VitalUp verification code is ${code}`;
 
       const title = isRecovery ? "Reset Your Password" : "Verify Your Account";
       const message = isRecovery
         ? "We received a request to reset your VitalUp password. Use the verification code below to proceed:"
         : "Welcome to VitalUp! Use the 6-digit verification code below to complete your sign-up:";
 
-      const html = renderOtpHtml({ title, message, token });
+      const html = renderOtpHtml({ title, message, token: code });
 
       await dispatchResend({
         from: SENDER_EMAIL,
@@ -92,201 +104,187 @@ serve(async (req: Request) => {
         to: [recipient],
         subject,
         html,
-        text: `${title}\n\n${message}\n\nCode: ${token}\n\nThis code will expire in 10 minutes. Reply to: ${REPLY_TO_EMAIL}`,
+        text: `${title}\n\n${message}\n\nCode: ${code}\n\nThis code will expire in 10 minutes. Reply to: ${REPLY_TO_EMAIL}`,
       });
 
-      return corsJsonResponse({ success: true, message: "Auth OTP sent successfully via Resend" });
+      return corsJsonResponse({ success: true });
     }
 
     // ------------------------------------------------------------------------
-    // CASE 2: Support Ticket & Account Deletion Requests
+    // CASE 2a: Support ticket from the app (signed in only)
     // ------------------------------------------------------------------------
-    if (payload.type === "support_ticket" || payload.type === "account_deletion_request") {
-      const {
-        user_email,
-        user_name,
-        user_id,
-        category,
-        subject: ticketSubject,
-        description,
-        scope,
-        include_diagnostics,
-        app_version,
-        os_platform,
-        device_model,
-        created_at,
-      } = payload as {
-        user_email?: string;
-        user_name?: string;
-        user_id?: string;
-        category?: string;
-        subject?: string;
-        description?: string;
-        scope?: string;
-        include_diagnostics?: boolean;
-        app_version?: string;
-        os_platform?: string;
-        device_model?: string;
-        created_at?: string;
-      };
+    if (payload.type === "support_ticket") {
+      // Who it's from comes from the verified session, never the body, so a
+      // ticket can't send a "confirmation" to someone else's inbox.
+      const user = await requireUser(req);
+      const userEmail = user.email;
+      if (!userEmail) throw new HttpError(400, "Your account has no email address.");
+      await enforceRecipientLimit(userEmail);
 
-      if (!user_email || typeof user_email !== "string" || !user_email.includes("@")) {
-        throw new HttpError(400, "A valid user_email is required.");
-      }
-
-      const desc = description && typeof description === "string" ? description : "Account deletion requested via website form.";
-      const catLabel = category?.trim() || (payload.type === "account_deletion_request" ? "Account Deletion Request" : "General Inquiry");
-      const subj = ticketSubject?.trim() || catLabel;
-
-      const isDeletion =
-        payload.type === "account_deletion_request" ||
-        catLabel.toLowerCase().includes("deletion") ||
-        subj.toLowerCase().includes("deletion");
-
-      if (isDeletion) {
-        // 1. Dispatch alert to privacy@vitalup.live and support@vitalup.live
-        const deletionAdminHtml = renderDeletionAdminHtml({
-          user_email: user_email.trim(),
-          scope: scope || "Complete Account & All Data",
-          description: desc.trim(),
-          created_at: created_at || new Date().toISOString(),
-        });
-
-        await dispatchResend({
-          from: PRIVACY_SENDER,
-          to: [PRIVACY_EMAIL, REPLY_TO_EMAIL],
-          reply_to: user_email.trim(),
-          subject: `[Action Required - Deletion Request] ${user_email.trim()}`,
-          html: deletionAdminHtml,
-          text: `VitalUp Account Deletion Request\n\nUser Email: ${user_email.trim()}\nScope: ${scope || "Complete Account & All Data"}\nDetails: ${desc.trim()}\nTimestamp: ${created_at || new Date().toISOString()}`,
-        });
-
-        // 2. Dispatch dedicated receipt to the user
-        const deletionReceiptHtml = renderDeletionRequestReceiptHtml({
-          user_email: user_email.trim(),
-          user_name: user_name?.trim(),
-          scope: scope || "Complete Account & All Data (Permanent Wipe)",
-          description: desc.trim(),
-        });
-
-        await dispatchResend({
-          from: PRIVACY_SENDER,
-          to: [user_email.trim()],
-          reply_to: PRIVACY_EMAIL,
-          subject: "VitalUp Account Deletion Request Received [Pending Verification]",
-          html: deletionReceiptHtml,
-          text: `Hi ${user_name?.trim() || "there"},\n\nWe have received your request to delete your VitalUp account associated with ${user_email.trim()}.\n\nScope: ${scope || "Complete Account & All Data"}\nStatus: Pending Verification & 72-Hour Processing Window\n\nTo cancel this request, reply directly to this email.\n\nVitalUp Privacy Team (privacy@vitalup.live)`,
-        });
-
-        return corsJsonResponse({
-          success: true,
-          message: "Account deletion request delivered to privacy team and confirmation sent to user.",
-        });
-      }
-
-      // Standard Support Ticket Submission
-      const supportTicketHtml = renderSupportTicketHtml({
-        user_email: user_email.trim(),
-        user_name: user_name?.trim(),
-        user_id,
-        category: catLabel,
-        subject: subj,
-        description: desc.trim(),
-        include_diagnostics: !!include_diagnostics,
-        app_version,
-        os_platform,
-        device_model,
-        created_at: created_at || new Date().toISOString(),
-      });
+      const catLabel = cleanText(payload.category, 60) || "General Inquiry";
+      const subj = cleanText(payload.subject, 120) || catLabel;
+      const desc = cleanText(payload.description, 4000, { multiline: true });
+      if (!desc) throw new HttpError(400, "Please describe the problem.");
+      const userName = cleanText(payload.user_name, 80) || undefined;
+      const createdAt = new Date().toISOString();
 
       await dispatchResend({
         from: SUPPORT_SENDER,
         to: [REPLY_TO_EMAIL],
-        reply_to: user_email.trim(),
+        reply_to: userEmail,
         subject: `[Support Ticket - ${catLabel}] ${subj}`,
-        html: supportTicketHtml,
-        text: `VitalUp Support Ticket\n\nFrom: ${user_email} (${user_name || "User"})\nUser ID: ${user_id || "N/A"}\nCategory: ${catLabel}\nSubject: ${subj}\n\nDescription:\n${desc}\n\nApp Version: ${app_version || "N/A"}\nPlatform: ${os_platform || "N/A"}\nDevice: ${device_model || "N/A"}\nTimestamp: ${created_at || new Date().toISOString()}`,
-      });
-
-      // Dispatch confirmation email to the user
-      const userConfirmationHtml = renderSupportConfirmationHtml({
-        user_name: user_name?.trim(),
-        category: catLabel,
-        subject: subj,
-        description: desc.trim(),
+        html: renderSupportTicketHtml({
+          user_email: userEmail,
+          user_name: userName,
+          user_id: user.id,
+          category: catLabel,
+          subject: subj,
+          description: desc,
+          include_diagnostics: payload.include_diagnostics === true,
+          app_version: cleanText(payload.app_version, 40) || undefined,
+          os_platform: cleanText(payload.os_platform, 40) || undefined,
+          device_model: cleanText(payload.device_model, 120) || undefined,
+          created_at: createdAt,
+        }),
+        text: `VitalUp Support Ticket\n\nFrom: ${userEmail} (${userName || "User"})\nUser ID: ${user.id}\nCategory: ${catLabel}\nSubject: ${subj}\n\nDescription:\n${desc}\n\nTimestamp: ${createdAt}`,
       });
 
       await dispatchResend({
         from: SUPPORT_SENDER,
-        to: [user_email.trim()],
+        to: [userEmail],
         reply_to: REPLY_TO_EMAIL,
-        subject: `We received your support request: "${subj}" [VitalUp Support]`,
-        html: userConfirmationHtml,
-        text: `Hi ${user_name?.trim() || "there"},\n\nThank you for reaching out to VitalUp Support. We have received your request regarding "${subj}".\n\nOur team is reviewing your message and will respond within 24 hours.\n\nCategory: ${catLabel}\nDetails: ${desc.trim()}\n\nIf you have more information to provide, reply directly to this email.\n\nVitalUp Team (support@vitalup.live)`,
+        subject: "We received your support request [VitalUp Support]",
+        html: renderSupportConfirmationHtml({
+          user_name: userName,
+          category: catLabel,
+          subject: subj,
+          description: desc,
+        }),
+        text: `Hi ${userName || "there"},\n\nThank you for reaching out to VitalUp Support. We have received your request and will respond within 24 hours.\n\nVitalUp Team (support@vitalup.live)`,
       });
 
-      return corsJsonResponse({
-        success: true,
-        message: "Support ticket delivered to support@vitalup.live and confirmation sent to user.",
-      });
+      return corsJsonResponse({ success: true });
     }
 
     // ------------------------------------------------------------------------
-    // CASE 3: Direct Transactional Email (OTPs, Notifications, Announcements)
+    // CASE 2b: Account deletion request from vitalup.live (signed out)
     // ------------------------------------------------------------------------
-    const { to, subject, title, message, otp, type } = payload as {
-      to?: string | string[];
-      subject?: string;
-      title?: string;
-      message?: string;
-      otp?: string;
-      type?: "otp" | "notification" | "announcement";
-    };
+    if (payload.type === "account_deletion_request") {
+      const userEmail = cleanText(payload.user_email, 254);
+      if (!EMAIL_RE.test(userEmail)) {
+        throw new HttpError(400, "Enter a valid email address.");
+      }
+      // Open to anyone (Play requires a web form), so each address gets
+      // only a few receipts a day and the receipt carries no free text.
+      await enforceRecipientLimit(userEmail);
 
-    const recipientList = Array.isArray(to) ? to : (to ? [to] : []);
-    if (recipientList.length === 0) {
-      throw new HttpError(400, "Field 'to' must contain at least one recipient email.");
+      const scope = cleanText(payload.scope, 80) || "Complete Account & All Data";
+      const desc = cleanText(payload.description, 2000, { multiline: true }) ||
+        "Account deletion requested via website form.";
+      const createdAt = new Date().toISOString();
+
+      await dispatchResend({
+        from: PRIVACY_SENDER,
+        to: [PRIVACY_EMAIL, REPLY_TO_EMAIL],
+        reply_to: userEmail,
+        subject: `[Action Required - Deletion Request] ${userEmail}`,
+        html: renderDeletionAdminHtml({
+          user_email: userEmail,
+          scope,
+          description: desc,
+          created_at: createdAt,
+        }),
+        text: `VitalUp Account Deletion Request\n\nUser Email: ${userEmail}\nScope: ${scope}\nDetails: ${desc}\nTimestamp: ${createdAt}`,
+      });
+
+      await dispatchResend({
+        from: PRIVACY_SENDER,
+        to: [userEmail],
+        reply_to: PRIVACY_EMAIL,
+        subject: "VitalUp Account Deletion Request Received [Pending Verification]",
+        html: renderDeletionRequestReceiptHtml({ user_email: userEmail, scope, description: "" }),
+        text: `Hi there,\n\nWe have received a request to delete the VitalUp account for ${userEmail}.\n\nScope: ${scope}\nStatus: Pending verification (72-hour processing window)\n\nIf you didn't ask for this, reply to this email.\n\nVitalUp Privacy Team (privacy@vitalup.live)`,
+      });
+
+      return corsJsonResponse({ success: true });
     }
 
-    let emailSubject = subject;
-    let emailHtml = "";
-
-    if (otp || type === "otp") {
-      const token = otp || "000000";
-      emailSubject = emailSubject ?? `Your VitalUp verification code: ${token}`;
-      emailHtml = renderOtpHtml({
-        title: title ?? "Your Verification Code",
-        message: message ?? "Here is your 6-digit VitalUp verification code:",
-        token,
-      });
-    } else {
-      // General Notification or Announcement
-      emailSubject = emailSubject ?? (type === "announcement" ? "VitalUp Announcement" : "VitalUp Notification");
-      emailHtml = renderGeneralHtml({
-        title: title ?? emailSubject,
-        message: message ?? "",
-        badge: type === "announcement" ? "ANNOUNCEMENT" : "NOTIFICATION",
-      });
-    }
-
-    await dispatchResend({
-      from: SENDER_EMAIL,
-      reply_to: REPLY_TO_EMAIL,
-      to: recipientList,
-      subject: emailSubject,
-      html: emailHtml,
-      text: `${title ?? emailSubject}\n\n${message ?? ""}\n\nVitalUp Team (support@vitalup.live)`,
-    });
-
-    return corsJsonResponse({
-      success: true,
-      message: `Email sent to ${recipientList.join(", ")} from ${SENDER_EMAIL}`,
-    });
-
+    // Anything else (the old "send any email to anyone" mode) is refused.
+    throw new HttpError(400, "Unsupported request.");
   } catch (err) {
     return handleError(err, "send-email", CORS_HEADERS);
   }
 });
+
+const EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[a-z]{2,24}$/i;
+
+/** Emails one address may receive from this function per day. */
+const MAX_PER_RECIPIENT_PER_DAY = 3;
+
+let _admin: ReturnType<typeof createClient> | null = null;
+function admin() {
+  _admin ??= createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+  return _admin;
+}
+
+/** The signed-in caller, from the request's JWT. */
+async function requireUser(req: Request): Promise<{ id: string; email?: string }> {
+  const token = bearerToken(req);
+  if (!token) throw new HttpError(401, "Please sign in again.");
+  const { data, error } = await admin().auth.getUser(token);
+  if (error || !data.user) throw new HttpError(401, "Please sign in again.");
+  return { id: data.user.id, email: data.user.email ?? undefined };
+}
+
+/**
+ * Records a send to [email] and refuses past the daily cap (table
+ * email_send_log, service role only). Fails closed: if the log can't be
+ * read, nothing is sent.
+ */
+async function enforceRecipientLimit(email: string): Promise<void> {
+  const recipient = email.trim().toLowerCase();
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count, error } = await admin()
+    .from("email_send_log")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient", recipient)
+    .gte("sent_at", since);
+  if (error) {
+    console.error("send-email: rate limit check failed", error.code);
+    throw new HttpError(503, "Couldn't send right now. Try again later.");
+  }
+  if ((count ?? 0) >= MAX_PER_RECIPIENT_PER_DAY) {
+    throw new HttpError(429, "Too many requests. Try again tomorrow.");
+  }
+  const { error: insertError } = await admin()
+    .from("email_send_log")
+    .insert({ recipient });
+  if (insertError) {
+    console.error("send-email: rate limit log failed", insertError.code);
+    throw new HttpError(503, "Couldn't send right now. Try again later.");
+  }
+}
+
+/**
+ * Checks the Standard Webhooks signature GoTrue puts on Send Email hook
+ * calls (secret SEND_EMAIL_HOOK_SECRET, "v1,whsec_..."). Without the secret
+ * the hook path is closed.
+ */
+function verifyAuthHook(req: Request, raw: string): void {
+  const secret = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") ?? "").replace(/^v1,/, "");
+  if (!secret) {
+    console.error("send-email: SEND_EMAIL_HOOK_SECRET is not set; refusing hook call.");
+    throw new HttpError(401, "Unauthorized.");
+  }
+  try {
+    new Webhook(secret).verify(raw, Object.fromEntries(req.headers));
+  } catch {
+    throw new HttpError(401, "Unauthorized.");
+  }
+}
 
 /** Call Resend REST API */
 async function dispatchResend(data: ResendPayload): Promise<void> {
@@ -391,98 +389,6 @@ function renderOtpHtml(params: { title: string; message: string; token: string }
 
               <p style="margin:0; font-size:13px; line-height:1.55; color:#64748B;">
                 If you did not make this request, you can safely disregard this email or contact support at <a href="mailto:support@vitalup.live" style="color:#19C3E0; text-decoration:none;">support@vitalup.live</a>.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding:22px 24px; border-top:1px solid #1F293D; background-color:#0B0F19;">
-              <p style="margin:0 0 8px; font-size:12px; color:#64748B;">
-                Sent from <strong style="color:#94A3B8;">noreply@vitalup.live</strong> &bull; Reply to: <a href="mailto:support@vitalup.live" style="color:#19C3E0; text-decoration:none;">support@vitalup.live</a>
-              </p>
-              <p style="margin:0; font-size:11px; color:#475569;">
-                &copy; 2026 VitalUp Platform &bull; <a href="https://vitalup.live/privacy" style="color:#64748B; text-decoration:none;">Privacy Policy</a> &bull; <a href="https://vitalup.live/terms" style="color:#64748B; text-decoration:none;">Terms</a> &bull; <a href="https://vitalup.live" style="color:#19C3E0; text-decoration:none;">vitalup.live</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-/** Professional App-Themed General Announcement / Notification HTML Template */
-function renderGeneralHtml(params: { title: string; message: string; badge: string }): string {
-  const logoUrl = "https://vitalup.live/assets/vitalup_light_logo.png";
-
-  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${params.title} — VitalUp</title>
-  <style type="text/css">
-    @media only screen and (max-width: 600px) {
-      .container-table { width: 100% !important; max-width: 100% !important; }
-      .content-padding { padding: 24px 20px !important; }
-      .header-padding { padding: 26px 20px 18px !important; }
-    }
-  </style>
-</head>
-<body style="margin:0; padding:0; background-color:#0B0F19; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#F1F5F9; -webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#0B0F19; padding:32px 14px;">
-    <tr>
-      <td align="center">
-        <!-- Main Card Container: AppCard Glass Theme (radius: 16px, border: 1px solid #1F293D) -->
-        <table role="presentation" class="container-table" width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width:540px; background-color:#111827; border:1px solid #1F293D; border-radius:16px; overflow:hidden; box-shadow:0 12px 36px rgba(0,0,0,0.45);">
-          
-          <!-- Header with App Light Logo -->
-          <tr>
-            <td class="header-padding" align="center" style="padding:32px 28px 22px; border-bottom:1px solid #1F293D; background-color:#111827;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <img src="${logoUrl}" alt="VitalUp Logo" width="52" height="52" style="display:block; border-radius:14px; border:1px solid rgba(255,255,255,0.12); box-shadow:0 4px 16px rgba(25,195,224,0.25); background:#FFFFFF;" />
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top:12px;">
-                    <span style="font-size:22px; font-weight:800; color:#FFFFFF; letter-spacing:-0.02em;">VitalUp</span>
-                    <span style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#19C3E0; margin-top:3px;">Health &amp; Fitness</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Body Content -->
-          <tr>
-            <td class="content-padding" style="padding:34px 32px 28px;">
-              <span style="display:inline-block; padding:4px 12px; background:rgba(25,195,224,0.12); border:1px solid rgba(25,195,224,0.28); border-radius:999px; font-size:11px; font-weight:700; color:#19C3E0; margin-bottom:16px; text-transform:uppercase; letter-spacing:0.06em;">
-                ${params.badge}
-              </span>
-              <h1 style="margin:0 0 16px; font-size:21px; font-weight:700; color:#FFFFFF; letter-spacing:-0.01em;">${params.title}</h1>
-              <div style="margin:0 0 28px; font-size:15px; line-height:1.7; color:#94A3B8;">
-                ${params.message}
-              </div>
-
-              <!-- Action Button (AppPrimaryButton style: 14px radius, #19C3E0 fill, #0C0C0C text) -->
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-                <tr>
-                  <td align="center" style="border-radius:14px; background-color:#19C3E0; box-shadow:0 4px 14px rgba(25,195,224,0.3);">
-                    <a href="https://vitalup.live" target="_blank" style="font-size:14px; font-weight:700; color:#0C0C0C; text-decoration:none; padding:13px 26px; display:inline-block; border-radius:14px; letter-spacing:0.01em;">
-                      Open VitalUp &rarr;
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin:0; font-size:13px; line-height:1.55; color:#64748B;">
-                Need help or have questions? Contact our support desk at <a href="mailto:support@vitalup.live" style="color:#19C3E0; text-decoration:none;">support@vitalup.live</a>.
               </p>
             </td>
           </tr>

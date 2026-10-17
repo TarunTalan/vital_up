@@ -400,31 +400,6 @@ async function bestProprietaryMatch(
   }
 }
 
-function saveEstimateToProprietary(supabase: SupabaseClient, productName: string, p: Per100g, source: string): void {
-  background((async () => {
-    const { data } = await supabase
-      .from('proprietary_products')
-      .select('id')
-      .eq('product_name', productName)
-      .limit(1);
-    if (data?.length) return;
-    const { error } = await supabase.from('proprietary_products').insert({
-      product_name: productName,
-      serving_size: '100g',
-      calories: p.calories,
-      protein_g: p.protein,
-      carbs_g: p.carbs,
-      fat_g: p.fat,
-      fiber_g: p.fiber,
-      sugar_g: p.sugar,
-      sodium_mg: p.sodium,
-      source,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) console.error(`Failed to cache "${productName}" in proprietary_products: ${error.message}`);
-  })());
-}
-
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -597,7 +572,7 @@ interface NutritionRequest {
   servingDescription: string;
 }
 
-async function handleGetNutrition(env: Env, request: NutritionRequest): Promise<Response> {
+async function handleGetNutrition(env: Env, userId: string, request: NutritionRequest): Promise<Response> {
   const idStr = request.fdcId;
   const foodName = request.foodName || idStr;
   const grams = clampNumber(parsePortionGrams(request.servingDescription) ?? 100, 1, RANGES.grams.max, 100);
@@ -645,11 +620,20 @@ async function handleGetNutrition(env: Env, request: NutritionRequest): Promise<
   const usda = await bestUsdaMatch(foodName, env.usdaKey, env.supabase);
   if (usda) return respond(usda.data);
 
+  // The model costs money per call and the name is typed by the user, so
+  // this is metered like a scan. Over the cap, zeros send the client to its
+  // offline estimate. Estimates are not saved to proprietary_products: that
+  // catalogue is shared, and one user's (possibly prompt-injected) name must
+  // not set the figures every other user gets.
+  const quota = await consumeDailyQuota(
+    env.supabase,
+    userId,
+    'nutrition_lookup',
+    dailyLimit('NUTRITION_LOOKUP_DAILY_LIMIT', 60),
+  );
+  if (!quota.allowed) return jsonResponse(ZERO_NUTRITION, 200);
   const estimate = await estimateNutritionPer100g(foodName, { gemini: env.geminiKey, groq: env.groqKey });
-  if (estimate) {
-    saveEstimateToProprietary(env.supabase, foodName, estimate, 'ai_estimate');
-    return respond(nutritionDataFromPer100g(estimate));
-  }
+  if (estimate) return respond(nutritionDataFromPer100g(estimate));
 
   // Zeros tell the client to fall back to its offline estimate.
   return jsonResponse(ZERO_NUTRITION, 200);
@@ -875,7 +859,7 @@ Deno.serve(async (req) => {
       return await handleSearch(env, query);
     }
     if (body.get_nutrition && body.fdc_id !== undefined && body.fdc_id !== null && body.fdc_id !== '') {
-      return await handleGetNutrition(env, {
+      return await handleGetNutrition(env, user.id, {
         fdcId: validateLookupId(body.fdc_id),
         foodName: optionalText(body.food_name, 'food_name', { max: LOOKUP_NAME_MAX, clip: true }) ?? '',
         servingDescription: optionalText(body.serving_description, 'serving_description', {

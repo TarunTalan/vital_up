@@ -22,5 +22,12 @@ verify_jwt = true
 
 [functions.send-email]
 enabled = true
-# Handles both Supabase Auth Send-Email hooks and authenticated client calls.
+# Auth Send-Email hook (signature-checked), signed-in support tickets
+# (JWT checked in the function) and the signed-out website deletion form.
+verify_jwt = false
+
+[functions.revenuecat-webhook]
+enabled = true
+# Called by RevenueCat with its own shared secret (checked in constant time,
+# fails closed), not a Supabase JWT; the gateway would reject it otherwise.
 verify_jwt = false
