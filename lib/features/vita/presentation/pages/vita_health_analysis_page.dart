@@ -21,7 +21,19 @@ class VitaHealthAnalysisPage extends StatefulWidget {
 
 class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
   final _repository = sl<VitaRepository>();
-  late final Future<HealthAnalysis> _analysis = _repository.getHealthAnalysis();
+  late Future<HealthAnalysis> _analysis = _load();
+
+  /// The AI call has its own timeout; this caps the whole fetch so the
+  /// loader can never spin forever.
+  Future<HealthAnalysis> _load() =>
+      _repository.getHealthAnalysis().timeout(const Duration(seconds: 60));
+
+  // Block body: an arrow body would hand setState the Future and throw.
+  void _reload() {
+    setState(() {
+      _analysis = _load();
+    });
+  }
   late final Future<VitaDailyInsights?> _insights =
       _repository.getDailyInsights();
 
@@ -32,6 +44,7 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
       bodyPadding: vitaBodyPadding(context),
       body: VitaFutureBody<HealthAnalysis>(
         future: _analysis,
+        onRetry: _reload,
         builder: (context, analysis) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

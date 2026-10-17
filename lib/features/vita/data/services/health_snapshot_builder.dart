@@ -14,6 +14,8 @@ import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
+import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
+import 'package:vital_up/features/profile/domain/repositories/profile_repository.dart';
 import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
 import 'package:vital_up/features/vita/domain/entities/health_snapshot.dart';
 
@@ -31,6 +33,10 @@ class HealthSnapshotBuilder {
   final HealthVitalsService _vitals;
   final SupabaseClient _supabase;
 
+  /// The signed-in user's profile (cache-first), so details edited after
+  /// onboarding reach Vita. Onboarding answers are only the fallback.
+  final ProfileRepository? _profiles;
+
   HealthSnapshotBuilder({
     required this._mealHistory,
     required this._isar,
@@ -41,7 +47,8 @@ class HealthSnapshotBuilder {
     required this._activePlan,
     required this._vitals,
     required this._supabase,
-  });
+    ProfileRepository? profiles,
+  }) : _profiles = profiles;
 
   Future<HealthSnapshot> build() async {
     final now = DateTime.now();
@@ -104,12 +111,18 @@ class HealthSnapshotBuilder {
   Future<_Meals> _meals(DateTime today, DateTime weekStart) async {
     final result = await _mealHistory.callAll();
     final entries = result.fold<List<MealLogEntry>>((_) => const [], (e) => e);
-    final week = entries.where((e) => !e.capturedAt.isBefore(weekStart)).toList();
+    final week = entries
+        .where((e) => !e.capturedAt.isBefore(weekStart))
+        .toList();
     final todays = week.where((e) => !e.capturedAt.isBefore(today)).toList();
 
     final perDay = <DateTime, double>{};
     for (final e in week) {
-      final day = DateTime(e.capturedAt.year, e.capturedAt.month, e.capturedAt.day);
+      final day = DateTime(
+        e.capturedAt.year,
+        e.capturedAt.month,
+        e.capturedAt.day,
+      );
       perDay[day] = (perDay[day] ?? 0) + e.totalCalories;
     }
     final avg = perDay.isEmpty
@@ -118,7 +131,9 @@ class HealthSnapshotBuilder {
 
     return _Meals(
       today: todays.length,
-      caloriesToday: todays.fold<double>(0, (s, e) => s + e.totalCalories).round(),
+      caloriesToday: todays
+          .fold<double>(0, (s, e) => s + e.totalCalories)
+          .round(),
       week: week.length,
       days: perDay.length,
       avgPerDay: avg,
@@ -137,7 +152,8 @@ class HealthSnapshotBuilder {
       ..sort((a, b) => b.endTime.compareTo(a.endTime));
 
     var lastNight = await _vitals.readSleepLastNightHours();
-    if (lastNight == null && recent.isNotEmpty &&
+    if (lastNight == null &&
+        recent.isNotEmpty &&
         recent.first.endTime.isAfter(now.subtract(const Duration(hours: 24)))) {
       lastNight = recent.first.durationMinutes / 60;
     }
@@ -146,7 +162,9 @@ class HealthSnapshotBuilder {
     if (lastNight != null && recent.isEmpty) hours.add(lastNight);
     return _Sleep(
       lastNight: lastNight,
-      average: hours.isEmpty ? null : hours.reduce((a, b) => a + b) / hours.length,
+      average: hours.isEmpty
+          ? null
+          : hours.reduce((a, b) => a + b) / hours.length,
       nights: hours.length,
     );
   }
@@ -155,7 +173,9 @@ class HealthSnapshotBuilder {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return const _Water(todayMl: null, tracks: false);
     final logs = await _isar.isar.waterLogCaches.where().findAll();
-    final mine = logs.where((l) => l.userId == userId && !l.timestamp.isBefore(weekStart));
+    final mine = logs.where(
+      (l) => l.userId == userId && !l.timestamp.isBefore(weekStart),
+    );
     final todayMl = mine
         .where((l) => !l.timestamp.isBefore(today))
         .fold<int>(0, (s, l) => s + l.amountMl);
@@ -166,7 +186,9 @@ class HealthSnapshotBuilder {
     if (!await _screenTime.hasPermission()) return null;
     final stats = await _screenTime.getUsageStats();
     if (stats.isEmpty) return null;
-    return stats.fold<Duration>(Duration.zero, (s, a) => s + a.usageDuration).inMinutes;
+    return stats
+        .fold<Duration>(Duration.zero, (s, a) => s + a.usageDuration)
+        .inMinutes;
   }
 
   Future<_Activity> _activityData(DateTime today, DateTime weekStart) async {
@@ -175,11 +197,14 @@ class HealthSnapshotBuilder {
         .map((h) => h.session)
         .where((s) => !s.startTime.isBefore(weekStart))
         .toList();
-    final todays = week.where((s) => !s.startTime.isBefore(today) && s.stepCountReliable);
+    final todays = week.where(
+      (s) => !s.startTime.isBefore(today) && s.stepCountReliable,
+    );
     final steps = todays.fold<int>(0, (sum, s) => sum + s.steps);
     return _Activity(
       workouts: week.length,
-      distanceKm: week.fold<double>(0, (s, a) => s + a.totalDistanceMeters) / 1000,
+      distanceKm:
+          week.fold<double>(0, (s, a) => s + a.totalDistanceMeters) / 1000,
       minutes: week.fold<int>(0, (s, a) => s + a.totalDurationSeconds) ~/ 60,
       stepsToday: steps > 0 ? steps : null,
     );
@@ -190,35 +215,67 @@ class HealthSnapshotBuilder {
     final values = await Future.wait([
       o.getDob(), o.getGender(), o.getWeight(), o.getWeightUnit(), // 0-3
       o.getHeight(), o.getHeightUnit(), o.getGoalType(), // 4-6
-      o.getTargetWeight(), o.getTargetWeightUnit(), o.getDietaryPreference(), // 7-9
+      o.getTargetWeight(),
+      o.getTargetWeightUnit(),
+      o.getDietaryPreference(), // 7-9
       o.getHealthConditions(), o.getAllergies(), o.getMedicines(), // 10-12
       o.getSmokes(), o.getActivity(), // 13-14
       o.getBloodPressureTop(), o.getBloodPressureBottom(), // 15-16
     ]);
 
-    final cache = await _isar.isar.userProfileCaches.where().findFirst();
+    final cache = await _profileCache();
+    final p = await _currentProfile();
+    // The saved profile wins; onboarding answers fill what it lacks.
+    String pick(String? saved, String onboarding) =>
+        saved != null && saved.trim().isNotEmpty ? saved : onboarding;
 
     return ProfileSnapshot(
-      age: _age(values[0]),
-      gender: meaningfulOrNull(values[1]),
-      weightKg: cache?.weightKg ?? _kg(values[2], values[3]),
-      heightCm: _cm(values[4], values[5]),
+      age: _age(pick(p?.dob, values[0])),
+      gender: meaningfulOrNull(pick(p?.gender, values[1])),
+      weightKg:
+          cache?.weightKg ??
+          _kg(pick(p?.weight, values[2]), pick(p?.weightUnit, values[3])),
+      heightCm: _cm(pick(p?.height, values[4]), pick(p?.heightUnit, values[5])),
       goalType: meaningfulOrNull(values[6]),
       targetWeightKg: cache?.targetWeightKg ?? _kg(values[7], values[8]),
       dietaryPreference: meaningfulOrNull(values[9]),
-      healthConditions: meaningfulOrNull(values[10]),
-      allergies: meaningfulOrNull(values[11]),
-      medicines: meaningfulOrNull(values[12]),
-      smokes: meaningfulOrNull(values[13]),
-      activityLevel: meaningfulOrNull(values[14]),
-      bloodPressureTop: int.tryParse(values[15].trim()),
-      bloodPressureBottom: int.tryParse(values[16].trim()),
+      healthConditions: meaningfulOrNull(pick(p?.healthConditions, values[10])),
+      allergies: meaningfulOrNull(pick(p?.allergies, values[11])),
+      medicines: meaningfulOrNull(pick(p?.medicines, values[12])),
+      smokes: meaningfulOrNull(pick(p?.smokes, values[13])),
+      activityLevel: meaningfulOrNull(pick(p?.activity, values[14])),
+      bloodPressureTop: int.tryParse(
+        pick(p?.bloodPressureTop, values[15]).trim(),
+      ),
+      bloodPressureBottom: int.tryParse(
+        pick(p?.bloodPressureBottom, values[16]).trim(),
+      ),
     );
   }
 
+  Future<ProfileEntity?> _currentProfile() async {
+    final profiles = _profiles;
+    if (profiles == null) return null;
+    try {
+      final result = await profiles.getProfile().withLoadTimeout();
+      return result.fold((_) => null, (p) => p);
+    } catch (e) {
+      debugPrint('Profile for Vita unavailable: $e');
+      return null;
+    }
+  }
+
+  /// This account's Isar profile mirror (never another account's row).
+  Future<UserProfileCache?> _profileCache() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+    return _isar.isar.userProfileCaches.getBySupabaseId(userId);
+  }
+
   Future<int?> _calorieGoal() async {
-    final cache = await _isar.isar.userProfileCaches.where().findFirst();
-    return cache?.dailyCalorieGoal ?? int.tryParse(await _onboarding.getCalorieGoal());
+    final cache = await _profileCache();
+    return cache?.dailyCalorieGoal ??
+        int.tryParse(await _onboarding.getCalorieGoal());
   }
 
   Future<List<String>> _planLines() async {
@@ -228,9 +285,9 @@ class HealthSnapshotBuilder {
 
   /// One compact line per meal, as sent to Vita.
   static List<String> planLines(MealPlan plan) => [
-        for (final m in plan.meals)
-          '${m.name} · ${m.calories} kcal · ${m.items.join(', ')}',
-      ];
+    for (final m in plan.meals)
+      '${m.name} · ${m.calories} kcal · ${m.items.join(', ')}',
+  ];
 
   /// Onboarding stores DOB as DD/MM/YYYY.
   static int? _age(String dob) {

@@ -45,13 +45,16 @@ class VitaLocalDataSource {
         StressCheckIn.fromJson,
       );
 
-  Future<void> addCheckIn(String userId, StressCheckIn checkIn) {
+  Future<void> addCheckIn(String userId, StressCheckIn checkIn) async {
+    // The mood widget writes check-ins from another isolate; start from
+    // what's on disk so this write can't drop one made there.
+    await _prefs.reload();
     final cutoff = DateTime.now().subtract(const Duration(days: _historyDays));
     final list = readCheckIns(userId)
         .where((c) => c.date.isAfter(cutoff) && !_sameDay(c.date, checkIn.date))
         .toList()
       ..add(checkIn);
-    return _prefs.setString(
+    await _prefs.setString(
       _key('checkins', userId),
       jsonEncode(list.map((c) => c.toJson()).toList()),
     );

@@ -154,12 +154,12 @@ class WeightService {
 
   Future<void> delete(WeightLogCache log) async {
     await _isar.writeTxn(() => _isar.weightLogCaches.delete(log.id));
-    if (log.isSynced) {
-      await _sync?.recordDelete(
-        'weight_logs',
-        syncId('weight', log.userId, log.timestamp),
-      );
-    }
+    // Always recorded: an upload can reach the server before it's marked
+    // synced here, and a delete of an id the server lacks changes nothing.
+    await _sync?.recordDelete(
+      'weight_logs',
+      syncId('weight', log.userId, log.timestamp),
+    );
   }
 
   /// Entries in [from, to), newest first.

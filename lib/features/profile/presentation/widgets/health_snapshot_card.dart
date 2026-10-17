@@ -40,10 +40,18 @@ class _HealthSnapshotCardState extends State<HealthSnapshotCard> {
   @override
   void didUpdateWidget(HealthSnapshotCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profile != widget.profile) _reload();
+    // A build follows didUpdateWidget, so no setState here.
+    if (oldWidget.profile != widget.profile) {
+      _latest = sl<WeightService>().latest();
+    }
   }
 
-  void _reload() => setState(() => _latest = sl<WeightService>().latest());
+  // Block body: an arrow body would hand setState the Future and throw.
+  void _reload() {
+    setState(() {
+      _latest = sl<WeightService>().latest();
+    });
+  }
 
   Future<void> _logWeight() async {
     await widget.onLogWeight!();

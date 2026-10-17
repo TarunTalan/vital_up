@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
@@ -23,7 +24,8 @@ class _WeeklySummaryPageState extends State<WeeklySummaryPage> {
   late Future<(WeeklySummary, WeightUnit)> _data = _load();
 
   Future<(WeeklySummary, WeightUnit)> _load() async => (
-    await sl<WeeklySummaryService>().load(),
+    // Reads Health Connect, which can hang; the error view offers Retry.
+    await sl<WeeklySummaryService>().load().withLoadTimeout(),
     await sl<WeightService>().unit(),
   );
 

@@ -28,10 +28,8 @@ class WaterIntakeService {
   Isar get _isar => _isarService.isar;
 
   /// The daily goal in ml; the default when unset or out of range.
-  int getDailyGoal() => sanitizeWaterGoal(
-    _prefs.getInt(_dailyGoalKey),
-    fallback: _defaultGoalMl,
-  );
+  int getDailyGoal() =>
+      sanitizeWaterGoal(_prefs.getInt(_dailyGoalKey), fallback: _defaultGoalMl);
 
   /// Saves the daily goal, kept within the allowed range.
   Future<void> setDailyGoal(int goal) async {
@@ -74,7 +72,9 @@ class WaterIntakeService {
     await _isar.writeTxn(() async {
       await _isar.waterLogCaches.delete(id);
     });
-    if (log != null && log.isSynced) {
+    // Always recorded: an upload can reach the server before it's marked
+    // synced here, and a delete of an id the server lacks changes nothing.
+    if (log != null) {
       await _sync?.recordDelete(
         'water_logs',
         syncId('water', log.userId, log.timestamp),

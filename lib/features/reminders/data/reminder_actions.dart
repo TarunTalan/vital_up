@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,7 @@ import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
+import 'package:vital_up/features/home_widget/data/widget_background.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 
@@ -45,6 +47,15 @@ Future<void> reminderActionBackground(NotificationResponse response) async {
     }
   } catch (e) {
     debugPrint('Reminder action ${response.actionId} failed: $e');
+    return;
+  }
+  // The home screen widgets would keep the old water / sleep figures until
+  // the app next opened.
+  try {
+    final signedIn = await HomeWidget.getWidgetData<bool>('signed_in') ?? false;
+    if (signedIn) await refreshFromDevice(userId);
+  } catch (e) {
+    debugPrint('Widget refresh after reminder action failed: $e');
   }
 }
 

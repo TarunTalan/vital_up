@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 
+import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 
 /// Body padding for Vita sub-pages: 16dp below the [AppTitleBar] (its own
@@ -18,10 +19,14 @@ class VitaFutureBody<T> extends StatelessWidget {
   final Future<T> future;
   final Widget Function(BuildContext context, T data) builder;
 
+  /// Starts the fetch again (the page swaps in a new [future]).
+  final VoidCallback onRetry;
+
   const VitaFutureBody({
     super.key,
     required this.future,
     required this.builder,
+    required this.onRetry,
   });
 
   @override
@@ -31,14 +36,9 @@ class VitaFutureBody<T> extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.hasData) return builder(context, snapshot.data as T);
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Vita couldn't load this. Try again later.",
-              textAlign: TextAlign.center,
-              style: context.text.bodyLarge?.copyWith(
-                color: context.vColors.grayText,
-              ),
-            ),
+          return LoadErrorView(
+            onRetry: onRetry,
+            message: "Vita couldn't load this. Try again.",
           );
         }
         return const Center(child: VitalUpLoader());
