@@ -52,6 +52,7 @@ supabase db push               # apply new migrations (outward-facing: ask first
 - **Routing:** go_router, `lib/core/router/app_router.dart` (`AppRouter.router`,
   routes by `name`, pages wrapped in `AppPage`). Initial location `/splash`.
   Deep links: `vitalup://` and `/open?route=` (widgets, notifications).
+  Unauthenticated links to non-public pages redirect to `/login` via router guard.
   `test/widget_test.dart` checks every notification/reminder route exists.
 - **Layers per feature:** `lib/features/<f>/{data,domain,presentation}`
   (datasources -> repositories -> entities -> cubit/pages/widgets). Errors use
@@ -83,7 +84,7 @@ supabase db push               # apply new migrations (outward-facing: ask first
 - **Bootstrap:** `lib/main.dart` (Supabase, DI, push, reminders, sync,
   foreground task init; global BlocProviders: Auth, Onboarding, ScreenTime,
   Settings; theme mode from `SettingsCubit`; `DevicePreview` only when
-  `!kReleaseMode`). `SleepCubit` is provided by the dashboard only (loading
+  `!kReleaseMode`; `debugPrint` silenced in `kReleaseMode` to keep logs clean). `SleepCubit` is provided by the dashboard only (loading
   it earlier would prompt for Health Connect before sign-in). Pages pushed
   through the router can't see dashboard providers: pass cubits as `extra`
   or keep them global.
@@ -183,7 +184,9 @@ Route names are GoRouter `name`s.
 
 - **auth:** routes `splash`, `onboarding` (intro carousel), `login`,
   `forgot-password`, `verify-otp`, `reset-password`, `reset-completed`.
-  Sign in by email or username (`get_email_by_username` RPC), sign up with
+  Sign in by email or username (`login_email(username, password)` RPC: returns
+  the email only with the right password, throttled; never expose emails by
+  username), sign up with
   email OTP (taken email/username checked via `email_registered` /
   `signup_username_available` RPCs, never by reading `profiles`), password reset by OTP, Google (`signInWithIdToken`); no Apple.
   Splash -> `dashboard` / `health-onboarding` (by `hasCompletedOnboarding`:
@@ -366,18 +369,31 @@ Route names are GoRouter `name`s.
   `finalize-community-awards` at :35 UTC = :05 IST finalises a period once
   late reports close, i.e. Wednesday / the 3rd; min 5 players; ties share a
   place; `get_community_awards`, `get_player_awards`; notification type
-  `award`).
+  `award`); security hardening (`20261020_security_hardening.sql`,
+  `20261021_profile_login_report_hardening.sql`): service-only tables
+  (subscriptions, scan_usage, recognition_logs, food_search_cache,
+  email_send_log, login_attempts) have no client policies; signed-in RPCs
+  revoke EXECUTE from PUBLIC (not just anon); a trigger keeps
+  `profiles.email` / `username_confirmed` server-owned and limits
+  `avatar_url` to the user's storage folder or Google; `submit_daily_report`
+  is a wrapper that caps water / meal / workout figures at synced logs
+  before `_submit_daily_report_core`; AI refunds capped at 3 a day.
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
   `scan-food` (image / search / nutrition / barcode), `vita-chat`
   (chat or insights), `generate-diet-plan` (429 at the daily limit, 422 for
   allergy failures), `send-push` (secret header, FCM v1), `send-email`
-  (Resend API, transactional, support tickets, web deletion requests),
+  (Resend; only the Auth hook (Standard Webhooks signature,
+  `SEND_EMAIL_HOOK_SECRET`), signed-in support tickets (sender from the JWT)
+  and the website deletion form; 3 mails per recipient a day; no free-form
+  sending),
   `delete-account` (purges auth.users, avatar files, cascades DB rows,
   audits to privacy@vitalup.live & support@vitalup.live),
   `revenuecat-webhook` (table `subscriptions`; fails closed without its
-  secret); `fatsecret-proxy` is an unused stub that returns 501. All
+  secret); `fatsecret-proxy` is an unused stub that returns 501.
+  `_shared/quota.ts` fails closed. AI nutrition estimates are never written
+  to the shared `proprietary_products` catalogue. All
   validate input with `_shared/validate.ts` and return short JSON errors.
   No deno locally: type-check with tsc + shims.
 
@@ -424,6 +440,7 @@ Route names are GoRouter `name`s.
 13. **Play App Signing & Android OAuth Clients:** Registered Google Play App Signing key SHA-1 (`F9:63:25:22:11:92:D8:2E:5D:DA:DC:F7:10:FA:D1:07:91:54:7C:0C`), Upload key SHA-1/256, and local Debug keystore SHA-1/256 to Firebase `com.vitalup.app`, auto-provisioning Google Cloud OAuth clients.
 14. **Google Play Reviewer Account & 7-Day Seeded Dataset:** Created and email-confirmed `reviewer@vitalup.live` (Password: `VitalUpTest2026!`, username: `vitalup_reviewer`) with complete 7-day tracking records (49 water logs, 7 sleep logs, 28 macro-detailed meal logs, 7 GPS workouts, 7 weight check-ins, Level 3 / 620 points, 6 badges).
 15. **Dashboard & Stale Data Synchronization:** Broadcast stream on `ProfileCache.changes` ensures name and demographic edits propagate instantly across Home, Profile, and Health details; Weight card shows green "Logged today" chip with "Update" CTA; Dashboard workout button renamed to "Start activity".
+16. **Pre-Release Security & Privacy Hardening:** Android data extraction rules (`data_extraction_rules.xml`) exclude health DBs/sharedprefs from cloud backup & device transfer; biometric app lock enforces `FLAG_SECURE` (`com.vitalup.app/window`) to hide recents previews and prevent screenshots; unused merged permissions (`RECORD_AUDIO`, `WRITE_EXTERNAL_STORAGE`, `AD_ID`) stripped; widget actions authenticated via per-install `action_token`; GoRouter protects deep links against unauthenticated access; Supabase migrations harden RLS on service-only tables, add `email_send_log` rate limiting, protect `login_email` RPC against username harvesting, and cap daily report stats.
 
 ### Remaining:
 1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).
@@ -435,13 +452,17 @@ Route names are GoRouter `name`s.
 
 - `MainActivity` (FlutterFragmentActivity) channels:
   `com.example.vital_up/audio_intent` (`getInstalledAudioApps`,
-  `launchAudioApp`, `playAudioImplicitly`) and
+  `launchAudioApp`, `playAudioImplicitly`),
   `com.example.vital_up/usage_stats` (`checkUsageStatsPermission`,
-  `getExactUsageStats`, `getScreenEvents`).
+  `getExactUsageStats`, `getScreenEvents`), and
+  `com.vitalup.app/window` (`setSecure` toggling `FLAG_SECURE` for biometric lock privacy).
 - `PermissionsRationaleActivity` (+ `ViewPermissionUsageActivity` alias):
   Health Connect privacy policy link.
 - Permissions are minimal on purpose (Play review): no background location,
-  no battery-optimisation exemption, Health Connect read-only. Usage Access
+  no battery-optimisation exemption, Health Connect read-only; unused library permissions
+  (`RECORD_AUDIO`, `WRITE_EXTERNAL_STORAGE`, `AD_ID`) stripped via `tools:node="remove"`.
+  `data_extraction_rules.xml` excludes internal databases and preferences from cloud backup
+  and device-to-device transfers. Widget buttons carry a private `action_token`. Usage Access
   and Health Connect need Play Console declarations.
 
 ## Tests
