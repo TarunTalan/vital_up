@@ -30,6 +30,13 @@ abstract class SyncAdapter {
   Future<void> apply(String userId, List<Map<String, dynamic>> rows);
 }
 
+/// An adapter whose rows are large (workouts carry their GPS route), so it
+/// sends and fetches fewer per request to stay within the request timeout.
+abstract interface class SyncSizing {
+  int get batchSize;
+  int get pageSize;
+}
+
 /// Stable cloud id for a local entry that has no id of its own, so the same
 /// entry uploaded twice (or pulled back) never duplicates.
 String syncId(String kind, String userId, DateTime at) => const Uuid().v5(
@@ -357,9 +364,17 @@ class WeightSyncAdapter implements SyncAdapter {
 
 // ---------------------------------------------------------------------------
 
-class ActivitySyncAdapter implements SyncAdapter {
+class ActivitySyncAdapter implements SyncAdapter, SyncSizing {
   final AppDatabase _db;
   ActivitySyncAdapter(this._db);
+
+  /// An hour's route is a few hundred KB; a handful per request keeps each
+  /// one well inside the timeout on a slow connection.
+  @override
+  int get batchSize => 5;
+
+  @override
+  int get pageSize => 20;
 
   @override
   String get table => 'activity_sessions';

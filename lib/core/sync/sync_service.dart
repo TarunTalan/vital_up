@@ -68,6 +68,10 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
   bool _started = false;
 
+  /// Bumped by [stop]; a run that started before it (sign-out) must not
+  /// write the old account's rows into the wiped device.
+  int _generation = 0;
+
   Future<void>? _running;
   Future<void>? _queued;
   bool _rerunPull = false;
@@ -95,22 +99,25 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     _started = true;
     WidgetsBinding.instance.addObserver(this);
     _writes.attach(this);
-    _authSub = _client.auth.onAuthStateChange.listen((auth) {
-      if (auth.event == AuthChangeEvent.signedOut) {
-        // Nothing left to sync for this session; don't retry into the next.
-        _debounce?.cancel();
-        _retryTimer?.cancel();
-        _consecutiveFailures = 0;
-        _lastPull = null;
-        return;
-      }
-      if (auth.session != null &&
-          (auth.event == AuthChangeEvent.initialSession ||
-              auth.event == AuthChangeEvent.signedIn)) {
-        _consecutiveFailures = 0;
-        sync(force: true);
-      }
-    });
+    _authSub = _client.auth.onAuthStateChange
+        // A token refresh that fails offline arrives as an error; not a crash.
+        .handleError((Object _) {})
+        .listen((auth) {
+          if (auth.event == AuthChangeEvent.signedOut) {
+            // Nothing left to sync for this session; don't retry into the next.
+            _debounce?.cancel();
+            _retryTimer?.cancel();
+            _consecutiveFailures = 0;
+            _lastPull = null;
+            return;
+          }
+          if (auth.session != null &&
+              (auth.event == AuthChangeEvent.initialSession ||
+                  auth.event == AuthChangeEvent.signedIn)) {
+            _consecutiveFailures = 0;
+            sync(force: true);
+          }
+        });
     _onlineSub = _connectivity.onlineChanges.listen((online) {
       if (!online) return;
       _consecutiveFailures = 0;
@@ -203,11 +210,31 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     return count;
   }
 
+  /// Stops the run in progress (it bails out before writing anything else
+  /// locally) and waits briefly for it to unwind. Call before wiping local
+  /// data, so a pull can't put the old account's rows back.
+  Future<void> stop() async {
+    _generation++;
+    _debounce?.cancel();
+    _retryTimer?.cancel();
+    final running = _running;
+    if (running == null) return;
+    try {
+      await running.timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
+
   /// Forgets what was downloaded, so the next sync pulls everything again.
   /// Call when local data is wiped (sign-out).
+  ///
+  /// Also forgets which backups ([BackupSyncAdapter]) were last seen: with
+  /// no state, the next sign-in restores the cloud copy instead of
+  /// uploading this device's now-empty reminders, notes and plan over it.
   Future<void> reset() async {
     for (final key in _prefs.getKeys().toList()) {
-      if (key.startsWith('sync_cursor_')) await _prefs.remove(key);
+      if (key.startsWith('sync_cursor_') || key.startsWith('backup_state_')) {
+        await _prefs.remove(key);
+      }
     }
     await _prefs.remove(_keyDeletes);
     _lastPull = null;
@@ -216,6 +243,8 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   Future<void> _run({required bool pull}) async {
     final userId = _userId;
     if (userId == null) return;
+    final generation = _generation;
+    bool stale() => _userId != userId || _generation != generation;
     // No network at all: wait for the reconnect event instead of retrying.
     if (!_connectivity.hasNetwork) return;
 
@@ -226,10 +255,10 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       for (final adapter in _adapters) {
         // Signed out or switched account mid-run: stop, so nothing from the
         // old account lands in the (wiped) local data.
-        if (_userId != userId) return;
+        if (stale()) return;
         try {
           await _uploader.push(adapter, userId);
-          if (pull) await _pull(adapter, userId);
+          if (pull) await _pull(adapter, userId, stale);
         } catch (e, stack) {
           if (isOfflineError(e)) rethrow;
           failed = true;
@@ -240,14 +269,15 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
           );
         }
       }
-      if (_userId != userId) return;
+      if (stale()) return;
       _connectivity.reportSuccess();
       if (pull) _lastPull = DateTime.now();
     } catch (e, stack) {
       failed = true;
       if (isOfflineError(e)) {
         _connectivity.reportFailure();
-      } else {
+      } else if (e is! ServerUnavailable) {
+        // An outage just backs off; anything else is a bug worth seeing.
         CrashReporter.report(e, stack, reason: 'Sync failed');
       }
     }
@@ -282,30 +312,56 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     });
   }
 
-  Future<void> _pull(SyncAdapter adapter, String userId) async {
+  Future<void> _pull(
+    SyncAdapter adapter,
+    String userId,
+    bool Function() stale,
+  ) async {
+    final int pageSize = switch (adapter) {
+      SyncSizing(:final pageSize) => pageSize,
+      _ => _pageSize,
+    };
     final cursorKey = 'sync_cursor_${adapter.table}_$userId';
     final saved = DateTime.tryParse(_prefs.getString(cursorKey) ?? '');
     // A corrupt cursor just means a full re-read (merging is idempotent).
     var cursor = saved?.subtract(_pullOverlap).toUtc().toIso8601String();
 
+    // Within a run, pages continue after the last (updated_at, id) seen:
+    // one upsert gives all its rows the same updated_at, so the time alone
+    // can't say where a page ended inside such a group.
+    String? lastId;
     while (true) {
       var query = _client.from(adapter.table).select().eq('user_id', userId);
-      if (cursor != null) query = query.gt('updated_at', cursor);
+      if (cursor != null) {
+        query = lastId == null
+            ? query.gt('updated_at', cursor)
+            : query.or(
+                'updated_at.gt."$cursor",'
+                'and(updated_at.eq."$cursor",id.gt."$lastId")',
+              );
+      }
 
       final rows = await _retryOperation<List<Map<String, dynamic>>>(() async {
-        final res = await query.order('updated_at').limit(_pageSize);
+        final res = await query
+            .order('updated_at', ascending: true)
+            .order('id', ascending: true)
+            .limit(pageSize);
         return List<Map<String, dynamic>>.from(res);
       });
 
       if (rows.isEmpty) break;
-      if (_userId != userId) return;
+      if (stale()) return;
       await adapter.apply(userId, rows);
       _pulled.add(adapter.table);
       final last = rows.last['updated_at'];
-      if (last is! String || last == cursor) break; // No progress: stop.
+      final id = rows.last['id'];
+      if (last is! String || id == null) break;
       cursor = last;
+      lastId = '$id';
+      // Stopped meanwhile (sign-out reset the cursors): don't save one back.
+      if (stale()) return;
       await _prefs.setString(cursorKey, last);
-      if (rows.length < _pageSize) break;
+      if (rows.length < pageSize) break;
     }
   }
 

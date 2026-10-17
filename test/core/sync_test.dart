@@ -126,19 +126,23 @@ void main() {
       expect(await ActivitySyncAdapter(otherPhone).pending('u'), isEmpty);
     });
 
-    test('deleting a synced workout tells the other devices', () async {
-      await repo.saveSession(
-        _session('a', endTime: _start.add(const Duration(minutes: 15))),
-      );
-      await repo.deleteSession('a'); // never uploaded: nothing to tell
-      expect(hooks.deletes, isEmpty);
-
+    test('deleting a workout tells the other devices', () async {
       await repo.saveSession(
         _session('b', endTime: _start.add(const Duration(minutes: 15))),
       );
       await adapter.markSynced('u', ['b']);
       await repo.deleteSession('b');
       expect(hooks.deletes, [('activity_sessions', 'b')]);
+    });
+
+    test('a delete is recorded even before the upload was confirmed', () async {
+      // The upload may have reached the server while its response was lost,
+      // so the row could exist there without being marked synced here.
+      await repo.saveSession(
+        _session('a', endTime: _start.add(const Duration(minutes: 15))),
+      );
+      await repo.deleteSession('a');
+      expect(hooks.deletes, [('activity_sessions', 'a')]);
     });
 
     test('a deletion from another device removes the workout', () async {

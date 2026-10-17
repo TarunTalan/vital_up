@@ -48,10 +48,20 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
+
+  /// Track points are always read by session (route, sync, cascade delete);
+  /// without this every lookup scans every point ever recorded.
+  static const _trackPointIndex =
+      'CREATE INDEX IF NOT EXISTS idx_track_points_session '
+      'ON drift_track_points (session_id)';
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) async {
+          await m.createAll();
+          await customStatement(_trackPointIndex);
+        },
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.addColumn(
@@ -81,6 +91,9 @@ class AppDatabase extends _$AppDatabase {
               driftActivitySessions,
               driftActivitySessions.synced,
             );
+          }
+          if (from < 6) {
+            await customStatement(_trackPointIndex);
           }
         },
         beforeOpen: (details) async {
@@ -218,8 +231,16 @@ class AppDatabase extends _$AppDatabase {
       .get();
 
   // Retrieve all sessions in reverse chronological order
-  Future<List<DriftActivitySession>> getAllSessions() =>
-      (select(driftActivitySessions)..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.desc)])).get();
+  Future<List<DriftActivitySession>> getAllSessions({DateTime? since}) {
+    final query = select(driftActivitySessions)
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.desc),
+      ]);
+    if (since != null) {
+      query.where((t) => t.startTime.isBiggerOrEqualValue(since));
+    }
+    return query.get();
+  }
 
   // Delete a session and cascaded points
   Future<void> deleteSession(String id) => transaction(() async {

@@ -90,7 +90,8 @@ class BackupSyncAdapter implements SyncAdapter {
   /// Uploads in flight: kind -> canonical data sent.
   final Map<String, String> _sending = {};
 
-  String _stateKey(String userId, String kind) => 'backup_state_${userId}_$kind';
+  String _stateKey(String userId, String kind) =>
+      'backup_state_${userId}_$kind';
 
   _BackupState? _state(String userId, String kind) {
     final raw = _prefs.getString(_stateKey(userId, kind));
@@ -128,13 +129,15 @@ class BackupSyncAdapter implements SyncAdapter {
         );
       }
       _sending[source.kind] = canonical;
-      rows.add(PendingRow(source.kind, {
-        'id': '$userId:${source.kind}',
-        'user_id': userId,
-        'kind': source.kind,
-        'data': data,
-        'changed_at': changedAt.toIso8601String(),
-      }));
+      rows.add(
+        PendingRow(source.kind, {
+          'id': '$userId:${source.kind}',
+          'user_id': userId,
+          'kind': source.kind,
+          'data': data,
+          'changed_at': changedAt.toIso8601String(),
+        }),
+      );
     }
     return rows;
   }

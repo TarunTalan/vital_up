@@ -163,6 +163,15 @@ class PendingWrite {
   );
 }
 
+/// The server is down or rate limiting; queued writes wait for a retry.
+class ServerUnavailable implements Exception {
+  final Object cause;
+  const ServerUnavailable(this.cause);
+
+  @override
+  String toString() => 'ServerUnavailable: $cause';
+}
+
 /// Durable outbox for server writes made while offline. Flushed in order by
 /// [SyncService] whenever it runs (reconnect, resume, after local changes).
 class PendingWrites {
@@ -267,6 +276,11 @@ class PendingWrites {
       _connectivity.reportSuccess();
       return true;
     } catch (e) {
+      // An outage is as temporary as being offline: keep the edit.
+      if (_isServerTrouble(e)) {
+        await enqueue(write);
+        return false;
+      }
       if (!isOfflineError(e)) rethrow;
       _connectivity.reportFailure();
       await enqueue(write);
@@ -292,6 +306,7 @@ class PendingWrites {
     // Stored entry -> its replacement after this flush (null = remove it).
     final outcome = <String, String?>{};
     Object? offline;
+    Object? unavailable;
     var stop = false;
     for (final raw in snapshot) {
       final write = _decode(raw);
@@ -316,6 +331,13 @@ class PendingWrites {
         }
         if (_isSessionError(e)) {
           // Expired session: not the write's fault, try again later.
+          stop = true;
+          continue;
+        }
+        if (_isServerTrouble(e)) {
+          // Outage or rate limit: not the write's fault either. Keep it
+          // (no attempt used) and let the sync back off.
+          unavailable = e;
           stop = true;
           continue;
         }
@@ -350,6 +372,16 @@ class PendingWrites {
       await _prefs.setStringList(_storageKey, next);
     }
     if (offline != null) throw offline;
+    if (unavailable != null) throw ServerUnavailable(unavailable);
+  }
+
+  /// 5xx, 429 and PostgREST's database-connection errors (PGRST000-003).
+  static bool _isServerTrouble(Object e) {
+    if (e is! PostgrestException) return false;
+    final code = e.code ?? '';
+    if (code == '429' || code.startsWith('PGRST00')) return true;
+    final status = int.tryParse(code);
+    return status != null && status >= 500 && status < 600;
   }
 
   static bool _isSessionError(Object e) {
