@@ -31,7 +31,9 @@ abstract final class AnalyticsService {
       // Enable collection in release / profile mode, disable in debug
       _enabled = !kDebugMode;
       await _analytics!.setAnalyticsCollectionEnabled(_enabled);
-      debugPrint('[AnalyticsService] Firebase Analytics initialized (enabled: $_enabled)');
+      debugPrint(
+        '[AnalyticsService] Firebase Analytics initialized (enabled: $_enabled)',
+      );
     } catch (e) {
       debugPrint('[AnalyticsService] Disabled, Firebase not configured: $e');
       _enabled = false;
@@ -41,10 +43,13 @@ abstract final class AnalyticsService {
   /// Links authenticated user id to analytics without collecting PII.
   static void watchUser(SupabaseClient client) {
     if (!_enabled || _analytics == null) return;
-    client.auth.onAuthStateChange.listen((auth) {
-      final userId = auth.session?.user.id;
-      _analytics?.setUserId(id: userId);
-    });
+    client.auth.onAuthStateChange
+        // A token refresh that fails offline arrives as an error; not a crash.
+        .handleError((Object _) {})
+        .listen((auth) {
+          final userId = auth.session?.user.id;
+          _analytics?.setUserId(id: userId);
+        });
   }
 
   /// Sets custom user properties (e.g., subscription tier, onboarding status).
@@ -70,10 +75,7 @@ abstract final class AnalyticsService {
       return;
     }
     try {
-      await _analytics!.logEvent(
-        name: name,
-        parameters: parameters,
-      );
+      await _analytics!.logEvent(name: name, parameters: parameters);
     } catch (e) {
       debugPrint('[AnalyticsService] Error logging event $name: $e');
     }
@@ -91,7 +93,9 @@ abstract final class AnalyticsService {
         screenClass: screenClass ?? screenName,
       );
     } catch (e) {
-      debugPrint('[AnalyticsService] Error logging screen view $screenName: $e');
+      debugPrint(
+        '[AnalyticsService] Error logging screen view $screenName: $e',
+      );
     }
   }
 
@@ -106,12 +110,15 @@ abstract final class AnalyticsService {
     required double distanceMeters,
     required int calories,
   }) async {
-    await logEvent('workout_completed', parameters: {
-      'activity_type': activityType,
-      'duration_seconds': durationSeconds,
-      'distance_meters': distanceMeters.round(),
-      'calories': calories,
-    });
+    await logEvent(
+      'workout_completed',
+      parameters: {
+        'activity_type': activityType,
+        'duration_seconds': durationSeconds,
+        'distance_meters': distanceMeters.round(),
+        'calories': calories,
+      },
+    );
   }
 
   /// Track food scanning actions.
@@ -132,16 +139,14 @@ abstract final class AnalyticsService {
 
   /// Track water logging.
   static Future<void> logWaterIntake({required int amountMl}) async {
-    await logEvent('water_logged', parameters: {
-      'amount_ml': amountMl,
-    });
+    await logEvent('water_logged', parameters: {'amount_ml': amountMl});
   }
 
   /// Track AI coach interaction.
-  static Future<void> logVitaInteraction({required String interactionType}) async {
-    await logEvent('vita_interaction', parameters: {
-      'type': interactionType,
-    });
+  static Future<void> logVitaInteraction({
+    required String interactionType,
+  }) async {
+    await logEvent('vita_interaction', parameters: {'type': interactionType});
   }
 
   /// Track badge unlock or challenge completion.
@@ -149,9 +154,9 @@ abstract final class AnalyticsService {
     required String achievementId,
     required String type, // badge | challenge
   }) async {
-    await logEvent('achievement_unlocked', parameters: {
-      'achievement_id': achievementId,
-      'achievement_type': type,
-    });
+    await logEvent(
+      'achievement_unlocked',
+      parameters: {'achievement_id': achievementId, 'achievement_type': type},
+    );
   }
 }
