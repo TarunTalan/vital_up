@@ -96,11 +96,13 @@ dependencies:
   url_launcher: ^6.3.0
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
+  firebase_analytics: ^12.1.0
+  firebase_crashlytics: ^5.4.0
+  envied: ^1.1.1
   flutter_local_notifications: ^22.3.1
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   package_info_plus: ^10.2.2
-  firebase_crashlytics: ^5.4.0
   home_widget: ^0.10.0
   local_auth: ^3.0.2
   share_plus: ^13.3.1
@@ -116,6 +118,7 @@ dev_dependencies:
 
   # Code generation
   build_runner: ^2.4.9
+  envied_generator: ^1.1.1
   isar_community_generator: ^3.3.2
   drift_dev: ^2.16.0
   injectable_generator: ^2.6.1

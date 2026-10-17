@@ -63,6 +63,7 @@ app.*.map.json
 lib/core/config/supabase_config.dart
 .env
 .env.*
+!.env.example
 *.env
 local.properties
 **/local.properties
