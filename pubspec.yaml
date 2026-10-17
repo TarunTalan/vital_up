@@ -153,6 +153,7 @@ flutter:
     - assets/icons/vita/
     - assets/audio/
     - assets/data/
+    - shorebird.yaml
 
 
   fonts:
