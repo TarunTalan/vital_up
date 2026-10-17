@@ -20,6 +20,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterFragmentActivity() {
     private val AUDIO_CHANNEL = "com.example.vital_up/audio_intent"
     private val USAGE_CHANNEL = "com.example.vital_up/usage_stats"
+    private val WINDOW_CHANNEL = "com.vitalup.app/window"
 
     /** Usage queries can take a while on busy phones: keep them off the UI thread. */
     private val usageExecutor = Executors.newSingleThreadExecutor()
@@ -82,6 +83,23 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // App lock on: hide the app in recents and block screenshots.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WINDOW_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "setSecure") {
+                val secure = call.argument<Boolean>("secure") ?: false
+                runOnUiThread {
+                    if (secure) {
+                        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+                result.success(null)
+            } else {
+                result.notImplemented()
+            }
+        }
 
         // Handler for audio apps & intents
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AUDIO_CHANNEL).setMethodCallHandler { call, result ->

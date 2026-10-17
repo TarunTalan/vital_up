@@ -80,6 +80,9 @@ abstract class VitalWidgetProvider : HomeWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Wg.ACTION_BACKGROUND && intent.data != null) {
+            // Providers must be exported for the launcher, so any app could
+            // send this action; only our own buttons carry the token.
+            if (!Wg.isOwnAction(context, intent)) return
             Wg.markRefreshing(context)
             showUpdating(context)
             Wg.runInDart(context, intent.data!!)
@@ -118,6 +121,21 @@ object Wg {
     const val ACTION_BACKGROUND = "com.vitalup.app.WIDGET_BACKGROUND"
     private const val NATIVE_PREFS = "vitalup_widget_native"
     private const val KEY_LAST_AUTO = "last_auto_refresh"
+    private const val KEY_ACTION_TOKEN = "action_token"
+    private const val EXTRA_ACTION_TOKEN = "com.vitalup.app.ACTION_TOKEN"
+
+    /** Random per-install secret in app-private prefs, put on every button. */
+    private fun actionToken(context: Context): String {
+        val prefs = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
+        prefs.getString(KEY_ACTION_TOKEN, null)?.let { return it }
+        val token = java.util.UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_ACTION_TOKEN, token).apply()
+        return token
+    }
+
+    /** The intent came from one of our widget buttons (not another app). */
+    fun isOwnAction(context: Context, intent: Intent): Boolean =
+        intent.getStringExtra(EXTRA_ACTION_TOKEN) == actionToken(context)
 
     /** Saved data older than this is refreshed by Dart when a widget updates. */
     private const val STALE_MS = 30 * 60 * 1000L
@@ -204,6 +222,7 @@ object Wg {
         val intent = Intent(context, provider).apply {
             action = ACTION_BACKGROUND
             data = uri
+            putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
         }
         return PendingIntent.getBroadcast(
             context,
