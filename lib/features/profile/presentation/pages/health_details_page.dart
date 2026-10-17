@@ -431,6 +431,7 @@ class _BodySheetState extends State<_BodySheet> {
     if (imperial && _feet.text.trim().isEmpty) return 'Enter feet too';
     return ProfileRules.heightError(_enteredCm(imperial));
   }
+
   late String _activity = widget.profile.activity;
 
   @override

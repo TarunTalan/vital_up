@@ -37,7 +37,11 @@ class CommunityRepositoryImpl implements CommunityRepository {
 
   String _key(String name) => 'community:$name:${_remote.requireUser()}';
   String get _communitiesKey => _key('communities');
-  String get _settingsKey => _key('settings');
+  String get _settingsKey => settingsKey(_remote.requireUser());
+
+  /// Cached Arena settings (username, city...); a username change patches
+  /// it so Arena shows the new name at once.
+  static String settingsKey(String userId) => 'community:settings:$userId';
   String get _friendsKey => _key('friends');
 
   /// Ranks that depend on who the caller's friends are or which

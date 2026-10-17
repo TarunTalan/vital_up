@@ -76,9 +76,7 @@ class _AccountFormState extends State<_AccountForm> {
   final _formKey = GlobalKey<FormState>();
   late ProfileEntity _saved = widget.profile;
   late final _name = TextEditingController(text: _saved.fullName);
-  late final _usernameController = TextEditingController(
-    text: _saved.username,
-  );
+  late final _usernameController = TextEditingController(text: _saved.username);
   late final _username = UsernameInput(sl<UsernameService>());
   late final _dob = TextEditingController(text: _formatDob(_saved.dob));
   late final _email = TextEditingController(text: _saved.email);

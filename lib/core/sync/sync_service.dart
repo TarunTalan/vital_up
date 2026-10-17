@@ -81,6 +81,13 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
   String? get _userId => _client.auth.currentUser?.id;
 
+  final _pulled = StreamController<String>.broadcast();
+
+  /// Table names (`water_logs`, `user_backups`...) whose rows from the
+  /// server were just written to the device, so open screens can re-read
+  /// them. Not [HabitEvents]: pulled rows can be from any day.
+  Stream<String> get pulled => _pulled.stream;
+
   /// Starts syncing on sign-in, app resume and reconnect. Call once at
   /// startup.
   void start() {
@@ -162,7 +169,8 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   /// the returned future completes after it (so "sync, then wipe" on
   /// sign-out really uploads the latest changes). Never throws.
   Future<void> sync({bool pull = true, bool force = false}) {
-    final wantsPull = pull &&
+    final wantsPull =
+        pull &&
         (force ||
             _lastPull == null ||
             DateTime.now().difference(_lastPull!) >= _minPullInterval);
@@ -184,7 +192,8 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   Future<int> pendingCount() async {
     final userId = _userId;
     if (userId == null) return 0;
-    var count = (_prefs.getStringList(_keyDeletes) ?? const []).length +
+    var count =
+        (_prefs.getStringList(_keyDeletes) ?? const []).length +
         _writes.countFor(userId);
     for (final adapter in _adapters) {
       try {
@@ -291,6 +300,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       if (rows.isEmpty) break;
       if (_userId != userId) return;
       await adapter.apply(userId, rows);
+      _pulled.add(adapter.table);
       final last = rows.last['updated_at'];
       if (last is! String || last == cursor) break; // No progress: stop.
       cursor = last;

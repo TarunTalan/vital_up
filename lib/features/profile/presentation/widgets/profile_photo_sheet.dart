@@ -79,9 +79,7 @@ Future<void> showProfilePhotoOptions(
             child: const Text('Cancel'),
           ),
           TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: context.colors.error,
-            ),
+            style: TextButton.styleFrom(foregroundColor: context.colors.error),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Remove'),
           ),

@@ -122,7 +122,8 @@ class _ProfilePageState extends State<ProfilePage> {
       },
       builder: (context, state) {
         final cubit = context.read<ProfileCubit>();
-        final profile = cubit.currentProfile ??
+        final profile =
+            cubit.currentProfile ??
             (state is ProfileLoading ? _lastProfile : null);
         _lastProfile = profile;
 
@@ -152,8 +153,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 profile: profile,
                 uploading: state is ProfilePhotoUpdating,
                 onOpen: () => _open('account-details'),
-                onPhoto: () =>
-                    showProfilePhotoOptions(context, cubit, profile),
+                onPhoto: () => showProfilePhotoOptions(context, cubit, profile),
                 onOpenArena: widget.onOpenArena,
               ),
               const SizedBox(height: AppDimens.sectionGap),

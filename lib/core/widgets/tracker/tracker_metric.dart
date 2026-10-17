@@ -21,7 +21,7 @@ enum TrackerMetric {
     icon: Icons.directions_run_rounded,
     color: AppColors.trackActivity,
     route: 'activity-goals',
-    logLabel: 'Start workout',
+    logLabel: 'Start activity',
     logIcon: Icons.play_arrow_rounded,
   ),
   mood(

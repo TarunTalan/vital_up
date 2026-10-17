@@ -18,13 +18,14 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     required GenerateMealPlan generateMealPlan,
     required GetActiveMealPlan getActiveMealPlan,
     required SetActiveMealPlan setActiveMealPlan,
-  })  : _generateMealPlan = generateMealPlan,
-        _getActiveMealPlan = getActiveMealPlan,
-        _setActiveMealPlan = setActiveMealPlan,
-        super(DietPlanInitial());
+  }) : _generateMealPlan = generateMealPlan,
+       _getActiveMealPlan = getActiveMealPlan,
+       _setActiveMealPlan = setActiveMealPlan,
+       super(DietPlanInitial());
 
   Future<void> loadActiveMealPlan() async {
-    emit(DietPlanLoading());
+    // A reload keeps the plan on screen instead of flashing "Get a plan".
+    if (state is! DietPlanLoaded) emit(DietPlanLoading());
     // A failed or slow local read falls back to "no plan" (generate CTA).
     final cached = await _getActiveMealPlan().orFallback(null, kLoadTimeout);
     if (isClosed) return;
@@ -54,7 +55,12 @@ class DietPlanCubit extends Cubit<DietPlanState> {
       );
     } catch (e) {
       addError(e);
-      if (!isClosed) emit(DietPlanError(userMessage(e, fallback: "Couldn't create your plan. Try again.")));
+      if (!isClosed)
+        emit(
+          DietPlanError(
+            userMessage(e, fallback: "Couldn't create your plan. Try again."),
+          ),
+        );
       return;
     }
     // The page may have been closed while the plan was generating.

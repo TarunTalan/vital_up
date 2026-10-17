@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,11 +17,18 @@ class FakeProfileRepository implements ProfileRepository {
   ProfileEntity? lastUpdatedProfile;
   int getProfileCallCount = 0;
   int updateProfileCallCount = 0;
+  final changesController = StreamController<ProfileEntity>.broadcast();
 
   @override
-  Future<Either<Failure, ProfileEntity>> getProfile({bool forceRefresh = false}) async {
+  Stream<ProfileEntity> get changes => changesController.stream;
+
+  @override
+  Future<Either<Failure, ProfileEntity>> getProfile({
+    bool forceRefresh = false,
+  }) async {
     getProfileCallCount++;
-    return getProfileResult ?? const Left(ServerFailure('Error fetching profile'));
+    return getProfileResult ??
+        const Left(ServerFailure('Error fetching profile'));
   }
 
   @override
@@ -34,8 +42,10 @@ class FakeProfileRepository implements ProfileRepository {
   Either<Failure, void>? removePhotoResult;
 
   @override
-  Future<Either<Failure, String>> uploadProfilePhoto(String userId, File imageFile) async =>
-      uploadPhotoResult ?? const Right('https://example.com/avatar.jpg');
+  Future<Either<Failure, String>> uploadProfilePhoto(
+    String userId,
+    File imageFile,
+  ) async => uploadPhotoResult ?? const Right('https://example.com/avatar.jpg');
 
   @override
   Future<Either<Failure, void>> removeProfilePhoto(String userId) async =>
@@ -67,86 +77,107 @@ void main() {
   });
 
   group('loadProfile', () {
-    test('should emit [ProfileLoading, ProfileLoaded] when fetching remote profile succeeds', () async {
-      fakeRepository.getProfileResult = const Right(tProfile);
+    test(
+      'should emit [ProfileLoading, ProfileLoaded] when fetching remote profile succeeds',
+      () async {
+        fakeRepository.getProfileResult = const Right(tProfile);
 
-      final expectedStates = [
-        ProfileLoading(),
-        const ProfileLoaded(tProfile),
-      ];
+        final expectedStates = [
+          ProfileLoading(),
+          const ProfileLoaded(tProfile),
+        ];
 
-      expectLater(cubit.stream, emitsInOrder(expectedStates));
+        expectLater(cubit.stream, emitsInOrder(expectedStates));
 
-      await cubit.loadProfile();
-      expect(fakeRepository.getProfileCallCount, equals(1));
-    });
+        await cubit.loadProfile();
+        expect(fakeRepository.getProfileCallCount, equals(1));
+      },
+    );
 
-    test('should emit [ProfileLoading, ProfileError] when fetching remote profile fails', () async {
-      fakeRepository.getProfileResult = const Left(ServerFailure('Connection error'));
+    test(
+      'should emit [ProfileLoading, ProfileError] when fetching remote profile fails',
+      () async {
+        fakeRepository.getProfileResult = const Left(
+          ServerFailure('Connection error'),
+        );
 
-      final expectedStates = [
-        ProfileLoading(),
-        const ProfileError('Connection error'),
-      ];
+        final expectedStates = [
+          ProfileLoading(),
+          const ProfileError('Connection error'),
+        ];
 
-      expectLater(cubit.stream, emitsInOrder(expectedStates));
+        expectLater(cubit.stream, emitsInOrder(expectedStates));
 
-      await cubit.loadProfile();
-      expect(fakeRepository.getProfileCallCount, equals(1));
-    });
+        await cubit.loadProfile();
+        expect(fakeRepository.getProfileCallCount, equals(1));
+      },
+    );
   });
 
   group('updateProfile', () {
-    test('should emit [ProfileSaving, ProfileSaveSuccess] when updating profile succeeds', () async {
-      fakeRepository.updateProfileResult = const Right(null);
+    test(
+      'should emit [ProfileSaving, ProfileSaveSuccess] when updating profile succeeds',
+      () async {
+        fakeRepository.updateProfileResult = const Right(null);
 
-      final expectedStates = [
-        const ProfileSaving(tProfile),
-        const ProfileSaveSuccess(tProfile),
-      ];
+        final expectedStates = [
+          const ProfileSaving(tProfile),
+          const ProfileSaveSuccess(tProfile),
+        ];
 
-      expectLater(cubit.stream, emitsInOrder(expectedStates));
+        expectLater(cubit.stream, emitsInOrder(expectedStates));
 
-      await cubit.updateProfile(tProfile);
-      expect(fakeRepository.updateProfileCallCount, equals(1));
-      expect(fakeRepository.lastUpdatedProfile, equals(tProfile));
-    });
+        await cubit.updateProfile(tProfile);
+        expect(fakeRepository.updateProfileCallCount, equals(1));
+        expect(fakeRepository.lastUpdatedProfile, equals(tProfile));
+      },
+    );
 
-    test('should emit [ProfileSaving, ProfileError, ProfileLoaded] when updating profile fails', () async {
-      fakeRepository.updateProfileResult = const Left(ServerFailure('Database error'));
+    test(
+      'should emit [ProfileSaving, ProfileError, ProfileLoaded] when updating profile fails',
+      () async {
+        fakeRepository.updateProfileResult = const Left(
+          ServerFailure('Database error'),
+        );
 
-      // The error is reported, then the unsaved profile stays on screen.
-      final expectedStates = [
-        const ProfileSaving(tProfile),
-        const ProfileError('Database error'),
-        const ProfileLoaded(tProfile),
-      ];
+        // The error is reported, then the unsaved profile stays on screen.
+        final expectedStates = [
+          const ProfileSaving(tProfile),
+          const ProfileError('Database error'),
+          const ProfileLoaded(tProfile),
+        ];
 
-      expectLater(cubit.stream, emitsInOrder(expectedStates));
+        expectLater(cubit.stream, emitsInOrder(expectedStates));
 
-      await cubit.updateProfile(tProfile);
-      expect(fakeRepository.updateProfileCallCount, equals(1));
-    });
+        await cubit.updateProfile(tProfile);
+        expect(fakeRepository.updateProfileCallCount, equals(1));
+      },
+    );
 
-    test('ProfileSaving state should contain current profile if cubit was already loaded', () async {
-      // 1. Load the profile first
-      fakeRepository.getProfileResult = const Right(tProfile);
-      await cubit.loadProfile();
-      expect(cubit.state, equals(const ProfileLoaded(tProfile)));
+    test(
+      'ProfileSaving state should contain current profile if cubit was already loaded',
+      () async {
+        // 1. Load the profile first
+        fakeRepository.getProfileResult = const Right(tProfile);
+        await cubit.loadProfile();
+        expect(cubit.state, equals(const ProfileLoaded(tProfile)));
 
-      // 2. Perform update
-      final updatedProfile = tProfile.copyWith(fullName: 'Updated Name');
-      fakeRepository.updateProfileResult = const Right(null);
+        // 2. Perform update
+        final updatedProfile = tProfile.copyWith(fullName: 'Updated Name');
+        fakeRepository.updateProfileResult = const Right(null);
 
-      final expectedStates = [
-        const ProfileSaving(tProfile), // should use the last loaded profile as currentProfile
-        ProfileSaveSuccess(updatedProfile),
-      ];
+        final expectedStates = [
+          const ProfileSaving(
+            tProfile,
+          ), // should use the last loaded profile as currentProfile
+          ProfileSaveSuccess(updatedProfile),
+        ];
 
-      expectLater(cubit.stream, emitsInOrder(expectedStates));
+        expectLater(cubit.stream, emitsInOrder(expectedStates));
 
-      await cubit.updateProfile(updatedProfile);
-    });
+        await cubit.updateProfile(updatedProfile);
+      },
+    );
   });
 
   group('profile photo', () {
@@ -176,7 +207,9 @@ void main() {
     });
 
     test('failed upload keeps the profile and reports the error', () async {
-      fakeRepository.uploadPhotoResult = const Left(ServerFailure('Upload failed'));
+      fakeRepository.uploadPhotoResult = const Left(
+        ServerFailure('Upload failed'),
+      );
       await cubit.loadProfile();
 
       await cubit.uploadPhoto(File('avatar.jpg'));
@@ -194,6 +227,19 @@ void main() {
       final updated = cubit.state as ProfilePhotoUpdated;
       expect(updated.profile.photoUrl, isNull);
       expect(updated.removed, isTrue);
+    });
+  });
+
+  group('changes', () {
+    test('shows a profile saved by another screen', () async {
+      fakeRepository.getProfileResult = const Right(tProfile);
+      await cubit.loadProfile();
+      final edited = tProfile.copyWith(fullName: 'New Name');
+
+      fakeRepository.changesController.add(edited);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(cubit.state, ProfileLoaded(edited));
     });
   });
 }

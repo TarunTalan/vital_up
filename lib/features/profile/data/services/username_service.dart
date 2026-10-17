@@ -1,4 +1,5 @@
 import 'package:vital_up/core/cache/cache_store.dart';
+import 'package:vital_up/features/community/data/repositories/community_repository_impl.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -46,8 +47,10 @@ class UsernameService {
   static String? formatError(String username) {
     final value = username.trim();
     if (value.isEmpty) return 'Username is required';
-    if (value.length < minLength) return 'Must be at least $minLength characters';
-    if (value.length > maxLength) return 'Must be at most $maxLength characters';
+    if (value.length < minLength)
+      return 'Must be at least $minLength characters';
+    if (value.length > maxLength)
+      return 'Must be at most $maxLength characters';
     if (!_allowed.hasMatch(value)) {
       return 'Letters, numbers, dots and underscores only';
     }
@@ -93,13 +96,17 @@ class UsernameService {
   Future<void> _remember(String userId, String username) async {
     final cache = _cache;
     if (cache == null) return;
-    await cache.write(
-      _statusKey(userId),
-      {'username': username, 'confirmed': true},
-    );
+    await cache.write(_statusKey(userId), {
+      'username': username,
+      'confirmed': true,
+    });
     await cache.update(
       ProfileCache.key(userId),
       (data) => ProfileCache.patch(data, {'username': username}),
+    );
+    await cache.update(
+      CommunityRepositoryImpl.settingsKey(userId),
+      (data) => data is Map ? {...data, 'username': username} : data,
     );
   }
 
@@ -116,11 +123,12 @@ class UsernameService {
     final error = formatError(username);
     if (error != null) throw UsernameException(error);
     try {
-      final saved = await _client.rpc(
-            'set_username',
-            params: {'p_username': username.trim()},
-          )
-          as String;
+      final saved =
+          await _client.rpc(
+                'set_username',
+                params: {'p_username': username.trim()},
+              )
+              as String;
       final userId = _client.auth.currentUser?.id;
       if (userId != null) await _remember(userId, saved);
       return saved;

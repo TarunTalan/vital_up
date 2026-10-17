@@ -66,12 +66,14 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final username = profileRes['username'] as String? ?? '';
       final email = profileRes['email'] as String? ?? user.email ?? '';
 
-      final String fullName = healthRes?['full_name'] as String? ??
+      final String fullName =
+          healthRes?['full_name'] as String? ??
           user.userMetadata?['full_name'] ??
           user.userMetadata?['name'] ??
           '';
 
-      final String photoUrl = user.userMetadata?['avatar_url'] ??
+      final String photoUrl =
+          user.userMetadata?['avatar_url'] ??
           user.userMetadata?['picture'] ??
           '';
 
@@ -92,7 +94,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         medicines: healthRes?['medicines'] as String? ?? '',
         smokes: healthRes?['smokes'] as String? ?? '',
         bloodPressureTop: healthRes?['blood_pressure_top'] as String? ?? '',
-        bloodPressureBottom: healthRes?['blood_pressure_bottom'] as String? ?? '',
+        bloodPressureBottom:
+            healthRes?['blood_pressure_bottom'] as String? ?? '',
         bpm: healthRes?['bpm'] as String? ?? '',
         activity: healthRes?['activity'] as String? ?? '',
         sleep: healthRes?['sleep'] as String? ?? '',
@@ -109,7 +112,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     }
   }
 
-  static const _healthColumns = 'full_name, dob, gender, weight, weight_unit, '
+  static const _healthColumns =
+      'full_name, dob, gender, weight, weight_unit, '
       'height, height_unit, oxygen_level, health_conditions, allergies, '
       'medicines, smokes, blood_pressure_top, blood_pressure_bottom, bpm, '
       'activity, sleep, calorie_goal';
@@ -187,9 +191,11 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         }
       }
 
-      logger.i(sent
-          ? 'Successfully updated profile for user: ${user.id}'
-          : 'Profile saved offline for user: ${user.id}; queued for sync');
+      logger.i(
+        sent
+            ? 'Successfully updated profile for user: ${user.id}'
+            : 'Profile saved offline for user: ${user.id}; queued for sync',
+      );
       return sent;
     } on ServerException {
       rethrow;
@@ -207,19 +213,25 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       _requireCurrentUser(userId);
 
       final dot = imageFile.path.lastIndexOf('.');
-      final ext = dot == -1 ? '' : imageFile.path.substring(dot + 1).toLowerCase();
+      final ext = dot == -1
+          ? ''
+          : imageFile.path.substring(dot + 1).toLowerCase();
       final contentType = _imageTypes[ext];
       if (contentType == null) {
         throw const ProfileUserError('Choose a JPG, PNG, WEBP or HEIC image.');
       }
 
       // A new file name per upload busts image caches holding the old URL.
-      final path = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path =
+          '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final bucket = supabaseClient.storage.from(_avatarBucket);
       await bucket.upload(
         path,
         imageFile,
-        fileOptions: FileOptions(contentType: contentType, cacheControl: '3600'),
+        fileOptions: FileOptions(
+          contentType: contentType,
+          cacheControl: '3600',
+        ),
       );
       final url = bucket.getPublicUrl(path);
 
@@ -266,7 +278,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await supabaseClient
           .from('profiles')
-          .update({'avatar_url': url}).eq('id', userId);
+          .update({'avatar_url': url})
+          .eq('id', userId);
     } catch (e) {
       logger.w('Could not sync avatar to profiles: $e');
     }

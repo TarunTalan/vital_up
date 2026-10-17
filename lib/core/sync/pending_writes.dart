@@ -202,9 +202,7 @@ class PendingWrites {
     }
   }
 
-  List<PendingWrite> _all() => [
-    for (final raw in _raw()) ?_decode(raw),
-  ];
+  List<PendingWrite> _all() => [for (final raw in _raw()) ?_decode(raw)];
 
   Future<void> _save(List<PendingWrite> writes) {
     var list = writes;
@@ -214,14 +212,19 @@ class PendingWrites {
       );
       list = list.sublist(list.length - maxQueued);
     }
-    return _prefs.setStringList(
-      _storageKey,
-      [for (final w in list) jsonEncode(w.toJson())],
-    );
+    return _prefs.setStringList(_storageKey, [
+      for (final w in list) jsonEncode(w.toJson()),
+    ]);
   }
 
   /// Writes queued for [userId].
   int countFor(String userId) => _all().where((w) => w.userId == userId).length;
+
+  /// Whether a write to one of [targets] (tables or RPCs) is still queued
+  /// for [userId]. Until it's sent, the server copy is older than the
+  /// local edit, so a refresh must not overwrite the local one with it.
+  bool hasQueuedFor(String userId, Set<String> targets) =>
+      _all().any((w) => w.userId == userId && targets.contains(w.target));
 
   /// Queues [write] (coalescing with a queued one of the same key) and asks
   /// for a sync.
@@ -235,7 +238,8 @@ class PendingWrites {
     } else {
       final old = all[i];
       final merges =
-          old.kind == write.kind && (write.kind == 'update' || write.kind == 'upsert');
+          old.kind == write.kind &&
+          (write.kind == 'update' || write.kind == 'upsert');
       // Keep the original position so writes stay in order.
       all[i] = merges
           ? old._copy(values: {...old.values, ...write.values}, attempts: 0)
@@ -324,7 +328,9 @@ class PendingWrites {
           outcome[raw] = null;
         } else {
           debugPrint('PendingWrites: ${write.key} failed, will retry: $e');
-          outcome[raw] = jsonEncode(write._copy(attempts: write.attempts + 1).toJson());
+          outcome[raw] = jsonEncode(
+            write._copy(attempts: write.attempts + 1).toJson(),
+          );
         }
       }
     }

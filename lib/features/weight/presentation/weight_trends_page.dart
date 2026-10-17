@@ -59,10 +59,9 @@ class WeightTrendsPage extends StatelessWidget {
       builder: (context, snap) {
         final unit = snap.data ?? WeightUnit.kg;
         return BlocProvider(
-          create: (_) => TrendCubit<WeightLogCache>(
-            service.trend,
-            range: TrendRange.month,
-          )..load(),
+          create: (_) =>
+              TrendCubit<WeightLogCache>(service.trend, range: TrendRange.month)
+                ..load(),
           child: Builder(
             builder: (context) {
               final cubit = context.read<TrendCubit<WeightLogCache>>();
@@ -184,17 +183,26 @@ class WeightCard extends StatelessWidget {
             }
             final latest = data.logs.firstOrNull;
             final goal = data.series.goal;
+            final status = _status(latest?.weightKg, goal);
+            // Like the other cards: once today's weight is in, say so and
+            // offer to update it instead of a fresh log.
+            final loggedToday =
+                latest != null &&
+                DateUtils.isSameDay(latest.timestamp, DateTime.now());
             return TrackerCard(
               metric: _metric,
-              status: _status(latest?.weightKg, goal),
+              status: loggedToday ? TrackerStatus.done : status,
+              statusLabel: loggedToday && status != TrackerStatus.done
+                  ? 'Logged today'
+                  : null,
               onOpen: () async {
                 await context.pushNamed(_metric.route);
                 cubit.load();
               },
               actions: [
                 TrackerQuickAction(
-                  label: _metric.logLabel,
-                  icon: _metric.logIcon,
+                  label: loggedToday ? 'Update' : _metric.logLabel,
+                  icon: loggedToday ? Icons.edit_rounded : _metric.logIcon,
                   color: _metric.color,
                   filled: true,
                   onTap: () async {

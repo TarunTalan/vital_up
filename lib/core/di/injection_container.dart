@@ -44,8 +44,10 @@ import 'package:vital_up/features/vita/data/services/health_vitals_service.dart'
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart' as vital_up_dashboard;
-import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart'
+    as vital_up_dashboard;
+import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart'
+    as vital_up_dashboard;
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/activity_goals/data/datasources/activity_goals_local_datasource.dart';
@@ -151,7 +153,6 @@ import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/core/events/habit_events.dart';
 
-
 final GetIt sl = GetIt.instance;
 
 Future<void> initDependencies() async {
@@ -216,23 +217,30 @@ Future<void> initDependencies() async {
       ),
     ),
   );
-  sl.registerLazySingleton<DioClient>(() => DioClient(
-        dio: Dio(),
-        logger: sl<Logger>(),
-      ));
+  sl.registerLazySingleton<DioClient>(
+    () => DioClient(dio: Dio(), logger: sl<Logger>()),
+  );
 
   // 6. Auth Clean Architecture Layers
   sl.registerLazySingleton<SupabaseClient>(() => Supabase.instance.client);
-  sl.registerLazySingleton<EmailService>(() => EmailService(supabase: sl<SupabaseClient>()));
-  
+  sl.registerLazySingleton<EmailService>(
+    () => EmailService(supabase: sl<SupabaseClient>()),
+  );
+
   sl.registerLazySingleton<AuthLocalDataSource>(
     () => AuthLocalDataSourceImpl(secureStorage: sl<FlutterSecureStorage>()),
   );
   sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), logger: sl<Logger>()),
+    () => AuthRemoteDataSourceImpl(
+      supabaseClient: sl<SupabaseClient>(),
+      logger: sl<Logger>(),
+    ),
   );
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(remoteDataSource: sl<AuthRemoteDataSource>(), localDataSource: sl<AuthLocalDataSource>()),
+    () => AuthRepositoryImpl(
+      remoteDataSource: sl<AuthRemoteDataSource>(),
+      localDataSource: sl<AuthLocalDataSource>(),
+    ),
   );
 
   // 7. Blocs / Cubits
@@ -260,13 +268,17 @@ Future<void> initDependencies() async {
       },
     ),
   );
-  
+
   // 8. Onboarding
   sl.registerLazySingleton<OnboardingDataStore>(
     () => SharedPreferencesOnboardingDataStore(sl<SharedPreferences>()),
   );
   sl.registerLazySingleton<OnboardingRemoteDataSource>(
-    () => OnboardingRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), pendingWrites: sl<PendingWrites>(), logger: sl<Logger>()),
+    () => OnboardingRemoteDataSourceImpl(
+      supabaseClient: sl<SupabaseClient>(),
+      pendingWrites: sl<PendingWrites>(),
+      logger: sl<Logger>(),
+    ),
   );
   sl.registerLazySingleton<OnboardingRepository>(
     () => OnboardingRepositoryImpl(
@@ -276,7 +288,10 @@ Future<void> initDependencies() async {
       currentUserId: () => sl<SupabaseClient>().auth.currentUser?.id,
     ),
   );
-  sl.registerFactory(() => OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()));
+  sl.registerFactory(
+    () =>
+        OnboardingCubit(sl<OnboardingDataStore>(), sl<OnboardingRepository>()),
+  );
 
   // 9. Food Scan Clean Architecture Layers
   sl.registerLazySingleton<Uuid>(() => const Uuid());
@@ -354,30 +369,36 @@ Future<void> initDependencies() async {
   );
 
   sl.registerLazySingleton<GetMealRecommendation>(
-    () => GetMealRecommendation(mealRecommendationRepository: sl<MealRecommendationRepository>()),
+    () => GetMealRecommendation(
+      mealRecommendationRepository: sl<MealRecommendationRepository>(),
+    ),
   );
 
-  sl.registerFactory(() => FoodScanBloc(
-    scanFoodImage: sl<ScanFoodImage>(),
-    scanBarcode: sl<ScanBarcode>(),
-    saveMealLog: sl<SaveMealLog>(),
-    getMealRecommendation: sl<GetMealRecommendation>(),
-    nutritionRepository: sl<NutritionRepository>(),
-    uuid: sl<Uuid>(),
-    logger: sl<Logger>(),
-  ));
+  sl.registerFactory(
+    () => FoodScanBloc(
+      scanFoodImage: sl<ScanFoodImage>(),
+      scanBarcode: sl<ScanBarcode>(),
+      saveMealLog: sl<SaveMealLog>(),
+      getMealRecommendation: sl<GetMealRecommendation>(),
+      nutritionRepository: sl<NutritionRepository>(),
+      uuid: sl<Uuid>(),
+      logger: sl<Logger>(),
+    ),
+  );
 
-  sl.registerFactory(() => MealLogBloc(
-    getMealLogHistory: sl<GetMealLogHistory>(),
-    deleteMealLog: sl<DeleteMealLog>(),
-    isarService: sl<IsarService>(),
-  ));
+  sl.registerFactory(
+    () => MealLogBloc(
+      getMealLogHistory: sl<GetMealLogHistory>(),
+      deleteMealLog: sl<DeleteMealLog>(),
+      isarService: sl<IsarService>(),
+    ),
+  );
   // 9. Diet Plan
   sl.registerLazySingleton<DietPlanRemoteDataSource>(
-        () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
+    () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
   );
   sl.registerLazySingleton<DietPlanRepository>(
-        () => DietPlanRepositoryImpl(
+    () => DietPlanRepositoryImpl(
       remoteDataSource: sl<DietPlanRemoteDataSource>(),
       isarService: sl<IsarService>(),
       prefs: sl<SharedPreferences>(),
@@ -387,7 +408,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton(() => GetActiveMealPlan(sl<DietPlanRepository>()));
   sl.registerLazySingleton(() => SetActiveMealPlan(sl<DietPlanRepository>()));
   sl.registerFactory(
-        () => DietPlanCubit(
+    () => DietPlanCubit(
       generateMealPlan: sl<GenerateMealPlan>(),
       getActiveMealPlan: sl<GetActiveMealPlan>(),
       setActiveMealPlan: sl<SetActiveMealPlan>(),
@@ -396,25 +417,37 @@ Future<void> initDependencies() async {
 
   // 10. Profile Screen Dependencies
   sl.registerLazySingleton<ProfileRemoteDataSource>(
-        () => ProfileRemoteDataSourceImpl(supabaseClient: sl<SupabaseClient>(), pendingWrites: sl<PendingWrites>(), logger: sl<Logger>()),
+    () => ProfileRemoteDataSourceImpl(
+      supabaseClient: sl<SupabaseClient>(),
+      pendingWrites: sl<PendingWrites>(),
+      logger: sl<Logger>(),
+    ),
   );
   sl.registerLazySingleton<ProfileRepository>(
-        () => ProfileRepositoryImpl(
+    () => ProfileRepositoryImpl(
       remoteDataSource: sl<ProfileRemoteDataSource>(),
       isarService: sl<IsarService>(),
       cacheStore: sl<CacheStore>(),
       currentUserId: () => sl<SupabaseClient>().auth.currentUser?.id,
       logger: sl<Logger>(),
+      hasQueuedEdits: (userId) => sl<PendingWrites>().hasQueuedFor(userId, {
+        'profiles',
+        'user_health_data',
+      }),
     ),
   );
-  sl.registerFactory(() => ProfileCubit(profileRepository: sl<ProfileRepository>()));
+  sl.registerFactory(
+    () => ProfileCubit(profileRepository: sl<ProfileRepository>()),
+  );
 
   // 11. Settings Dependencies
   sl.registerLazySingleton<SettingsLocalDataSource>(
-        () => SettingsLocalDataSourceImpl(sharedPreferences: sl<SharedPreferences>()),
+    () =>
+        SettingsLocalDataSourceImpl(sharedPreferences: sl<SharedPreferences>()),
   );
   sl.registerLazySingleton<SettingsRepository>(
-        () => SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
+    () =>
+        SettingsRepositoryImpl(localDataSource: sl<SettingsLocalDataSource>()),
   );
   sl.registerLazySingleton<SettingsCubit>(
     () => SettingsCubit(
@@ -431,11 +464,11 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<AppDatabase>(() => driftDb);
 
   sl.registerLazySingleton<ActivityRepository>(
-        () => ActivityRepositoryImpl(
-          sl<AppDatabase>(),
-          sl<SyncService>(),
-          sl<HabitEvents>(),
-        ),
+    () => ActivityRepositoryImpl(
+      sl<AppDatabase>(),
+      sl<SyncService>(),
+      sl<HabitEvents>(),
+    ),
   );
   sl.registerLazySingleton<WorkoutCheckpointStore>(
     () => WorkoutCheckpointStore(sl<SharedPreferences>()),
@@ -455,60 +488,50 @@ Future<void> initDependencies() async {
     debugPrint('Could not finalize interrupted activity sessions: $e');
   }
   sl.registerLazySingleton<ActivityHistoryRepository>(
-        () => ActivityHistoryRepositoryImpl(
+    () => ActivityHistoryRepositoryImpl(
       activityRepository: sl<ActivityRepository>(),
       sharedPreferences: sl<SharedPreferences>(),
     ),
   );
-  sl.registerLazySingleton<MapTileRepository>(
-        () => MapTileRepositoryImpl(),
-  );
+  sl.registerLazySingleton<MapTileRepository>(() => MapTileRepositoryImpl());
 
   sl.registerLazySingleton<LocationTrackingRepository>(
-        () => LocationTrackingRepositoryImpl(),
+    () => LocationTrackingRepositoryImpl(),
   );
   sl.registerLazySingleton<StepCounterRepository>(
-        () => StepCounterRepositoryImpl(),
+    () => StepCounterRepositoryImpl(),
   );
 
   // Use cases
   sl.registerLazySingleton(
-        () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
+    () => GetLiveLocationStream(sl<LocationTrackingRepository>()),
   );
   sl.registerLazySingleton(
-        () => GetLiveStepsStream(sl<StepCounterRepository>()),
+    () => GetLiveStepsStream(sl<StepCounterRepository>()),
   );
   sl.registerLazySingleton(
-        () => StartTrackingSession(sl<LocationTrackingRepository>()),
+    () => StartTrackingSession(sl<LocationTrackingRepository>()),
+  );
+  sl.registerLazySingleton(() => PauseTrackingSession());
+  sl.registerLazySingleton(() => ResumeTrackingSession());
+  sl.registerLazySingleton(() => StopAndSaveSession(sl<ActivityRepository>()));
+  sl.registerLazySingleton(() => GetSessionHistory(sl<ActivityRepository>()));
+  sl.registerLazySingleton(
+    () => GetActivityHistory(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-        () => PauseTrackingSession(),
+    () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-        () => ResumeTrackingSession(),
+    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-        () => StopAndSaveSession(sl<ActivityRepository>()),
-  );
-  sl.registerLazySingleton(
-        () => GetSessionHistory(sl<ActivityRepository>()),
-  );
-  sl.registerLazySingleton(
-        () => GetActivityHistory(sl<ActivityHistoryRepository>()),
-  );
-  sl.registerLazySingleton(
-        () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
-  );
-  sl.registerLazySingleton(
-        () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
-  );
-  sl.registerLazySingleton(
-        () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
+    () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
   );
 
   // Bloc
   sl.registerFactory(
-        () => ActivityTrackingBloc(
+    () => ActivityTrackingBloc(
       getLiveLocationStream: sl<GetLiveLocationStream>(),
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
@@ -517,7 +540,7 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(
-        () => ActivityHistoryBloc(
+    () => ActivityHistoryBloc(
       getActivityHistory: sl<GetActivityHistory>(),
       saveSessionAnnotation: sl<SaveSessionAnnotation>(),
       deleteActivitySession: sl<DeleteActivitySession>(),
@@ -526,12 +549,22 @@ Future<void> initDependencies() async {
 
   // Audio Services
   sl.registerLazySingleton<WorkoutAudioService>(() => WorkoutAudioService());
-  sl.registerLazySingleton<LocalAudioQueryService>(() => LocalAudioQueryService());
-  sl.registerLazySingleton<InAppAudioDownloader>(() => InAppAudioDownloader(sl<IsarService>()));
+  sl.registerLazySingleton<LocalAudioQueryService>(
+    () => LocalAudioQueryService(),
+  );
+  sl.registerLazySingleton<InAppAudioDownloader>(
+    () => InAppAudioDownloader(sl<IsarService>()),
+  );
   sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
   // 10. Dashboard / Screen Time / Sleep
-  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(() => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()));
-  sl.registerFactory(() => vital_up_dashboard.ScreenTimeCubit(sl<vital_up_dashboard.ScreenTimeService>()));
+  sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(
+    () => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()),
+  );
+  sl.registerFactory(
+    () => vital_up_dashboard.ScreenTimeCubit(
+      sl<vital_up_dashboard.ScreenTimeService>(),
+    ),
+  );
 
   sl.registerLazySingleton<SleepService>(
     () => SleepService(
@@ -635,13 +668,18 @@ Future<void> initDependencies() async {
 
   // 15. Community, friends & leaderboards
   sl.registerLazySingleton<CommunityRepository>(
-    () => CommunityRepositoryImpl(CommunityRemoteDataSource(sl<SupabaseClient>(), sl<PendingWrites>()), sl<CacheStore>()),
+    () => CommunityRepositoryImpl(
+      CommunityRemoteDataSource(sl<SupabaseClient>(), sl<PendingWrites>()),
+      sl<CacheStore>(),
+    ),
   );
   sl.registerFactory(() => CommunityCubit(sl<CommunityRepository>()));
   sl.registerFactory(() => FriendsCubit(sl<CommunityRepository>()));
 
   // 16. Usernames (Google sign-ups choose theirs after sign-in)
-  sl.registerLazySingleton(() => UsernameService(sl<SupabaseClient>(), sl<CacheStore>()));
+  sl.registerLazySingleton(
+    () => UsernameService(sl<SupabaseClient>(), sl<CacheStore>()),
+  );
 
   // 17. Notifications: friend requests, achievements, announcements
   sl.registerLazySingleton<NotificationsRepository>(
@@ -680,7 +718,9 @@ Future<void> initDependencies() async {
   );
 
   // 18. Reminders (local, on-device schedule)
-  sl.registerLazySingleton(() => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()));
+  sl.registerLazySingleton(
+    () => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()),
+  );
 
   sl.registerLazySingleton(
     () => RemindersService(
@@ -705,12 +745,17 @@ Future<void> initDependencies() async {
         ActivitySyncAdapter(sl<AppDatabase>()),
         // Small per-user data kept in preferences / Isar (user_backups).
         BackupSyncAdapter(sl<SharedPreferences>(), [
-          PrefsBackupSource('settings', sl<SharedPreferences>(), [
-            'settings_theme_mode',
-            'settings_notifications_enabled',
-            'settings_weight_unit',
-            'settings_height_unit',
-          ]),
+          PrefsBackupSource(
+            'settings',
+            sl<SharedPreferences>(),
+            [
+              'settings_theme_mode',
+              'settings_notifications_enabled',
+              'settings_weight_unit',
+              'settings_height_unit',
+            ],
+            onRestored: () => sl<SettingsCubit>().loadSettings(),
+          ),
           PrefsBackupSource('goals', sl<SharedPreferences>(), [
             'activity_goals_v1',
             'daily_water_goal',
@@ -805,7 +850,9 @@ Future<void> initDependencies() async {
   );
 
   // 25. Friend challenges
-  sl.registerLazySingleton(() => ChallengesRepository(sl<SupabaseClient>(), sl<CacheStore>()));
+  sl.registerLazySingleton(
+    () => ChallengesRepository(sl<SupabaseClient>(), sl<CacheStore>()),
+  );
 
   // 26. Data export (Settings > Account)
   sl.registerLazySingleton(

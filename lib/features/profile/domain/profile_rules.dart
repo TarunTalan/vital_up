@@ -17,7 +17,8 @@ abstract final class ProfileRules {
     final name = cleanName(input);
     if (name.isEmpty) return 'Enter your name';
     if (name.length < 2) return 'Use at least 2 characters';
-    if (!_name.hasMatch(name)) return 'Use letters, spaces, hyphens or apostrophes';
+    if (!_name.hasMatch(name))
+      return 'Use letters, spaces, hyphens or apostrophes';
     return null;
   }
 

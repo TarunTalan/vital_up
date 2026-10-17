@@ -204,6 +204,15 @@ class WeightService {
         final kg = await _cache.fetch<double?>(
           targetCacheKey(userId),
           remote: () async {
+            // A goal set offline is still queued: keep it over the older
+            // server value.
+            if (_pendingWrites.hasQueuedFor(userId, {'user_health_data'})) {
+              final local = await _cache.read<double?>(
+                targetCacheKey(userId),
+                decode: (json) => (json as num?)?.toDouble(),
+              );
+              if (local != null) return local.value;
+            }
             final row = await _client
                 .from('user_health_data')
                 .select('target_weight, target_weight_unit')

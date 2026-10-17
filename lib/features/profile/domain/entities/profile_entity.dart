@@ -74,6 +74,7 @@ class ProfileEntity extends Equatable {
     String? sleep,
     String? photoUrl,
     int? dailyCalorieGoal,
+
     /// [photoUrl] can't express "remove", so pass true to clear it.
     bool clearPhotoUrl = false,
   }) {
@@ -105,27 +106,27 @@ class ProfileEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        username,
-        email,
-        fullName,
-        dob,
-        gender,
-        weight,
-        weightUnit,
-        height,
-        heightUnit,
-        oxygenLevel,
-        healthConditions,
-        allergies,
-        medicines,
-        smokes,
-        bloodPressureTop,
-        bloodPressureBottom,
-        bpm,
-        activity,
-        sleep,
-        photoUrl,
-        dailyCalorieGoal,
-      ];
+    id,
+    username,
+    email,
+    fullName,
+    dob,
+    gender,
+    weight,
+    weightUnit,
+    height,
+    heightUnit,
+    oxygenLevel,
+    healthConditions,
+    allergies,
+    medicines,
+    smokes,
+    bloodPressureTop,
+    bloodPressureBottom,
+    bpm,
+    activity,
+    sleep,
+    photoUrl,
+    dailyCalorieGoal,
+  ];
 }

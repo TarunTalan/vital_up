@@ -15,6 +15,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -76,6 +77,10 @@ class _DashboardPageState extends State<DashboardPage> {
   late final ProfileCubit _profileCubit;
   StreamSubscription<PushOpen>? _pushOpens;
   int _selectedIndex = 0;
+
+  /// Home was shown before, so showing it again re-reads every card
+  /// (edits made on other tabs or pushed pages).
+  bool _homeShown = false;
   final List<int> _navigationQueue = [0];
 
   @override
@@ -292,16 +297,24 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildSelectedTab(BuildContext context) {
+    final refreshHome = _homeShown;
+    if (_selectedIndex == 0) _homeShown = true;
     return switch (_selectedIndex) {
       0 => BlocProvider<MealLogBloc>(
         create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
         child: BlocListener<ProfileCubit, ProfileState>(
           bloc: _profileCubit,
-          listenWhen: (_, state) => state is ProfileLoaded,
+          listenWhen: (prev, next) =>
+              (next is ProfileLoaded || next is ProfileSaveSuccess) &&
+              next.shownProfile?.dailyCalorieGoal !=
+                  prev.shownProfile?.dailyCalorieGoal,
           // Re-read so the calorie goal appears once the profile syncs.
           listener: (context, _) =>
               context.read<MealLogBloc>().add(const LoadTodaysMeals()),
-          child: _HomeTab(onScanMeal: () => _selectTab(1)),
+          child: _HomeTab(
+            onScanMeal: () => _selectTab(1),
+            refreshOnShow: refreshHome,
+          ),
         ),
       ),
       1 => FoodScannerPage(onBack: _handlePop),
@@ -317,7 +330,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _HomeTab extends StatefulWidget {
   final VoidCallback? onScanMeal;
-  const _HomeTab({this.onScanMeal});
+
+  /// Re-read every card when the tab mounts (not on the first show, when
+  /// the cubits have just loaded).
+  final bool refreshOnShow;
+
+  const _HomeTab({this.onScanMeal, this.refreshOnShow = false});
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -330,9 +348,13 @@ class _HomeTabState extends State<_HomeTab> {
       if (!mounted) return;
       context.read<WaterIntakeCubit>().reload();
       context.read<TrendCubit<SleepSessionInfo>>().load();
+      context.read<TrendCubit<WeightLogCache>>().load();
       context.read<ActivityGoalsCubit>().load();
       context.read<StressCheckInCubit>().reload();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
+      context.read<TrendCubit<MealLogEntry>>().load();
+      context.read<DietPlanCubit>().loadActiveMealPlan();
+      context.read<ScreenTimeCubit>().loadStats();
       context.read<GamificationCubit>().sync();
       // The realtime feed can drop while backgrounded; cache-first, so this
       // only refetches when the inbox is a few minutes old.
@@ -340,16 +362,74 @@ class _HomeTabState extends State<_HomeTab> {
     },
   );
 
+  StreamSubscription<HabitLogged>? _habits;
+  StreamSubscription<String>? _pulls;
+
   @override
   void initState() {
     super.initState();
     _lifecycle;
+    // Logs made outside these cards (notification actions, home widgets,
+    // Health Connect imports, other pages) and rows synced from other
+    // devices show up at once.
+    _habits = sl<HabitEvents>().stream.listen((e) => _reloadHabit(e.habit));
+    _pulls = sl<SyncService>().pulled.listen(_reloadTable);
+    if (widget.refreshOnShow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reloadAll();
+      });
+    }
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
+    _habits?.cancel();
+    _pulls?.cancel();
     super.dispose();
+  }
+
+  void _reloadHabit(Habit habit) {
+    if (!mounted) return;
+    switch (habit) {
+      case Habit.water:
+        context.read<WaterIntakeCubit>().reload();
+      case Habit.meal:
+        context.read<MealLogBloc>().add(const RefreshAfterSave());
+        context.read<TrendCubit<MealLogEntry>>().load();
+      case Habit.activity:
+        context.read<ActivityGoalsCubit>().load();
+      case Habit.mood:
+        context.read<StressCheckInCubit>().reload();
+      case Habit.weight:
+        context.read<TrendCubit<WeightLogCache>>().load();
+      case Habit.sleep:
+        // SleepCubit follows SleepService.changes; the trend follows it.
+        break;
+    }
+  }
+
+  void _reloadTable(String table) {
+    if (!mounted) return;
+    switch (table) {
+      case 'water_logs':
+        _reloadHabit(Habit.water);
+      case 'meal_logs':
+        _reloadHabit(Habit.meal);
+      case 'weight_logs':
+        _reloadHabit(Habit.weight);
+      case 'activity_sessions':
+        _reloadHabit(Habit.activity);
+      case 'sleep_logs':
+        context.read<SleepCubit>().loadSleepData(
+          requestPermission: false,
+          silent: true,
+        );
+        context.read<TrendCubit<SleepSessionInfo>>().load();
+      default:
+        // Restored goals, mood check-ins or diet plan.
+        _reloadAll();
+    }
   }
 
   Future<void> _refreshAllData() async {
@@ -368,13 +448,18 @@ class _HomeTabState extends State<_HomeTab> {
 
   void _reloadAll() {
     context.read<WaterIntakeCubit>().reload();
-    context.read<SleepCubit>().loadSleepData();
+    // Quiet and never prompting: the card keeps showing last night.
+    context.read<SleepCubit>().loadSleepData(
+      requestPermission: false,
+      silent: true,
+    );
     context.read<TrendCubit<SleepSessionInfo>>().load();
     context.read<ScreenTimeCubit>().loadStats();
     context.read<TrendCubit<WeightLogCache>>().load();
     context.read<ActivityGoalsCubit>().load();
     context.read<StressCheckInCubit>().reload();
     context.read<MealLogBloc>().add(const LoadTodaysMeals());
+    context.read<TrendCubit<MealLogEntry>>().load();
     context.read<DietPlanCubit>().loadActiveMealPlan();
     context.read<GamificationCubit>().sync();
     context.read<NotificationsCubit>().load();
@@ -648,15 +733,14 @@ class _Greeting extends StatelessWidget {
         ? 'Good afternoon'
         : 'Good evening';
     return BlocBuilder<ProfileCubit, ProfileState>(
+      // Keep the last name on screen while the profile reloads or saves.
+      buildWhen: (_, next) => next.shownProfile != null,
       builder: (context, state) {
-        final name = switch (state) {
-          ProfileLoaded(:final profile) =>
-            profile.fullName.trim().isNotEmpty
-                ? profile.fullName.trim().split(' ').first
-                : profile.username,
-          ProfilePhotoUpdated(:final profile) => profile.username,
-          _ => '',
-        };
+        final profile = state.shownProfile;
+        final fullName = profile?.fullName.trim() ?? '';
+        final name = fullName.isNotEmpty
+            ? fullName.split(RegExp(r'\s+')).first
+            : profile?.username ?? '';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,

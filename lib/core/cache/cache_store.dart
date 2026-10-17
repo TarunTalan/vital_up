@@ -42,6 +42,15 @@ class CacheStore {
   Directory? _dir;
   final Map<String, Cached<Object?>> _memory = {};
   final Map<String, Future<Object?>> _inFlight = {};
+  final _changes = StreamController<String>.broadcast();
+
+  /// Keys whose value was written, updated or removed, as it happens. Lets
+  /// every screen showing a cached value refresh when any writer (a local
+  /// edit, a server refresh, another feature) changes it.
+  Stream<String> get changes => _changes.stream;
+
+  /// [changes] for one [key].
+  Stream<void> watch(String key) => changes.where((k) => k == key);
 
   /// Bumped by [clear]; a fetch that started before a clear (sign-out)
   /// must not write the old account's data back into the cache.
@@ -53,9 +62,13 @@ class CacheStore {
 
   Future<Directory> _directory() async {
     if (_dir != null) return _dir!;
-    final dir = _override ??
+    final dir =
+        _override ??
         Directory(
-          p.join((await getApplicationSupportDirectory()).path, 'vitalup_cache'),
+          p.join(
+            (await getApplicationSupportDirectory()).path,
+            'vitalup_cache',
+          ),
         );
     if (!await dir.exists()) await dir.create(recursive: true);
     return _dir = dir;
@@ -84,18 +97,19 @@ class CacheStore {
     try {
       final generation = _generation;
       late final Future<Object?> request;
-      request = _inFlight[key] ??= () async {
-        final value = await remote().timeout(fetchTimeout);
-        _connectivity.reportSuccess();
-        final data = encode == null ? value : encode(value);
-        if (generation == _generation) await write(key, data);
-        return data;
-      }().whenComplete(() {
-        // Block body on purpose: returning the removed future would make
-        // whenComplete wait on itself. Only drop our own entry: a clear()
-        // may have let a newer request take the slot.
-        if (identical(_inFlight[key], request)) _inFlight.remove(key);
-      });
+      request = _inFlight[key] ??=
+          () async {
+            final value = await remote().timeout(fetchTimeout);
+            _connectivity.reportSuccess();
+            final data = encode == null ? value : encode(value);
+            if (generation == _generation) await write(key, data);
+            return data;
+          }().whenComplete(() {
+            // Block body on purpose: returning the removed future would make
+            // whenComplete wait on itself. Only drop our own entry: a clear()
+            // may have let a newer request take the slot.
+            if (identical(_inFlight[key], request)) _inFlight.remove(key);
+          });
       final json = await request;
       return decode == null ? json as T : decode(json);
     } catch (e) {
@@ -129,6 +143,7 @@ class CacheStore {
   Future<void> write(String key, Object? data) async {
     final entry = Cached<Object?>(data, DateTime.now());
     _memory[key] = entry;
+    _changes.add(key);
     try {
       final file = await _file(key);
       // Write then rename, so a crash mid-write never leaves half a file.
@@ -162,6 +177,7 @@ class CacheStore {
 
   Future<void> remove(String key) async {
     _memory.remove(key);
+    _changes.add(key);
     try {
       final file = await _file(key);
       if (await file.exists()) await file.delete();
