@@ -13,10 +13,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-// Firebase (push notifications). Applied only once android/app/google-services.json
+// Firebase (push, analytics, Crashlytics). Applied only once android/app/google-services.json
 // has been downloaded from the Firebase console, so the app still builds before then.
+// The Crashlytics plugin uploads the R8 mapping file so native stack traces are readable.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 android {
@@ -36,7 +38,8 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
-        targetSdk = 35
+        // Play requires API 36 for new apps and updates from 31 Aug 2026.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -63,6 +66,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Bundles native symbol tables in the AAB so Play Console can
+            // symbolicate native crashes and ANRs.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }

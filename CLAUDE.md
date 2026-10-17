@@ -22,16 +22,19 @@ supabase db push               # apply new migrations (outward-facing: ask first
 ```
 
 - Environment variables & secrets: `.env` (copy `.env.example`); compiled
-  and XOR-obfuscated via `envied` into `lib/core/config/env.dart`.
+  and XOR-obfuscated via `envied` into `lib/core/config/env.dart`
+  (`env.g.dart` is gitignored; run build_runner after cloning).
   `lib/core/config/supabase_config.dart` delegates to `Env`.
-  `android/key.properties` holds release signing (the build silently falls
-  back to the debug key without it).
+  `android/key.properties` holds release signing (the local build silently
+  falls back to the debug key without it; the release workflow refuses).
 - Code Push: Shorebird configured in `shorebird.yaml` and `.github/workflows/shorebird_patch.yml`.
 - Analytics & Crashlytics: `lib/core/monitoring/analytics_service.dart` (Firebase Analytics)
   and `crash_reporter.dart` (Crashlytics).
 - Release Obfuscation: R8 minification enabled in `build.gradle.kts` + Dart
   `--obfuscate --split-debug-info`. Release guide in `docs/PLAY_STORE_PRE_RELEASE_GUIDE.md`.
-- Legal URLs are placeholders: `lib/core/config/legal_links.dart` and
+  Tag `v<pubspec version>` runs `play_store_release.yml` (Shorebird release,
+  targetSdk 36); patches must use the same obfuscation flags.
+- Legal URLs (vitalup.live): `lib/core/config/legal_links.dart` and
   `android/app/src/main/res/values/strings.xml` (`privacy_policy_url`).
 - `dart analyze lib test` has no warnings; only info lints remain
   (`prefer_initializing_formals`, deprecated `Share` API, a few in
