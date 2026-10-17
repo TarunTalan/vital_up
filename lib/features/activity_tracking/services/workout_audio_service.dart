@@ -39,7 +39,7 @@ class WorkoutAudioService {
     if (trackName == 'None') {
       await stop();
       try {
-        sl<VoiceCoachService>().stop();
+        sl<VoiceCoachService>().stop().ignore();
       } catch (_) {}
       return;
     }
@@ -61,7 +61,7 @@ class WorkoutAudioService {
       _currentTrack = trackName;
 
       try {
-        sl<VoiceCoachService>().stop();
+        sl<VoiceCoachService>().stop().ignore();
       } catch (_) {}
 
       String? resolvedSource = source;
@@ -166,7 +166,7 @@ class WorkoutAudioService {
       await _audioPlayer.pause();
     }
     try {
-      sl<VoiceCoachService>().stop();
+      sl<VoiceCoachService>().stop().ignore();
     } catch (_) {}
   }
 

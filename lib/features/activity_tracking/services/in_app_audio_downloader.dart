@@ -6,7 +6,6 @@ import 'package:isar_community/isar.dart';
 import 'package:vital_up/core/database/collections/downloaded_track.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 
-import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 
 /// File name for a track id such as "Story: It's Possible": only letters,
 /// digits, dash and underscore, so ids can never escape the audio folder.
@@ -38,13 +37,6 @@ class InAppAudioDownloader {
   }) async {
     File? partial;
     try {
-      try {
-        await ForegroundServiceManager.startDownloadService(trackTitle: title);
-      } catch (e) {
-        // The download still works in the foreground without the service.
-        debugPrint('Download service failed to start: $e');
-      }
-
       final docDir = await getApplicationDocumentsDirectory();
       // Ensure the audio subdirectory exists
       final audioDir = Directory('${docDir.path}/downloaded_audio');
@@ -64,12 +56,6 @@ class InAppAudioDownloader {
           if (total > 0) {
             final progress = (received / total).clamp(0.0, 1.0);
             onProgress(progress);
-            ForegroundServiceManager.updateDownloadProgress(
-              trackTitle: title,
-              progress: progress,
-            ).catchError((Object e) {
-              debugPrint('Download progress update failed: $e');
-            });
           }
         },
       );
@@ -96,11 +82,6 @@ class InAppAudioDownloader {
         } catch (e) {
           debugPrint('Removing partial download failed: $e');
         }
-      }
-      try {
-        await ForegroundServiceManager.stopDownloadService();
-      } catch (e) {
-        debugPrint('Download service failed to stop: $e');
       }
     }
   }
