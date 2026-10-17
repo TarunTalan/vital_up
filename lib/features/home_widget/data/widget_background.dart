@@ -86,6 +86,10 @@ Future<bool> _refreshWithAppServices() async {
       await Supabase.initialize(
         url: SupabaseConfig.url,
         publishableKey: SupabaseConfig.publishableKey,
+        // Only the app refreshes the session. Refresh tokens are single use:
+        // if this engine rotated one, the app would still hold the old one
+        // and its next refresh could sign the user out.
+        authOptions: const FlutterAuthClientOptions(autoRefreshToken: false),
       );
       _supabaseReady = true;
     }
@@ -93,7 +97,10 @@ Future<bool> _refreshWithAppServices() async {
       await di.initDependencies();
       _appServicesReady = true;
     }
-    if (Supabase.instance.client.auth.currentUser == null) return false;
+    final auth = Supabase.instance.client.auth;
+    if (auth.currentUser == null) return false;
+    // An expired token would be refreshed by the first request (see above).
+    if (auth.currentSession?.isExpired ?? true) return false;
     await di.sl<HomeWidgetService>().refresh();
     return true;
   } catch (e) {
@@ -116,7 +123,11 @@ Future<void> refreshFromDevice(String userId) async {
   final start = DateTime(now.year, now.month, now.day);
   final meals = await isar.mealLogCaches
       .where()
-      .capturedAtBetween(start, start.add(const Duration(days: 1)))
+      .capturedAtBetween(
+        start,
+        start.add(const Duration(days: 1)),
+        includeUpper: false,
+      )
       .findAll();
   final calories = meals.fold<double>(0, (sum, m) => sum + m.totalCalories);
   final weight = await isar.weightLogCaches

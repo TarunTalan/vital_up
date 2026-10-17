@@ -173,7 +173,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
         if (mounted) {
           showSuccessSnackBar(
             context,
-            'Support ticket sent to $kSupportEmail! A confirmation was emailed to $email.',
+            'Ticket sent. We emailed you a confirmation.',
           );
           context.pop();
         }
@@ -232,7 +232,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       return;
     }
     if (mounted) {
-      showSuccessSnackBar(context, 'Ticket copied! You can paste and email it to $kSupportEmail.');
+      showSuccessSnackBar(context, 'Ticket copied. Paste it into an email to support.');
       context.pop();
     }
   }

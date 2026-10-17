@@ -67,7 +67,10 @@ class HomeWidgetService {
     HomeWidget.registerInteractivityCallback(homeWidgetCallback);
     _lifecycle = AppLifecycleListener(onHide: refresh, onResume: refresh);
     _habits = habits.listen((_) => refresh());
-    _auth = _client.auth.onAuthStateChange.listen((_) => refresh());
+    _auth = _client.auth.onAuthStateChange
+        // A token refresh that fails offline arrives as an error; not a crash.
+        .handleError((Object _) {})
+        .listen((_) => refresh());
     refresh();
   }
 
@@ -167,7 +170,7 @@ class HomeWidgetService {
               : headline?.goal.metric.name,
           activityCurrent: activity == null
               ? last?.activityCurrent
-              : headline?.current,
+              : _keepHealthSteps(activity, headline, last),
           activityTarget: activity == null
               ? last?.activityTarget
               : headline?.goal.target,
@@ -191,6 +194,25 @@ class HomeWidgetService {
       debugPrint('Home widget refresh failed: $e');
       await endWidgetRefresh();
     }
+  }
+
+  /// Health Connect can't be read from the background (widget auto-refresh,
+  /// the refresh button), so steps fall back to workouts only. Keep the
+  /// higher count already shown today instead of dropping to 0.
+  static double? _keepHealthSteps(
+    ActivityGoalsSnapshot activity,
+    GoalProgress? headline,
+    WidgetInputs? last,
+  ) {
+    final current = headline?.current;
+    if (activity.stepsFromHealth ||
+        headline?.goal.metric != GoalMetric.steps ||
+        last?.activityMetric != GoalMetric.steps.name) {
+      return current;
+    }
+    final shown = last?.activityCurrent;
+    if (shown == null || current == null) return current ?? shown;
+    return shown > current ? shown : current;
   }
 
   /// Same goal Home shows: the active meal plan, else the profile's goal.

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -60,17 +62,41 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _open(String route) =>
       context.pushNamed(route, extra: context.read<ProfileCubit>());
 
-  void _handleLogout() {
+  bool _checkingBackup = false;
+
+  /// Sign-out removes this account's data from the phone, so anything not
+  /// backed up yet is uploaded first; if that can't happen (offline), the
+  /// user is told before they lose it.
+  Future<void> _handleLogout() async {
     if (widget.onLogout != null) {
       widget.onLogout!();
       return;
     }
+    if (_checkingBackup) return;
     final auth = context.read<AuthCubit>();
-    showSmoothDialog(
+    final sync = sl<SyncService>();
+    var pending = await sync.pendingCount();
+    if (!mounted) return;
+    if (pending > 0) {
+      setState(() => _checkingBackup = true);
+      try {
+        await sync.sync().timeout(const Duration(seconds: 15));
+      } catch (_) {}
+      pending = await sync.pendingCount();
+      if (!mounted) return;
+      setState(() => _checkingBackup = false);
+    }
+    final unsaved = pending > 0;
+    await showSmoothDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
-        content: const Text('You can sign back in at any time.'),
+        content: Text(
+          unsaved
+              ? "Some entries aren't backed up yet and will be removed from "
+                    'this phone. Connect to the internet first to keep them.'
+              : 'You can sign back in at any time.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -82,7 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.of(dialogContext).pop();
               auth.logout();
             },
-            child: const Text('Sign out'),
+            child: Text(unsaved ? 'Sign out anyway' : 'Sign out'),
           ),
         ],
       ),
@@ -240,6 +266,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   size: AppDimens.iconMd,
                   color: context.colors.error,
                 ),
+                isLoading: _checkingBackup,
                 onTap: _handleLogout,
               ),
               const SizedBox(height: AppDimens.space12),

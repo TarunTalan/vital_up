@@ -11,6 +11,7 @@ import 'package:vital_up/features/activity_tracking/data/repositories/activity_h
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
+import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 
 /// Permanently deletes the signed-in user's account (server: the
@@ -24,6 +25,7 @@ class AccountService {
   final SharedPreferences _prefs;
   final SyncService _sync;
   final CacheStore _cache;
+  final OnboardingDataStore? _onboarding;
 
   AccountService(
     this._client,
@@ -33,8 +35,9 @@ class AccountService {
     this._drift,
     this._prefs,
     this._sync,
-    this._cache,
-  );
+    this._cache, [
+    this._onboarding,
+  ]);
 
   static const _deleteFailed = "Couldn't delete your account. Try again.";
 
@@ -66,6 +69,8 @@ class AccountService {
   /// Removes the signed-in user's logs, workouts and reminders from this
   /// device (sign-out). Settings and goals stay.
   Future<void> clearLocalUserData() async {
+    // First: a sync still running must not write rows back after the wipe.
+    await _step('sync', _sync.stop);
     await _step('reminders', _reminders.clear);
     await _step('isar', _isar.clearUserData);
     await _step('drift', _drift.clearAll);
@@ -78,6 +83,11 @@ class AccountService {
     });
     await _step('diet plan preferences', () async {
       await _prefs.remove(DietPlanRepositoryImpl.preferencesKey);
+    });
+    // Health answers (age, medicines, allergies...) Vita falls back on;
+    // the next account here must never inherit them.
+    await _step('onboarding answers', () async {
+      await _onboarding?.clearOnboardingData();
     });
     // Points at a workout that was just wiped with the rest of Drift.
     await _step('workout in progress', () async {

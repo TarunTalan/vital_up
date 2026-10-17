@@ -124,14 +124,17 @@ class PushService {
     if (initial != null) _handleOpen(initial.data);
 
     messaging.onTokenRefresh.listen((_) => register());
-    _client.auth.onAuthStateChange.listen((auth) {
-      final signedIn = auth.session != null;
-      if (signedIn &&
-          (auth.event == AuthChangeEvent.initialSession ||
-              auth.event == AuthChangeEvent.signedIn)) {
-        register();
-      }
-    });
+    _client.auth.onAuthStateChange
+        // A token refresh that fails offline arrives as an error; not a crash.
+        .handleError((Object _) {})
+        .listen((auth) {
+          final signedIn = auth.session != null;
+          if (signedIn &&
+              (auth.event == AuthChangeEvent.initialSession ||
+                  auth.event == AuthChangeEvent.signedIn)) {
+            register();
+          }
+        });
   }
 
   Future<void> _initLocal() async {
@@ -218,10 +221,12 @@ class PushService {
               _reregisterAfter) {
         return;
       }
-      await _client.rpc(
-        'register_push_token',
-        params: {'p_token': token, 'p_platform': _platform},
-      );
+      await _client
+          .rpc(
+            'register_push_token',
+            params: {'p_token': token, 'p_platform': _platform},
+          )
+          .timeout(const Duration(seconds: 15));
       await _prefs.setString(_keyToken, token);
       await _prefs.setString(_keyUser, user);
       await _prefs.setInt(_keyAt, DateTime.now().millisecondsSinceEpoch);

@@ -611,6 +611,7 @@ Future<void> initDependencies() async {
       activePlan: sl<GetActiveMealPlan>(),
       vitals: sl<HealthVitalsService>(),
       supabase: sl<SupabaseClient>(),
+      profiles: sl<ProfileRepository>(),
     ),
   );
   sl.registerLazySingleton<VitaRepository>(
@@ -807,6 +808,7 @@ Future<void> initDependencies() async {
       sl<SharedPreferences>(),
       sl<SyncService>(),
       sl<CacheStore>(),
+      sl<OnboardingDataStore>(),
     ),
   );
 
