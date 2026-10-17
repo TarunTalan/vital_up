@@ -5,6 +5,8 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/challenge_tile.dart';
@@ -62,7 +64,21 @@ class ArenaChallengesSection extends StatelessWidget {
               actionLabel: 'See all',
               onAction: () => _openAll(context),
             ),
-            if (shown.isEmpty)
+            // Not loaded yet (or failed): never the "create one" empty state.
+            if (state.challenges == null)
+              AppCard(
+                child: state.failed
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppDimens.space16,
+                        ),
+                        child: LoadErrorView(
+                          onRetry: context.read<ChallengesCubit>().load,
+                        ),
+                      )
+                    : const TrackerLoading(),
+              )
+            else if (shown.isEmpty)
               _EmptyChallenges(onCreate: () => _create(context))
             else ...[
               for (final c in shown) ...[

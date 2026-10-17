@@ -14,10 +14,17 @@ class GamificationRemoteDataSource {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<Map<String, dynamic>> submitDailyReport(DailyMetrics metrics) async {
-    final result = await _client.rpc(
-      'submit_daily_report',
-      params: {'p_day': dayParam(metrics.day), 'p_metrics': metrics.toJson()},
-    );
+    // Callers share one in-flight report; a hung socket must not block
+    // every later sync for the rest of the session.
+    final result = await _client
+        .rpc(
+          'submit_daily_report',
+          params: {
+            'p_day': dayParam(metrics.day),
+            'p_metrics': metrics.toJson(),
+          },
+        )
+        .timeout(const Duration(seconds: 20));
     return Map<String, dynamic>.from(result as Map);
   }
 

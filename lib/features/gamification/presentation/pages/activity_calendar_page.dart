@@ -338,6 +338,30 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
   /// Daily summary card (e.g. "Light activity day with good rest...")
   Widget _buildDailySummaryCard(BuildContext context, ActivityCalendarState state) {
     String message = "No data recorded for this day.";
+    if (state.failed) {
+      return AppCard(
+        width: double.infinity,
+        padding: AppDimens.cardPaddingCompact,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Couldn't load this day.",
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context
+                  .read<ActivityCalendarCubit>()
+                  .selectDate(state.selectedDate),
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
     if (state.loading) {
       message = "Loading...";
     } else if (state.selectedMetrics != null) {

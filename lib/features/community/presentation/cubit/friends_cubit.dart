@@ -269,6 +269,12 @@ class FriendsCubit extends Cubit<FriendsState> {
 
   FriendsCubit(this._repository) : super(const FriendsState());
 
+  @override
+  void emit(FriendsState state) {
+    // Requests can finish after the page closed (back during a save).
+    if (!isClosed) super.emit(state);
+  }
+
   Future<void> load() async {
     emit(state.copyWith(failed: false));
     try {

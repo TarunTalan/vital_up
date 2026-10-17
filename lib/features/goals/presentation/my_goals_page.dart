@@ -33,6 +33,13 @@ class MyGoalsPage extends StatefulWidget {
 class _MyGoalsPageState extends State<MyGoalsPage> {
   late Future<Map<TrackerMetric, String?>> _goals = _load();
 
+  // Block body: an arrow body would hand setState the Future and throw.
+  void _reload() {
+    setState(() {
+      _goals = _load();
+    });
+  }
+
   Future<Map<TrackerMetric, String?>> _load() =>
       _read().withLoadTimeout().catchError((Object e, StackTrace stack) {
         debugPrint('My goals failed to load: $e');
@@ -78,7 +85,7 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
       return;
     }
     if (await editTrackerGoal(context, metric) && mounted) {
-      setState(() => _goals = _load());
+      _reload();
     }
   }
 
@@ -91,7 +98,9 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
       ),
       onRefresh: () async {
         final next = _load();
-        setState(() => _goals = next);
+        setState(() {
+          _goals = next;
+        });
         try {
           await next;
         } catch (_) {
@@ -104,7 +113,7 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
           if (snap.hasError) {
             return LoadErrorView(
               onRetry: () {
-                setState(() => _goals = _load());
+                _reload();
               },
             );
           }

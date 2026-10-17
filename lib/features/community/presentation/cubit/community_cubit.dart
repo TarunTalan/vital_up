@@ -113,6 +113,12 @@ class CommunityCubit extends Cubit<CommunityState> {
 
   CommunityCubit(this._repository) : super(const CommunityState());
 
+  @override
+  void emit(CommunityState state) {
+    // Requests can finish after the page closed (back during a save).
+    if (!isClosed) super.emit(state);
+  }
+
   Future<void> load() async {
     emit(state.copyWith(loading: true, failed: false));
     try {
