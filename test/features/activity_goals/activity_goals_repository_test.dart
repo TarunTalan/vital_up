@@ -16,7 +16,13 @@ class _FakeHistory implements ActivityHistoryRepository {
   _FakeHistory(this.sessions);
 
   @override
-  Future<List<ActivitySession>> getSessions() async => sessions;
+  Future<List<ActivitySession>> getSessions({
+    DateTime? since,
+    bool withRoutes = true,
+  }) async => [
+    for (final s in sessions)
+      if (since == null || !s.startTime.isBefore(since)) s,
+  ];
   @override
   Future<Map<String, SessionAnnotation>> getAllAnnotations() async => {};
   @override

@@ -9,8 +9,12 @@ import 'package:vital_up/features/activity_tracking/domain/entities/session_anno
 /// that same data source so history reads the sessions that were actually
 /// saved, rather than a separate store.
 abstract class ActivityHistoryRepository {
-  /// Returns all saved sessions, most recent first.
-  Future<List<ActivitySession>> getSessions();
+  /// Returns saved sessions, most recent first ([since]: started at or after it;
+  /// without [withRoutes] the GPS points are skipped).
+  Future<List<ActivitySession>> getSessions({
+    DateTime? since,
+    bool withRoutes = true,
+  });
 
   /// Returns the annotation (tag/note) for a session, if one was set.
   Future<SessionAnnotation?> getAnnotation(String sessionId);

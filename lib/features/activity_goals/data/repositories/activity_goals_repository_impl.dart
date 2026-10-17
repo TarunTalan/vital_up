@@ -52,7 +52,12 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     // Each source is optional: a slow or failing one leaves its part empty
     // rather than holding up the whole card.
     final (history, healthSteps) = await (
-      _history().orFallback(const <HistoryEntry>[]),
+      // Only the days shown, and only totals: no GPS routes (this runs on
+      // every widget refresh).
+      _history(
+        since: from,
+        withRoutes: false,
+      ).orFallback(const <HistoryEntry>[]),
       _dailySteps(days).orFallback(null),
     ).wait;
     final sessions = [
