@@ -1,0 +1,53 @@
+Take control of your health and fitness with VitalUp — your all-in-one, privacy-first wellness companion.
+
+Whether you're training for a 5K, logging meals instantly with our AI camera, staying on top of hydration, or optimizing your sleep recovery, VitalUp brings your health metrics together with actionable insights to help you build lasting, healthy habits.
+
+KEY FEATURES:
+
+🏃 PRECISION ACTIVITY & WORKOUT TRACKING
+• Accurate GPS tracking for running, cycling, walking, and hiking.
+• Real-time distance, pacing, split times, elevation gain, and audio cues.
+• Offline route caching and detailed post-workout route maps.
+• Seamless sync with Health Connect.
+
+🥗 AI FOOD SCANNER & NUTRITION
+• Snap a photo or scan barcodes to instantly identify foods and log macros.
+• Automatic breakdown of calories, protein, carbs, and healthy fats.
+• Personalized diet plans and intelligent meal recommendations.
+• Offline nutrition library for instant lookups without an active connection.
+
+💧 HYDRATION & WATER TRACKER
+• Quick one-tap water logging right from your home screen widgets.
+• Smart, dynamic hydration goals tailored to your workouts and climate.
+• Timely, gentle reminders to keep your hydration on track throughout the day.
+
+🌙 SLEEP & RECOVERY
+• Automatic sleep tracking and stage analysis (Deep, REM, Light) via Health Connect.
+• Monitor bedtime consistency, sleep debt, and wake-up trends.
+• Understand how daily activity and nutrition impact your sleep quality.
+
+🤖 VITA — YOUR PERSONAL AI COACH
+• Have real-time conversations about nutrition, recovery, and wellness goals.
+• Get personalized daily recommendations based on your unique tracking history.
+• Practical guidance on workout recovery and stress management.
+
+🏆 THE ARENA & GAMIFICATION
+• Stay motivated: earn XP, unlock achievements, and maintain daily streaks.
+• Join community challenges and climb friendly leaderboards.
+• Send high-fives and celebrate wellness milestones together.
+
+📲 INTERACTIVE HOME SCREEN WIDGETS
+• Beautiful Android widgets in small, wide, and expanded layouts.
+• Check your daily rings, active calorie burn, and step counts at a glance.
+• Log water intake or quick mood check-ins directly from your home screen.
+
+🔒 PRIVACY-FIRST & SECURE
+• Offline-First: Your sensitive health logs stay stored safely on your phone.
+• Biometric App Lock: Secure your personal health data with fingerprint or face unlock.
+• Encrypted Sync: Cloud backups are end-to-end protected.
+• Zero Data Selling: You own your data. Export or delete your account at any time with a single tap.
+
+________________________________________
+
+DISCLAIMER:
+VitalUp is designed solely for personal fitness, wellness, and lifestyle tracking. It is not a certified medical device and is not intended to diagnose, treat, cure, or prevent any medical condition or disease. Always consult a qualified healthcare professional before beginning any new diet, fitness, or wellness program.

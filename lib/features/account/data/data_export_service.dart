@@ -112,9 +112,14 @@ class DataExportService {
     try {
       // Bounded so a bad connection can't hang the export.
       const timeout = Duration(seconds: 15);
+      // Named columns: email isn't readable from profiles (it comes from
+      // the session below), so select('*') would be refused.
       final account = await _client
           .from('profiles')
-          .select()
+          .select(
+            'username, display_name, avatar_url, city, country_code, '
+            'leaderboard_visible, timezone',
+          )
           .eq('id', userId)
           .maybeSingle()
           .timeout(timeout);

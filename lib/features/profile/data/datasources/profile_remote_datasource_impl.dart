@@ -51,7 +51,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final results = await Future.wait([
         supabaseClient
             .from('profiles')
-            .select('username, email')
+            // profiles.email isn't readable by clients; it's the session's.
+            .select('username')
             .eq('id', userId)
             .single(),
         supabaseClient
@@ -64,7 +65,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final healthRes = results[1];
 
       final username = profileRes['username'] as String? ?? '';
-      final email = profileRes['email'] as String? ?? user.email ?? '';
+      final email = user.email ?? '';
 
       final String fullName =
           healthRes?['full_name'] as String? ??

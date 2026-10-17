@@ -378,6 +378,10 @@ Route names are GoRouter `name`s.
   `avatar_url` to the user's storage folder or Google; `submit_daily_report`
   is a wrapper that caps water / meal / workout figures at synced logs
   before `_submit_daily_report_core`; AI refunds capped at 3 a day.
+  `20261022_profiles_private_email.sql`: anon has no access to `profiles`;
+  authenticated gets a column grant of everything except `email` (a new
+  profiles column is private until granted; never `select('*')` profiles,
+  and read the user's own email from the session).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
