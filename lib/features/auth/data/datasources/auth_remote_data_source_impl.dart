@@ -36,10 +36,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       String email = request.username;
       
-      // If the input doesn't look like an email, assume it's a username
+      // If the input doesn't look like an email, assume it's a username. The
+      // server only returns the email together with the right password, so
+      // usernames (shown on leaderboards) can't be turned into emails.
       if (!email.contains('@')) {
          final response = await _supabaseClient
-             .rpc('get_email_by_username', params: {'p_username': request.username.trim()})
+             .rpc('login_email', params: {
+               'p_username': request.username.trim(),
+               'p_password': request.password,
+             })
              .timeout(_timeout);
          if (response != null && response is String && response.isNotEmpty) {
            email = response;

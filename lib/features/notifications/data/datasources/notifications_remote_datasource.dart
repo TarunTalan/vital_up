@@ -65,6 +65,8 @@ class NotificationsRemoteDataSource {
 
     RealtimeChannel? channel;
     var joined = false;
+    // Returned to the caller; onCancel removes the channel.
+    // ignore: close_sinks
     late final StreamController<Map<String, dynamic>> controller;
     void onChange(PostgresChangePayload payload) {
       if (payload.newRecord.isNotEmpty) controller.add(payload.newRecord);

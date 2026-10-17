@@ -1,68 +1,16 @@
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Service for dispatching autonomous emails (notifications, announcements,
-/// and custom transactional OTPs) powered by Resend via Supabase Edge Function.
+/// Sends support tickets through the `send-email` Edge Function (Resend).
 ///
-/// Sender: noreply@vitalup.live
-/// Reply-To: support@vitalup.live
+/// The function only accepts tickets from a signed-in user and takes the
+/// sender's email from the session, so it can't be used to mail anyone else.
 class EmailService {
   final SupabaseClient _supabase;
   final Logger _logger = Logger();
 
   EmailService({SupabaseClient? supabase})
       : _supabase = supabase ?? Supabase.instance.client;
-
-  /// Sends a transactional notification email.
-  Future<bool> sendNotification({
-    required String to,
-    required String title,
-    required String message,
-    String? subject,
-  }) async {
-    final payload = <String, dynamic>{
-      'to': to,
-      'type': 'notification',
-      'title': title,
-      'message': message,
-    };
-    if (subject != null) payload['subject'] = subject;
-    return _dispatch(payload);
-  }
-
-  /// Sends an announcement email to one or multiple recipients.
-  Future<bool> sendAnnouncement({
-    required List<String> to,
-    required String title,
-    required String message,
-    String? subject,
-  }) async {
-    final payload = <String, dynamic>{
-      'to': to,
-      'type': 'announcement',
-      'title': title,
-      'message': message,
-    };
-    if (subject != null) payload['subject'] = subject;
-    return _dispatch(payload);
-  }
-
-  /// Dispatches a custom OTP code.
-  Future<bool> sendCustomOtp({
-    required String to,
-    required String otp,
-    String? title,
-    String? message,
-  }) async {
-    final payload = <String, dynamic>{
-      'to': to,
-      'type': 'otp',
-      'otp': otp,
-    };
-    if (title != null) payload['title'] = title;
-    if (message != null) payload['message'] = message;
-    return _dispatch(payload);
-  }
 
   /// Submits a contact support ticket:
   /// 1. Sends full user details and ticket inputs formatted into the brand template to support@vitalup.live
@@ -105,7 +53,7 @@ class EmailService {
       );
 
       if (res.status == 200) {
-        _logger.i('Email dispatched successfully to ${body['to']} via Resend.');
+        _logger.i('Support ticket sent.');
         return true;
       } else {
         _logger.e('Failed to send email: ${res.data}');

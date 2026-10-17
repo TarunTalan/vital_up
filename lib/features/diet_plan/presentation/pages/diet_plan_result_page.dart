@@ -96,7 +96,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
       if (_mode == 'manual') {
         final target = widget.params['target'];
         if (target is! NutritionTarget) {
-          _cubit.showError("Couldn't read your targets. Go back and try again.");
+          _cubit.showError(
+            "Couldn't read your targets. Go back and try again.",
+          );
           return;
         }
         _target = target;
@@ -128,7 +130,8 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         if (_mode == 'smart') {
           _target = calcOnboarding(onboardingData);
         } else if (_mode == 'goal') {
-          final targetWeight = (widget.params['targetWeight'] as num?)?.toDouble();
+          final targetWeight = (widget.params['targetWeight'] as num?)
+              ?.toDouble();
           final timeframe = (widget.params['timeframe'] as num?)?.round();
           if (targetWeight == null || timeframe == null || timeframe < 1) {
             _cubit.showError("Couldn't read your goal. Go back and try again.");
@@ -166,7 +169,8 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
 
   void _regenerate() {
     final now = DateTime.now();
-    if (_lastRegenerateTime != null && now.difference(_lastRegenerateTime!).inSeconds < 5) {
+    if (_lastRegenerateTime != null &&
+        now.difference(_lastRegenerateTime!).inSeconds < 5) {
       showSmoothSnackBar(
         context,
         message: 'Please wait a moment before trying again.',
@@ -223,85 +227,126 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _cubit,
       child: BlocBuilder<DietPlanCubit, DietPlanState>(
         builder: (context, state) {
-          return AppScaffold(
-            header: const AppPageHeader(title: 'Your Diet Plan'),
-            scrollable: false,
-            padBody: false,
-            bottomBar: state is DietPlanLoaded && _mode != 'cached'
-                ? _buildBottomActions(context, state.mealPlan)
-                : null,
-            body: Builder(
-              builder: (context) {
-                if (state is DietPlanLoading) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const VitalUpLoader(),
-                        const SizedBox(height: AppDimens.space16),
-                        Text(
-                          'Creating your plan...',
-                          textAlign: TextAlign.center,
-                          style: context.text.bodyMedium?.copyWith(
-                            color: context.vColors.grayText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (state is DietPlanLoaded) {
-                  return _buildPlanContent(context, state.mealPlan);
-                } else if (state is DietPlanError) {
-                  return Center(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(context.gutter),
+          // Leaving mid-generation throws away a plan that already used one
+          // of today's AI generations, so ask first.
+          return PopScope(
+            canPop: state is! DietPlanLoading,
+            onPopInvokedWithResult: (didPop, _) async {
+              if (didPop) return;
+              if (await _confirmLeave(context) && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: AppScaffold(
+              header: const AppPageHeader(title: 'Your Diet Plan'),
+              scrollable: false,
+              padBody: false,
+              bottomBar: state is DietPlanLoaded && _mode != 'cached'
+                  ? _buildBottomActions(context, state.mealPlan)
+                  : null,
+              body: Builder(
+                builder: (context) {
+                  if (state is DietPlanLoading) {
+                    return Center(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AppIconBadge(
-                            icon: const Icon(Icons.error_outline_rounded),
-                            color: context.colors.error,
-                            size: AppDimens.iconXxl,
-                          ),
+                          const VitalUpLoader(),
                           const SizedBox(height: AppDimens.space16),
                           Text(
-                            state.message,
+                            'Creating your plan...',
                             textAlign: TextAlign.center,
-                            style: context.text.bodyMedium,
-                          ),
-                          const SizedBox(height: AppDimens.sectionGap),
-                          if (_target != null)
-                            AppPrimaryButton(
-                              label: 'Try Again',
-                              onTap: _retry,
-                              expand: false,
+                            style: context.text.bodyMedium?.copyWith(
+                              color: context.colors.onSurface,
                             ),
+                          ),
+                          const SizedBox(height: AppDimens.space4),
+                          Text(
+                            'This can take up to a minute.',
+                            textAlign: TextAlign.center,
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.vColors.grayText,
+                            ),
+                          ),
                         ],
+                      ),
+                    );
+                  } else if (state is DietPlanLoaded) {
+                    return _buildPlanContent(context, state.mealPlan);
+                  } else if (state is DietPlanError) {
+                    return Center(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(context.gutter),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIconBadge(
+                              icon: const Icon(Icons.error_outline_rounded),
+                              color: context.colors.error,
+                              size: AppDimens.iconXxl,
+                            ),
+                            const SizedBox(height: AppDimens.space16),
+                            Text(
+                              state.message,
+                              textAlign: TextAlign.center,
+                              style: context.text.bodyMedium,
+                            ),
+                            const SizedBox(height: AppDimens.sectionGap),
+                            if (_target != null)
+                              AppPrimaryButton(
+                                label: 'Try Again',
+                                onTap: _retry,
+                                expand: false,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return Center(
+                    child: Text(
+                      'No active plan found.',
+                      style: context.text.bodyMedium?.copyWith(
+                        color: context.vColors.grayText,
                       ),
                     ),
                   );
-                }
-                return Center(
-                  child: Text(
-                    'No active plan found.',
-                    style: context.text.bodyMedium?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
-                  ),
-                );
-              },
+                },
+              ),
             ),
           );
         },
       ),
     );
+  }
+
+  Future<bool> _confirmLeave(BuildContext context) async {
+    final leave = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Leave now?'),
+        content: const Text(
+          'Your plan is still being made and will be lost if you leave.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
   }
 
   Widget _buildBottomActions(BuildContext context, MealPlan plan) {
@@ -332,7 +377,10 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
           onTap: () async {
             if (_saving) return;
             setState(() => _saving = true);
-            final saved = await _cubit.saveActivePlan(plan, preferences: _preferences);
+            final saved = await _cubit.saveActivePlan(
+              plan,
+              preferences: _preferences,
+            );
             if (!mounted) return;
             setState(() => _saving = false);
             if (!context.mounted) return;
@@ -408,7 +456,12 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                             section(AppColors.carbs, plan.totalCarbs),
                             section(AppColors.fat, plan.totalFat),
                           ]
-                        : [section(context.vColors.divider ?? AppColors.protein, 1)],
+                        : [
+                            section(
+                              context.vColors.divider ?? AppColors.protein,
+                              1,
+                            ),
+                          ],
                   ),
                 ),
                 FittedBox(
@@ -524,9 +577,7 @@ class _MealCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(meal.name, style: context.text.titleSmall),
-              ),
+              Expanded(child: Text(meal.name, style: context.text.titleSmall)),
               const SizedBox(width: AppDimens.space8),
               Container(
                 padding: const EdgeInsets.symmetric(

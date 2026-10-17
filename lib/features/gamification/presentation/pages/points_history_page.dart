@@ -44,9 +44,18 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      onRefresh: () async => setState(() {
-        _data = _load();
-      }),
+      // Keeps the pull spinner up until the new data has arrived.
+      onRefresh: () async {
+        final next = _load();
+        setState(() {
+          _data = next;
+        });
+        try {
+          await next;
+        } catch (_) {
+          // Shown by the FutureBuilder below.
+        }
+      },
       header: const AppPageHeader(title: 'Points'),
       body: FutureBuilder<_HistoryData>(
         future: _data,
