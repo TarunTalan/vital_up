@@ -1,4 +1,4 @@
-package com.tarun_siddhi.vital_up
+package com.vitalup.app
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -115,7 +115,7 @@ abstract class VitalWidgetProvider : HomeWidgetProvider() {
 
 /** Shared widget helpers: data keys, intents, header and metric binding. */
 object Wg {
-    const val ACTION_BACKGROUND = "com.tarun_siddhi.vital_up.WIDGET_BACKGROUND"
+    const val ACTION_BACKGROUND = "com.vitalup.app.WIDGET_BACKGROUND"
     private const val NATIVE_PREFS = "vitalup_widget_native"
     private const val KEY_LAST_AUTO = "last_auto_refresh"
 

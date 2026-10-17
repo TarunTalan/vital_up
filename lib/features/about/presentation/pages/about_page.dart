@@ -86,7 +86,7 @@ class _AboutPageState extends State<AboutPage> {
     }
   }
 
-  static const _fallbackPackage = 'com.tarun_siddhi.vital_up';
+  static const _fallbackPackage = 'com.vitalup.app';
 
   void _onRate(int stars) {
     setState(() => _selectedRating = stars);

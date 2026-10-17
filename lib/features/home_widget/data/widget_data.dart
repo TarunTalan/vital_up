@@ -15,7 +15,7 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 /// Each size the app offers is its own provider, because Android pins a
 /// widget at its provider's default size (see WidgetSizes.kt).
 abstract final class WidgetProviders {
-  static const _pkg = 'com.tarun_siddhi.vital_up';
+  static const _pkg = 'com.vitalup.app';
 
   static const todaySmall = '$_pkg.TodaySmallWidgetProvider';
   static const today = '$_pkg.VitalUpWidgetProvider';

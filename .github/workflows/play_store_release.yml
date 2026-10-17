@@ -131,7 +131,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
-          packageName: com.tarun_siddhi.vital_up
+          packageName: com.vitalup.app
           releaseFiles: build/app/outputs/bundle/release/*.aab
           track: ${{ inputs.track || 'internal' }}
           status: completed

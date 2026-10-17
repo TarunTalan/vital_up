@@ -1,4 +1,4 @@
-package com.tarun_siddhi.vital_up
+package com.vitalup.app
 
 /*
  * Size variants. Android has no way to pin a widget at a chosen size: the

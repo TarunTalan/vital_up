@@ -20,7 +20,7 @@ if (file("google-services.json").exists()) {
 }
 
 android {
-    namespace = "com.tarun_siddhi.vital_up"
+    namespace = "com.vitalup.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.tarun_siddhi.vital_up"
+        applicationId = "com.vitalup.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26

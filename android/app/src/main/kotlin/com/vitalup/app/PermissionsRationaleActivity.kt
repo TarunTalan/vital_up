@@ -1,4 +1,4 @@
-package com.tarun_siddhi.vital_up
+package com.vitalup.app
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
