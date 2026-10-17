@@ -83,9 +83,29 @@ import 'package:vital_up/core/monitoring/analytics_service.dart';
 class AppRouter {
   AppRouter._();
 
+  /// Reachable without a session. Everything else needs one: a
+  /// `vitalup://` link must not open a signed-in page on a signed-out app.
+  /// (/open and /widget/open send signed-out users to login themselves.)
+  static const _publicPaths = {
+    '/splash',
+    '/onboarding',
+    '/login',
+    '/forgot-password',
+    '/verify-otp',
+    '/reset-password',
+    '/reset-completed',
+    '/open',
+    '/widget/open',
+  };
+
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     observers: [AnalyticsService.observer],
+    redirect: (context, state) {
+      if (_publicPaths.contains(state.uri.path)) return null;
+      final signedIn = Supabase.instance.client.auth.currentSession != null;
+      return signedIn ? null : '/login';
+    },
     routes: [
       GoRoute(
         path: '/splash',

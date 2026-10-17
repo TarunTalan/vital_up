@@ -26,6 +26,7 @@ class _BiometricLockGuardState extends State<BiometricLockGuard>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _bioService = sl<BiometricAuthService>();
+    _bioService.applyScreenPrivacy();
 
     if (_bioService.isBiometricEnabled()) {
       _isLocked = true;

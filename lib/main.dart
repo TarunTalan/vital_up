@@ -34,6 +34,9 @@ import 'package:vital_up/features/settings/presentation/cubit/settings_state.dar
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // debugPrint still writes to logcat in release builds, and error text can
+  // carry server or health details. Real problems go to Crashlytics.
+  if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
 
   // Uncaught errors go to Crashlytics (release builds, once configured).
   await CrashReporter.init();
