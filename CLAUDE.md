@@ -60,7 +60,7 @@ supabase db push               # apply new migrations (outward-facing: ask first
   - Isar (`core/database/isar_service.dart`, `core/database/collections`):
     water, sleep, meals, weight, offline foods, barcode cache, diet plans,
     downloaded tracks.
-  - Drift (`core/database/drift_database.dart`, schema v5): workout sessions
+  - Drift (`core/database/drift_database.dart`, schema v6): workout sessions
     and GPS track points.
   - SharedPreferences: goals, settings, per-user Vita data, reminders.
   - `core/cache/cache_store.dart`: cached server JSON with max ages; offline
@@ -71,6 +71,10 @@ supabase db push               # apply new migrations (outward-facing: ask first
     stores settings/goals/reminders/stress/workout notes/diet plan in
     `user_backups`. `pending_writes.dart` queues offline server writes and
     RPCs (pref `pending_server_writes_v1`).
+  - `ProfileCache` (`features/profile/data/profile_cache.dart`): local profile cache
+    with `changes` broadcast stream so edits made anywhere (Home, Profile, Health details,
+    onboarding, or weight logging) update all listening screens immediately without stale values.
+    Local edits take precedence until committed to the server.
   - `HabitEvents` (`core/events`) broadcasts "something was logged" (water,
     meal, activity, mood, weight, sleep); reminders and widgets listen.
 - **Backend:** Supabase (auth, Postgres + RLS, storage, realtime, pg_cron,
@@ -416,14 +420,15 @@ Route names are GoRouter `name`s.
 9. **Modern 3D Achievement Badges (32 SVGs):** Extracted, alpha-keyed, and deployed full 32-badge asset suite with standalone SVGs embedding base64 high-res graphics without vector distortion.
 10. **Gamification Badge UI:** Reusable `BadgeEmblem`, `BadgeTile`, `showBadgeDetailSheet`, and responsive grid integrated into `BadgesPage`, player profile sheets, and reward dialogs.
 11. **Tracker Trends & Sleep Insights:** Modernized `TrendBarChart`, detailed sleep card metrics, and proportional status bars in `ActivityCalendarPage`.
+12. **Play Store Pre-Release Suite:** Renamed application package to `com.vitalup.app`, upgraded to target SDK 36, enabled R8 minification with ProGuard keep rules, NDK symbol tables, GitHub Actions CI/CD workflows for release and Shorebird patches, and comprehensive `docs/PLAY_STORE_PRE_RELEASE_GUIDE.md`.
+13. **Play App Signing & Android OAuth Clients:** Registered Google Play App Signing key SHA-1 (`F9:63:25:22:11:92:D8:2E:5D:DA:DC:F7:10:FA:D1:07:91:54:7C:0C`), Upload key SHA-1/256, and local Debug keystore SHA-1/256 to Firebase `com.vitalup.app`, auto-provisioning Google Cloud OAuth clients.
+14. **Google Play Reviewer Account & 7-Day Seeded Dataset:** Created and email-confirmed `reviewer@vitalup.live` (Password: `VitalUpTest2026!`, username: `vitalup_reviewer`) with complete 7-day tracking records (49 water logs, 7 sleep logs, 28 macro-detailed meal logs, 7 GPS workouts, 7 weight check-ins, Level 3 / 620 points, 6 badges).
+15. **Dashboard & Stale Data Synchronization:** Broadcast stream on `ProfileCache.changes` ensures name and demographic edits propagate instantly across Home, Profile, and Health details; Weight card shows green "Logged today" chip with "Update" CTA; Dashboard workout button renamed to "Start activity".
 
 ### Remaining:
-1. **Google Account Avatar Propagation:** Wait for Google CDN cache propagation (2-24h) for `support@vitalup.live` and `privacy@vitalup.live` profile pictures. Create Google Account for `noreply@vitalup.live` for auth email avatars.
-2. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
-3. **Google Play Console Submission:**
-   - Add Privacy Policy URL: `https://vitalup.live/privacy`
-   - Add Account Deletion URL: `https://vitalup.live/delete-account`
-   - Complete Health Connect read-only declarations in Play Console.
+1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).
+2. **Play Console Declarations:** Submit Health apps form & Health Connect read permissions, Usage Access permission video, Location foreground service video, and Data safety form.
+3. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
 ## Native Android
