@@ -744,7 +744,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop) return;
+            // As a dashboard tab, the dashboard's own PopScope handles back;
+            // every PopScope on a route is told, so handling it here too
+            // would step back through two tabs at once.
+            if (didPop || widget.onBack != null) return;
             _handleBack();
           },
           child: Scaffold(

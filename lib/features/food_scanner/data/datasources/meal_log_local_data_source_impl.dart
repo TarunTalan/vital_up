@@ -47,7 +47,7 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
 
     final caches = await isarService.isar.mealLogCaches
         .where()
-        .capturedAtBetween(startOfDay, endOfDay)
+        .capturedAtBetween(startOfDay, endOfDay, includeUpper: false)
         .sortByCapturedAtDesc()
         .findAll();
 
@@ -66,19 +66,15 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
 
   @override
   Future<void> deleteMealLog(String id) async {
-    final wasSynced = await isarService.isar.mealLogCaches
-        .where()
-        .mealLogIdEqualTo(id)
-        .filter()
-        .isSyncedEqualTo(true)
-        .isNotEmpty();
     await isarService.isar.writeTxn(() async {
       await isarService.isar.mealLogCaches
           .where()
           .mealLogIdEqualTo(id)
           .deleteAll();
     });
-    if (wasSynced) await sync?.recordDelete('meal_logs', id);
+    // Always recorded: an upload can reach the server before it's marked
+    // synced here, and a delete of an id the server lacks changes nothing.
+    await sync?.recordDelete('meal_logs', id);
   }
 
   MealLogCache _toCache(MealLogEntry entry) {
@@ -88,8 +84,12 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
       ..imagePath = entry.imagePath
       ..itemIds = entry.items.map((item) => item.id).toList()
       ..itemNames = entry.items.map((item) => item.name).toList()
-      ..itemConfidences = entry.items.map((item) => item.confidenceScore).toList()
-      ..itemServingDescriptions = entry.items.map((item) => item.servingDescription).toList()
+      ..itemConfidences = entry.items
+          .map((item) => item.confidenceScore)
+          .toList()
+      ..itemServingDescriptions = entry.items
+          .map((item) => item.servingDescription)
+          .toList()
       ..itemQuantities = entry.items.map((item) => item.quantity).toList()
       ..itemUnits = entry.items.map((item) => item.unit).toList()
       ..nutritionCalories = entry.nutrition.map((nut) => nut.calories).toList()
@@ -109,7 +109,8 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
   /// parallel lists of different lengths, an unknown meal type or non-finite
   /// numbers; read them defensively instead of throwing a RangeError.
   MealLogEntry _toDomain(MealLogCache cache) {
-    T at<T>(List<T> list, int i, T fallback) => i < list.length ? list[i] : fallback;
+    T at<T>(List<T> list, int i, T fallback) =>
+        i < list.length ? list[i] : fallback;
 
     final items = List.generate(
       cache.itemIds.length,
@@ -124,22 +125,27 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
     );
 
     // One nutrition row per item; a row without an item is dropped.
-    final nutritionCount = cache.nutritionCalories.length < items.length ? cache.nutritionCalories.length : items.length;
+    final nutritionCount = cache.nutritionCalories.length < items.length
+        ? cache.nutritionCalories.length
+        : items.length;
     final nutrition = List.generate(
       nutritionCount,
-      (index) => sanitizeNutrition(NutritionInfo(
-        calories: cache.nutritionCalories[index],
-        proteinG: at(cache.nutritionProteinG, index, 0.0),
-        carbsG: at(cache.nutritionCarbsG, index, 0.0),
-        fatG: at(cache.nutritionFatG, index, 0.0),
-        fiberG: at(cache.nutritionFiberG, index, 0.0),
-        sugarG: at(cache.nutritionSugarG, index, 0.0),
-        sodiumMg: at(cache.nutritionSodiumMg, index, 0.0),
-        per: items[index],
-      )),
+      (index) => sanitizeNutrition(
+        NutritionInfo(
+          calories: cache.nutritionCalories[index],
+          proteinG: at(cache.nutritionProteinG, index, 0.0),
+          carbsG: at(cache.nutritionCarbsG, index, 0.0),
+          fatG: at(cache.nutritionFatG, index, 0.0),
+          fiberG: at(cache.nutritionFiberG, index, 0.0),
+          sugarG: at(cache.nutritionSugarG, index, 0.0),
+          sodiumMg: at(cache.nutritionSodiumMg, index, 0.0),
+          per: items[index],
+        ),
+      ),
     );
 
-    final mealType = cache.mealType >= 0 && cache.mealType < MealType.values.length
+    final mealType =
+        cache.mealType >= 0 && cache.mealType < MealType.values.length
         ? MealType.values[cache.mealType]
         : MealType.snack;
 
@@ -149,7 +155,10 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
       imagePath: cache.imagePath,
       items: items,
       nutrition: nutrition,
-      totalCalories: saneAmount(cache.totalCalories, max: NutritionLimits.caloriesMax * 10),
+      totalCalories: saneAmount(
+        cache.totalCalories,
+        max: NutritionLimits.caloriesMax * 10,
+      ),
       mealType: mealType,
       userConfirmed: cache.userConfirmed,
     );

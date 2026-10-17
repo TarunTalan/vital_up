@@ -82,6 +82,27 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
     await _fetchAndEmit(emit);
   }
 
+  /// A failed refresh keeps the meals on screen and only reports it; with
+  /// nothing shown yet, the error view (with retry) takes over.
+  void _fail(Emitter<MealLogState> emit, String message) {
+    final current = state;
+    if (current is! MealLogLoaded) {
+      emit(MealLogError(message));
+      return;
+    }
+    emit(
+      MealLogLoaded(
+        entries: current.entries,
+        totalCalories: current.totalCalories,
+        totalProteinG: current.totalProteinG,
+        totalCarbsG: current.totalCarbsG,
+        totalFatG: current.totalFatG,
+        dailyCalorieGoal: current.dailyCalorieGoal,
+        notice: message,
+      ),
+    );
+  }
+
   Future<void> _fetchAndEmit(Emitter<MealLogState> emit) async {
     final Either<Failure, List<MealLogEntry>> result;
     try {
@@ -90,7 +111,7 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
           : await getMealLogHistory(DateTime.now()).withLoadTimeout();
     } catch (e) {
       addError(e);
-      emit(const MealLogError(kLoadErrorMessage));
+      _fail(emit, kLoadErrorMessage);
       return;
     }
     // Read calorie goal from Isar UserProfileCache first
@@ -106,7 +127,7 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
       // Non-critical — dashboard still shows raw totals
     }
 
-    result.fold((failure) => emit(MealLogError(failure.message)), (entries) {
+    result.fold((failure) => _fail(emit, failure.message), (entries) {
       // Aggregate daily totals
       double calories = 0, protein = 0, carbs = 0, fat = 0;
       for (final entry in entries) {
