@@ -37,3 +37,19 @@
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 -dontwarn kotlin.**
 -dontwarn kotlinx.coroutines.**
+
+# 8. Firebase Core, Analytics, Crashlytics & Messaging
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keepattributes SourceFile,LineNumberTable
+-keep public class * extends java.lang.Exception
+
+# 9. Shorebird Code Push / OTA Updater
+-keep class dev.shorebird.** { *; }
+-dontwarn dev.shorebird.**
+
+# 10. Drift / SQLite Native Libs
+-keep class io.flutter.plugins.sharedpreferences.** { *; }
+-keep class com.tekartik.sqflite.** { *; }
+-dontwarn com.tekartik.sqflite.**
+
