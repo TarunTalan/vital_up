@@ -54,7 +54,10 @@ class _ActivityGoalsView extends StatelessWidget {
             ? null
             : () async {
                 if (!await cubit.delete(goal) && context.mounted) {
-                  showErrorSnackBar(context, "Couldn't delete this goal. Try again.");
+                  showErrorSnackBar(
+                    context,
+                    "Couldn't delete this goal. Try again.",
+                  );
                 }
               },
       ),
@@ -168,41 +171,23 @@ class _ActivityGoalsView extends StatelessWidget {
                       ),
                     if (selected != null) ...[
                       const SizedBox(height: AppDimens.cardGap),
-                      AppCard(
-                        width: double.infinity,
-                        padding: AppDimens.cardPaddingCompact,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppCaption(
-                                    '${selected.goal.metric.label} · '
-                                    '${state.range.caption}',
-                                  ),
-                                ),
-                                TrendRangeToggle(
-                                  value: state.range,
-                                  onChanged: cubit.load,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppDimens.cardInnerGap),
-                            TrendBarChart(
-                              series: state.range == TrendRange.month
-                                  ? selected.series.weekly()
-                                  : selected.series,
-                              weekly: state.range == TrendRange.month,
-                              color: selected.goal.metric.color,
-                              valueFormatter: selected.goal.metric.format,
-                            ),
-                            const SizedBox(height: AppDimens.cardInnerGap),
-                            TrendStatsRow(
-                              series: selected.series,
-                              format: selected.goal.metric.format,
-                            ),
-                          ],
+                      TrendChartCard(
+                        caption:
+                            '${selected.goal.metric.label} · '
+                            '${state.range.caption}',
+                        range: state.range,
+                        onRange: cubit.load,
+                        chart: TrendBarChart(
+                          series: state.range == TrendRange.month
+                              ? selected.series.weekly()
+                              : selected.series,
+                          weekly: state.range == TrendRange.month,
+                          color: selected.goal.metric.color,
+                          valueFormatter: selected.goal.metric.format,
+                        ),
+                        stats: TrendStatsRow(
+                          series: selected.series,
+                          format: selected.goal.metric.format,
                         ),
                       ),
                       if (insights.isNotEmpty) ...[

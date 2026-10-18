@@ -5,6 +5,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Card overlaid on top of the map showing the live duration, distance,
 /// calories, and average pace while an activity is idle/in-progress/paused.
@@ -123,51 +124,48 @@ class TopStats extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Duration + optional BPM
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: FitText(
                     formatDuration(elapsed),
                     style: AppTextStyles.metricLarge.copyWith(
                       color: colors.onSurface,
                     ),
                   ),
-                  if (hasBpm) ...[
-                    const SizedBox(width: AppDimens.space12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space8,
-                        vertical: AppDimens.space4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: v.errorFill,
-                        borderRadius: BorderRadius.circular(
-                          AppDimens.radiusPill,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.favorite_rounded,
-                            color: colors.error,
-                            size: AppDimens.iconXs,
-                          ),
-                          const SizedBox(width: AppDimens.space4),
-                          Text(
-                            '$heartRateBpm',
-                            style: context.text.titleSmall?.copyWith(
-                              color: colors.error,
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+                if (hasBpm) ...[
+                  const SizedBox(width: AppDimens.space12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space8,
+                      vertical: AppDimens.space4,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: v.errorFill,
+                      borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite_rounded,
+                          color: colors.error,
+                          size: AppDimens.iconXs,
+                        ),
+                        const SizedBox(width: AppDimens.space4),
+                        Text(
+                          '$heartRateBpm',
+                          style: context.text.titleSmall?.copyWith(
+                            color: colors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
             const SizedBox(height: AppDimens.space4),
             const AppCaption('Duration'),
@@ -237,14 +235,11 @@ class StatColumn extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
+          FitText(
+            value,
+            maxLines: 1,
+            style: context.text.headlineSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           const SizedBox(height: AppDimens.space4),

@@ -7,6 +7,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 class CustomizeLayoutPage extends StatefulWidget {
   final WorkoutPrefsNotifier prefsNotifier;
@@ -100,13 +101,10 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
                 children: [
                   const AppCaption('Layout preview'),
                   const SizedBox(height: AppDimens.space12),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      '00:05:42',
-                      style: AppTextStyles.metric.copyWith(
-                        color: colors.onSurface,
-                      ),
+                  FitText(
+                    '00:05:42',
+                    style: AppTextStyles.metric.copyWith(
+                      color: colors.onSurface,
                     ),
                   ),
                   const SizedBox(height: AppDimens.space2),

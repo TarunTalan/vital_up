@@ -21,6 +21,7 @@ import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 class WorkoutAudioPage extends StatefulWidget {
   final WorkoutPrefs current;
@@ -616,7 +617,7 @@ class _SegmentTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tab(
       height: AppDimens.segmentHeight,
-      child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
+      child: FitText(label, maxLines: 1),
     );
   }
 }

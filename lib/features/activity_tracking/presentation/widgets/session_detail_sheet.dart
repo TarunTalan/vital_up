@@ -12,6 +12,7 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Shows full stats for one session plus editable tag/note fields.
 /// Call via [showSessionDetailSheet]; the returned future resolves with
@@ -192,7 +193,10 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             label: 'Save',
             onTap: () {
               Navigator.of(context).pop((
-                sanitizeOptional(_tag.text, maxLength: SessionAnnotationLimits.tag),
+                sanitizeOptional(
+                  _tag.text,
+                  maxLength: SessionAnnotationLimits.tag,
+                ),
                 sanitizeOptional(
                   _note.text,
                   maxLength: SessionAnnotationLimits.note,
@@ -221,15 +225,11 @@ class _DetailStat extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                maxLines: 1,
-                style: context.text.titleSmall?.copyWith(
-                  color: context.colors.onSurface,
-                ),
+            FitText(
+              value,
+              maxLines: 1,
+              style: context.text.titleSmall?.copyWith(
+                color: context.colors.onSurface,
               ),
             ),
             Text(

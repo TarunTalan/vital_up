@@ -4,6 +4,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Opaque control tile used for every button in the map overlay so they stay
 /// legible over map tiles. [accent] switches to the selected / tinted style.
@@ -81,24 +82,22 @@ class _ControlLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconWidget = Icon(icon, color: color, size: AppDimens.iconMd);
-    final text = Text(
-      label,
-      maxLines: 1,
-      style: context.text.labelMedium?.copyWith(
-        color: color,
-        fontWeight: FontWeight.w600,
+    final text = Flexible(
+      child: FitText(
+        label,
+        style: context.text.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.space8),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: iconTrailing
-              ? [text, const SizedBox(width: AppDimens.space4), iconWidget]
-              : [iconWidget, const SizedBox(width: AppDimens.space4), text],
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: iconTrailing
+            ? [text, const SizedBox(width: AppDimens.space4), iconWidget]
+            : [iconWidget, const SizedBox(width: AppDimens.space4), text],
       ),
     );
   }

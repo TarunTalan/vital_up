@@ -145,8 +145,19 @@ void main() {
     );
     await settle(tester);
 
-    expect(shownTextScale(tester, find.byType(ActivityHistoryPage)), 2.0);
+    expect(
+      shownTextScale(tester, find.byType(ActivityHistoryPage)),
+      kMaxTextScale,
+    );
     expect(takeAllExceptions(tester), isEmpty);
+    // Every label, figure and button shows whole.
+    expect(
+      truncatedTexts(
+        tester,
+        previews: {'Morning run by the lake with friends'},
+      ),
+      isEmpty,
+    );
     expect(find.text('Sessions'), findsOneWidget);
   });
 }

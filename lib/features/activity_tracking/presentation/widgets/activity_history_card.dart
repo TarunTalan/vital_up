@@ -175,6 +175,7 @@ class _MiniStat extends StatelessWidget {
         Text(
           value,
           maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurface,
             fontWeight: FontWeight.w500,

@@ -7,6 +7,8 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_sheet.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
 
 extension GoalMetricStyle on GoalMetric {
   IconData get icon => switch (this) {
@@ -39,6 +41,12 @@ extension GoalMetricStyle on GoalMetric {
 
   /// Number with unit, e.g. "2.4 km".
   String formatWithUnit(double value) => '${format(value)} $unit';
+
+  /// Short number with unit for tight spots, e.g. "10K steps".
+  String formatShortWithUnit(double value) => switch (this) {
+    GoalMetric.distance => formatWithUnit(value),
+    _ => '${formatCompactCount(value)} $unit',
+  };
 }
 
 /// Icon badge, name + window, progress bar and "current / target".
@@ -72,10 +80,7 @@ class GoalProgressRow extends StatelessWidget {
                   metric.svgAsset!,
                   width: AppDimens.iconSm,
                   height: AppDimens.iconSm,
-                  colorFilter: ColorFilter.mode(
-                    metric.color,
-                    BlendMode.srcIn,
-                  ),
+                  colorFilter: ColorFilter.mode(metric.color, BlendMode.srcIn),
                 )
               : Icon(metric.icon),
         ),
@@ -276,11 +281,7 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
                               BlendMode.srcIn,
                             ),
                           )
-                        : Icon(
-                            m.icon,
-                            size: AppDimens.iconXs,
-                            color: m.color,
-                          ),
+                        : Icon(m.icon, size: AppDimens.iconXs, color: m.color),
                     label: Text(m.label),
                     selected: _metric == m,
                     showCheckmark: false,
@@ -308,21 +309,20 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
                 tooltip: 'Decrease',
                 onPressed: _target - step >= _metric.minTarget(_period)
                     ? () => setState(
-                          () => _target =
-                              _metric.clampTarget(_period, _target - step),
-                        )
+                        () => _target = _metric.clampTarget(
+                          _period,
+                          _target - step,
+                        ),
+                      )
                     : null,
                 icon: const Icon(Icons.remove_rounded),
               ),
               Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _metric.formatWithUnit(_target),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.metricLarge.copyWith(
-                      color: _metric.color,
-                    ),
+                child: FitText(
+                  _metric.formatWithUnit(_target),
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.metricLarge.copyWith(
+                    color: _metric.color,
                   ),
                 ),
               ),
@@ -330,9 +330,11 @@ class _GoalEditorSheetState extends State<GoalEditorSheet> {
                 tooltip: 'Increase',
                 onPressed: _target + step <= _metric.maxTarget(_period)
                     ? () => setState(
-                          () => _target =
-                              _metric.clampTarget(_period, _target + step),
-                        )
+                        () => _target = _metric.clampTarget(
+                          _period,
+                          _target + step,
+                        ),
+                      )
                     : null,
                 icon: const Icon(Icons.add_rounded),
               ),

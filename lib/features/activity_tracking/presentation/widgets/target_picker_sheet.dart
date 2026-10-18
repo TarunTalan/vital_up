@@ -7,6 +7,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Bottom sheet for selecting a workout target (distance or calories).
 /// Pops `(type, value)` on save, `(WorkoutTargetType.none, 0)` on Clear,
@@ -108,7 +109,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
     final v = context.vColors;
     final distUnitLabel = widget.distanceUnit.label.toUpperCase();
     final fieldHeight =
-        MediaQuery.textScalerOf(context).scale(AppDimens.inputHeight) +
+        context
+            .textScaled(AppDimens.inputHeight)
+            .clamp(AppDimens.inputHeight, double.infinity) +
         AppDimens.space16;
 
     return SafeArea(
@@ -152,17 +155,11 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                 tabs: [
                   Tab(
                     height: AppDimens.segmentHeight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('Distance ($distUnitLabel)'),
-                    ),
+                    child: FitText('Distance ($distUnitLabel)'),
                   ),
                   const Tab(
                     height: AppDimens.segmentHeight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('Calories (kcal)'),
-                    ),
+                    child: FitText('Calories (kcal)'),
                   ),
                 ],
               ),
@@ -172,11 +169,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
             AnimatedContainer(
               duration: AppDurations.medium,
               // Room for the error line under the field.
-              height: fieldHeight +
-                  (_error == null
-                      ? 0
-                      : MediaQuery.textScalerOf(context)
-                          .scale(AppDimens.space32)),
+              height:
+                  fieldHeight +
+                  (_error == null ? 0 : context.textScaled(AppDimens.space32)),
               child: TabBarView(
                 controller: _tabs,
                 children: [
@@ -205,8 +200,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                   child: AppSecondaryButton(
                     label: 'Clear',
                     // Null would read as "dismissed" and keep the target.
-                    onTap: () =>
-                        Navigator.of(context).pop((WorkoutTargetType.none, 0.0)),
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pop((WorkoutTargetType.none, 0.0)),
                   ),
                 ),
                 const SizedBox(width: AppDimens.space12),

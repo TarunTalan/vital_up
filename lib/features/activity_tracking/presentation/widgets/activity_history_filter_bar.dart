@@ -22,9 +22,9 @@ class ActivityHistoryFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
-    final chipHeight = MediaQuery.textScalerOf(
-      context,
-    ).scale(AppDimens.headerActionSize - AppDimens.space4);
+    final chipHeight = context
+        .textScaled(AppDimens.headerActionSize - AppDimens.space4)
+        .clamp(AppDimens.headerActionSize - AppDimens.space4, double.infinity);
 
     return Column(
       children: [

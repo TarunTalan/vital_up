@@ -18,6 +18,8 @@ import 'package:vital_up/features/activity_tracking/presentation/utils/activity_
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_filter_bar.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/session_detail_sheet.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 
 /// Shows every saved activity session with date/time, key stats, and any
 /// tag/note the user added, with filtering by activity type and search.
@@ -240,34 +242,20 @@ class _HistorySummary extends StatelessWidget {
         children: [
           const AppCaption('All time'),
           const SizedBox(height: AppDimens.space12),
-          Row(
+          AdaptiveRow(
             children: [
-              Expanded(
-                child: _SummaryStat(
-                  value: '${state.totalSessions}',
-                  label: 'Sessions',
-                ),
+              _SummaryStat(value: '${state.totalSessions}', label: 'Sessions'),
+              _SummaryStat(
+                value: formatDistanceKm(state.totalDistanceMeters),
+                label: 'km',
               ),
-              Expanded(
-                child: _SummaryStat(
-                  value: formatDistanceKm(state.totalDistanceMeters),
-                  label: 'km',
+              _SummaryStat(
+                value: formatDuration(
+                  Duration(seconds: state.totalDurationSeconds),
                 ),
+                label: 'Time',
               ),
-              Expanded(
-                child: _SummaryStat(
-                  value: formatDuration(
-                    Duration(seconds: state.totalDurationSeconds),
-                  ),
-                  label: 'Time',
-                ),
-              ),
-              Expanded(
-                child: _SummaryStat(
-                  value: '${state.totalCalories}',
-                  label: 'Calories',
-                ),
-              ),
+              _SummaryStat(value: '${state.totalCalories}', label: 'Calories'),
             ],
           ),
         ],
@@ -289,15 +277,11 @@ class _SummaryStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
+          FitText(
+            value,
+            maxLines: 1,
+            style: context.text.headlineSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           const SizedBox(height: AppDimens.space2),

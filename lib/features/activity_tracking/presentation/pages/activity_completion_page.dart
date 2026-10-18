@@ -10,6 +10,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Full screen shown after an activity is stopped and saved. Displays the
 /// finished session's stats with a back button in the top-left corner.
@@ -200,15 +201,11 @@ class _CompletionStatCard extends StatelessWidget {
                 : Icon(icon!),
           ),
           const SizedBox(height: AppDimens.space12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
+          FitText(
+            value,
+            maxLines: 1,
+            style: context.text.headlineSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           const SizedBox(height: AppDimens.space4),
