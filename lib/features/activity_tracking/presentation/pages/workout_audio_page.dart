@@ -1,8 +1,11 @@
 import 'dart:async';
+
+import 'package:background_downloader/background_downloader.dart' show TaskStatus;
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -48,17 +51,43 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
 
   bool _isLoadingLocal = false;
   final Map<String, double> _downloadProgress = {};
+  StreamSubscription<({String trackId, double? progress})>? _downloadChanges;
 
   @override
   void initState() {
     super.initState();
     _loadLocalSongs();
     _loadFavoritesAndDownloads();
+    _followBackgroundDownloads();
   }
 
   @override
   void dispose() {
+    _downloadChanges?.cancel();
     super.dispose();
+  }
+
+  /// Downloads keep running with this screen closed: show the ones still
+  /// going (started before it opened) and pick up any that finished.
+  Future<void> _followBackgroundDownloads() async {
+    await _downloader.start();
+    final active = await _downloader.activeDownloads();
+    if (!mounted) return;
+    setState(() => _downloadProgress.addAll(active));
+    _downloadChanges = _downloader.changes.listen(
+      (change) {
+        if (!mounted) return;
+        final progress = change.progress;
+        if (progress == null) {
+          setState(() => _downloadProgress.remove(change.trackId));
+          _loadFavoritesAndDownloads();
+        } else if (_downloadProgress.containsKey(change.trackId)) {
+          setState(() => _downloadProgress[change.trackId] = progress);
+        }
+      },
+      onError: (Object e) => debugPrint('Download updates failed: $e'),
+    );
+    _loadFavoritesAndDownloads();
   }
 
   Future<void> _loadLocalSongs() async {
@@ -149,6 +178,9 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     // One download per track: a second tap would write the same file.
     if (_downloadProgress.containsKey(trackId)) return;
     setState(() => _downloadProgress[trackId] = 0.01);
+    // Progress shows in the tray, so the download can be left running.
+    await sl<ReminderScheduler>().requestPermission();
+    if (!mounted) return;
     try {
       await _downloader.downloadTrack(
         trackId: trackId,
@@ -170,8 +202,12 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
       }
     } catch (e) {
       debugPrint('Audio download failed: $e');
+      // Cancelled from the notification: nothing to report.
+      final cancelled =
+          e is AudioDownloadFailed && e.status == TaskStatus.canceled;
       if (mounted) {
         setState(() => _downloadProgress.remove(trackId));
+        if (cancelled) return;
         showErrorSnackBar(
           context,
           userMessage(e, fallback: "Couldn't download this track. Try again."),

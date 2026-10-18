@@ -89,7 +89,6 @@ dependencies:
   flutter_blue_plus: ^1.35.3
   just_audio: ^0.9.42
   audio_session: ^0.1.21
-  just_audio_background: ^0.0.1-beta.15
   on_audio_query_forked: ^2.9.1
   on_audio_query_android: ^1.1.0
   permission_handler: ^11.3.1
@@ -108,6 +107,7 @@ dependencies:
   share_plus: ^13.3.1
   archive: ^4.3.0
   connectivity_plus: ^7.3.1
+  background_downloader: ^9.5.9
 
 
 dev_dependencies:

@@ -119,6 +119,13 @@
             android:foregroundServiceType="location"
             android:exported="false" />
 
+        <!-- background_downloader's user-initiated job service (dataSync type).
+             Unused: audio downloads run as WorkManager jobs without a
+             foreground service, so no extra Play Console declaration. -->
+        <service
+            android:name="com.bbflight.background_downloader.UIDTJobService"
+            tools:node="remove" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

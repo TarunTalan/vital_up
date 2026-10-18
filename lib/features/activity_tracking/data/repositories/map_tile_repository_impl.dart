@@ -2,9 +2,15 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 
 class MapTileRepositoryImpl implements MapTileRepository {
+  /// Shows download progress in the notification tray; null in tests.
+  final MapDownloadNotifier? _notifier;
+
+  MapTileRepositoryImpl([this._notifier]);
+
   /// The style the tracking map renders. Tiles alone can't draw a map
   /// offline: the style JSON, sprites and fonts live in a separate style
   /// pack that must be downloaded too.
@@ -68,7 +74,9 @@ class MapTileRepositoryImpl implements MapTileRepository {
     final controller = StreamController<double>();
 
     void emit(double value) {
-      if (!controller.isClosed) controller.add(value.clamp(0.0, 1.0));
+      final progress = value.clamp(0.0, 1.0);
+      _notifier?.progress(progress);
+      if (!controller.isClosed) controller.add(progress);
     }
 
     Future(() async {
@@ -140,8 +148,10 @@ class MapTileRepositoryImpl implements MapTileRepository {
         );
 
         emit(1.0);
+        await _notifier?.done();
         await controller.close();
       } catch (e) {
+        await _notifier?.cancel();
         if (!controller.isClosed) {
           controller.addError(e);
           await controller.close();
