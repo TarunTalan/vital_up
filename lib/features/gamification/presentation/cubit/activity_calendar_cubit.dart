@@ -135,9 +135,10 @@ class ActivityCalendarCubit extends Cubit<ActivityCalendarState> {
         daysToLoad.add(d);
       }
 
-      final results = await Future.wait(
-        daysToLoad.map((d) => _collector.collect(userId, d, now: now)),
-      ).withLoadTimeout();
+      // One read per store for the whole month, not one per day.
+      final results = await _collector
+          .collectDays(userId, daysToLoad, now: now)
+          .withLoadTimeout();
 
       // Moved to another month meanwhile.
       if (isClosed || state.focusedMonth != m) return;

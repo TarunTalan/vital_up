@@ -1,6 +1,10 @@
 import 'package:isar_community/isar.dart';
 import 'package:vital_up/core/database/collections/user_profile_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
+import 'package:vital_up/features/dashboard/domain/entities/sleep_session_info.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
+import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
@@ -58,34 +62,93 @@ class DailyMetricsCollector {
     String userId,
     DateTime day, {
     DateTime? now,
+  }) async => (await collectDays(userId, [day], now: now)).single;
+
+  /// Metrics for several [days] (e.g. a calendar month), oldest first.
+  /// Every store is read once for the whole range instead of once per day.
+  Future<List<DailyMetrics>> collectDays(
+    String userId,
+    List<DateTime> days, {
+    DateTime? now,
   }) async {
+    if (days.isEmpty) return const [];
     final clock = now ?? DateTime.now();
-    final date = startOfDay(day);
-    final end = nextDay(date);
-    final isToday = date == startOfDay(clock);
+    final dates = {for (final d in days) startOfDay(d)}.toList()..sort();
+    final first = dates.first;
+    final end = nextDay(dates.last);
 
     final (goals, history, healthSteps, meals, plan, water, sleep) = await (
       _goals
           .getProgress(TrendRange.week)
           .then<ActivityGoalsSnapshot?>((s) => s)
           .orFallback(null),
-      _history().orFallback(const <HistoryEntry>[]),
-      _health.readDailySteps([date]).orFallback(null),
-      _meals(date)
-          .then((r) => r.getOrElse(() => const <MealLogEntry>[]))
-          .orFallback(const <MealLogEntry>[]),
+      // Totals only: no GPS routes, only sessions from the first day on.
+      _history(since: first).orFallback(const <HistoryEntry>[]),
+      _health.readDailySteps(dates).orFallback(null),
+      Future.wait([
+        for (final date in dates)
+          _meals(date)
+              .then((r) => r.getOrElse(() => const <MealLogEntry>[]))
+              .orFallback(const <MealLogEntry>[]),
+      ]),
       _activePlan().orFallback(null),
-      _water.getLogsBetween(userId, date, end).orFallback(const []),
-      _sleep.getSleepBetween(date, end).orFallback(const []),
+      _water.getLogsBetween(userId, first, end).orFallback(const []),
+      _sleep.getSleepBetween(first, end).orFallback(const []),
     ).wait;
 
-    // Fitness
-    final sessions = [
-      for (final e in history)
-        if (!e.session.startTime.isBefore(date) &&
-            e.session.startTime.isBefore(end))
-          e.session,
+    final checkIns = _vita.readCheckIns(userId);
+    final waterGoal = _water.getDailyGoal();
+    final profileGoal = plan == null ? _profileCalorieGoal() : null;
+
+    return [
+      for (final (i, date) in dates.indexed)
+        await _day(
+          date: date,
+          clock: clock,
+          goals: goals,
+          sessions: [
+            for (final e in history)
+              if (!e.session.startTime.isBefore(date) &&
+                  e.session.startTime.isBefore(nextDay(date)))
+                e.session,
+          ],
+          healthSteps: healthSteps?[date],
+          meals: meals[i],
+          plan: plan,
+          water: [
+            for (final l in water)
+              if (startOfDay(l.timestamp) == date) l,
+          ],
+          waterGoal: waterGoal,
+          sleep: [
+            for (final s in sleep)
+              if (startOfDay(s.wakeTime) == date) s,
+          ],
+          checkIn: checkIns
+              .where((c) => startOfDay(c.date) == date)
+              .firstOrNull,
+          profileGoal: profileGoal,
+        ),
     ];
+  }
+
+  Future<DailyMetrics> _day({
+    required DateTime date,
+    required DateTime clock,
+    required ActivityGoalsSnapshot? goals,
+    required List<ActivitySession> sessions,
+    required int? healthSteps,
+    required List<MealLogEntry> meals,
+    required MealPlan? plan,
+    required List<WaterLogCache> water,
+    required int waterGoal,
+    required List<SleepSessionInfo> sleep,
+    required StressCheckIn? checkIn,
+    required Future<int?>? profileGoal,
+  }) async {
+    final isToday = date == startOfDay(clock);
+
+    // Fitness
     final sessionSteps = sessions.fold<int>(
       0,
       (sum, s) => sum + (s.stepCountReliable ? s.steps : 0),
@@ -109,10 +172,6 @@ class DailyMetricsCollector {
     final waterMl = water.fold<int>(0, (sum, l) => sum + l.amountMl);
 
     // Lifestyle
-    final checkIn = _vita
-        .readCheckIns(userId)
-        .where((c) => startOfDay(c.date) == date)
-        .firstOrNull;
     final sleptMinutes = sleep.fold<int>(
       0,
       (best, s) => s.duration.inMinutes > best ? s.duration.inMinutes : best,
@@ -120,7 +179,7 @@ class DailyMetricsCollector {
 
     return DailyMetrics(
       day: date,
-      steps: healthSteps?[date] ?? sessionSteps,
+      steps: healthSteps ?? sessionSteps,
       distanceMeters: sessions
           .fold<double>(0, (sum, s) => sum + s.totalDistanceMeters)
           .round(),
@@ -135,12 +194,12 @@ class DailyMetricsCollector {
       weeklyGoalsAchieved: weekly,
       foodLogs: meals.length,
       waterLogs: water.length,
-      waterGoalMet: waterMl > 0 && waterMl >= _water.getDailyGoal(),
+      waterGoalMet: waterMl > 0 && waterMl >= waterGoal,
       plannedMeals: planned.length,
       plannedMealsLogged: planned.where((p) => p.logged).length,
       calorieGoalMet:
           (!isToday || clock.hour >= calorieCheckHour) &&
-          await _calorieGoalMet(meals, plan),
+          await _calorieGoalMet(meals, plan, profileGoal),
       sleepLogged: sleep.isNotEmpty,
       sleepHours: sleptMinutes / 60,
       moodCheckIn: checkIn != null,
@@ -148,9 +207,13 @@ class DailyMetricsCollector {
     );
   }
 
-  Future<bool> _calorieGoalMet(List<MealLogEntry> meals, MealPlan? plan) async {
+  Future<bool> _calorieGoalMet(
+    List<MealLogEntry> meals,
+    MealPlan? plan,
+    Future<int?>? profileGoal,
+  ) async {
     if (meals.isEmpty) return false;
-    final goal = plan?.totalCalories ?? await _profileCalorieGoal();
+    final goal = plan?.totalCalories ?? await profileGoal;
     if (goal == null || goal <= 0) return false;
     final eaten = meals.fold<double>(0, (sum, m) => sum + m.totalCalories);
     return (eaten - goal).abs() <= goal * calorieTolerance;

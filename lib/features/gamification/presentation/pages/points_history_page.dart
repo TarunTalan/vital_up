@@ -100,10 +100,12 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                               color: context.colors.primary,
                             ),
                             const SizedBox(width: AppDimens.space6),
-                            Text(
-                              'Level ${stats.level.level} · ${stats.level.title}',
-                              style: context.text.bodyMedium?.copyWith(
-                                color: context.vColors.grayText,
+                            Flexible(
+                              child: Text(
+                                'Level ${stats.level.level} · ${stats.level.title}',
+                                style: context.text.bodyMedium?.copyWith(
+                                  color: context.vColors.grayText,
+                                ),
                               ),
                             ),
                           ],

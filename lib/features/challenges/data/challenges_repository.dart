@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
@@ -159,6 +160,23 @@ class ChallengeException implements Exception {
 /// Reads are cache-first (see [CacheStore]) so the list and standings open
 /// instantly and stay readable offline. Creating and answering need the
 /// server's answer (limits, expired invites), so they are online only.
+/// Request ids for challenges created from one form: a retry of the same
+/// challenge reuses its id (the server then returns the one it made), a
+/// changed choice gets a new one.
+class ChallengeRequestIds {
+  final _ids = <String, String>{};
+
+  String forChallenge(
+    ChallengeMetric metric,
+    int days,
+    Iterable<String> friendIds,
+  ) {
+    final friends = friendIds.toSet().toList()..sort();
+    return _ids['${metric.code}|$days|${friends.join(',')}'] ??=
+        const Uuid().v4();
+  }
+}
+
 class ChallengesRepository {
   final SupabaseClient _client;
   final CacheStore _cache;
@@ -248,10 +266,14 @@ class ChallengesRepository {
     return null;
   }
 
+  /// [requestId] identifies one challenge the user is creating: a retry
+  /// after a lost reply sends the same id, and the server returns the
+  /// challenge it already made instead of creating a second one.
   Future<void> create({
     required ChallengeMetric metric,
     required int days,
     required List<String> friendIds,
+    String? requestId,
   }) async {
     final error = validateCreate(
       metric: metric,
@@ -267,6 +289,7 @@ class ChallengesRepository {
           'p_metric': metric.code,
           'p_days': days,
           'p_friend_ids': friendIds,
+          'p_request_id': ?requestId,
         },
       ),
     );
@@ -296,9 +319,12 @@ class ChallengesRepository {
     await _cache.remove(_boardKey(challenge.id));
   }
 
+  /// Longest a challenge write may take before the user can retry.
+  static const _writeTimeout = Duration(seconds: 20);
+
   Future<T> _call<T>(Future<T> Function() run) async {
     try {
-      return await run();
+      return await run().timeout(_writeTimeout);
     } on ChallengeException {
       rethrow;
     } on PostgrestException catch (e) {

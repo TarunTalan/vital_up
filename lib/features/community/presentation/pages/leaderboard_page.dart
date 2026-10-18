@@ -657,22 +657,32 @@ class _PodiumPlace extends StatelessWidget {
             ringColor: color,
           ),
           const SizedBox(height: AppDimens.space6),
+          // Names wrap; points shrink to fit rather than being cut.
           Text(
             e.isMe ? 'You' : e.username,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: context.text.titleSmall?.copyWith(
               color: context.colors.onSurface,
             ),
           ),
-          Text(
-            friendIds.contains(e.userId)
-                ? 'Friend · ${_points.format(e.points)} pts'
-                : '${_points.format(e.points)} pts',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.bodySmall?.copyWith(
-              color: context.vColors.grayText,
+          if (friendIds.contains(e.userId))
+            Text(
+              'Friend',
+              maxLines: 1,
+              style: context.text.bodySmall?.copyWith(
+                color: context.vColors.grayText,
+              ),
+            ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '${_points.format(e.points)} pts',
+              maxLines: 1,
+              style: context.text.bodySmall?.copyWith(
+                color: context.vColors.grayText,
+              ),
             ),
           ),
           const SizedBox(height: AppDimens.space6),
@@ -751,12 +761,17 @@ class _RankRow extends StatelessWidget {
                           color: _rankColor(rank),
                         ),
                       )
-                    : Text(
-                        rank == null ? '–' : _points.format(rank),
-                        style: context.text.titleSmall?.copyWith(
-                          color: e.isMe
-                              ? context.vColors.accentText
-                              : context.colors.onSurface,
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          rank == null ? '–' : _points.format(rank),
+                          maxLines: 1,
+                          style: context.text.titleSmall?.copyWith(
+                            color: e.isMe
+                                ? context.vColors.accentText
+                                : context.colors.onSurface,
+                          ),
                         ),
                       ),
               ),

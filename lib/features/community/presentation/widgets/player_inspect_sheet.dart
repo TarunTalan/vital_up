@@ -74,10 +74,6 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
       showSuccessSnackBar(context, 'Cheer sent to @${widget.friend.username}');
     } on PlayerProfileException catch (e) {
       if (!mounted) return;
-      // Sent earlier (maybe from another device): show it as sent.
-      if (e.message == PlayerProfileException.alreadyCheered) {
-        setState(() => _cheered = true);
-      }
       showErrorSnackBar(context, e.message);
     } catch (e) {
       debugPrint('Cheer failed: $e');

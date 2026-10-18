@@ -418,16 +418,22 @@ class CategoryPointsTile extends StatelessWidget {
                 )
               : Icon(category.icon, size: AppDimens.iconSm, color: color),
           const SizedBox(height: AppDimens.space6),
-          Text(
-            '${signed ? '+' : ''}${_points.format(points)}',
-            style: context.text.titleSmall?.copyWith(
-              color: context.colors.onSurface,
+          // Narrow tiles (4 across on small phones): the total shrinks to
+          // fit instead of breaking mid-number, and the label wraps.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${signed ? '+' : ''}${_points.format(points)}',
+              maxLines: 1,
+              style: context.text.titleSmall?.copyWith(
+                color: context.colors.onSurface,
+              ),
             ),
           ),
           Text(
             category.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
             style: context.text.labelSmall?.copyWith(
               color: context.vColors.grayText,
             ),

@@ -44,25 +44,27 @@ abstract final class GamificationIcons {
   static const quest = 'assets/icons/gamification/quest.svg';
 
   // VitalUp Achievement Badges
-  static const badgeStreak3 = 'assets/icons/badges/streak_3.svg';
-  static const badgeStreak7 = 'assets/icons/badges/streak_7.svg';
-  static const badgeStreak30 = 'assets/icons/badges/streak_30.svg';
-  static const badgeStreak100 = 'assets/icons/badges/streak_100.svg';
-  static const badgeSteps10k = 'assets/icons/badges/steps_10k.svg';
-  static const badgeSteps20k = 'assets/icons/badges/steps_20k.svg';
-  static const badgeWorkouts1 = 'assets/icons/badges/workouts_1.svg';
-  static const badgeWorkouts25 = 'assets/icons/badges/workouts_25.svg';
-  static const badgeWorkouts100 = 'assets/icons/badges/workouts_100.svg';
-  static const badgeDiet7 = 'assets/icons/badges/diet_days_7.svg';
-  static const badgeWater7 = 'assets/icons/badges/water_days_7.svg';
-  static const badgeSleep7 = 'assets/icons/badges/sleep_days_7.svg';
-  static const badgeCheckin14 = 'assets/icons/badges/checkin_days_14.svg';
-  static const badgePoints1000 = 'assets/icons/badges/points_1000.svg';
-  static const badgeLevel5 = 'assets/icons/badges/level_5.svg';
-  static const badgeLevel10 = 'assets/icons/badges/level_10.svg';
+  static const badgeStreak3 = 'assets/images/badges/streak_3.webp';
+  static const badgeStreak7 = 'assets/images/badges/streak_7.webp';
+  static const badgeStreak30 = 'assets/images/badges/streak_30.webp';
+  static const badgeStreak100 = 'assets/images/badges/streak_100.webp';
+  static const badgeSteps10k = 'assets/images/badges/steps_10k.webp';
+  static const badgeSteps20k = 'assets/images/badges/steps_20k.webp';
+  static const badgeWorkouts1 = 'assets/images/badges/workouts_1.webp';
+  static const badgeWorkouts25 = 'assets/images/badges/workouts_25.webp';
+  static const badgeWorkouts100 = 'assets/images/badges/workouts_100.webp';
+  static const badgeDiet7 = 'assets/images/badges/diet_days_7.webp';
+  static const badgeWater7 = 'assets/images/badges/water_days_7.webp';
+  static const badgeSleep7 = 'assets/images/badges/sleep_days_7.webp';
+  static const badgeCheckin14 = 'assets/images/badges/checkin_days_14.webp';
+  static const badgePoints1000 = 'assets/images/badges/points_1000.webp';
+  static const badgeLevel5 = 'assets/images/badges/level_5.webp';
+  static const badgeLevel10 = 'assets/images/badges/level_10.webp';
 
-  /// `badges.icon_key` → `assets/icons/badges/<key>.svg`.
-  static String badge(String iconKey) => 'assets/icons/badges/$iconKey.svg';
+  /// `badges.icon_key` → `assets/images/badges/<key>.webp`. The badges are
+  /// raster art: WebP decodes far faster than the source SVGs (which only
+  /// wrap an embedded PNG) and is less than half their size.
+  static String badge(String iconKey) => 'assets/images/badges/$iconKey.webp';
 
   /// Top 1..3 leaderboard rank laurel wreath SVGs.
   static String? leaderboardRank(int rank) {
@@ -102,8 +104,8 @@ abstract final class GamificationIcons {
   }
 }
 
-/// An SVG or PNG game icon. Monochrome SVGs are tinted with [color]; rich
-/// multi-color achievement badge SVGs and PNGs preserve their app theme gradients.
+/// An SVG, PNG or WebP game icon. Monochrome SVGs are tinted with [color];
+/// badge and award art keeps its own colours.
 class GameIcon extends StatelessWidget {
   final String asset;
   final IconData fallback;
@@ -121,11 +123,13 @@ class GameIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = color ?? IconTheme.of(context).color;
-    if (asset.endsWith('.png')) {
+    if (asset.endsWith('.png') || asset.endsWith('.webp')) {
       return Image.asset(
         asset,
         width: size,
         height: size,
+        // Decode at the shown size, not the source resolution.
+        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
         fit: BoxFit.contain,
         errorBuilder: (_, _, _) => Icon(fallback, size: size, color: tint),
       );

@@ -5,6 +5,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/name_with_you_tag.dart';
 
 final _pointsFormat = NumberFormat.decimalPattern();
 
@@ -82,14 +83,9 @@ class FriendTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isMe
-                      ? '${hasName ? name : '@${friend.username}'} (you)'
-                      : hasName
-                      ? name
-                      : '@${friend.username}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                NameWithYouTag(
+                  name: hasName ? name : '@${friend.username}',
+                  isMe: isMe,
                   style: context.text.titleSmall?.copyWith(
                     color: context.colors.onSurface,
                   ),

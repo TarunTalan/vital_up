@@ -68,12 +68,14 @@ class ChallengesCubit extends Cubit<ChallengesState> {
     required ChallengeMetric metric,
     required int days,
     required List<String> friendIds,
+    String? requestId,
   }) async {
     try {
       await _repository.create(
         metric: metric,
         days: days,
         friendIds: friendIds,
+        requestId: requestId,
       );
     } on ChallengeException catch (e) {
       return e.message;

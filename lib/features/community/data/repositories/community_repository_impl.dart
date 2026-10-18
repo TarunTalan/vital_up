@@ -110,9 +110,9 @@ class CommunityRepositoryImpl implements CommunityRepository {
   }) async {
     try {
       if (joined) {
-        await _remote.join(community.id);
+        await _remote.join(community.id).timeout(_requestTimeout);
       } else {
-        await _remote.leave(community.id);
+        await _remote.leave(community.id).timeout(_requestTimeout);
       }
     } on PostgrestException catch (e) {
       // Joined already (e.g. on another device): the goal is met.
@@ -384,8 +384,17 @@ class CommunityRepositoryImpl implements CommunityRepository {
       getPlayerProfile(_remote.requireUser());
 
   @override
-  Future<void> sendCheer(String userId) =>
-      _profileCall(() => _remote.sendCheer(userId).timeout(_requestTimeout));
+  Future<void> sendCheer(String userId) async {
+    try {
+      await _profileCall(
+        () => _remote.sendCheer(userId).timeout(_requestTimeout),
+      );
+    } on PlayerProfileException catch (e) {
+      // A retry after a lost reply, or a cheer sent from another device:
+      // the cheer is there, which is what the user wanted.
+      if (e.message != PlayerProfileException.alreadyCheered) rethrow;
+    }
+  }
 
   /// Maps server and network failures to [PlayerProfileException].
   Future<T> _profileCall<T>(Future<T> Function() run) async {

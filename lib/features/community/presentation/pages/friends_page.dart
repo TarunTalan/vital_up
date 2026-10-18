@@ -23,6 +23,7 @@ import 'package:vital_up/features/community/presentation/widgets/invite_share_ca
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/name_with_you_tag.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -505,10 +506,9 @@ class _PersonRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isMe ? '$title (you)' : title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    NameWithYouTag(
+                      name: title,
+                      isMe: isMe,
                       style: context.text.titleSmall?.copyWith(
                         color: context.colors.onSurface,
                       ),

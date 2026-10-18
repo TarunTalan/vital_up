@@ -34,6 +34,12 @@ class _FakeCollector implements DailyMetricsCollector {
     collected.add(day);
     return DailyMetrics(day: day, foodLogs: foodLogs);
   }
+  @override
+  Future<List<DailyMetrics>> collectDays(
+    String userId,
+    List<DateTime> days, {
+    DateTime? now,
+  }) async => [for (final d in days) await collect(userId, d, now: now)];
 }
 
 class _FakeRemote implements GamificationRemoteDataSource {

@@ -37,11 +37,13 @@ class BadgeEmblem extends StatelessWidget {
     this.size = AppDimens.badgeTile,
   });
 
-  static const _greyscale = ColorFilter.matrix(<double>[
+  /// Greyscale with the locked fade folded into alpha: one layer per tile
+  /// instead of an Opacity and a ColorFiltered (two saveLayers).
+  static const _lockedFilter = ColorFilter.matrix(<double>[
     0.2126, 0.7152, 0.0722, 0, 0, //
     0.2126, 0.7152, 0.0722, 0, 0, //
     0.2126, 0.7152, 0.0722, 0, 0, //
-    0, 0, 0, 1, 0, //
+    0, 0, 0, AppDimens.badgeLockedOpacity, 0, //
   ]);
 
   @override
@@ -53,10 +55,7 @@ class BadgeEmblem extends StatelessWidget {
       color: badge.earned ? AppColors.rankGold : context.vColors.grayText,
     );
     if (badge.earned) return icon;
-    return Opacity(
-      opacity: AppDimens.badgeLockedOpacity,
-      child: ColorFiltered(colorFilter: _greyscale, child: icon),
-    );
+    return ColorFiltered(colorFilter: _lockedFilter, child: icon);
   }
 }
 
