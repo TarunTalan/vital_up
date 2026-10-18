@@ -85,7 +85,8 @@ void showSmoothSnackBar(
 }) {
   if (!context.mounted) return;
   final messenger =
-      ScaffoldMessenger.maybeOf(context) ?? rootScaffoldMessengerKey.currentState;
+      ScaffoldMessenger.maybeOf(context) ??
+      rootScaffoldMessengerKey.currentState;
   if (messenger == null) return;
   // Never show an empty bubble.
   if (message.trim().isEmpty) message = 'Something went wrong. Try again.';
@@ -103,10 +104,7 @@ void showSmoothSnackBar(
       elevation: 6.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        side: BorderSide(
-          color: iconColor.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
+        side: BorderSide(color: iconColor.withValues(alpha: 0.35), width: 1.0),
       ),
       margin: const EdgeInsets.symmetric(
         horizontal: AppDimens.gutter,
@@ -128,9 +126,8 @@ void showSmoothSnackBar(
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: Color(0xFFF8FAFC),
-                fontSize: 14.0,
+              style: AppTextStyles.small14.copyWith(
+                color: const Color(0xFFF8FAFC),
                 height: 1.4,
                 fontWeight: FontWeight.w500,
               ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/services/app_loading_controller.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Primary CTA — Figma `button/ pri`:
 /// 48h, radius 14, #19C3E0 fill, #0C0C0C "body 16 med" label, 16/12 padding.
@@ -214,7 +216,8 @@ class _ButtonShellState extends State<_ButtonShell> {
           },
           child: SizedBox(
             width: widget.expand ? double.infinity : null,
-            height: AppDimens.buttonHeight,
+            // Grows with the text size so the label never clips.
+            height: context.textScaled(AppDimens.buttonHeight),
             child: widget.child,
           ),
         ),
@@ -250,34 +253,32 @@ class _ButtonContent extends StatelessWidget {
         ),
       );
     }
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (leadingIcon != null) ...[
-            IconTheme(
-              data: IconThemeData(color: color, size: AppDimens.iconMd),
-              child: leadingIcon!,
-            ),
-            const SizedBox(width: AppDimens.buttonGap),
-          ],
-          Text(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (leadingIcon != null) ...[
+          IconTheme(
+            data: IconThemeData(color: color, size: AppDimens.iconMd),
+            child: leadingIcon!,
+          ),
+          const SizedBox(width: AppDimens.buttonGap),
+        ],
+        Flexible(
+          child: FitText(
             label,
-            maxLines: 1,
             style: context.text.labelLarge?.copyWith(color: color),
           ),
-          if (showRightArrow) ...[
-            const SizedBox(width: AppDimens.buttonGap),
-            SvgPicture.asset(
-              'assets/icons/ui/right_arrow.svg',
-              width: AppDimens.iconXs,
-              height: AppDimens.iconXs,
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            ),
-          ],
+        ),
+        if (showRightArrow) ...[
+          const SizedBox(width: AppDimens.buttonGap),
+          SvgPicture.asset(
+            'assets/icons/ui/right_arrow.svg',
+            width: AppDimens.iconXs,
+            height: AppDimens.iconXs,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          ),
         ],
-      ),
+      ],
     );
   }
 }

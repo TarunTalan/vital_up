@@ -166,18 +166,24 @@ class AppProgressBar extends StatelessWidget {
   }
 }
 
-/// Uppercase eyebrow label used at the top of cards
-/// (Figma "caption 12", e.g. "TODAY'S INSIGHTS").
+/// Eyebrow label used at the top of cards
+/// (Figma "caption 12", e.g. "TODAY'S INSIGHTS" or sentence case).
 class AppCaption extends StatelessWidget {
   final String text;
   final Color? color;
+  final bool uppercase;
 
-  const AppCaption(this.text, {super.key, this.color});
+  const AppCaption(
+    this.text, {
+    super.key,
+    this.color,
+    this.uppercase = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      uppercase ? text.toUpperCase() : text,
       style: AppTextStyles.caption.copyWith(
         color: color ?? context.vColors.grayText,
       ),

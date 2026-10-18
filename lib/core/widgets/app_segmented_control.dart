@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Figma segmented tabs (Move / Rest / Fuel / Vitals): glass track, the
 /// selected segment filled with primary and lifted by the segment shadow.
@@ -24,7 +26,31 @@ class AppSegmentedControl<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
-    final height = compact ? AppDimens.space32 : AppDimens.segmentHeight;
+    // Grows with the text size so labels never clip.
+    final height = context.textScaled(
+      compact ? AppDimens.space32 : AppDimens.segmentHeight,
+    );
+    // Each segment's share follows its label, so a long one
+    // ("Occasionally") gets the room it needs instead of wrapping.
+    final style = _Segment.styleOf(context, compact: compact);
+    final scaler = MediaQuery.textScalerOf(context);
+    int flexOf(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      // A shared base keeps similar labels equal; only a long one stands
+      // out.
+      return (width + _Segment.padding * 2 + AppDimens.space48).ceil().clamp(
+        1,
+        1 << 20,
+      );
+    }
+
     final segments = [
       for (final value in values)
         _Segment(
@@ -50,8 +76,10 @@ class AppSegmentedControl<T> extends StatelessWidget {
       child: Row(
         mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         children: [
-          for (final segment in segments)
-            compact ? segment : Expanded(child: segment),
+          for (var i = 0; i < segments.length; i++)
+            compact
+                ? segments[i]
+                : Expanded(flex: flexOf(label(values[i])), child: segments[i]),
         ],
       ),
     );
@@ -59,6 +87,14 @@ class AppSegmentedControl<T> extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
+  /// Horizontal padding of a full-size segment.
+  static const double padding = AppDimens.space8;
+
+  static TextStyle? styleOf(BuildContext context, {required bool compact}) =>
+      (compact ? context.text.bodySmall : context.text.labelMedium)?.copyWith(
+        fontWeight: FontWeight.w500,
+      );
+
   static final _hiddenShadow = [
     for (final s in AppShadows.segment)
       s.copyWith(color: s.color.withValues(alpha: 0)),
@@ -99,7 +135,7 @@ class _Segment extends StatelessWidget {
             minHeight: height,
           ),
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? AppDimens.space10 : AppDimens.space8,
+            horizontal: compact ? AppDimens.space10 : padding,
             vertical: AppDimens.space4,
           ),
           alignment: Alignment.center,
@@ -111,15 +147,14 @@ class _Segment extends StatelessWidget {
             borderRadius: radius,
             boxShadow: selected ? AppShadows.segment : _hiddenShadow,
           ),
-          child: Text(
+          // One line; shrinks a little before it would wrap.
+          child: FitText(
             label,
-            maxLines: 2,
             textAlign: TextAlign.center,
-            style: (compact ? context.text.bodySmall : context.text.labelMedium)
-                ?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: selected ? v.buttonText : v.grayText,
-                ),
+            style: styleOf(
+              context,
+              compact: compact,
+            )?.copyWith(color: selected ? v.buttonText : v.grayText),
           ),
         ),
       ),
