@@ -222,7 +222,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   AppListTile(
                     icon: Icons.medical_services_rounded,
                     iconColor: AppColors.teal,
-                    title: 'Doctor health report',
+                    title: 'Health report',
                     subtitle: 'A summary to share with your doctor',
                     onTap: () => context.pushNamed('health-report'),
                   ),

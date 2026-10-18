@@ -19,7 +19,6 @@ import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
-import 'package:vital_up/features/vita/presentation/widgets/vita_ai_consent_sheet.dart';
 
 /// How the app behaves: appearance, units, notifications, connected apps,
 /// privacy and about. Account and health items live under Profile.
@@ -59,10 +58,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     if (!connected) {
       if (mounted) {
-        showErrorSnackBar(
-          context,
-          'Allow health data access to turn this on.',
-        );
+        showErrorSnackBar(context, 'Allow health data access to turn this on.');
       }
       return;
     }
@@ -77,10 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (success) {
       showSuccessSnackBar(context, on ? 'App lock on' : 'App lock off');
     } else if (on) {
-      showErrorSnackBar(
-        context,
-        'Set up a screen lock on this device first.',
-      );
+      showErrorSnackBar(context, 'Set up a screen lock on this device first.');
     }
   }
 
@@ -103,7 +96,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     setState(() => _openingLeaderboards = false);
     if (failed) {
-      showErrorSnackBar(context, "Couldn't load leaderboard settings. Try again.");
+      showErrorSnackBar(
+        context,
+        "Couldn't load leaderboard settings. Try again.",
+      );
     } else {
       await CommunitySettingsSheet.show(context, cubit: cubit);
     }
@@ -155,7 +151,9 @@ class _SettingsPageState extends State<SettingsPage> {
               const AppSectionHeader('Appearance'),
               AppSegmentedControl<String>(
                 values: _themes,
-                selected: _themes.contains(s.themeMode) ? s.themeMode : 'system',
+                selected: _themes.contains(s.themeMode)
+                    ? s.themeMode
+                    : 'system',
                 label: _themeLabel,
                 onChanged: (mode) => _update(s.copyWith(themeMode: mode)),
               ),
@@ -263,8 +261,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.auto_awesome_outlined,
                     title: 'AI coach data',
                     subtitle: 'What Vita and AI plans may use',
-                    onTap: () =>
-                        showVitaAiConsentSheet(context, manage: true),
+                    onTap: () => context.pushNamed('ai-coach-data'),
                   ),
                   AppListTile(
                     icon: Icons.insights_rounded,
