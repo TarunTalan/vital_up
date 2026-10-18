@@ -18,6 +18,7 @@ import 'package:vital_up/core/database/collections/barcode_cache.dart';
 import 'package:vital_up/core/database/collections/offline_food.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class IsarService {
   late final Isar isar;
@@ -113,8 +114,10 @@ class IsarService {
   ) async {
     final last = prefs.getInt(_keyFoodsSyncedAt);
     if (last != null &&
-        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(last)) <
-            _foodsRefreshEvery) {
+        isWithinLast(
+          _foodsRefreshEvery,
+          DateTime.fromMillisecondsSinceEpoch(last),
+        )) {
       return;
     }
     // Run asynchronously to not block UI/app startup

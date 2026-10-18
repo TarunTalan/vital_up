@@ -12,6 +12,7 @@ import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
 import 'package:vital_up/core/sync/sync_uploader.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Backs up the logs recorded on this device to Supabase and brings back
 /// entries made on other devices (see migration 20261008_synced_logs.sql),
@@ -180,7 +181,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
         pull &&
         (force ||
             _lastPull == null ||
-            DateTime.now().difference(_lastPull!) >= _minPullInterval);
+            !isWithinLast(_minPullInterval, _lastPull!));
     if (_running != null) {
       _rerunPull |= wantsPull;
       return _queued ??= _running!.then((_) {

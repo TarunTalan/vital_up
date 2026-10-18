@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// A cached server response: the decoded value and when it was fetched.
 class Cached<T> {
@@ -16,6 +17,10 @@ class Cached<T> {
   const Cached(this.value, this.savedAt);
 
   Duration get age => DateTime.now().difference(savedAt);
+
+  /// Saved less than [maxAge] ago; a copy dated in the future (the clock was
+  /// ahead) counts as stale.
+  bool isFresh(Duration maxAge) => isWithinLast(maxAge, savedAt);
 }
 
 /// Persistent cache for server reads, so screens open instantly and keep
@@ -88,7 +93,7 @@ class CacheStore {
     bool forceRefresh = false,
   }) async {
     final cached = await read<T>(key, decode: decode);
-    if (cached != null && !forceRefresh && cached.age < maxAge) {
+    if (cached != null && !forceRefresh && cached.isFresh(maxAge)) {
       return cached.value;
     }
     // Known offline: don't wait for a request to time out.

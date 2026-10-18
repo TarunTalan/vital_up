@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:isar_community/isar.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/database/drift_database.dart';
+import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/sync/sync_service.dart';
@@ -72,6 +77,8 @@ class AccountService {
     // First: a sync still running must not write rows back after the wipe.
     await _step('sync', _sync.stop);
     await _step('reminders', _reminders.clear);
+    // Before Isar is cleared: the meal rows hold the photo paths.
+    await _step('meal photos', _deleteMealPhotos);
     await _step('isar', _isar.clearUserData);
     await _step('drift', _drift.clearAll);
     await _step('sync state', _sync.reset);
@@ -93,6 +100,53 @@ class AccountService {
     await _step('workout in progress', () async {
       await _prefs.remove(WorkoutCheckpointStore.key);
     });
+    // Vita chats, check-ins, scores and insights are keyed by user, but the
+    // health details in them must not stay on a shared phone.
+    await _step('vita history', () async {
+      for (final key in _prefs.getKeys().where(isVitaUserKey).toList()) {
+        await _prefs.remove(key);
+      }
+    });
+    // Camera / picker photos, exports and health reports shared from here.
+    await _step('temporary files', _deleteTemporaryFiles);
+  }
+
+  /// Per-user Vita history keys (`vita_<name>_<userId>`).
+  @visibleForTesting
+  static bool isVitaUserKey(String key) =>
+      RegExp(r'^vita_(chat|checkins|scores|insights)_').hasMatch(key);
+
+  Future<void> _deleteMealPhotos() async {
+    final paths = await _isar.isar.mealLogCaches
+        .where()
+        .imagePathProperty()
+        .findAll();
+    for (final path in paths.where((p) => p.isNotEmpty)) {
+      await _deleteFile(File(path));
+    }
+  }
+
+  /// Files at the top of the cache folder (camera and image picker photos,
+  /// the data export, health reports) and share_plus's copies of them.
+  static Future<void> _deleteTemporaryFiles() async {
+    final dir = await getTemporaryDirectory();
+    if (!await dir.exists()) return;
+    await for (final entity in dir.list(followLinks: false)) {
+      if (entity is File) {
+        await _deleteFile(entity);
+      } else if (entity is Directory &&
+          entity.path.split(Platform.pathSeparator).last == 'share_plus') {
+        await entity.delete(recursive: true);
+      }
+    }
+  }
+
+  static Future<void> _deleteFile(File file) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (e) {
+      debugPrint('Could not delete a local file: $e');
+    }
   }
 
   /// Removes every trace of the user from this device and signs out.

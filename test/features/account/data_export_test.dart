@@ -62,11 +62,43 @@ void main() {
       ]),
     );
     expect(files.containsKey('profile.json'), isFalse);
+    // Offline: no server parts, so no arena file; app data is always there.
+    expect(files.containsKey('arena.json'), isFalse);
+    expect(files.containsKey('app_data.json'), isTrue);
     expect(files['water.csv'], contains('2026-10-01T08:00:00.000,250'));
     expect(files['workouts.csv'], contains(',run,1800,5000,300,5000'));
 
     final zip = ZipDecoder().decodeBytes(zipExport(files));
     final water = zip.findFile('water.csv')!;
     expect(utf8.decode(water.content as List<int>), files['water.csv']);
+  });
+
+  test('app data decodes preference JSON strings; server parts get a file', () {
+    final files = buildExportFiles(
+      ExportData(
+        exportedAt: DateTime(2026, 10, 2, 9),
+        app: {
+          'vita': {
+            'vita_chat_{user}': '[{"role":"user","text":"hi"}]',
+            'vita_scores_{user}': null,
+          },
+          'goals': {'daily_water_goal': 2500},
+          'note': '[not json',
+        },
+        server: {
+          'badges': [
+            {'badge_code': 'streak_3', 'earned_at': '2026-10-01'},
+          ],
+        },
+      ),
+    );
+    final app = jsonDecode(files['app_data.json']!) as Map;
+    expect(app['vita']['vita_chat_{user}'], [
+      {'role': 'user', 'text': 'hi'},
+    ]);
+    expect(app['goals']['daily_water_goal'], 2500);
+    expect(app['note'], '[not json');
+    final arena = jsonDecode(files['arena.json']!) as Map;
+    expect(arena['badges'].first['badge_code'], 'streak_3');
   });
 }
