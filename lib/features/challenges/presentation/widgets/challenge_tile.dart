@@ -14,6 +14,7 @@ import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart'
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/widgets/name_with_you_tag.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 IconData challengeMetricIcon(ChallengeMetric m) => switch (m) {
   ChallengeMetric.activeMinutes => Icons.timer_rounded,
@@ -313,12 +314,10 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
                                           ? AppColors.rankSilver
                                           : AppColors.rankBronze,
                                     )
-                                  : FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        s.rank == null ? '–' : '#${s.rank}',
-                                        style: context.text.titleSmall,
-                                      ),
+                                  : FitText(
+                                      s.rank == null ? '–' : '#${s.rank}',
+                                      textAlign: TextAlign.center,
+                                      style: context.text.titleSmall,
                                     ),
                             ),
                             UserAvatar(username: s.username, url: s.avatarUrl),

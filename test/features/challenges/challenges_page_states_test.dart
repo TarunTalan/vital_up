@@ -132,8 +132,10 @@ void main() {
     await pump(tester, textScale: kMaxTextScale);
     await settle(tester);
 
-    expect(shownTextScale(tester, find.byType(ChallengesPage)), 2.0);
+    expect(shownTextScale(tester, find.byType(ChallengesPage)), kMaxTextScale);
     expect(takeAllExceptions(tester), isEmpty);
+    // Every label, figure and button shows whole.
+    expect(truncatedTexts(tester), isEmpty);
     expect(find.text('INVITES (1)'), findsOneWidget);
   });
 }

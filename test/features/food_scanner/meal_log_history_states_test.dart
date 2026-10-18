@@ -164,20 +164,22 @@ void main() {
     expect(pill('P: 25g'), findsOneWidget);
   });
 
-  testWidgets(
-    'fits a small phone at the largest text size',
-    (tester) async {
-      repo.results.add(() async => Right(_meals));
-      await pumpPage(
-        tester,
-        const MealLogHistoryPage(),
-        textScale: kMaxTextScale,
-      );
-      await settle(tester);
+  testWidgets('fits a small phone at the largest text size', (tester) async {
+    repo.results.add(() async => Right(_meals));
+    await pumpPage(
+      tester,
+      const MealLogHistoryPage(),
+      textScale: kMaxTextScale,
+    );
+    await settle(tester);
 
-      expect(shownTextScale(tester, find.byType(MealLogHistoryPage)), 2.0);
-      expect(takeAllExceptions(tester), isEmpty);
-      expect(find.text('Paneer butter masala, Jeera rice'), findsOneWidget);
-    },
-  );
+    expect(
+      shownTextScale(tester, find.byType(MealLogHistoryPage)),
+      kMaxTextScale,
+    );
+    expect(takeAllExceptions(tester), isEmpty);
+    // Every label, figure and button shows whole.
+    expect(truncatedTexts(tester), isEmpty);
+    expect(find.text('Paneer butter masala, Jeera rice'), findsOneWidget);
+  });
 }

@@ -4,6 +4,7 @@ import 'package:vital_up/core/config/legal_links.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Figma "Terms & Conditions" modal (sign up section): lighter surface,
 /// radius 20, glass border, numbered list, full-width primary CTA.
@@ -39,7 +40,10 @@ class TermsAndConditionsDialog extends StatelessWidget {
     final v = context.vColors;
 
     return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: AppDimens.space4, sigmaY: AppDimens.space4),
+      filter: ImageFilter.blur(
+        sigmaX: AppDimens.space4,
+        sigmaY: AppDimens.space4,
+      ),
       child: Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.symmetric(
@@ -48,12 +52,17 @@ class TermsAndConditionsDialog extends StatelessWidget {
         ),
         elevation: 0,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+          constraints: const BoxConstraints(
+            maxWidth: AppDimens.maxContentWidth,
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: v.surfaceElevated,
               borderRadius: BorderRadius.circular(AppDimens.radiusDialog),
-              border: Border.all(color: v.glassBorder!, width: AppDimens.borderThin),
+              border: Border.all(
+                color: v.glassBorder!,
+                width: AppDimens.borderThin,
+              ),
             ),
             padding: const EdgeInsets.symmetric(
               horizontal: AppDimens.space20,
@@ -63,14 +72,11 @@ class TermsAndConditionsDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Terms & Conditions',
-                    textAlign: TextAlign.center,
-                    style: context.text.displayLarge?.copyWith(
-                      color: context.colors.onSurface,
-                    ),
+                FitText(
+                  'Terms & Conditions',
+                  textAlign: TextAlign.center,
+                  style: context.text.displayLarge?.copyWith(
+                    color: context.colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: AppDimens.space20),
@@ -135,7 +141,9 @@ class _TermItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = context.text.bodyMedium?.copyWith(color: context.colors.onSurface);
+    final style = context.text.bodyMedium?.copyWith(
+      color: context.colors.onSurface,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: AppDimens.space16),
       child: Row(
@@ -143,7 +151,12 @@ class _TermItem extends StatelessWidget {
         children: [
           SizedBox(
             width: AppDimens.space32,
-            child: Text('$index.', style: style, textAlign: TextAlign.end, softWrap: false),
+            child: Text(
+              '$index.',
+              style: style,
+              textAlign: TextAlign.end,
+              softWrap: false,
+            ),
           ),
           const SizedBox(width: AppDimens.space6),
           Expanded(child: Text(text, style: style)),

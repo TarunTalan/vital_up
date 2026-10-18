@@ -69,7 +69,6 @@ class _MeetVitaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = context.colors.onSurface;
     return AppCard(
-      blur: true,
       width: double.infinity,
       padding: AppDimens.cardPaddingLarge,
       child: Column(

@@ -18,7 +18,6 @@ class VitaInsightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       highlighted: true,
-      blur: true,
       padding: AppDimens.cardPaddingLarge,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

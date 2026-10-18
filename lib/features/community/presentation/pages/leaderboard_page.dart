@@ -21,6 +21,8 @@ import 'package:vital_up/features/community/presentation/widgets/award_widgets.d
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -199,9 +201,16 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
               _Filters(state: state, cubit: cubit),
               const SizedBox(height: AppDimens.space16),
               if (state.loading && entries != null)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: AppDimens.space8),
-                  child: LinearProgressIndicator(),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimens.space8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                    child: LinearProgressIndicator(
+                      minHeight: AppDimens.progressHeight,
+                      color: context.colors.primary,
+                      backgroundColor: context.vColors.track,
+                    ),
+                  ),
                 ),
               if (entries == null)
                 Padding(
@@ -671,18 +680,16 @@ class _PodiumPlace extends StatelessWidget {
             Text(
               'Friend',
               maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: context.text.bodySmall?.copyWith(
                 color: context.vColors.grayText,
               ),
             ),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '${_points.format(e.points)} pts',
-              maxLines: 1,
-              style: context.text.bodySmall?.copyWith(
-                color: context.vColors.grayText,
-              ),
+          FitText(
+            '${formatCompactCount(e.points)} pts',
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
             ),
           ),
           const SizedBox(height: AppDimens.space6),
@@ -761,17 +768,13 @@ class _RankRow extends StatelessWidget {
                           color: _rankColor(rank),
                         ),
                       )
-                    : FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          rank == null ? '–' : _points.format(rank),
-                          maxLines: 1,
-                          style: context.text.titleSmall?.copyWith(
-                            color: e.isMe
-                                ? context.vColors.accentText
-                                : context.colors.onSurface,
-                          ),
+                    : FitText(
+                        rank == null ? '–' : _points.format(rank),
+                        maxLines: 1,
+                        style: context.text.titleSmall?.copyWith(
+                          color: e.isMe
+                              ? context.vColors.accentText
+                              : context.colors.onSurface,
                         ),
                       ),
               ),

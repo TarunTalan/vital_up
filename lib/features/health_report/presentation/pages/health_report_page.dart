@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
@@ -88,8 +89,6 @@ class _HealthReportPageState extends State<HealthReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
-
     return AppScaffold(
       header: const AppPageHeader(
         title: 'Doctor Health Report',
@@ -110,39 +109,17 @@ class _HealthReportPageState extends State<HealthReportPage> {
             // 1. Time Horizon Filter
             AppCaption('TIME HORIZON'),
             const SizedBox(height: AppDimens.space8),
-            // Wraps on narrow phones instead of overflowing.
-            Wrap(
-              spacing: AppDimens.space8,
-              runSpacing: AppDimens.space8,
-              children: [7, 30, 90].map((days) {
-                final isSelected = _selectedDays == days;
-                return ChoiceChip(
-                    label: Text('Last $days Days'),
-                    selected: isSelected,
-                    selectedColor: AppColors.primary.withAlpha(45),
-                    backgroundColor: v.glassFill,
-                    side: BorderSide(
-                      color: isSelected
-                          ? AppColors.primary
-                          : (v.glassBorder ?? Colors.transparent),
-                    ),
-                    labelStyle: context.text.bodySmall?.copyWith(
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isSelected
-                          ? AppColors.primary
-                          : context.colors.onSurface,
-                    ),
-                    onSelected: (selected) {
-                      if (selected && _selectedDays != days) {
-                        setState(() => _selectedDays = days);
-                        _loadReport();
-                        HapticFeedback.selectionClick();
-                      }
-                    },
-                );
-              }).toList(),
+            AppSegmentedControl<int>(
+              values: const [7, 30, 90],
+              selected: _selectedDays,
+              label: (days) => 'Last $days Days',
+              onChanged: (days) {
+                if (_selectedDays != days) {
+                  setState(() => _selectedDays = days);
+                  _loadReport();
+                  HapticFeedback.selectionClick();
+                }
+              },
             ),
             const SizedBox(height: AppDimens.space16),
 
@@ -197,23 +174,14 @@ class _HealthReportPageState extends State<HealthReportPage> {
 
     return AppCard(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppDimens.space8),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withAlpha(25),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                ),
-                child: const Icon(
-                  Icons.favorite_rounded,
-                  color: AppColors.error,
-                  size: AppDimens.iconMd,
-                ),
+              const AppIconBadge(
+                color: AppColors.error,
+                icon: Icon(Icons.favorite_rounded),
               ),
               const SizedBox(width: AppDimens.space12),
               Expanded(
@@ -282,23 +250,14 @@ class _HealthReportPageState extends State<HealthReportPage> {
   Widget _buildSleepReportCard(BuildContext context, HealthReportSummary s) {
     return AppCard(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppDimens.space8),
-                decoration: BoxDecoration(
-                  color: AppColors.sleep.withAlpha(25),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                ),
-                child: const Icon(
-                  Icons.bedtime_rounded,
-                  color: AppColors.sleep,
-                  size: AppDimens.iconMd,
-                ),
+              const AppIconBadge(
+                color: AppColors.sleep,
+                icon: Icon(Icons.bedtime_rounded),
               ),
               const SizedBox(width: AppDimens.space12),
               Text(
@@ -344,23 +303,14 @@ class _HealthReportPageState extends State<HealthReportPage> {
   Widget _buildActivityReportCard(BuildContext context, HealthReportSummary s) {
     return AppCard(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppDimens.space8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-                ),
-                child: const Icon(
-                  Icons.directions_run_rounded,
-                  color: AppColors.primary,
-                  size: AppDimens.iconMd,
-                ),
+              const AppIconBadge(
+                color: AppColors.primary,
+                icon: Icon(Icons.directions_run_rounded),
               ),
               const SizedBox(width: AppDimens.space12),
               Text(
@@ -406,20 +356,11 @@ class _HealthReportPageState extends State<HealthReportPage> {
   ) {
     return AppCard(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppDimens.space16),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(AppDimens.space10),
-            decoration: BoxDecoration(
-              color: AppColors.water.withAlpha(25),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.water_drop_rounded,
-              color: AppColors.water,
-              size: AppDimens.iconLg,
-            ),
+          const AppIconBadge(
+            color: AppColors.water,
+            icon: Icon(Icons.water_drop_rounded),
           ),
           const SizedBox(width: AppDimens.space12),
           Expanded(

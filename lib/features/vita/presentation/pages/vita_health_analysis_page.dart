@@ -10,6 +10,7 @@ import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart'
 import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_page_body.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Figma `health coach/ analysis` (1908:13240).
 class VitaHealthAnalysisPage extends StatefulWidget {
@@ -34,8 +35,9 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
       _analysis = _load();
     });
   }
-  late final Future<VitaDailyInsights?> _insights =
-      _repository.getDailyInsights();
+
+  late final Future<VitaDailyInsights?> _insights = _repository
+      .getDailyInsights();
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +54,10 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Vita knows you',
-                      style: context.text.headlineLarge?.copyWith(
-                        color: context.colors.onSurface,
-                      ),
+                  FitText(
+                    'Vita knows you',
+                    style: context.text.headlineLarge?.copyWith(
+                      color: context.colors.onSurface,
                     ),
                   ),
                   const SizedBox(height: AppDimens.space4),
@@ -96,7 +94,8 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
             if (analysis.signals.length <= 1) ...[
               const SizedBox(height: AppDimens.space16),
               const AppInfoNote(
-                message: 'Log meals, sleep, water and workouts — or connect '
+                message:
+                    'Log meals, sleep, water and workouts — or connect '
                     'your watch from the Stress Guide — and Vita will '
                     'analyse more of your health here.',
               ),
@@ -121,7 +120,6 @@ class _SignalRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = context.colors.onSurface;
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,

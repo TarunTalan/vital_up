@@ -112,8 +112,19 @@ void main() {
     await pump(tester, textScale: kMaxTextScale);
     await settle(tester);
 
-    expect(shownTextScale(tester, find.byType(NotificationsPage)), 2.0);
+    expect(
+      shownTextScale(tester, find.byType(NotificationsPage)),
+      kMaxTextScale,
+    );
     expect(takeAllExceptions(tester), isEmpty);
+    // Every label, figure and button shows whole.
+    expect(
+      truncatedTexts(
+        tester,
+        previews: {'You earned the Week Warrior badge for a seven day streak'},
+      ),
+      isEmpty,
+    );
     expect(find.text('1 unread'), findsOneWidget);
   });
 }

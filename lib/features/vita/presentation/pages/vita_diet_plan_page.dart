@@ -156,7 +156,6 @@ class _MealCard extends StatelessWidget {
     );
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,

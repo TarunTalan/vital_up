@@ -78,9 +78,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             children: [
               const SizedBox(height: AppDimens.space16),
               SizedBox(
-                height: MediaQuery.textScalerOf(
-                  context,
-                ).scale(AppDimens.headerActionSize - AppDimens.space4),
+                height: context
+                    .textScaled(AppDimens.headerActionSize - AppDimens.space4)
+                    .clamp(
+                      AppDimens.headerActionSize - AppDimens.space4,
+                      double.infinity,
+                    ),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: context.pagePadding,

@@ -23,6 +23,7 @@ import 'package:vital_up/features/gamification/domain/entities/score_category.da
 import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 
 final _number = NumberFormat.decimalPattern();
 
@@ -352,19 +353,14 @@ class PlayerProfileStats extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppDimens.cardGap),
-        Row(
+        AdaptiveRow(
           children: [
-            for (final c in ScoreCategory.scored) ...[
-              if (c != ScoreCategory.scored.first)
-                const SizedBox(width: AppDimens.space8),
-              Expanded(
-                child: CategoryPointsTile(
-                  category: c,
-                  points: p.pointsIn(c),
-                  signed: false,
-                ),
+            for (final c in ScoreCategory.scored)
+              CategoryPointsTile(
+                category: c,
+                points: p.pointsIn(c),
+                signed: false,
               ),
-            ],
           ],
         ),
         if (p.recentBadges.isNotEmpty) ...[

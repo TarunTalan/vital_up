@@ -10,6 +10,8 @@ import 'package:vital_up/features/community/domain/entities/leaderboard_entry.da
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 /// Arena section: pending friend requests, then a scrolling strip of
 /// friends and the caller in rank order (tap a friend to inspect) ending in
@@ -245,9 +247,9 @@ List<FriendChipData> rankedFriendChips(
 
 /// Tile width for the strip, growing with the text size so names and
 /// figures stay whole.
-double _chipWidth(BuildContext context) => MediaQuery.textScalerOf(
-  context,
-).scale(AppDimens.friendChipWidth).clamp(AppDimens.friendChipWidth, 180.0);
+double _chipWidth(BuildContext context) => context
+    .textScaled(AppDimens.friendChipWidth)
+    .clamp(AppDimens.friendChipWidth, 180.0);
 
 final _pointsFormat = NumberFormat.decimalPattern();
 
@@ -308,7 +310,7 @@ class _FriendChip extends StatelessWidget {
             const SizedBox(height: AppDimens.space4),
             if (points != null)
               Text(
-                '${_pointsFormat.format(points)} pts',
+                '${formatCompactCount(points!)} pts',
                 textAlign: TextAlign.center,
                 style: context.text.labelLarge?.copyWith(
                   color: context.colors.onSurface,

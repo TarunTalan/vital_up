@@ -135,7 +135,6 @@ class _StressLevelCard extends StatelessWidget {
     final grey = context.vColors.grayText;
 
     return AppCard(
-      blur: true,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
       child: Column(
@@ -188,7 +187,6 @@ class _CheckInCard extends StatelessWidget {
     final onSurface = context.colors.onSurface;
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
@@ -243,7 +241,6 @@ class _TriggersCard extends StatelessWidget {
     final rowStyle = context.text.bodyMedium?.copyWith(color: onSurface);
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
@@ -286,7 +283,6 @@ class _ConnectWearableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
