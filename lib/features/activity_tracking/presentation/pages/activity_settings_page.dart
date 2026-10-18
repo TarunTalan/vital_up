@@ -242,7 +242,7 @@ class ActivitySettingsPage extends StatelessWidget {
                             content: SingleChildScrollView(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
-                                children: ActivityType.values.map((type) {
+                                children: ActivityType.outdoor.map((type) {
                                   final isSel =
                                       prefs.defaultActivityType == type;
                                   return ListTile(

@@ -3,18 +3,27 @@ import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
-/// Horizontal row of activity-type filter chips plus a search box for
-/// filtering by tag/note text.
+/// Horizontal row of filter chips (All, Outdoor, Workouts, then one per
+/// recorded type) plus a search box for filtering by tag/note text.
 class ActivityHistoryFilterBar extends StatelessWidget {
+  final ActivityGroup? selectedGroup;
   final ActivityType? selectedType;
+
+  /// Types the user has sessions of; only these get a chip.
+  final List<ActivityType> types;
+  final ValueChanged<ActivityGroup?> onGroupSelected;
   final ValueChanged<ActivityType?> onTypeSelected;
   final ValueChanged<String> onSearchChanged;
 
   const ActivityHistoryFilterBar({
     super.key,
+    required this.selectedGroup,
     required this.selectedType,
+    required this.types,
+    required this.onGroupSelected,
     required this.onTypeSelected,
     required this.onSearchChanged,
   });
@@ -36,11 +45,19 @@ class ActivityHistoryFilterBar extends StatelessWidget {
             children: [
               _FilterChip(
                 label: 'All',
-                selected: selectedType == null,
-                onTap: () => onTypeSelected(null),
+                selected: selectedType == null && selectedGroup == null,
+                onTap: () => onGroupSelected(null),
               ),
               const SizedBox(width: AppDimens.space8),
-              for (final type in ActivityType.values) ...[
+              for (final group in ActivityGroup.values) ...[
+                _FilterChip(
+                  label: group.label,
+                  selected: selectedGroup == group,
+                  onTap: () => onGroupSelected(group),
+                ),
+                const SizedBox(width: AppDimens.space8),
+              ],
+              for (final type in types) ...[
                 _FilterChip(
                   label: type.label,
                   icon: activityTypeIcon(type),

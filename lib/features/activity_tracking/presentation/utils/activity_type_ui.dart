@@ -10,5 +10,12 @@ IconData activityTypeIcon(ActivityType type) {
     ActivityType.cycle => Icons.directions_bike_rounded,
     ActivityType.trekking => Icons.hiking_rounded,
     ActivityType.climbing => Icons.terrain_rounded,
+    ActivityType.strength => Icons.fitness_center_rounded,
+    ActivityType.yoga => Icons.self_improvement_rounded,
+    ActivityType.hiit => Icons.bolt_rounded,
+    ActivityType.swimming => Icons.pool_rounded,
+    ActivityType.dance => Icons.music_note_rounded,
+    ActivityType.sports => Icons.sports_tennis_rounded,
+    ActivityType.other => Icons.sports_gymnastics_rounded,
   };
 }

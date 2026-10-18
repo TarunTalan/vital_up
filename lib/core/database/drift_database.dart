@@ -26,6 +26,10 @@ class DriftActivitySessions extends Table {
   /// Uploaded to `activity_sessions` (SyncService). Reset on every save.
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
 
+  /// `WorkoutIntensity.name` for workouts without a route; null for GPS.
+  /// Declared last: upgrades add it after every older column.
+  TextColumn get intensity => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -49,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   /// Track points are always read by session (route, sync, cascade delete);
   /// without this every lookup scans every point ever recorded.
@@ -95,6 +99,12 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 6) {
             await customStatement(_trackPointIndex);
+          }
+          if (from < 7) {
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.intensity,
+            );
           }
         },
         beforeOpen: (details) async {

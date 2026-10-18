@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
+import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/widgets/tracker/quick_log_hub.dart';
@@ -115,6 +118,8 @@ class _DashboardPageState extends State<DashboardPage> {
       sl<WeeklySummaryService>().reportTimezone();
       push.requestPermissionAndRegister();
       sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
+      // Track downloads that finished while the app was closed.
+      sl<InAppAudioDownloader>().start();
     });
   }
 
@@ -141,7 +146,13 @@ class _DashboardPageState extends State<DashboardPage> {
   void _openPush(PushOpen open) {
     if (!mounted) return;
     final route = notificationRoute(open.type, open.route);
-    if (route != null) context.pushNamed(route);
+    if (route == null) return;
+    // The timer notification can be tapped with its screen already open.
+    if (route == LocalWorkoutTimerNotifier.route) {
+      openWorkoutTimer(context);
+    } else {
+      context.pushNamed(route);
+    }
   }
 
   @override

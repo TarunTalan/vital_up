@@ -13,7 +13,10 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
@@ -123,6 +126,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   StreamSubscription<Position>? _positionSubscription;
   late final AppLifecycleListener _lifecycleListener;
 
+  /// Pause / Resume tapped on the workout notification.
+  StreamSubscription<String>? _notificationButtons;
+
   /// Set once Start or Resume is tapped, so the map preview never
   /// subscribes while the workout's own GPS stream is starting.
   bool _workoutRequested = false;
@@ -144,10 +150,15 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
+    _notificationButtons = ForegroundServiceManager.buttonPresses.listen(
+      _onNotificationButton,
+    );
     // Settle an interrupted workout first: its resume needs the GPS stream
     // and the location prompt to itself.
     _checkInterruptedWorkout().whenComplete(() {
-      if (mounted) _startLocationUpdates();
+      if (!mounted) return;
+      _startLocationUpdates();
+      _openTimedWorkout();
     });
     // Checkpoint the workout whenever the app leaves the foreground — the
     // OS may kill a backgrounded app without further notice.
@@ -255,6 +266,33 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
+  /// Pause / Resume, from the controls or the workout notification.
+  void _pauseTracking() {
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingInProgress) return;
+    bloc.add(PauseTracking());
+    _pauseWorkoutAudio();
+  }
+
+  void _resumeTracking() {
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingPaused) return;
+    bloc.add(ResumeTracking());
+    if (_prefsNotifier.value.voiceCoachEnabled) {
+      _voiceCoach.announceResume();
+    }
+    _resumeWorkoutAudio();
+  }
+
+  void _onNotificationButton(String id) {
+    if (!mounted) return;
+    if (id == ForegroundServiceManager.pauseButton) {
+      _pauseTracking();
+    } else if (id == ForegroundServiceManager.resumeButton) {
+      _resumeTracking();
+    }
+  }
+
   void _stopWorkoutAudio() {
     final prefs = _prefsNotifier.value;
     if (prefs.preferredPlayerPackage == 'builtIn') {
@@ -333,6 +371,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _lifecycleListener.dispose();
     _positionSubscription?.cancel();
     _hrSubscription?.cancel();
+    _notificationButtons?.cancel();
     _hrManager.dispose();
     _voiceCoach.dispose();
     _unitNotifier.dispose();
@@ -409,6 +448,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       _voiceCoach.announceStart();
     }
     _playWorkoutAudio();
+  }
+
+  /// A workout without a route is still being timed (left or closed
+  /// mid-workout): show it instead of offering a new GPS one.
+  void _openTimedWorkout() {
+    if (sl<WorkoutTimerStore>().read() == null) return;
+    if (context.read<ActivityTrackingBloc>().state is! TrackingIdle) return;
+    openWorkoutTimer(context);
   }
 
   /// Offers to carry on a workout the app was closed in the middle of. One
@@ -1257,20 +1304,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                           _beginTracking();
                                         }
                                       },
-                                      onPause: () {
-                                        bloc.add(PauseTracking());
-                                        _pauseWorkoutAudio();
-                                      },
-                                      onResume: () {
-                                        bloc.add(ResumeTracking());
-
-                                        if (_prefsNotifier
-                                            .value
-                                            .voiceCoachEnabled) {
-                                          _voiceCoach.announceResume();
-                                        }
-                                        _resumeWorkoutAudio();
-                                      },
+                                      onPause: _pauseTracking,
+                                      onResume: _resumeTracking,
                                       onStop: () {
                                         final prefs = _prefsNotifier.value;
                                         String? tType;

@@ -14,6 +14,8 @@ import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_history_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
 import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
@@ -31,6 +33,7 @@ class AccountService {
   final SyncService _sync;
   final CacheStore _cache;
   final OnboardingDataStore? _onboarding;
+  final WorkoutTimerNotifier? _workoutTimer;
 
   AccountService(
     this._client,
@@ -42,6 +45,7 @@ class AccountService {
     this._sync,
     this._cache, [
     this._onboarding,
+    this._workoutTimer,
   ]);
 
   static const _deleteFailed = "Couldn't delete your account. Try again.";
@@ -114,6 +118,8 @@ class AccountService {
     // Points at a workout that was just wiped with the rest of Drift.
     await _step('workout in progress', () async {
       await _prefs.remove(WorkoutCheckpointStore.key);
+      await _prefs.remove(WorkoutTimerStore.key);
+      await _workoutTimer?.cancel();
     });
     // Vita chats, check-ins, scores and insights are keyed by user, but the
     // health details in them must not stay on a shared phone.

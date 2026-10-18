@@ -19,6 +19,7 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     required this.deleteActivitySession,
   }) : super(const ActivityHistoryLoading()) {
     on<LoadActivityHistory>(_onLoad);
+    on<FilterByActivityGroup>(_onFilterByActivityGroup);
     on<FilterByActivityType>(_onFilterByActivityType);
     on<SearchHistory>(_onSearch);
     on<UpdateSessionAnnotation>(_onUpdateAnnotation);
@@ -42,6 +43,21 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     }
   }
 
+  void _onFilterByActivityGroup(
+      FilterByActivityGroup event,
+      Emitter<ActivityHistoryState> emit,
+      ) {
+    final s = state;
+    if (s is! ActivityHistoryLoaded) return;
+
+    final updated = s.copyWith(
+      groupFilter: event.group,
+      clearGroupFilter: event.group == null,
+      clearActivityTypeFilter: true,
+    );
+    emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
+  }
+
   void _onFilterByActivityType(
       FilterByActivityType event,
       Emitter<ActivityHistoryState> emit,
@@ -52,6 +68,7 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     final updated = s.copyWith(
       activityTypeFilter: event.activityType,
       clearActivityTypeFilter: event.activityType == null,
+      clearGroupFilter: true,
     );
     emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
   }
@@ -68,8 +85,10 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     final query = s.searchQuery.trim().toLowerCase();
 
     return s.allEntries.where((entry) {
-      final matchesType = s.activityTypeFilter == null ||
-          entry.session.activityType == s.activityTypeFilter;
+      final type = entry.session.activityType;
+      final matchesType =
+          (s.activityTypeFilter == null || type == s.activityTypeFilter) &&
+          (s.groupFilter?.contains(type) ?? true);
 
       if (!matchesType) return false;
       if (query.isEmpty) return true;

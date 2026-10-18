@@ -152,7 +152,8 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
 
     final defaultActivityTypeName =
         prefs.getString('workout_default_activity_type') ?? ActivityType.walk.name;
-    final defaultActivityType = ActivityType.values.firstWhere(
+    // A GPS workout starts with this type, so only outdoor types count.
+    final defaultActivityType = ActivityType.outdoor.firstWhere(
       (e) => e.name == defaultActivityTypeName,
       orElse: () => ActivityType.walk,
     );

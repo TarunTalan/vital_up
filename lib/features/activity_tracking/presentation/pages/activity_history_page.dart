@@ -14,6 +14,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_filter_bar.dart';
@@ -43,7 +44,19 @@ class _ActivityHistoryView extends StatelessWidget {
     final colors = context.colors;
 
     return AppScaffold(
-      header: const AppPageHeader(title: 'Activity History'),
+      header: AppPageHeader(
+        title: 'Activity History',
+        action: AppHeaderAction(
+          icon: const Icon(Icons.add_rounded),
+          tooltip: 'Log a workout',
+          onTap: () async {
+            final saved = await showLogWorkoutSheet(context);
+            if (!saved || !context.mounted) return;
+            showSuccessSnackBar(context, 'Workout saved');
+            context.read<ActivityHistoryBloc>().add(LoadActivityHistory());
+          },
+        ),
+      ),
       scrollable: false,
       padBody: false,
       body: GestureDetector(
@@ -214,7 +227,12 @@ class _PinnedFilterBar extends StatelessWidget {
             bottom: AppDimens.space8,
           ),
           child: ActivityHistoryFilterBar(
+            selectedGroup: state.groupFilter,
             selectedType: state.activityTypeFilter,
+            types: state.recordedTypes,
+            onGroupSelected: (group) => context
+                .read<ActivityHistoryBloc>()
+                .add(FilterByActivityGroup(group)),
             onTypeSelected: (type) => context.read<ActivityHistoryBloc>().add(
               FilterByActivityType(type),
             ),

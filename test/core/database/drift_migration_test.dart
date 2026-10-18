@@ -98,6 +98,9 @@ List<String> _legacyDatabase(int version) {
     point(600, 12.972),
     point(0, 12.971),
     point(1200, 12.973),
+    if (version >= 6)
+      'CREATE INDEX IF NOT EXISTS idx_track_points_session '
+          'ON drift_track_points (session_id);',
     'PRAGMA user_version = $version;',
   ];
 }
@@ -155,7 +158,7 @@ void main() {
     await tmp.delete(recursive: true);
   });
 
-  for (var version = 1; version <= 5; version++) {
+  for (var version = 1; version <= 6; version++) {
     group('upgrade from v$version', () {
       late AppDatabase db;
 
@@ -193,6 +196,7 @@ void main() {
         expect(run.targetValue, version >= 3 ? 5000.0 : null);
         expect(run.targetAchieved, version >= 3 ? isTrue : isFalse);
         expect(run.synced, version >= 5 ? isTrue : isFalse);
+        expect(run.intensity, isNull);
 
         final walk = sessions.first;
         expect(walk.endTime, isNull);

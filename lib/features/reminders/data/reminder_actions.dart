@@ -11,6 +11,7 @@ import 'package:vital_up/core/database/collections/sleep_log_cache.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
 import 'package:vital_up/features/home_widget/data/widget_background.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
@@ -29,9 +30,20 @@ String? reminderUserId(NotificationResponse response) {
 }
 
 /// A notification action tapped while the app was closed: "+250 ml" on a
-/// water reminder, "Going to bed" / "I'm up" for sleep.
+/// water reminder, "Going to bed" / "I'm up" for sleep, Pause / Resume on
+/// the workout timer.
 @pragma('vm:entry-point')
 Future<void> reminderActionBackground(NotificationResponse response) async {
+  // Pause / Resume on the workout timer: not tied to a user.
+  final action = response.actionId;
+  if (LocalWorkoutTimerNotifier.handles(action)) {
+    try {
+      await handleWorkoutTimerAction(action!);
+    } catch (e) {
+      debugPrint('Workout timer action $action failed: $e');
+    }
+    return;
+  }
   // No signed-in user in the payload (signed out, old notification): do
   // nothing rather than log data for nobody.
   final userId = reminderUserId(response);

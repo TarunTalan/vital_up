@@ -29,6 +29,8 @@ const notificationLinkableRoutes = {
   'weight-trends',
   'weekly-summary',
   'challenges',
+  // Ongoing workout timer notification.
+  'workout-timer',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.

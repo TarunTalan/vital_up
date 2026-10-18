@@ -117,7 +117,13 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_ste
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/log_workout.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/start_tracking_session.dart';
@@ -489,7 +495,11 @@ Future<void> initDependencies() async {
       sharedPreferences: sl<SharedPreferences>(),
     ),
   );
-  sl.registerLazySingleton<MapTileRepository>(() => MapTileRepositoryImpl());
+  sl.registerLazySingleton<MapTileRepository>(
+    () => MapTileRepositoryImpl(
+      MapDownloadNotifier(sl<FlutterLocalNotificationsPlugin>()),
+    ),
+  );
 
   sl.registerLazySingleton<LocationTrackingRepository>(
     () => LocationTrackingRepositoryImpl(),
@@ -522,6 +532,19 @@ Future<void> initDependencies() async {
     () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
+    () => LogWorkout(
+      repository: sl<ActivityRepository>(),
+      weightKg: () async => (await sl<AuthRepository>().getCurrentUser())
+          .fold((_) => null, (user) => user?.weightKg),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => WorkoutTimerStore(sl<SharedPreferences>()),
+  );
+  sl.registerLazySingleton<WorkoutTimerNotifier>(
+    () => LocalWorkoutTimerNotifier(sl<FlutterLocalNotificationsPlugin>()),
+  );
+  sl.registerLazySingleton(
     () => GetLiveSessionStream(sl<LocationTrackingRepository>()),
   );
 
@@ -533,6 +556,14 @@ Future<void> initDependencies() async {
       stopAndSaveSession: sl<StopAndSaveSession>(),
       authRepository: sl<AuthRepository>(),
       checkpointStore: sl<WorkoutCheckpointStore>(),
+    ),
+  );
+  sl.registerFactoryParam<WorkoutTimerCubit, ActivityType, void>(
+    (type, _) => WorkoutTimerCubit(
+      store: sl<WorkoutTimerStore>(),
+      logWorkout: sl<LogWorkout>(),
+      notifier: sl<WorkoutTimerNotifier>(),
+      type: type,
     ),
   );
   sl.registerFactory(
@@ -704,6 +735,15 @@ Future<void> initDependencies() async {
       sl<SharedPreferences>(),
       (response) async {
         // Notification actions tapped while the app is open.
+        final action = response.actionId;
+        if (LocalWorkoutTimerNotifier.handles(action)) {
+          await handleWorkoutTimerAction(
+            action!,
+            prefs: sl<SharedPreferences>(),
+            plugin: sl<FlutterLocalNotificationsPlugin>(),
+          );
+          return;
+        }
         final userId = reminderUserId(response);
         if (userId == null) return;
         switch (response.actionId) {
@@ -824,6 +864,7 @@ Future<void> initDependencies() async {
       sl<SyncService>(),
       sl<CacheStore>(),
       sl<OnboardingDataStore>(),
+      sl<WorkoutTimerNotifier>(),
     ),
   );
 

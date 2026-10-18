@@ -1,4 +1,5 @@
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/workout_intensity.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 
 class ActivitySession {
@@ -23,6 +24,14 @@ class ActivitySession {
   /// Whether the target was achieved during this session.
   final bool targetAchieved;
 
+  /// How hard a workout without a route was; null for GPS sessions.
+  final WorkoutIntensity? intensity;
+
+  /// Whether distance and pace mean anything: GPS activities, and workouts
+  /// that came with a distance (a watch's swim).
+  bool get hasDistance =>
+      activityType.isGpsBased || totalDistanceMeters > 0;
+
   const ActivitySession({
     required this.id,
     required this.activityType,
@@ -38,5 +47,6 @@ class ActivitySession {
     this.targetType,
     this.targetValue,
     this.targetAchieved = false,
+    this.intensity,
   });
 }

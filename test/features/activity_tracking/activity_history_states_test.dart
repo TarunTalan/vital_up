@@ -13,6 +13,7 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity
 import 'package:vital_up/features/activity_tracking/domain/usecases/save_session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_history_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 
 import '../../helpers/pump_app.dart';
 
@@ -45,14 +46,19 @@ class _FakeRepo implements ActivityHistoryRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-ActivitySession _session(String id, ActivityType type, int daysAgo) {
+ActivitySession _session(
+  String id,
+  ActivityType type,
+  int daysAgo, {
+  double meters = 21097.5,
+}) {
   final start = DateTime.now().subtract(Duration(days: daysAgo, hours: 1));
   return ActivitySession(
     id: id,
     activityType: type,
     startTime: start,
     endTime: start.add(const Duration(hours: 2, minutes: 14)),
-    totalDistanceMeters: 21097.5,
+    totalDistanceMeters: meters,
     totalDurationSeconds: 8040,
     avgPaceSecondsPerKm: 381,
     calories: 1480,
@@ -134,6 +140,45 @@ void main() {
     await tester.enterText(find.byType(TextField), 'zzz');
     await settle(tester);
     expect(find.text('No activities match'), findsOneWidget);
+  });
+
+  testWidgets('Outdoor and Workouts split GPS sessions from gym ones', (
+    tester,
+  ) async {
+    repo.results.add(
+      () async => [
+        ..._sessions,
+        _session('g', ActivityType.strength, 1, meters: 0),
+      ],
+    );
+    await pumpPage(tester, const ActivityHistoryPage());
+    await settle(tester);
+
+    final cards = find.byType(ActivityHistoryCard);
+    Finder card(String label) =>
+        find.descendant(of: cards, matching: find.text(label));
+
+    expect(cards, findsNWidgets(4));
+    expect(card('Strength'), findsOneWidget);
+
+    await tester.tap(find.text('Workouts'));
+    await settle(tester);
+    expect(cards, findsOneWidget);
+    expect(card('Strength'), findsOneWidget);
+    // No distance on a gym session.
+    expect(
+      find.descendant(of: cards, matching: find.textContaining(' km')),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('Outdoor'));
+    await settle(tester);
+    expect(cards, findsNWidgets(3));
+    expect(card('Strength'), findsNothing);
+
+    await tester.tap(find.text('All'));
+    await settle(tester);
+    expect(cards, findsNWidgets(4));
   });
 
   testWidgets('fits a small phone at the largest text size', (tester) async {

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -196,10 +199,12 @@ class MoreActivitiesButton extends StatelessWidget {
 
   void _showOptions(BuildContext context) {
     final colors = context.colors;
+    // The dialog's own context is gone once it pops.
+    final outer = context;
     showSmoothDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('More Activities'),
+        title: const Text('More activities'),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppDimens.space8,
           vertical: AppDimens.space16,
@@ -208,7 +213,7 @@ class MoreActivitiesButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final type in ActivityType.values)
+              for (final type in ActivityType.outdoor)
                 ListTile(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppDimens.radiusSm),
@@ -226,6 +231,54 @@ class MoreActivitiesButton extends StatelessWidget {
                     onSelected(type);
                   },
                 ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimens.space16,
+                  AppDimens.space16,
+                  AppDimens.space16,
+                  AppDimens.space4,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AppCaption('Workouts, no GPS'),
+                ),
+              ),
+              for (final type in ActivityType.workouts)
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                  ),
+                  leading: Icon(
+                    activityTypeIcon(type),
+                    color: colors.onSurface,
+                  ),
+                  title: Text(type.label),
+                  trailing: Icon(
+                    Icons.timer_outlined,
+                    color: context.vColors.grayText,
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    outer.pushNamed('workout-timer', extra: type);
+                  },
+                ),
+              ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+                ),
+                leading: Icon(
+                  Icons.edit_calendar_rounded,
+                  color: colors.onSurface,
+                ),
+                title: const Text('Log a past workout'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  final saved = await showLogWorkoutSheet(outer);
+                  if (saved && outer.mounted) {
+                    showSuccessSnackBar(outer, 'Workout saved');
+                  }
+                },
+              ),
             ],
           ),
         ),

@@ -112,11 +112,12 @@ class ActivityHistoryCard extends StatelessWidget {
                     spacing: AppDimens.space12,
                     runSpacing: AppDimens.space4,
                     children: [
-                      _MiniStat(
-                        icon: Icons.straighten_rounded,
-                        value:
-                            '${formatDistanceKm(session.totalDistanceMeters)} km',
-                      ),
+                      if (session.hasDistance)
+                        _MiniStat(
+                          icon: Icons.straighten_rounded,
+                          value:
+                              '${formatDistanceKm(session.totalDistanceMeters)} km',
+                        ),
                       _MiniStat(
                         icon: Icons.access_time_rounded,
                         value: formatDuration(
@@ -127,6 +128,11 @@ class ActivityHistoryCard extends StatelessWidget {
                         icon: Icons.local_fire_department_rounded,
                         value: '${session.calories} cal',
                       ),
+                      if (session.intensity case final intensity?)
+                        _MiniStat(
+                          icon: Icons.speed_rounded,
+                          value: intensity.label,
+                        ),
                     ],
                   ),
                   if ((tag != null && tag.isNotEmpty) || hasTarget) ...[

@@ -104,41 +104,54 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             padding: AppDimens.cardPaddingCompact,
             child: Column(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _DetailStat(
-                      label: 'Distance',
-                      value:
-                          '${formatDistanceKm(session.totalDistanceMeters)} km',
-                    ),
-                    _DetailStat(
-                      label: 'Duration',
-                      value: formatDuration(
-                        Duration(seconds: session.totalDurationSeconds),
+                if (session.hasDistance) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _DetailStat(
+                        label: 'Distance',
+                        value:
+                            '${formatDistanceKm(session.totalDistanceMeters)} km',
                       ),
-                    ),
-                    _DetailStat(
-                      label: 'Pace',
-                      value: '${formatPace(session.avgPaceSecondsPerKm)} /km',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppDimens.space12),
+                      _DetailStat(
+                        label: 'Duration',
+                        value: formatDuration(
+                          Duration(seconds: session.totalDurationSeconds),
+                        ),
+                      ),
+                      _DetailStat(
+                        label: 'Pace',
+                        value: '${formatPace(session.avgPaceSecondsPerKm)} /km',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.space12),
+                ],
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (!session.hasDistance)
+                      _DetailStat(
+                        label: 'Duration',
+                        value: formatDuration(
+                          Duration(seconds: session.totalDurationSeconds),
+                        ),
+                      ),
                     _DetailStat(
                       label: 'Calories',
                       value: '${session.calories} cal',
                     ),
-                    _DetailStat(
-                      label: 'Steps',
-                      value: session.stepCountReliable
-                          ? '${session.steps}'
-                          : '${session.steps}*',
-                    ),
-                    const Expanded(child: SizedBox()),
+                    if (session.hasDistance || session.steps > 0)
+                      _DetailStat(
+                        label: 'Steps',
+                        value: session.stepCountReliable
+                            ? '${session.steps}'
+                            : '${session.steps}*',
+                      ),
+                    if (session.intensity case final intensity?)
+                      _DetailStat(label: 'Intensity', value: intensity.label),
+                    if (session.hasDistance)
+                      const Expanded(child: SizedBox()),
                   ],
                 ),
               ],

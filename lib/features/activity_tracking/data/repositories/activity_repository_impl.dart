@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/workout_intensity.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
@@ -30,6 +31,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetType: Value(session.targetType),
       targetValue: Value(session.targetValue),
       targetAchieved: Value(session.targetAchieved),
+      intensity: Value(session.intensity?.name),
     );
 
     final dbPoints = session.points
@@ -119,10 +121,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
 
     return ActivitySession(
       id: s.id,
-      activityType: ActivityType.values.firstWhere(
-        (e) => e.name == s.activityType,
-        orElse: () => ActivityType.walk,
-      ),
+      activityType: ActivityType.fromName(s.activityType),
       startTime: s.startTime,
       endTime: s.endTime,
       totalDistanceMeters: s.totalDistanceMeters,
@@ -135,6 +134,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetType: s.targetType,
       targetValue: s.targetValue,
       targetAchieved: s.targetAchieved ?? false,
+      intensity: WorkoutIntensity.fromName(s.intensity),
     );
   }
 }
