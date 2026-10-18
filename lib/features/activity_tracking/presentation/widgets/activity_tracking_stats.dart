@@ -115,8 +115,9 @@ class TopStats extends StatelessWidget {
       child: AppCard(
         margin: context.pagePadding,
         padding: AppDimens.cardPaddingCompact,
+        // 90% opaque over a live map: a blur here was invisible but
+        // re-rendered the map behind it every frame.
         tint: v.surfaceElevated!.withValues(alpha: 0.9),
-        blur: true,
         shadow: AppShadows.elevated,
         child: Column(
           mainAxisSize: MainAxisSize.min,

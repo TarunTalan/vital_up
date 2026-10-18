@@ -54,7 +54,7 @@ class _FakeActivityRepo implements ActivityRepository {
   @override
   Future<List<ActivitySession>> getSessions({
     DateTime? since,
-    bool withRoutes = true,
+    bool withRoutes = false,
   }) async => saved;
   @override
   Future<ActivitySession?> getSessionById(String id) async => null;

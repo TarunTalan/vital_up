@@ -64,11 +64,13 @@ class ActivityRepositoryImpl implements ActivityRepository {
   @override
   Future<List<ActivitySession>> getSessions({
     DateTime? since,
-    bool withRoutes = true,
+    bool withRoutes = false,
   }) async {
     final dbSessions = await database.getAllSessions(since: since);
     final pointsBySession = withRoutes
-        ? await database.getAllTrackPointsBySession()
+        ? await database.getTrackPointsBySession([
+            for (final s in dbSessions) s.id,
+          ])
         : const <String, List<DriftTrackPoint>>{};
 
     return dbSessions

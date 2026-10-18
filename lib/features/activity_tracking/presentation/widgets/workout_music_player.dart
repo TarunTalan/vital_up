@@ -138,6 +138,7 @@ class WorkoutMusicPlayer extends StatelessWidget {
           tooltip: 'Minimize Player',
         );
 
+        // Nearly opaque over the live map, so no blur (it cost every frame).
         final cardTint = v.surfaceElevated!.withValues(alpha: 0.9);
 
         if (isMinimized) {
@@ -149,7 +150,6 @@ class WorkoutMusicPlayer extends StatelessWidget {
               vertical: AppDimens.space8,
             ),
             tint: cardTint,
-            blur: true,
             shadow: AppShadows.soft,
             child: Row(
               children: [
@@ -189,7 +189,6 @@ class WorkoutMusicPlayer extends StatelessWidget {
             vertical: AppDimens.space12,
           ),
           tint: cardTint,
-          blur: true,
           shadow: AppShadows.soft,
           child: Column(
             mainAxisSize: MainAxisSize.min,

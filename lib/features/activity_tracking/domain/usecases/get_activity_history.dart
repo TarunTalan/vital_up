@@ -18,7 +18,7 @@ class GetActivityHistory {
 
   Future<List<HistoryEntry>> call({
     DateTime? since,
-    bool withRoutes = true,
+    bool withRoutes = false,
   }) async {
     final sessions = await repository.getSessions(
       since: since,

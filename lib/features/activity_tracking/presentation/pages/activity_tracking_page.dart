@@ -89,6 +89,34 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   TrackPoint? _currentPosition;
   TrackPoint? _startPoint;
 
+  /// The drawn route and puck, updated in place: re-creating them sent the
+  /// whole route over the platform channel on every tick.
+  mbx.PolylineAnnotation? _routeLine;
+  Future<void>? _routeCreating;
+  int _drawnRouteLength = 0;
+  mbx.CircleAnnotation? _puck;
+  Future<void>? _puckCreating;
+
+  /// No map calls while the app is hidden; [_onShown] redraws once.
+  bool _appHidden = false;
+  List<TrackPoint>? _hiddenRoute;
+  TrackPoint? _hiddenPuck;
+
+  /// Built once: the map must not be rebuilt by the per-second ticks.
+  late final Widget _mapLayer = Positioned.fill(
+    child: mbx.MapWidget(
+      key: const ValueKey("mapWidget"),
+      onMapCreated: _onMapCreated,
+      onTapListener: (context) {
+        if (mounted) {
+          setState(() {
+            _isUiVisible = !_isUiVisible;
+          });
+        }
+      },
+    ),
+  );
+
   /// Map-preview position feed while no workout is running. It must be
   /// cancelled before a workout starts: geolocator shares one native stream
   /// and would hand the workout this low-precision, foreground-only feed.
@@ -125,8 +153,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     // OS may kill a backgrounded app without further notice.
     _lifecycleListener = AppLifecycleListener(
       onHide: () {
+        _appHidden = true;
         if (mounted) context.read<ActivityTrackingBloc>().add(PersistProgress());
       },
+      onShow: _onShown,
     );
   }
 
@@ -608,26 +638,54 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     } catch (_) {}
   }
 
+  void _onShown() {
+    _appHidden = false;
+    final route = _hiddenRoute;
+    final puck = _hiddenPuck;
+    _hiddenRoute = null;
+    _hiddenPuck = null;
+    if (route != null) _updateRoute(route);
+    if (puck != null) _updatePuck(puck);
+  }
+
   void _updateRoute(List<TrackPoint> points) {
-    if (_polylineAnnotationManager == null || points.length < 2 || !mounted)
+    final manager = _polylineAnnotationManager;
+    if (manager == null || points.length < 2 || !mounted) return;
+    if (_appHidden) {
+      _hiddenRoute = points;
       return;
+    }
+    // Ticks and step updates re-emit the same route.
+    if (points.length == _drawnRouteLength) return;
+    // A create still in flight: the next new point draws the latest route.
+    if (_routeCreating != null) return;
+    _drawnRouteLength = points.length;
 
-    _polylineAnnotationManager!.deleteAll();
-
-    final coordinates = points.map((p) => [p.longitude, p.latitude]).toList();
-    final primaryColor = context.colors.primary;
-
-    _polylineAnnotationManager!.create(
-      mbx.PolylineAnnotationOptions(
-        geometry: mbx.LineString(
-          coordinates: coordinates
-              .map((c) => mbx.Position(c[0], c[1]))
-              .toList(),
-        ),
-        lineColor: primaryColor.toARGB32(),
-        lineWidth: ActivityMapDimens.routeWidth,
-      ),
+    final geometry = mbx.LineString(
+      coordinates: [for (final p in points) mbx.Position(p.longitude, p.latitude)],
     );
+    final line = _routeLine;
+    if (line != null) {
+      line.geometry = geometry;
+      manager.update(line).ignore();
+      return;
+    }
+    _routeCreating = manager
+        .create(
+          mbx.PolylineAnnotationOptions(
+            geometry: geometry,
+            lineColor: context.colors.primary.toARGB32(),
+            lineWidth: ActivityMapDimens.routeWidth,
+          ),
+        )
+        .then<void>((created) {
+          _routeLine = created;
+        })
+        .catchError((Object e) {
+          _drawnRouteLength = 0;
+          debugPrint('Drawing the route failed: $e');
+        })
+        .whenComplete(() => _routeCreating = null);
   }
 
   void _updateStartPoint(TrackPoint? point) {
@@ -650,22 +708,42 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   void _updatePuck(TrackPoint? point) {
-    if (_circleAnnotationManager == null || point == null || !mounted) return;
-
-    _circleAnnotationManager!.deleteAll();
-    final primaryColor = context.colors.primary;
-
-    _circleAnnotationManager!.create(
-      mbx.CircleAnnotationOptions(
-        geometry: mbx.Point(
-          coordinates: mbx.Position(point.longitude, point.latitude),
-        ),
-        circleRadius: ActivityMapDimens.puckRadius,
-        circleColor: primaryColor.toARGB32(),
-        circleStrokeWidth: ActivityMapDimens.puckStroke,
-        circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
-      ),
+    final manager = _circleAnnotationManager;
+    if (manager == null || point == null || !mounted) return;
+    if (_appHidden) {
+      _hiddenPuck = point;
+      return;
+    }
+    final geometry = mbx.Point(
+      coordinates: mbx.Position(point.longitude, point.latitude),
     );
+    final puck = _puck;
+    if (puck != null) {
+      puck.geometry = geometry;
+      manager.update(puck).ignore();
+      return;
+    }
+    if (_puckCreating != null) return;
+    _puckCreating = manager
+        .create(
+          mbx.CircleAnnotationOptions(
+            geometry: geometry,
+            circleRadius: ActivityMapDimens.puckRadius,
+            circleColor: context.colors.primary.toARGB32(),
+            circleStrokeWidth: ActivityMapDimens.puckStroke,
+            circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
+          ),
+        )
+        .then<void>((created) {
+          _puck = created;
+          // A newer fix may have arrived while it was being created.
+          final latest = _currentPosition;
+          if (latest != null && !identical(latest, point)) {
+            _updatePuck(latest);
+          }
+        })
+        .catchError((Object e) => debugPrint('Drawing the position failed: $e'))
+        .whenComplete(() => _puckCreating = null);
   }
 
   void _centerCamera(double lat, double lng, {double? zoom}) {
@@ -681,6 +759,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _polylineAnnotationManager?.deleteAll();
     _circleAnnotationManager?.deleteAll();
     _startPointAnnotationManager?.deleteAll();
+    _routeLine = null;
+    _drawnRouteLength = 0;
+    _puck = null;
+    _hiddenRoute = null;
     setState(() {
       _startPoint = null;
     });
@@ -842,19 +924,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             body: Stack(
               children: [
                 // Map fills the background
-                Positioned.fill(
-                  child: mbx.MapWidget(
-                    key: const ValueKey("mapWidget"),
-                    onMapCreated: _onMapCreated,
-                    onTapListener: (context) {
-                      if (mounted) {
-                        setState(() {
-                          _isUiVisible = !_isUiVisible;
-                        });
-                      }
-                    },
-                  ),
-                ),
+                _mapLayer,
 
                 // Back Button (only in Idle)
                 if (state is TrackingIdle)

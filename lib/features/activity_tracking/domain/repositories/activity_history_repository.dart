@@ -13,7 +13,7 @@ abstract class ActivityHistoryRepository {
   /// without [withRoutes] the GPS points are skipped).
   Future<List<ActivitySession>> getSessions({
     DateTime? since,
-    bool withRoutes = true,
+    bool withRoutes = false,
   });
 
   /// Returns the annotation (tag/note) for a session, if one was set.

@@ -18,7 +18,7 @@ class _FakeHistory implements ActivityHistoryRepository {
   @override
   Future<List<ActivitySession>> getSessions({
     DateTime? since,
-    bool withRoutes = true,
+    bool withRoutes = false,
   }) async => [
     for (final s in sessions)
       if (since == null || !s.startTime.isBefore(since)) s,

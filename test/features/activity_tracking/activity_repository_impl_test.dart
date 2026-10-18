@@ -8,11 +8,16 @@ import 'package:vital_up/features/activity_tracking/domain/entities/track_point.
 
 final _start = DateTime(2026, 10, 1, 7);
 
-ActivitySession _session(String id, {DateTime? endTime, int seconds = 600}) =>
+ActivitySession _session(
+  String id, {
+  DateTime? endTime,
+  int seconds = 600,
+  DateTime? start,
+}) =>
     ActivitySession(
       id: id,
       activityType: ActivityType.walk,
-      startTime: _start,
+      startTime: start ?? _start,
       endTime: endTime,
       totalDistanceMeters: 840,
       totalDurationSeconds: seconds,
@@ -46,7 +51,7 @@ void main() {
 
   test('round-trips a session with its route, including altitude', () async {
     await repo.saveSession(_session('a', endTime: _start.add(const Duration(minutes: 10))));
-    final loaded = (await repo.getSessions()).single;
+    final loaded = (await repo.getSessions(withRoutes: true)).single;
     expect(loaded.points, hasLength(3));
     expect(loaded.points.map((p) => p.altitude), [900, 901, 902]);
   });
@@ -54,9 +59,30 @@ void main() {
   test('re-saving a checkpoint replaces the route instead of duplicating it', () async {
     await repo.saveSession(_session('a'));
     await repo.saveSession(_session('a', endTime: _start.add(const Duration(minutes: 10))));
-    final loaded = (await repo.getSessions()).single;
+    final loaded = (await repo.getSessions(withRoutes: true)).single;
     expect(loaded.points, hasLength(3));
     expect(loaded.endTime, isNotNull);
+  });
+
+  test('routes are only loaded when asked for', () async {
+    await repo.saveSession(_session('a', endTime: _start.add(const Duration(minutes: 10))));
+    expect((await repo.getSessions()).single.points, isEmpty);
+  });
+
+  test('routes are loaded only for the sessions returned', () async {
+    await repo.saveSession(_session('old', endTime: _start.add(const Duration(minutes: 10))));
+    final later = _start.add(const Duration(days: 2));
+    await repo.saveSession(
+      _session(
+        'new',
+        start: later,
+        endTime: later.add(const Duration(minutes: 10)),
+      ),
+    );
+    final loaded = await repo.getSessions(since: later, withRoutes: true);
+    expect(loaded.map((s) => s.id), ['new']);
+    expect(await db.getTrackPointsBySession(['old', 'new']), hasLength(2));
+    expect((await db.getTrackPointsBySession(['new'])).keys, ['new']);
   });
 
   test('deleting a session also deletes its track points', () async {
