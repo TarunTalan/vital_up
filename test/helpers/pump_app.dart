@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -62,6 +63,41 @@ Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 5; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
+}
+
+/// Texts on screen that don't show whole: cut by an ellipsis or a lost
+/// line, or clipped by a box shorter than the text. Empty when every text
+/// is complete. Text inside scroll views that sit off screen counts too.
+/// [previews] are free texts (names, messages) meant to be cut short.
+List<String> truncatedTexts(
+  WidgetTester tester, {
+  Set<String> previews = const {},
+}) {
+  final cut = <String>[];
+  void visit(RenderObject node) {
+    if (node is RenderParagraph && node.hasSize) {
+      final plain = node.text.toPlainText();
+      final text = plain.replaceAll('\n', ' / ');
+      final width = node.size.width;
+      final fullHeight = node.getMinIntrinsicHeight(width);
+      if (previews.contains(plain)) {
+        // Free text shown as a preview (full text a tap away).
+      } else if (node.didExceedMaxLines) {
+        cut.add('"$text" (cut off)');
+      } else if (fullHeight > node.size.height + 0.5) {
+        cut.add('"$text" (clipped height)');
+      } else if (node.maxLines == 1 &&
+          node.getMaxIntrinsicWidth(double.infinity) > width + 0.5) {
+        cut.add('"$text" (too wide)');
+      }
+    }
+    node.visitChildren(visit);
+  }
+
+  for (final view in tester.binding.renderViews) {
+    visit(view);
+  }
+  return cut;
 }
 
 /// Every exception thrown while laying out the page, e.g. a RenderFlex

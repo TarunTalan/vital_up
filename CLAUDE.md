@@ -50,6 +50,8 @@ supabase functions deploy <name>
   `close_sinks` (`unawaited_futures` was tried: too noisy for intentional
   fire-and-forget calls). `test/code_rules_test.dart` fails on
   `setState(() => _future = ...)` (returns a Future, throws at runtime).
+  It also fails on a `FittedBox` around `Text` and literal font sizes
+  below 12 (use `FitText` and `AppTextStyles`).
 
 ## Stack and architecture
 
@@ -205,6 +207,31 @@ make one back press skip two tabs).
 - Contrast: never use `colors.primary`, `rankGold` or `streak` as text
   (about 2:1 on light); use `vColors.accentText` / `onSurface` and keep
   brand colours for fills, rings and icons. Dark `grayText` is #A3A3A3.
+- Text size: honour the system setting, capped at 0.85-1.5 (`ResponsiveTextScale`) through `AppTextScaler`
+  (`core/utils/responsive.dart`): body text gets the full factor, larger
+  styles less (Android 14 curve, every platform). Size boxes with
+  `context.textScaled(x)` (body rate, never below `x`), never
+  `textScaler.scale(height)`. From 1.2 (`context.isLargeText`) dense rows
+  reflow: `TrackerTilePair` stacks, the Today card is 2 x 2,
+  `TrackerFigureRow` has two a row; bottom nav labels stop growing at 1.2.
+  Card figures use `AppTextStyles.metric` at one size everywhere:
+  `TrackerProgress` moves the goal to its own line ("of 8h 0m") rather
+  than shrinking the figure; the mood label wraps to two lines.
+  Rows of 3+ stats use `AdaptiveRow` (`core/widgets/adaptive_row.dart`:
+  two a row at large text or under 72dp a column); Home tile pairs are
+  `TrackerTilePair`; tile headers move the status chip under the title
+  when both don't fit; buttons grow with text; `TrendBarChart` sizes its
+  label rows from the line height and picks one date form that fits every
+  bar ("Mon 12 Oct" > "Mon 12" > "M 12"). One bar is selected (today by
+  default): coloured, its value in the row above all bars; the rest grey.
+  A tap selects a bar, a second tap goes back to today; bars use the full
+  width and the goal line is named in a legend under the dates ("Goal 10K",
+  "Limit 2h"). Detail pages use
+  `TrendChartCard` (caption + compact `TrendRangeToggle`, chart, divider,
+  `TrendStatsRow`) for the same spacing everywhere. Tests: `truncatedTexts(tester, previews:)` in
+  `test/helpers/pump_app.dart` lists cut, clipped or too-wide text; every
+  largest-text page test and `test/core/widgets/text_fit_test.dart` expect
+  it empty (only free-text previews allowed).
 - Rules: no hardcoded colours/sizes, 16dp gutter, no emojis (Material/SVG
   icons; icon assets are supplied by the user, never created; `GameIcon`
   falls back to a Material icon when an SVG is missing), Home is health-first
@@ -216,7 +243,16 @@ make one back press skip two tabs).
   `AppListGroup` + `AppListTile`, `AppSegmentedControl`,
   `AppPrimaryButton`/`AppSecondaryButton`, `AppTextField` (+ `.integer`,
   `.decimal`, `AppDropdownField`), `UserAvatar`, `LoadErrorView`,
-  `VitalUpLoader`, `AppScoreRing`. Tracker kit in `core/widgets/tracker/`:
+  `VitalUpLoader`, `AppScoreRing`, `FitText` (text that shrinks to fit
+  down to `AppTextStyles.minFontSize` 12 or 75% of a larger style, then
+  ellipsis; use it instead of `FittedBox` around text). It is built on
+  `MeasuredLayoutBuilder` (`core/widgets/measured_layout_builder.dart`), a
+  LayoutBuilder that reports intrinsic sizes, so it works inside
+  `IntrinsicWidth`/`IntrinsicHeight` (a plain LayoutBuilder throws there).
+  `AppSegmentedControl` sizes segments by label (plus a shared base) and
+  keeps labels on one line. Numbers in tight
+  spots use `formatCompactCount` (`core/utils/number_formats.dart`:
+  exact below 10,000, then "12.5K"). Tracker kit in `core/widgets/tracker/`:
   `TrackerMetric` enum (label, icon, colour, route per metric), `TrackerCard`,
   `TrackerFigureRow`, `TrackerStatusChip`, `TrackerQuickAction`,
   `TrackerRing`, `TrackerPrompt`, quick-log hub. Sheets/dialogs/snackbars:
@@ -302,6 +338,12 @@ Route names are GoRouter `name`s.
   (`reminder_actions.dart` handles both with the app closed).
   `SleepService.changes` reloads `SleepCubit`; saving last night emits
   `Habit.sleep` to quiet morning sleep reminders.
+  Home card states: estimate (figure + "Estimate" chip, Review = Looks
+  right / Adjust; left unreviewed it's saved automatically by
+  `saveUnreviewedEstimates` on the next load: yesterday's, and today's
+  after 2 pm when it can't change), in bed, prompt, and a
+  saved night (done status: "Goal met" or "Logged"; Edit, or Details for
+  Health Connect nights).
 - **weight:** `WeightService`, Isar `WeightLogCache` (always kg), mirrored to
   `user_health_data`; goal weight in CacheStore (legacy pref
   `weight_target_kg` fallback).
@@ -414,8 +456,12 @@ Route names are GoRouter `name`s.
   - **Badge Widgets:** `lib/features/gamification/presentation/widgets/badge_widgets.dart`
     provides `BadgeEmblem` (greyscale + reduced opacity when locked), `BadgeTile`,
     `showBadgeDetailSheet`, and responsive `_BadgeGrid`.
-  - **Activity Calendar:** `activity_calendar_page.dart` uses `_CalendarDay` with
-    proportional multi-tier status bars and monthly navigation.
+  - **Activity Calendar:** `activity_calendar_page.dart` (monthly navigation,
+    Move/Rest/Fuel/Vitals sections) shows the month with `MonthCalendarGrid`
+    (`gamification/presentation/widgets/month_calendar_grid.dart`, Figma
+    track/calender 1297:18016): Sun-first weekdays (single letters when the
+    names don't fit), square glass cells sized from the width (44dp on 412),
+    taller with large text, `CalendarDayGrade` bar, selected day filled.
   - **Levels:** 20 levels by lifetime points (`levels` table); titles mirrored
     in `levelTitles` (`player_stats.dart`, test checks the seed). No tiers.
   - **Community awards:** top 3 of every community win weekly medals
@@ -582,12 +628,12 @@ Route names are GoRouter `name`s.
   not yet redeployed).
 - Partial: 3 lifecycle/process death (code fixes; device tests pending).
 - Done (Oct 18): 9 tests: Drift v1-v5 -> v6 migration test, page state
-  tests (loading/error/empty/loaded + 2.0 text on 360 dp), in-process flow
+  tests (loading/error/empty/loaded + max text (1.5) on 360 dp), in-process flow
   tests (`test/flows/`: offline -> online, two devices, sign-out, startup
   routing, midnight). No on-device `integration_test/` yet.
 - Done in code (Oct 18, device checks pending; `20261024` not deployed):
   5 input & display (system text size honoured up to 2.0 in
-  `ResponsiveTextScale`, scrolling sheets/dialogs, no ellipsis on names or
+  `ResponsiveTextScale`, scrolling sheets/dialogs, text shrinks to a readable floor then ellipsis (`FitText`), names or
   stats, `NameWithYouTag`, meal macros summed, two-device merges in
   `PrefsBackupSource`, profile saves send changed columns only, session
   errors queued, timeouts on server writes) and 7 performance (startup
@@ -646,7 +692,7 @@ scans `lib` for patterns the analyzer misses.
   drift_schemas/`.
 - `test/helpers/pump_app.dart` (`pumpPage`, `kSmallPhone`,
   `kMaxTextScale`): page state tests (`*_states_test.dart`) check each
-  state and no overflow at 2.0 text. `testWidgets` takes only `skip: true`.
+  state and no overflow at max text (`kMaxTextScale` = 1.5). `testWidgets` takes only `skip: true`.
 - `test/flows/` run real services, Isar, Drift and the Supabase client
   against `support/fake_backend.dart` (HTTP fake with RLS-like rules);
   `support/test_device.dart` is one simulated phone. Isar loads the
