@@ -134,9 +134,7 @@ class SleepCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TrackerPrompt(title: title, color: _metric.color),
-          ],
+          children: [TrackerPrompt(title: title, color: _metric.color)],
         ),
       ),
     );
@@ -294,9 +292,13 @@ class SleepCard extends StatelessWidget {
   ) {
     final time = DateFormat.jm();
     final duration = formatDashboardDuration(estimate.duration);
-    return _prompt(
+    // Shown like a logged night (same figure as every card), marked as an
+    // estimate until the user reviews it.
+    return _night(
       context,
-      title: 'Slept $duration?',
+      estimate,
+      status: TrackerStatus.notLogged,
+      statusLabel: 'Estimate',
       action: TrackerQuickAction(
         label: 'Review',
         icon: Icons.checklist_rounded,
@@ -344,16 +346,48 @@ class SleepCard extends StatelessWidget {
     SleepSessionInfo session,
   ) {
     final goalMinutes = sl<SleepService>().getGoalMinutes();
+    final goalMet = session.duration.inMinutes >= goalMinutes;
+    // A saved night is finished, not "on track": logged like weight and
+    // mood, with "Goal met" when it reached the goal.
+    return _night(
+      context,
+      session,
+      status: TrackerStatus.done,
+      statusLabel: goalMet ? null : 'Logged',
+      action: session.source == SleepDataSource.healthStore
+          // Health Connect nights come from the watch; they open the
+          // details instead of an edit that wouldn't stick.
+          ? TrackerQuickAction(
+              label: 'Details',
+              icon: Icons.bar_chart_rounded,
+              color: _metric.color,
+              onTap: () => _open(context),
+            )
+          : TrackerQuickAction(
+              label: 'Edit',
+              icon: Icons.edit_rounded,
+              color: _metric.color,
+              onTap: () => _log(context, initial: session),
+            ),
+    );
+  }
+
+  /// A night against the sleep goal: the figure, goal and progress bar.
+  Widget _night(
+    BuildContext context,
+    SleepSessionInfo session, {
+    required TrackerStatus status,
+    String? statusLabel,
+    required Widget action,
+  }) {
+    final goalMinutes = sl<SleepService>().getGoalMinutes();
     final minutes = session.duration.inMinutes;
     return TrackerCard(
       metric: _metric,
-      status: TrackerStatus.of(
-        value: minutes.toDouble(),
-        goal: goalMinutes.toDouble(),
-        paceFraction: 1,
-      ),
+      status: status,
+      statusLabel: statusLabel,
       onOpen: () => _open(context),
-      actions: [_logAction(context, cubit)],
+      actions: [action],
       child: Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

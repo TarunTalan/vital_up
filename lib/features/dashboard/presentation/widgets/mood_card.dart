@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
 import 'mood_widgets.dart';
 import 'tracker_log_sheets.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 const _metric = TrackerMetric.mood;
 
@@ -69,15 +70,13 @@ class MoodCard extends StatelessWidget {
                       ),
                       const SizedBox(width: AppDimens.space8),
                       Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            today.label,
-                            maxLines: 1,
-                            style: AppTextStyles.metric.copyWith(
-                              color: context.colors.onSurface,
-                            ),
+                        // Same size as other cards' figures: a long
+                        // mood ("Very stressed") wraps rather than shrinks.
+                        child: FitText(
+                          today.label,
+                          maxLines: 2,
+                          style: AppTextStyles.metric.copyWith(
+                            color: context.colors.onSurface,
                           ),
                         ),
                       ),

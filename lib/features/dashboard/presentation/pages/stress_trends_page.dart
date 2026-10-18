@@ -78,6 +78,7 @@ class StressTrendsPage extends StatelessWidget {
                 _TagSummary(checkIns: data.logs),
             ],
             emptyLogs: 'No check-in today. Tap Check in to add one.',
+            editLabel: 'Edit check-in',
             dateOf: (c) => c.date,
             allLogs: () async =>
                 sl<VitaRepository>().getStressCheckIns().reversed.toList(),
@@ -151,12 +152,12 @@ class _TagSummary extends StatelessWidget {
           const AppCaption("What's been on your mind"),
           const SizedBox(height: AppDimens.space12),
           Wrap(
-              spacing: AppDimens.space8,
-              runSpacing: AppDimens.space8,
-              children: [
-                for (final e in top) StressTagChip(e.key, suffix: '${e.value}'),
-              ],
-            ),
+            spacing: AppDimens.space8,
+            runSpacing: AppDimens.space8,
+            children: [
+              for (final e in top) StressTagChip(e.key, suffix: '${e.value}'),
+            ],
+          ),
         ],
       ),
     );

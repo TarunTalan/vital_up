@@ -66,6 +66,7 @@ class SleepTrendsPage extends StatelessWidget {
                   paceFraction: 1,
                 ),
                 ringLabel: night == null ? null : '${night.sleepScore}',
+                logged: night != null,
                 statusColor: night == null
                     ? null
                     : sleepScoreColor(night.sleepScore),
@@ -106,8 +107,10 @@ class SleepTrendsPage extends StatelessWidget {
               );
               return nights..sort((a, b) => b.wakeTime.compareTo(a.wakeTime));
             },
+            editLabel: 'Edit sleep',
             onLog: () async {
-              if (await showSleepLogSheet(context)) {
+              final logs = cubit.state.data?.logs ?? const [];
+              if (await showSleepLogSheet(context, initial: _lastNight(logs))) {
                 await cubit.load();
                 try {
                   await sl<HomeWidgetService>().refresh();

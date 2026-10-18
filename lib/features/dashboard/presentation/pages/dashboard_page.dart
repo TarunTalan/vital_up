@@ -8,6 +8,8 @@ import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/widgets/tracker/quick_log_hub.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:intl/intl.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_sheets.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
@@ -22,7 +24,6 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_bottom_nav.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
@@ -45,7 +46,6 @@ import 'package:vital_up/features/activity_goals/presentation/widgets/activity_g
 import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/mood_card.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/today_summary_card.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
@@ -482,8 +482,7 @@ class _HomeTabState extends State<_HomeTab> {
 
   static bool _reloadedRecently() {
     final last = _lastFullReload;
-    return last != null &&
-        isWithinLast(const Duration(seconds: 30), last);
+    return last != null && isWithinLast(const Duration(seconds: 30), last);
   }
 
   void _reloadAll() {
@@ -580,6 +579,7 @@ class _HomeTabState extends State<_HomeTab> {
   Widget _buildSectionTitle(
     BuildContext context,
     String title, {
+    String? note,
     String? actionLabel,
     VoidCallback? onAction,
   }) {
@@ -592,8 +592,21 @@ class _HomeTabState extends State<_HomeTab> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title.toUpperCase(),
+            child: Text.rich(
+              TextSpan(
+                text: title.toUpperCase(),
+                children: [
+                  // e.g. today's date beside "TODAY", in plain case.
+                  if (note != null)
+                    TextSpan(
+                      text: '  ·  $note',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                ],
+              ),
               style: context.text.labelMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -703,6 +716,7 @@ class _HomeTabState extends State<_HomeTab> {
                         _buildSectionTitle(
                           context,
                           'Today',
+                          note: DateFormat('EEE, d MMM').format(DateTime.now()),
                           // Day-by-day history of every goal, not just activity.
                           actionLabel: 'History',
                           onAction: () async {
@@ -740,12 +754,15 @@ class _HomeTabState extends State<_HomeTab> {
                         const SizedBox(height: AppDimens.sectionGap),
 
                         _buildSectionTitle(context, 'Body & Wellbeing'),
-                        const _TileRow(
+                        const TrackerTilePair(
                           left: WaterIntakeCard(),
                           right: WeightCard(),
                         ),
                         const SizedBox(height: AppDimens.cardGap),
-                        const _TileRow(left: SleepCard(), right: MoodCard()),
+                        const TrackerTilePair(
+                          left: SleepCard(),
+                          right: MoodCard(),
+                        ),
                         const SizedBox(height: AppDimens.cardGap),
                         const ScreenTimeSummaryRow(),
                       ],
@@ -761,7 +778,7 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-/// Header title: today's date over a time-of-day greeting.
+/// Header title: a time-of-day greeting with the first name.
 class _Greeting extends StatelessWidget {
   const _Greeting();
 
@@ -782,48 +799,16 @@ class _Greeting extends StatelessWidget {
         final name = fullName.isNotEmpty
             ? fullName.split(RegExp(r'\s+')).first
             : profile?.username ?? '';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppCaption(DateFormat('EEE, d MMM').format(now)),
-            const SizedBox(height: AppDimens.space4),
-            Text(
-              name.isEmpty ? greeting : '$greeting, $name',
-              maxLines: 2,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
-            ),
-          ],
+        // Today's date sits beside the Today section label below.
+        return Text(
+          name.isEmpty ? greeting : '$greeting, $name',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.headlineSmall?.copyWith(
+            color: context.colors.onSurface,
+          ),
         );
       },
-    );
-  }
-}
-
-/// Two half-width tracker tiles side by side at a shared height, which
-/// grows with the system text size so tile content never clips.
-class _TileRow extends StatelessWidget {
-  final Widget left;
-  final Widget right;
-
-  const _TileRow({required this.left, required this.right});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.textScalerOf(
-        context,
-      ).scale(AppDimens.dashboardTileHeight),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: AppDimens.cardGap),
-          Expanded(child: right),
-        ],
-      ),
     );
   }
 }

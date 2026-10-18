@@ -115,7 +115,9 @@ class SleepService {
 
     final manual = await _isarService.isar.sleepLogCaches
         .filter()
-        .group((q) => q.userIdEqualTo(_userId).or().userIdEqualTo(_legacyUserId))
+        .group(
+          (q) => q.userIdEqualTo(_userId).or().userIdEqualTo(_legacyUserId),
+        )
         .endTimeBetween(from, to, includeUpper: false)
         .sortByEndTime()
         .findAll();
@@ -130,7 +132,10 @@ class SleepService {
     }
 
     try {
-      final permissions = List.filled(_allSleepTypes.length, HealthDataAccess.READ);
+      final permissions = List.filled(
+        _allSleepTypes.length,
+        HealthDataAccess.READ,
+      );
       if (await _health
               .hasPermissions(_allSleepTypes, permissions: permissions)
               .orFallback(null) ==
@@ -209,21 +214,27 @@ class SleepService {
   }
 
   Future<void> installHealthConnect() async {
-     if (Platform.isAndroid) {
-       await _health.installHealthConnect();
-     }
+    if (Platform.isAndroid) {
+      await _health.installHealthConnect();
+    }
   }
 
   /// Whether sleep can be read; asks for access unless [request] is false.
   Future<bool> hasPermission({bool request = true}) async {
-    final permissions = List.filled(_allSleepTypes.length, HealthDataAccess.READ);
+    final permissions = List.filled(
+      _allSleepTypes.length,
+      HealthDataAccess.READ,
+    );
     bool? hasPermissions = await _health
         .hasPermissions(_allSleepTypes, permissions: permissions)
         .orFallback(null);
     if (!request) return hasPermissions ?? false;
     if (hasPermissions == null || !hasPermissions) {
       try {
-        hasPermissions = await _health.requestAuthorization(_allSleepTypes, permissions: permissions);
+        hasPermissions = await _health.requestAuthorization(
+          _allSleepTypes,
+          permissions: permissions,
+        );
       } catch (e) {
         return false;
       }
@@ -272,14 +283,20 @@ class SleepService {
   /// Last night guessed from when the screen was off, for the user to
   /// confirm. Null off Android, without usage access, or when nothing
   /// looks like a night yet.
-  Future<SleepSessionInfo?> estimateLastNight() async {
+  Future<SleepSessionInfo?> estimateLastNight() =>
+      _estimateNight(startOfDay(DateTime.now()));
+
+  /// The night that ended on [wakeDay], guessed from screen activity.
+  Future<SleepSessionInfo?> _estimateNight(DateTime wakeDay) async {
     if (!Platform.isAndroid) return null;
     final now = DateTime.now();
-    final today = startOfDay(now);
+    final dayEnd = nextDay(wakeDay);
     try {
       final raw = await _usageChannel.invokeListMethod<Map>('getScreenEvents', {
-        'start': today.subtract(const Duration(hours: 8)).millisecondsSinceEpoch,
-        'end': now.millisecondsSinceEpoch,
+        'start': wakeDay
+            .subtract(const Duration(hours: 8))
+            .millisecondsSinceEpoch,
+        'end': (now.isBefore(dayEnd) ? now : dayEnd).millisecondsSinceEpoch,
       });
       final events = [
         for (final e in raw ?? const <Map>[])
@@ -288,11 +305,40 @@ class SleepService {
             on: e['on'] == true,
           ),
       ];
-      return estimateSleepFromScreen(events, wakeDay: today);
+      return estimateSleepFromScreen(events, wakeDay: wakeDay);
     } catch (e) {
       debugPrint('Sleep estimate from screen activity unavailable: $e');
       return null;
     }
+  }
+
+  /// Saves phone estimates nobody reviewed, so a skipped review doesn't
+  /// leave a gap in trends and Arena: yesterday's night, and today's once
+  /// its detection window has closed (it can't change after that). Nights
+  /// already saved or from Health Connect, and an open "Going to bed", are
+  /// left alone. Returns the nights saved.
+  Future<List<SleepSessionInfo>> saveUnreviewedEstimates() async {
+    if (!Platform.isAndroid || !await canEstimateFromPhone()) return const [];
+    if (await pendingBedtime() != null) return const [];
+    final saved = <SleepSessionInfo>[];
+    for (final day in estimateDaysToAutoSave(DateTime.now())) {
+      if ((await getSleepBetween(day, nextDay(day))).isNotEmpty) continue;
+      final estimate = await _estimateNight(day);
+      if (estimate == null) continue;
+      try {
+        saved.add(
+          await saveManualEntry(
+            estimate.bedTime,
+            estimate.wakeTime,
+            source: SleepDataSource.phone,
+            asleep: estimate.duration,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Sleep estimate not saved automatically: $e');
+      }
+    }
+    return saved;
   }
 
   /// The "Going to bed" time still waiting for "I'm up", if any. Re-reads
@@ -384,7 +430,9 @@ class SleepService {
     await _isarService.isar.writeTxn(() async {
       final sameNight = await _isarService.isar.sleepLogCaches
           .filter()
-          .group((q) => q.userIdEqualTo(userId).or().userIdEqualTo(_legacyUserId))
+          .group(
+            (q) => q.userIdEqualTo(userId).or().userIdEqualTo(_legacyUserId),
+          )
           .endTimeBetween(dayStart, nextDay(dayStart), includeUpper: false)
           .findAll();
       replaced.addAll(sameNight);

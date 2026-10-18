@@ -12,6 +12,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 const _metric = TrackerMetric.nutrition;
 
@@ -238,13 +239,10 @@ class MacroBar extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: context.text.labelSmall?.copyWith(color: context.vColors.grayText),
     );
-    final figure = Text(
-      '${value.round()} / ${maxValue.round()}g',
-      maxLines: 1,
-      style: context.text.labelSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: context.colors.onSurface,
-      ),
+    final figureText = '${value.round()} / ${maxValue.round()}g';
+    final figureStyle = context.text.labelSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: context.colors.onSurface,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,16 +250,17 @@ class MacroBar extends StatelessWidget {
         if (compact) ...[
           name,
           const SizedBox(height: AppDimens.space2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: figure,
-          ),
+          FitText(figureText, style: figureStyle),
         ] else
           Row(
             children: [
               Expanded(child: name),
-              figure,
+              Text(
+                figureText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: figureStyle,
+              ),
             ],
           ),
         const SizedBox(height: AppDimens.space4),
@@ -327,25 +326,19 @@ class _MealSlot extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppDimens.space4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  style: context.text.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: logged ? accent : v.grayText,
-                  ),
+              FitText(
+                name,
+                maxLines: 1,
+                style: context.text.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: logged ? accent : v.grayText,
                 ),
               ),
               if (caption != null)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    caption!,
-                    maxLines: 1,
-                    style: context.text.labelSmall?.copyWith(color: v.grayText),
-                  ),
+                FitText(
+                  caption!,
+                  maxLines: 1,
+                  style: context.text.labelSmall?.copyWith(color: v.grayText),
                 ),
             ],
           ),

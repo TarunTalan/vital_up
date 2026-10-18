@@ -85,6 +85,9 @@ class WeightTrendsPage extends StatelessWidget {
                         : 'Logged ${DateFormat('EEE d MMM, h:mm a').format(latest.timestamp)}',
                     status: _status(latest?.weightKg, goal),
                     statusLabel: _toGoal(unit, latest?.weightKg, goal),
+                    logged:
+                        latest != null &&
+                        isSameDay(latest.timestamp, DateTime.now()),
                     fraction: _progress(data.logs, goal),
                   );
                 },
@@ -101,6 +104,7 @@ class WeightTrendsPage extends StatelessWidget {
                   DateTime(2000),
                   nextDay(startOfDay(DateTime.now())),
                 ),
+                editLabel: 'Update weight',
                 onLog: () async {
                   if (await showWeightEntrySheet(context)) cubit.load();
                 },

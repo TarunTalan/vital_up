@@ -181,8 +181,7 @@ SleepSessionInfo? estimateSleepFromScreen(
   for (final g in gaps) {
     if (g.from.isBefore(windowStart)) continue;
     final last = nights.isEmpty ? null : nights.last;
-    if (last != null &&
-        g.from.difference(last.to) <= rules.maxInterruption) {
+    if (last != null && g.from.difference(last.to) <= rules.maxInterruption) {
       nights.last = (
         from: last.from,
         to: g.to,
@@ -232,3 +231,16 @@ int bedtimeConsistency(List<DateTime> bedTimes) {
   return (100 - stdDev / 3).round().clamp(40, 100);
 }
 
+/// Wake days whose unreviewed phone estimate is saved automatically at
+/// [now]: yesterday, and today once its detection window has closed (the
+/// estimate can't change after [ScreenSleepRules.latestWakeHour]).
+List<DateTime> estimateDaysToAutoSave(
+  DateTime now, {
+  ScreenSleepRules rules = const ScreenSleepRules(),
+}) {
+  final today = DateTime(now.year, now.month, now.day);
+  return [
+    DateTime(today.year, today.month, today.day - 1),
+    if (now.hour >= rules.latestWakeHour) today,
+  ];
+}

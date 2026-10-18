@@ -21,6 +21,7 @@ import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart'
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Swipe-to-delete for a detail page's history: removes [log] at once,
 /// deletes it, reloads, and says so if it couldn't be deleted.
@@ -50,6 +51,9 @@ class TrackerToday {
   /// Text in the ring; defaults to the percentage.
   final String? ringLabel;
 
+  /// Whether today is already logged; defaults to a met goal.
+  final bool? logged;
+
   const TrackerToday({
     required this.value,
     required this.status,
@@ -58,7 +62,10 @@ class TrackerToday {
     this.statusLabel,
     this.statusColor,
     this.ringLabel,
+    this.logged,
   });
+
+  bool get isLogged => logged ?? status == TrackerStatus.done;
 }
 
 /// The one detail-page layout every tracker uses (Figma track/detail):
@@ -72,7 +79,9 @@ class TrackerToday {
 /// 5. Today's log — today's entries (swipe to delete) and "See all", which
 ///    opens [TrackerLogsPage] with every entry ([allLogs]).
 ///
-/// The pinned bottom button is always the metric's log action.
+/// The pinned bottom button is the metric's log action. Once today is
+/// logged (or its goal met) it turns into the quieter secondary button, as
+/// on the Home cards, labelled [editLabel] for once-a-day trackers.
 /// Needs a [TrendCubit<L>] above it.
 class TrackerDetailScaffold<L> extends StatelessWidget {
   final TrackerMetric metric;
@@ -120,6 +129,10 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
   /// Primary bottom action; defaults to the metric's log label.
   final VoidCallback? onLog;
   final String? logLabel;
+
+  /// Bottom button label once today is logged ("Edit check-in"); null keeps
+  /// [logLabel] (trackers logged several times a day).
+  final String? editLabel;
   final Widget? headerAction;
   final Future<void> Function()? onRefresh;
 
@@ -149,6 +162,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     this.logsActionLabel = 'See all',
     this.onLog,
     this.logLabel,
+    this.editLabel,
     this.headerAction,
     this.onRefresh,
     this.ranges = TrendRange.standard,
@@ -198,10 +212,26 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
       header: AppPageHeader(title: title ?? metric.label, action: headerAction),
       bottomBar: onLog == null
           ? null
-          : AppPrimaryButton(
-              label: logLabel ?? metric.logLabel,
-              leadingIcon: Icon(metric.logIcon),
-              onTap: onLog!,
+          : BlocBuilder<TrendCubit<L>, TrendState<L>>(
+              builder: (context, state) {
+                final data = state.data;
+                final logged =
+                    data != null && (today ?? _defaultToday)(data).isLogged;
+                if (!logged) {
+                  return AppPrimaryButton(
+                    label: logLabel ?? metric.logLabel,
+                    leadingIcon: Icon(metric.logIcon),
+                    onTap: onLog!,
+                  );
+                }
+                return AppSecondaryButton(
+                  label: editLabel ?? logLabel ?? metric.logLabel,
+                  leadingIcon: Icon(
+                    editLabel != null ? Icons.edit_rounded : metric.logIcon,
+                  ),
+                  onTap: onLog!,
+                );
+              },
             ),
       onRefresh:
           onRefresh ??
@@ -310,7 +340,7 @@ class _HeroCard extends StatelessWidget {
     final fraction = raw != null && raw.isFinite ? raw : null;
     return AppCard(
       width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
+      padding: AppDimens.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -322,15 +352,11 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     AppCaption(label),
                     const SizedBox(height: AppDimens.space8),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        today.value,
-                        maxLines: 1,
-                        style: AppTextStyles.metricLarge.copyWith(
-                          color: context.colors.onSurface,
-                        ),
+                    FitText(
+                      today.value,
+                      maxLines: 1,
+                      style: AppTextStyles.metricLarge.copyWith(
+                        color: context.colors.onSurface,
                       ),
                     ),
                     if (today.caption != null) ...[
@@ -430,42 +456,25 @@ class _TrendCard<L> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: AppCaption(state.range.caption),
-              ),
-              TrendRangeToggle(
-                value: state.range,
-                onChanged: onRange,
-                ranges: ranges,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TrendBarChart(
-            series: switch (state.range) {
-              TrendRange.week => data.series,
-              TrendRange.month => data.series.weekly(),
-              TrendRange.halfYear => data.series.monthly(),
-            },
-            weekly: state.range == TrendRange.month,
-            monthly: state.range == TrendRange.halfYear,
-            color: metric.color,
-            valueFormatter: format,
-            axisFormatter: axisFormat,
-            colorOf: colorOf,
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TrendStatsRow(series: data.series, format: format),
-        ],
+    return TrendChartCard(
+      caption: state.range.caption,
+      range: state.range,
+      onRange: onRange,
+      ranges: ranges,
+      chart: TrendBarChart(
+        series: switch (state.range) {
+          TrendRange.week => data.series,
+          TrendRange.month => data.series.weekly(),
+          TrendRange.halfYear => data.series.monthly(),
+        },
+        weekly: state.range == TrendRange.month,
+        monthly: state.range == TrendRange.halfYear,
+        color: metric.color,
+        valueFormatter: format,
+        axisFormatter: axisFormat,
+        colorOf: colorOf,
       ),
+      stats: TrendStatsRow(series: data.series, format: format),
     );
   }
 }
