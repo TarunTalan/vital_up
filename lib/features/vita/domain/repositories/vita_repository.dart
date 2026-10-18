@@ -1,6 +1,7 @@
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
+import 'package:vital_up/core/utils/quota_reset.dart';
 
 /// Thrown when Vita can't produce a reply; [message] is user-facing.
 class VitaException implements Exception {
@@ -18,9 +19,11 @@ class VitaException implements Exception {
   static const couldNotReply = "Vita couldn't reply. Try again.";
   static const signIn = 'Sign in to chat with Vita.';
   static const sessionExpired = 'Your session expired. Sign in again.';
-  static const dailyLimitReached = "You've hit today's Vita limit. Try tomorrow.";
+  static String get dailyLimitReached =>
+      "You've hit today's Vita limit. It resets at ${quotaResetTime()}.";
   static const tooSlow = 'Vita is taking too long. Try again.';
   static const offlineMessage = "You're offline. Try again when connected.";
+  static const consentNeeded = 'Allow Vita to use your data to get a reply.';
 
   @override
   String toString() => message;

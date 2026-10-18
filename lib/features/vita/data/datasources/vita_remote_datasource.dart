@@ -116,7 +116,7 @@ class VitaRemoteDataSource {
       }
       throw switch (e.status) {
         401 => const VitaException(VitaException.sessionExpired),
-        429 => const VitaException(
+        429 => VitaException(
             VitaException.dailyLimitReached,
             dailyLimit: true,
           ),

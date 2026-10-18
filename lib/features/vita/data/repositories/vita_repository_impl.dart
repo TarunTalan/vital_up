@@ -5,6 +5,7 @@ import 'package:vital_up/features/vita/data/datasources/vita_local_datasource.da
 import 'package:vital_up/features/vita/data/datasources/vita_remote_datasource.dart';
 import 'package:vital_up/features/vita/data/services/health_snapshot_builder.dart';
 import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
+import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
 import 'package:vital_up/features/vita/domain/entities/health_snapshot.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
@@ -12,6 +13,7 @@ import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart'
 import 'package:vital_up/features/vita/domain/services/health_analysis_builder.dart';
 import 'package:vital_up/features/vita/domain/services/stress_estimator.dart';
 import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class VitaRepositoryImpl implements VitaRepository {
   final VitaRemoteDataSource _remote;
@@ -23,6 +25,9 @@ class VitaRepositoryImpl implements VitaRepository {
   final HealthAnalysisBuilder _analysis;
   final HabitEvents? _events;
 
+  /// Nothing reaches the AI without it; Health Connect only with its opt-in.
+  final VitaAiConsent _consent;
+
   /// Shared by screens opened together so the day's insights are fetched once.
   Future<VitaDailyInsights?>? _insightsInFlight;
 
@@ -32,6 +37,7 @@ class VitaRepositoryImpl implements VitaRepository {
     required this._snapshots,
     required this._vitals,
     required this._supabase,
+    required this._consent,
     this._stress = const StressEstimator(),
     this._analysis = const HealthAnalysisBuilder(),
     this._events,
@@ -64,8 +70,10 @@ class VitaRepositoryImpl implements VitaRepository {
     List<VitaMessage> history, {
     MealPlan? draftPlan,
   }) async {
-    final snapshot = await _snapshots.build();
-    final stress = _computeStress(snapshot);
+    if (!_consent.accepted) {
+      throw const VitaException(VitaException.consentNeeded);
+    }
+    final (snapshot, stress) = await _aiSnapshot();
     final message = await _remote.chat(
       history: history,
       snapshot: {
@@ -144,6 +152,8 @@ class VitaRepositoryImpl implements VitaRepository {
   Future<VitaDailyInsights?> getDailyInsights() {
     final cached = _local.readInsights(_userId);
     if (cached != null && _isToday(cached.date)) return Future.value(cached);
+    // No request until the user has accepted the AI data notice.
+    if (!_consent.accepted) return Future.value(cached);
     return _insightsInFlight ??= _fetchInsights(cached).whenComplete(() {
       _insightsInFlight = null;
     });
@@ -154,10 +164,8 @@ class VitaRepositoryImpl implements VitaRepository {
 
   Future<VitaDailyInsights?> _fetchInsights(VitaDailyInsights? stale) async {
     try {
-      final snapshot = await _snapshots.build();
-      final data = await _remote.insights(
-        _payload(snapshot, _computeStress(snapshot)),
-      );
+      final (snapshot, stress) = await _aiSnapshot();
+      final data = await _remote.insights(_payload(snapshot, stress));
       final insights = VitaDailyInsights.fromJson({
         ...data,
         'date': DateTime.now().toIso8601String(),
@@ -172,13 +180,31 @@ class VitaRepositoryImpl implements VitaRepository {
 
   // --- Helpers ----------------------------------------------------------------
 
-  StressReport _computeStress(HealthSnapshot snapshot) {
+  /// The snapshot (and the stress estimate from it) that may go to the AI.
+  Future<(HealthSnapshot, StressReport)> _aiSnapshot() async {
+    final includeHealthConnect = _consent.includeHealthConnect;
+    final snapshot = (await _snapshots.build()).forAi(
+      includeHealthConnect: includeHealthConnect,
+    );
+    // Saved scores may have been computed from Health Connect vitals.
+    return (
+      snapshot,
+      _computeStress(snapshot, useSavedScores: includeHealthConnect),
+    );
+  }
+
+  StressReport _computeStress(
+    HealthSnapshot snapshot, {
+    bool useSavedScores = true,
+  }) {
     final now = snapshot.takenAt;
     final checkIns = _local.readCheckIns(_userId);
     final today = checkIns.where((c) => _sameDay(c.date, now)).lastOrNull;
-    final yesterday = _local.readScores(_userId)[VitaLocalDataSource.dayKey(
-      now.subtract(const Duration(days: 1)),
-    )];
+    final yesterday = useSavedScores
+        ? _local.readScores(_userId)[VitaLocalDataSource.dayKey(
+            previousDay(now),
+          )]
+        : null;
     return _stress.estimate(
       snapshot: snapshot,
       checkIn: today,

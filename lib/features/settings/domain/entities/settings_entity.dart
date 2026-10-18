@@ -7,12 +7,16 @@ class SettingsEntity extends Equatable {
   final String weightUnit;
   final String heightUnit;
 
+  /// Firebase Analytics (app opens and screens; never health data).
+  final bool analyticsEnabled;
+
   const SettingsEntity({
     this.themeMode = 'system',
     this.notificationsEnabled = true,
     this.healthSyncEnabled = false,
     this.weightUnit = 'kg',
     this.heightUnit = 'cm',
+    this.analyticsEnabled = true,
   });
 
   SettingsEntity copyWith({
@@ -21,6 +25,7 @@ class SettingsEntity extends Equatable {
     bool? healthSyncEnabled,
     String? weightUnit,
     String? heightUnit,
+    bool? analyticsEnabled,
   }) {
     return SettingsEntity(
       themeMode: themeMode ?? this.themeMode,
@@ -28,6 +33,7 @@ class SettingsEntity extends Equatable {
       healthSyncEnabled: healthSyncEnabled ?? this.healthSyncEnabled,
       weightUnit: weightUnit ?? this.weightUnit,
       heightUnit: heightUnit ?? this.heightUnit,
+      analyticsEnabled: analyticsEnabled ?? this.analyticsEnabled,
     );
   }
 
@@ -38,5 +44,6 @@ class SettingsEntity extends Equatable {
         healthSyncEnabled,
         weightUnit,
         heightUnit,
+        analyticsEnabled,
       ];
 }

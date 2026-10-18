@@ -19,6 +19,7 @@ import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/features/vita/presentation/widgets/vita_ai_consent_sheet.dart';
 
 /// How the app behaves: appearance, units, notifications, connected apps,
 /// privacy and about. Account and health items live under Profile.
@@ -257,6 +258,23 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: 'Who sees you, and your city',
                     trailing: _openingLeaderboards ? _chevronSpinner() : null,
                     onTap: _openLeaderboards,
+                  ),
+                  AppListTile(
+                    icon: Icons.auto_awesome_outlined,
+                    title: 'AI coach data',
+                    subtitle: 'What Vita and AI plans may use',
+                    onTap: () =>
+                        showVitaAiConsentSheet(context, manage: true),
+                  ),
+                  AppListTile(
+                    icon: Icons.insights_rounded,
+                    title: 'Share usage analytics',
+                    subtitle: 'App opens and screens only. No health data.',
+                    trailing: Switch(
+                      value: s.analyticsEnabled,
+                      onChanged: (on) =>
+                          _update(s.copyWith(analyticsEnabled: on)),
+                    ),
                   ),
                 ],
               ),

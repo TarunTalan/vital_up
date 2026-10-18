@@ -6,6 +6,7 @@ import 'package:vital_up/core/database/collections/user_profile_cache.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
@@ -13,8 +14,10 @@ import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/features/profile/domain/repositories/profile_repository.dart';
 import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
 import 'package:vital_up/features/vita/domain/entities/health_snapshot.dart';
@@ -72,6 +75,7 @@ class HealthSnapshotBuilder {
     final sleep = results[1] as _Sleep?;
     final water = results[2] as _Water?;
     final activity = results[4] as _Activity?;
+    final healthSteps = results[9] as int?;
 
     return HealthSnapshot(
       takenAt: now,
@@ -86,14 +90,23 @@ class HealthSnapshotBuilder {
       sleepLastNightHours: sleep?.lastNight,
       sleepAvgHours: sleep?.average,
       sleepNightsLogged: sleep?.nights ?? 0,
+      sleepLastNightFromHealthConnect: sleep?.fromHealthConnect ?? false,
+      loggedSleepLastNightHours: sleep?.loggedLastNight,
+      loggedSleepAvgHours: sleep?.loggedAverage,
+      loggedSleepNights: sleep?.loggedNights ?? 0,
       waterTodayMl: water?.todayMl,
       waterGoalMl: _water.getDailyGoal(),
       tracksWater: water?.tracks ?? false,
       screenTimeTodayMinutes: results[3] as int?,
-      stepsToday: results[9] as int? ?? activity?.stepsToday,
+      stepsToday: healthSteps ?? activity?.stepsToday,
+      stepsFromHealthConnect: healthSteps != null,
+      workoutStepsToday: activity?.stepsToday,
       workoutsThisWeek: activity?.workouts ?? 0,
       distanceThisWeekKm: activity?.distanceKm ?? 0,
       activeMinutesThisWeek: activity?.minutes ?? 0,
+      importedWorkoutsThisWeek: activity?.importedWorkouts ?? 0,
+      importedDistanceThisWeekKm: activity?.importedDistanceKm ?? 0,
+      importedActiveMinutesThisWeek: activity?.importedMinutes ?? 0,
       vitals: results[8] as VitalsSnapshot? ?? const VitalsSnapshot(),
       dietPlanMeals: results[7] as List<String>? ?? const [],
     );
@@ -151,21 +164,28 @@ class HealthSnapshotBuilder {
     final recent = logs.where((l) => l.endTime.isAfter(weekAgo)).toList()
       ..sort((a, b) => b.endTime.compareTo(a.endTime));
 
-    var lastNight = await _vitals.readSleepLastNightHours();
-    if (lastNight == null &&
+    // Saved entries are manual or the phone's estimate, never Health Connect.
+    final loggedLastNight =
         recent.isNotEmpty &&
-        recent.first.endTime.isAfter(now.subtract(const Duration(hours: 24)))) {
-      lastNight = recent.first.durationMinutes / 60;
-    }
+            recent.first.endTime.isAfter(now.subtract(const Duration(hours: 24)))
+        ? recent.first.durationMinutes / 60
+        : null;
+    final logged = recent.map((l) => l.durationMinutes / 60).toList();
+    double? average(List<double> hours) =>
+        hours.isEmpty ? null : hours.reduce((a, b) => a + b) / hours.length;
 
-    final hours = recent.map((l) => l.durationMinutes / 60).toList();
+    final healthLastNight = await _vitals.readSleepLastNightHours();
+    final lastNight = healthLastNight ?? loggedLastNight;
+    final hours = [...logged];
     if (lastNight != null && recent.isEmpty) hours.add(lastNight);
     return _Sleep(
       lastNight: lastNight,
-      average: hours.isEmpty
-          ? null
-          : hours.reduce((a, b) => a + b) / hours.length,
+      average: average(hours),
       nights: hours.length,
+      fromHealthConnect: healthLastNight != null,
+      loggedLastNight: loggedLastNight,
+      loggedAverage: average(logged),
+      loggedNights: logged.length,
     );
   }
 
@@ -197,16 +217,28 @@ class HealthSnapshotBuilder {
         .map((h) => h.session)
         .where((s) => !s.startTime.isBefore(weekStart))
         .toList();
+    final imported = week
+        .where((s) => s.id.startsWith(HealthImportService.idPrefix))
+        .toList();
     final todays = week.where(
-      (s) => !s.startTime.isBefore(today) && s.stepCountReliable,
+      (s) =>
+          !s.startTime.isBefore(today) &&
+          s.stepCountReliable &&
+          !s.id.startsWith(HealthImportService.idPrefix),
     );
     final steps = todays.fold<int>(0, (sum, s) => sum + s.steps);
+    double km(List<ActivitySession> s) =>
+        s.fold<double>(0, (sum, a) => sum + a.totalDistanceMeters) / 1000;
+    int minutes(List<ActivitySession> s) =>
+        s.fold<int>(0, (sum, a) => sum + a.totalDurationSeconds) ~/ 60;
     return _Activity(
       workouts: week.length,
-      distanceKm:
-          week.fold<double>(0, (s, a) => s + a.totalDistanceMeters) / 1000,
-      minutes: week.fold<int>(0, (s, a) => s + a.totalDurationSeconds) ~/ 60,
+      distanceKm: km(week),
+      minutes: minutes(week),
       stepsToday: steps > 0 ? steps : null,
+      importedWorkouts: imported.length,
+      importedDistanceKm: km(imported),
+      importedMinutes: minutes(imported),
     );
   }
 
@@ -230,7 +262,7 @@ class HealthSnapshotBuilder {
         saved != null && saved.trim().isNotEmpty ? saved : onboarding;
 
     return ProfileSnapshot(
-      age: _age(pick(p?.dob, values[0])),
+      age: ageFromDob(pick(p?.dob, values[0])),
       gender: meaningfulOrNull(pick(p?.gender, values[1])),
       weightKg:
           cache?.weightKg ??
@@ -289,18 +321,11 @@ class HealthSnapshotBuilder {
       '${m.name} · ${m.calories} kcal · ${m.items.join(', ')}',
   ];
 
-  /// Onboarding stores DOB as DD/MM/YYYY.
-  static int? _age(String dob) {
-    final parts = dob.split('/').map((p) => int.tryParse(p.trim())).toList();
-    if (parts.length != 3 || parts.any((p) => p == null)) return null;
-    var (day, month, year) = (parts[0]!, parts[1]!, parts[2]!);
-    if (month > 12 && day <= 12) (day, month) = (month, day);
-    if (year < 1900 || month < 1 || month > 12) return null;
-    final now = DateTime.now();
-    var age = now.year - year;
-    if (now.month < month || (now.month == month && now.day < day)) age--;
-    return age >= 0 && age < 130 ? age : null;
-  }
+  /// Profile and onboarding store DOB as ddMMyyyy (older builds wrote
+  /// dd/MM/yyyy, so separators are dropped first).
+  @visibleForTesting
+  static int? ageFromDob(String dob) =>
+      ProfileRules.ageFromDob(dob.replaceAll(RegExp(r'[\s/.\-]'), ''));
 
   static double? _kg(String value, String unit) {
     final v = double.tryParse(value.trim());
@@ -339,7 +364,18 @@ class _Meals {
 class _Sleep {
   final double? lastNight, average;
   final int nights;
-  const _Sleep({this.lastNight, this.average, required this.nights});
+  final bool fromHealthConnect;
+  final double? loggedLastNight, loggedAverage;
+  final int loggedNights;
+  const _Sleep({
+    this.lastNight,
+    this.average,
+    required this.nights,
+    required this.fromHealthConnect,
+    this.loggedLastNight,
+    this.loggedAverage,
+    required this.loggedNights,
+  });
 }
 
 class _Water {
@@ -352,10 +388,15 @@ class _Activity {
   final int workouts, minutes;
   final double distanceKm;
   final int? stepsToday;
+  final int importedWorkouts, importedMinutes;
+  final double importedDistanceKm;
   const _Activity({
     required this.workouts,
     required this.distanceKm,
     required this.minutes,
     this.stepsToday,
+    required this.importedWorkouts,
+    required this.importedDistanceKm,
+    required this.importedMinutes,
   });
 }

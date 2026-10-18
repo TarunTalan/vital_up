@@ -175,6 +175,21 @@ int stressStreak(Iterable<StressCheckIn> checkIns, {DateTime? now}) {
   return streak;
 }
 
+/// How long check-ins and daily scores are kept.
+const vitaHistoryDays = 90;
+
+/// Entries older than this are trimmed from a history whose entries are
+/// dated [dates]. Counted back from the newest entry, or [now] when that is
+/// earlier, so a clock set months ahead can't wipe real history.
+DateTime historyCutoff(Iterable<DateTime> dates, DateTime now) {
+  DateTime? newest;
+  for (final d in dates) {
+    if (newest == null || d.isAfter(newest)) newest = d;
+  }
+  final anchor = newest == null || newest.isAfter(now) ? now : newest;
+  return DateTime(anchor.year, anchor.month, anchor.day - vitaHistoryDays);
+}
+
 class StressReport extends Equatable {
   /// 0 (calm) – 100 (very stressed).
   final int score;

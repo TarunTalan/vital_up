@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// Everything Vita knows about the user right now, gathered from on-device
 /// data (meal logs, sleep, water, screen time, activity, Health Connect /
 /// Apple Health vitals, onboarding profile, active diet plan).
@@ -41,6 +43,24 @@ class HealthSnapshot {
   // Active diet plan meal lines ("Breakfast · 420 kcal · Poha, Chai").
   final List<String> dietPlanMeals;
 
+  // Where figures came from. Health Connect parts leave the AI payload
+  // unless the user opted in (see [forAi]); on-device features use all.
+  final bool stepsFromHealthConnect;
+
+  /// Steps counted by this app's own workouts today.
+  final int? workoutStepsToday;
+  final bool sleepLastNightFromHealthConnect;
+
+  /// Sleep from saved entries only (manual / phone estimate).
+  final double? loggedSleepLastNightHours;
+  final double? loggedSleepAvgHours;
+  final int loggedSleepNights;
+
+  /// Workouts imported from Health Connect (included in the totals above).
+  final int importedWorkoutsThisWeek;
+  final double importedDistanceThisWeekKm;
+  final int importedActiveMinutesThisWeek;
+
   const HealthSnapshot({
     required this.takenAt,
     required this.profile,
@@ -64,7 +84,52 @@ class HealthSnapshot {
     this.activeMinutesThisWeek = 0,
     this.vitals = const VitalsSnapshot(),
     this.dietPlanMeals = const [],
+    this.stepsFromHealthConnect = false,
+    this.workoutStepsToday,
+    this.sleepLastNightFromHealthConnect = false,
+    this.loggedSleepLastNightHours,
+    this.loggedSleepAvgHours,
+    this.loggedSleepNights = 0,
+    this.importedWorkoutsThisWeek = 0,
+    this.importedDistanceThisWeekKm = 0,
+    this.importedActiveMinutesThisWeek = 0,
   });
+
+  /// What may be sent to the AI. Without the user's Health Connect opt-in,
+  /// vitals, Health Connect steps and sleep, and imported workouts are left
+  /// out; only data logged in this app remains.
+  HealthSnapshot forAi({required bool includeHealthConnect}) {
+    if (includeHealthConnect) return this;
+    return HealthSnapshot(
+      takenAt: takenAt,
+      profile: profile,
+      mealsToday: mealsToday,
+      caloriesToday: caloriesToday,
+      calorieGoal: calorieGoal,
+      mealsThisWeek: mealsThisWeek,
+      daysWithMealsThisWeek: daysWithMealsThisWeek,
+      avgCaloriesPerDay: avgCaloriesPerDay,
+      todayMealSummaries: todayMealSummaries,
+      sleepLastNightHours: loggedSleepLastNightHours,
+      sleepAvgHours: loggedSleepAvgHours,
+      sleepNightsLogged: loggedSleepNights,
+      waterTodayMl: waterTodayMl,
+      waterGoalMl: waterGoalMl,
+      tracksWater: tracksWater,
+      screenTimeTodayMinutes: screenTimeTodayMinutes,
+      stepsToday: stepsFromHealthConnect ? workoutStepsToday : stepsToday,
+      workoutsThisWeek: math.max(0, workoutsThisWeek - importedWorkoutsThisWeek),
+      distanceThisWeekKm:
+          math.max(0, distanceThisWeekKm - importedDistanceThisWeekKm),
+      activeMinutesThisWeek:
+          math.max(0, activeMinutesThisWeek - importedActiveMinutesThisWeek),
+      dietPlanMeals: dietPlanMeals,
+      workoutStepsToday: workoutStepsToday,
+      loggedSleepLastNightHours: loggedSleepLastNightHours,
+      loggedSleepAvgHours: loggedSleepAvgHours,
+      loggedSleepNights: loggedSleepNights,
+    );
+  }
 
   bool get logsMeals => mealsThisWeek > 0;
 

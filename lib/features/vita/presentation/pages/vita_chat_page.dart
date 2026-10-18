@@ -13,6 +13,7 @@ import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_bubble.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_composer.dart';
+import 'package:vital_up/features/vita/presentation/widgets/vita_ai_consent_sheet.dart';
 
 /// `vita-chat` route extra when opened to tweak an unsaved [draftPlan]:
 /// "Update My Plan" then pops back with the change instructions
@@ -35,17 +36,19 @@ class VitaChatPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<VitaChatCubit>()
-        ..load(initialPrompt: initialPrompt, draftPlan: draftPlan),
-      child: _VitaChatView(returnsTweak: draftPlan != null),
+      create: (_) => sl<VitaChatCubit>(),
+      child: _VitaChatView(initialPrompt: initialPrompt, draftPlan: draftPlan),
     );
   }
 }
 
 class _VitaChatView extends StatefulWidget {
-  final bool returnsTweak;
+  final String? initialPrompt;
+  final MealPlan? draftPlan;
 
-  const _VitaChatView({required this.returnsTweak});
+  const _VitaChatView({this.initialPrompt, this.draftPlan});
+
+  bool get returnsTweak => draftPlan != null;
 
   @override
   State<_VitaChatView> createState() => _VitaChatViewState();
@@ -59,6 +62,27 @@ class _VitaChatViewState extends State<_VitaChatView> {
   ];
 
   final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  /// Nothing is sent before the user has accepted the AI data notice.
+  Future<void> _start() async {
+    if (!mounted) return;
+    final allowed = await ensureVitaAiConsent(context);
+    if (!mounted) return;
+    if (!allowed) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    await context.read<VitaChatCubit>().load(
+      initialPrompt: widget.initialPrompt,
+      draftPlan: widget.draftPlan,
+    );
+  }
 
   @override
   void dispose() {
