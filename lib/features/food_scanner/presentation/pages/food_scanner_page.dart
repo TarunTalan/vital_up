@@ -32,6 +32,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/features/food_scanner/domain/ml_kit_errors.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -92,6 +93,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   bool _isStreaming = false;
   bool _isProcessingFrame = false;
+  DateTime? _lastFrameProcessedAt;
+  static const _frameInterval = Duration(milliseconds: 250);
   bool _isScanningBarcode = false;
   bool _isScanningNutritionLabel = false;
   String? _currentFailedBarcode;
@@ -143,12 +146,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         orElse: () => cameras.first,
       );
 
+      // High stays: the same controller takes the meal photo.
       final controller = CameraController(
         backCamera,
         ResolutionPreset.high,
         enableAudio: false,
+        // NV21 arrives as one plane ML Kit reads directly, no copy.
         imageFormatGroup: Platform.isAndroid
-            ? ImageFormatGroup.yuv420
+            ? ImageFormatGroup.nv21
             : ImageFormatGroup.bgra8888,
       );
 
@@ -207,6 +212,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     // While framing a nutrition label the package barcode is usually in
     // view too; don't start another lookup for it.
     if (_isProcessingFrame || _isScanningBarcode || _isScanningNutritionLabel) return;
+    // A few looks a second find a barcode just as fast as every frame,
+    // without the CPU and battery cost.
+    final now = DateTime.now();
+    final last = _lastFrameProcessedAt;
+    if (last != null && now.difference(last) < _frameInterval && !now.isBefore(last)) {
+      return;
+    }
+    _lastFrameProcessedAt = now;
     _isProcessingFrame = true;
 
     try {
@@ -268,11 +281,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   InputImage? _convertCameraImage(CameraImage image, CameraDescription cameraDesc) {
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
-      }
-      final bytes = allBytes.done().buffer.asUint8List();
+      // NV21 (Android) and BGRA (iOS) both come as a single plane.
+      if (image.planes.length != 1) return null;
+      final bytes = image.planes.first.bytes;
 
       final rotation = InputImageRotationValue.fromRawValue(cameraDesc.sensorOrientation) ??
           InputImageRotation.rotation90deg;
@@ -461,7 +472,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       debugPrint('OCR processing error: $e');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Close loader
-        showErrorSnackBar(context, "Couldn't read the label. Enter the details.");
+        showErrorSnackBar(
+          context,
+          mlKitErrorMessage(
+            e,
+            fallback: "Couldn't read the label. Enter the details.",
+          ),
+        );
         // Fallback to manual entry with empty values
         _openNutritionManualEntry(null);
       }
@@ -935,6 +952,10 @@ class _RecognizingOverlay extends StatelessWidget {
         Positioned.fill(
           child: Image.file(
             image,
+            // Gallery picks can be 2048 px or more; decode at screen size.
+            cacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .round(),
             fit: BoxFit.cover,
           ),
         ),
@@ -1231,6 +1252,9 @@ class _ScannedPreviewCard extends StatelessWidget {
             File(imagePath),
             width: double.infinity,
             height: cardHeight,
+            cacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .round(),
             fit: BoxFit.cover,
           ),
           Padding(

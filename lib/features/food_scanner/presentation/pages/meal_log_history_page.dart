@@ -14,6 +14,7 @@ import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
@@ -205,23 +206,23 @@ class _MealLogTile extends StatelessWidget {
             children: [
               _MacroPill(
                 label: 'Cals',
-                value: '${entry.totalCalories.toInt()}',
+                value: '${entry.totalCalories.round()}',
                 color: colors.primary,
               ),
               if (entry.nutrition.isNotEmpty) ...[
                 _MacroPill(
                   label: 'P',
-                  value: '${entry.nutrition.first.proteinG.toInt()}g',
+                  value: '${_sum(entry, (n) => n.proteinG)}g',
                   color: AppColors.scanProtein,
                 ),
                 _MacroPill(
                   label: 'C',
-                  value: '${entry.nutrition.first.carbsG.toInt()}g',
+                  value: '${_sum(entry, (n) => n.carbsG)}g',
                   color: AppColors.scanCarbs,
                 ),
                 _MacroPill(
                   label: 'F',
-                  value: '${entry.nutrition.first.fatG.toInt()}g',
+                  value: '${_sum(entry, (n) => n.fatG)}g',
                   color: AppColors.scanFat,
                 ),
               ],
@@ -317,3 +318,7 @@ class _MacroPill extends StatelessWidget {
     );
   }
 }
+
+/// A macro over every item of the meal (the calories shown are the total).
+int _sum(MealLogEntry entry, double Function(NutritionInfo n) of) =>
+    entry.nutrition.fold<double>(0, (sum, n) => sum + of(n)).round();

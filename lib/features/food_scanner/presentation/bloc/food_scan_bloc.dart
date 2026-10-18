@@ -661,10 +661,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Clamp once more right before saving: nothing absurd reaches the log.
     _currentNutrition = [for (final n in _currentNutrition) sanitizeNutrition(n)];
-    final totalCalories = _currentNutrition.fold<double>(
-      0,
-      (sum, nut) => sum + nut.calories,
-    );
+    final totalCalories = mealTotalCalories(_currentNutrition);
 
     final entry = MealLogEntry(
       id: uuid.v4(),

@@ -416,8 +416,9 @@ class _FoodDetailData {
     String capitalize(String s) {
       if (s.isEmpty) return s;
       return s.split(' ').map((word) {
-        if (word.isEmpty) return '';
-        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        // Only all-lowercase words: keep "KFC" and "McDonald's" as written.
+        if (word.isEmpty || word != word.toLowerCase()) return word;
+        return word[0].toUpperCase() + word.substring(1);
       }).join(' ');
     }
 
@@ -746,7 +747,13 @@ class _ScannedDish extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (hasImage)
-                  Image.file(File(imagePath!), fit: BoxFit.cover)
+                  Image.file(
+                    File(imagePath!),
+                    cacheWidth: (context.w(200) *
+                            MediaQuery.devicePixelRatioOf(context))
+                        .round(),
+                    fit: BoxFit.cover,
+                  )
                 else
                   ColoredBox(
                     color: context.vColors.glassFill!,

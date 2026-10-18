@@ -8,6 +8,9 @@ import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.da
 abstract final class NutritionLimits {
   static const double caloriesMax = InputLimits.caloriesMax * 1.0;
 
+  /// Calories in one whole meal log (server CHECK on `total_calories`).
+  static const double mealCaloriesMax = 10000;
+
   /// Protein / carbs / fat / fibre / sugar grams in one entry.
   static const double macroGMax = 1000;
 
@@ -83,6 +86,19 @@ double safeScale(double oldQuantity, double newQuantity) {
 String saneFoodName(Object? raw, {String fallback = ''}) {
   final text = raw == null ? '' : sanitizeText(raw.toString(), maxLength: InputLimits.shortText);
   return text.isEmpty ? fallback : text;
+}
+
+/// A meal's calories: the sum of its foods, capped at what one meal log
+/// may hold (the server refuses `meal_logs` rows above it, and a refused
+/// row would stay on this phone only).
+double mealTotalCalories(Iterable<NutritionInfo> foods) {
+  final sum = foods.fold<double>(
+    0,
+    (total, n) => total + saneAmount(n.calories, max: NutritionLimits.caloriesMax),
+  );
+  return sum > NutritionLimits.mealCaloriesMax
+      ? NutritionLimits.mealCaloriesMax
+      : sum;
 }
 
 /// [info] with every value clamped to [NutritionLimits].
