@@ -32,10 +32,13 @@ class UserAvatar extends StatelessWidget {
       child: Text(
         initial,
         style: (initialStyle ?? context.text.titleSmall)?.copyWith(
-          color: context.colors.primary,
+          color: context.vColors.accentText,
         ),
       ),
     );
+    // Decode at the shown size: uploads are up to 1024 px, and a full-size
+    // decode per row filled the image cache on leaderboards.
+    final decodeWidth = (size * MediaQuery.devicePixelRatioOf(context)).round();
 
     Widget imageWidget;
     final trimmedUrl = url?.trim();
@@ -47,6 +50,7 @@ class UserAvatar extends StatelessWidget {
         trimmedUrl,
         width: size,
         height: size,
+        cacheWidth: decodeWidth,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => fallback,
       );
@@ -55,6 +59,7 @@ class UserAvatar extends StatelessWidget {
         trimmedUrl,
         width: size,
         height: size,
+        cacheWidth: decodeWidth,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => fallback,
       );
@@ -63,6 +68,7 @@ class UserAvatar extends StatelessWidget {
         File(trimmedUrl.replaceFirst('file://', '')),
         width: size,
         height: size,
+        cacheWidth: decodeWidth,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => fallback,
       );

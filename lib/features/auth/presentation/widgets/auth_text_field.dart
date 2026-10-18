@@ -157,7 +157,10 @@ class _AuthTextFieldState extends State<AuthTextField>
       filtered = input.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
     }
 
-    return filtered.length > maxLen ? filtered.substring(0, maxLen) : filtered;
+    // Count characters, not UTF-16 units: cutting inside an emoji would
+    // leave half of it behind.
+    final chars = filtered.characters;
+    return chars.length > maxLen ? chars.take(maxLen).toString() : filtered;
   }
 
   Widget _buildBullet(String text) {

@@ -93,12 +93,14 @@ class _Segment extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: AppDurations.fast,
-          height: height,
+          // A minimum, not a fixed height: large system text grows it.
           constraints: BoxConstraints(
             minWidth: compact ? AppDimens.space40 : 0,
+            minHeight: height,
           ),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? AppDimens.space10 : AppDimens.space8,
+            vertical: AppDimens.space4,
           ),
           alignment: Alignment.center,
           // Fade between primary and a transparent primary, and between the
@@ -111,8 +113,8 @@ class _Segment extends StatelessWidget {
           ),
           child: Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            textAlign: TextAlign.center,
             style: (compact ? context.text.bodySmall : context.text.labelMedium)
                 ?.copyWith(
                   fontWeight: FontWeight.w500,
