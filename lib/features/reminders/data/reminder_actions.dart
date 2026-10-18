@@ -15,6 +15,7 @@ import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
 import 'package:vital_up/features/home_widget/data/widget_background.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// The signed-in user a reminder was scheduled for, from its payload.
 String? reminderUserId(NotificationResponse response) {
@@ -137,7 +138,11 @@ Future<int> addWaterInBackground(String userId, int ml) async {
   final today = await isar.waterLogCaches
       .filter()
       .userIdEqualTo(userId)
-      .timestampGreaterThan(DateTime(now.year, now.month, now.day))
+      .timestampBetween(
+        startOfDay(now),
+        nextDay(startOfDay(now)),
+        includeUpper: false,
+      )
       .findAll();
   return today.fold<int>(0, (sum, l) => sum + l.amountMl);
 }
@@ -155,7 +160,11 @@ Future<int> getTodayWaterInBackground(String userId) async {
   final today = await isar.waterLogCaches
       .filter()
       .userIdEqualTo(userId)
-      .timestampGreaterThan(DateTime(now.year, now.month, now.day))
+      .timestampBetween(
+        startOfDay(now),
+        nextDay(startOfDay(now)),
+        includeUpper: false,
+      )
       .findAll();
   return today.fold<int>(0, (sum, l) => sum + l.amountMl);
 }
@@ -176,7 +185,7 @@ Future<int> saveMoodInBackground(
   final now = DateTime.now();
   final checkIn =
       StressCheckIn(date: now, level: level.clamp(1, 5), tags: tags);
-  final cutoff = now.subtract(const Duration(days: 90));
+  final cutoff = historyCutoff(checkIns.map((c) => c.date), now);
   final updated = checkIns
       .where((c) =>
           c.date.isAfter(cutoff) &&

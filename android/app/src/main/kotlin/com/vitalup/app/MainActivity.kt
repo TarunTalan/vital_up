@@ -26,6 +26,34 @@ class MainActivity : FlutterFragmentActivity() {
     private val usageExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * Mapbox sends usage and location telemetry by default; the map only
+     * needs tiles. The Flutter plugin has no switch for it and its SDK isn't
+     * on this module's compile classpath, so call
+     * `TelemetryUtils.setEventsCollectionState(false, callback)` reflectively.
+     * The proguard rules keep com.mapbox.**.
+     */
+    private fun disableMapboxTelemetry() {
+        try {
+            val utils = Class.forName("com.mapbox.common.TelemetryUtils")
+            val method = utils.methods.firstOrNull {
+                it.name == "setEventsCollectionState" && java.lang.reflect.Modifier.isStatic(it.modifiers)
+            } ?: return
+            val args = method.parameterTypes.map { type ->
+                when {
+                    type == java.lang.Boolean.TYPE || type == java.lang.Boolean::class.java -> false
+                    type.isInterface -> java.lang.reflect.Proxy.newProxyInstance(
+                        type.classLoader, arrayOf(type)
+                    ) { _, _, _ -> null }
+                    else -> null
+                }
+            }
+            method.invoke(null, *args.toTypedArray())
+        } catch (e: Throwable) {
+            Log.w("VitalUp", "Couldn't turn off Mapbox telemetry: ${e.javaClass.simpleName}")
+        }
+    }
+
     override fun onDestroy() {
         usageExecutor.shutdown()
         super.onDestroy()
@@ -83,6 +111,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        disableMapboxTelemetry()
 
         // App lock on: hide the app in recents and block screenshots.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WINDOW_CHANNEL).setMethodCallHandler { call, result ->

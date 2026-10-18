@@ -41,3 +41,22 @@ Map<DateTime, List<T>> bucketByDay<T>(
   }
   return buckets;
 }
+
+/// Whether [at] lies in the last [window] before [now]. A time in the
+/// future (the clock was ahead when it was saved) is never recent, so a
+/// corrected clock doesn't block refreshes until real time catches up.
+bool isWithinLast(Duration window, DateTime at, {DateTime? now}) {
+  final age = (now ?? DateTime.now()).difference(at);
+  return !age.isNegative && age < window;
+}
+
+/// The calendar day before [d] (midnight), correct across DST changes.
+DateTime previousDay(DateTime d) => DateTime(d.year, d.month, d.day - 1);
+
+/// Whole calendar days from [from] to [to], ignoring the time of day and
+/// DST (a 23 h or 25 h day still counts as one).
+int calendarDaysBetween(DateTime from, DateTime to) => DateTime.utc(
+  to.year,
+  to.month,
+  to.day,
+).difference(DateTime.utc(from.year, from.month, from.day)).inDays;

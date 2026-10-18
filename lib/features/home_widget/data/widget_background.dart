@@ -13,6 +13,8 @@ import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/features/home_widget/data/widget_data.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
+import 'package:vital_up/core/config/secure_session_storage.dart';
 
 /// Runs when a widget button is tapped (or a widget asks for a refresh), in
 /// a background isolate.
@@ -89,7 +91,10 @@ Future<bool> _refreshWithAppServices() async {
         // Only the app refreshes the session. Refresh tokens are single use:
         // if this engine rotated one, the app would still hold the old one
         // and its next refresh could sign the user out.
-        authOptions: const FlutterAuthClientOptions(autoRefreshToken: false),
+        authOptions: FlutterAuthClientOptions(
+          autoRefreshToken: false,
+          localStorage: SecureSessionStorage(supabaseUrl: SupabaseConfig.url),
+        ),
       );
       _supabaseReady = true;
     }
@@ -125,7 +130,7 @@ Future<void> refreshFromDevice(String userId) async {
       .where()
       .capturedAtBetween(
         start,
-        start.add(const Duration(days: 1)),
+        nextDay(start),
         includeUpper: false,
       )
       .findAll();

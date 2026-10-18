@@ -26,7 +26,7 @@ open class HydrationWidgetProvider : VitalWidgetProvider() {
         views.setInt(R.id.wg_water_badge_bg, "setColorFilter", accent)
         views.setInt(R.id.wg_water_icon, "setColorFilter", accent)
         views.setTextViewText(R.id.wg_water_value, if (current) data.getString("m_water_value", "—") else "—")
-        views.setTextViewText(R.id.wg_water_detail, data.getString("m_water_detail", "") ?: "")
+        views.setTextViewText(R.id.wg_water_detail, Wg.detail(data, "water"))
         views.setViewVisibility(R.id.wg_water_bar, if (progress < 0) View.INVISIBLE else View.VISIBLE)
         views.setInt(R.id.wg_water_bar, "setImageLevel", progress.coerceIn(0, 100) * 100)
         views.setInt(R.id.wg_water_bar, "setColorFilter", accent)

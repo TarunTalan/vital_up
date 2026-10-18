@@ -143,17 +143,14 @@ class SleepService {
               )
               .orFallback(const []),
         );
-        final nights = bucketByDay(points, (p) => p.dateTo);
-        for (final entry in nights.entries) {
-          if (entry.key.isBefore(startOfDay(from)) || !entry.key.isBefore(to)) {
-            continue;
-          }
-          final night = buildHealthNight([
-            for (final p in entry.value)
-              if (_stageOf[p.type] case final stage?)
-                SleepSample(stage, p.dateFrom, p.dateTo),
-          ]);
-          if (night != null) byDay[entry.key] = night;
+        final nights = healthNightsByWakeDay([
+          for (final p in points)
+            if (_stageOf[p.type] case final stage?)
+              SleepSample(stage, p.dateFrom, p.dateTo),
+        ]);
+        for (final MapEntry(key: day, value: night) in nights.entries) {
+          if (day.isBefore(startOfDay(from)) || !day.isBefore(to)) continue;
+          byDay[day] = night;
         }
       }
     } catch (e) {
@@ -352,10 +349,18 @@ class SleepService {
     Duration? asleep,
   }) async {
     if (wakeTime.isBefore(bedTime)) {
-      wakeTime = wakeTime.add(const Duration(days: 1));
+      // Calendar day, not 24 h: a DST night is 23 or 25 hours long.
+      wakeTime = DateTime(
+        wakeTime.year,
+        wakeTime.month,
+        wakeTime.day + 1,
+        wakeTime.hour,
+        wakeTime.minute,
+      );
     }
-    if (!wakeTime.isAfter(bedTime)) {
-      throw ArgumentError('Wake-up time must be after bedtime');
+    final span = wakeTime.difference(bedTime);
+    if (span < minSleepEntry || span > maxSleepEntry) {
+      throw ArgumentError('Sleep must be 30 minutes to 18 hours');
     }
 
     var duration = asleep ?? wakeTime.difference(bedTime);

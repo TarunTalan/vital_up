@@ -150,7 +150,8 @@ object Wg {
 
     fun isRefreshing(data: SharedPreferences): Boolean {
         val since = data.getString("refreshing_since_ms", null)?.toLongOrNull() ?: return false
-        return System.currentTimeMillis() - since < REFRESH_TIMEOUT_MS
+        // A mark from the future (the clock was ahead, then corrected) is stale.
+        return System.currentTimeMillis() - since in 0 until REFRESH_TIMEOUT_MS
     }
 
     /** Dart clears this when it saves the refreshed data (publishWidgets). */
@@ -172,6 +173,20 @@ object Wg {
     /** Saved values belong to today (daily totals from yesterday are wrong). */
     fun isCurrent(data: SharedPreferences) = data.getString("snapshot_day", null) == today()
 
+    /** Weight is the latest reading, not a daily total: it stays after midnight. */
+    fun isCurrent(data: SharedPreferences, metric: String) = metric == "weight" || isCurrent(data)
+
+    /** The saved detail, or a neutral one when it describes an earlier day. */
+    fun detail(data: SharedPreferences, metric: String): String {
+        val saved = data.getString("m_${metric}_detail", "") ?: ""
+        if (isCurrent(data, metric)) return saved
+        return when (metric) {
+            "mood" -> "Not checked in"
+            "sleep" -> "Not logged"
+            else -> saved
+        }
+    }
+
     private fun updatedAt(data: SharedPreferences): Long =
         data.getString("updated_at_ms", null)?.toLongOrNull() ?: 0L
 
@@ -190,10 +205,13 @@ object Wg {
     fun maybeAutoRefresh(context: Context, data: SharedPreferences) {
         if (!signedIn(data)) return
         val now = System.currentTimeMillis()
-        val stale = !isCurrent(data) || now - updatedAt(data) > STALE_MS
+        // Times from the future (the clock was ahead, then corrected) count
+        // as stale instead of blocking refreshes until real time catches up.
+        val age = now - updatedAt(data)
+        val stale = !isCurrent(data) || age > STALE_MS || age < 0
         if (!stale) return
         val prefs = context.getSharedPreferences(NATIVE_PREFS, Context.MODE_PRIVATE)
-        if (now - prefs.getLong(KEY_LAST_AUTO, 0L) < AUTO_THROTTLE_MS) return
+        if (now - prefs.getLong(KEY_LAST_AUTO, 0L) in 0 until AUTO_THROTTLE_MS) return
         prefs.edit().putLong(KEY_LAST_AUTO, now).apply()
         runInDart(context, Uri.parse("vitalup://widget/refresh"))
     }
@@ -298,7 +316,6 @@ object Wg {
 
     /** Fills slots 1-4 with [metrics]; unused slots are hidden. */
     fun bindSlots(views: RemoteViews, context: Context, data: SharedPreferences, metrics: List<String>, count: Int) {
-        val current = isCurrent(data)
         for (i in 0 until 4) {
             val ids = slotIds[i]
             val metric = metrics.getOrNull(i)
@@ -306,6 +323,7 @@ object Wg {
                 views.setViewVisibility(ids[0], View.GONE)
                 continue
             }
+            val current = isCurrent(data, metric)
             val accent = color(data, metric)
             val progress = if (current) data.getInt("m_${metric}_progress", -1) else 0
             views.setViewVisibility(ids[0], View.VISIBLE)
@@ -314,7 +332,7 @@ object Wg {
             views.setInt(ids[2], "setColorFilter", accent)
             views.setTextViewText(ids[3], data.getString("m_${metric}_label", "") ?: "")
             views.setTextViewText(ids[4], if (current) data.getString("m_${metric}_value", "—") ?: "—" else "—")
-            views.setTextViewText(ids[5], data.getString("m_${metric}_detail", "") ?: "")
+            views.setTextViewText(ids[5], detail(data, metric))
             if (progress < 0) {
                 views.setViewVisibility(ids[6], View.INVISIBLE)
             } else {

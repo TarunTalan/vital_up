@@ -64,6 +64,7 @@ import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
 import '../widgets/water_intake_card.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -346,6 +347,9 @@ class _HomeTabState extends State<_HomeTab> {
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(
     onResume: () {
       if (!mounted) return;
+      // The day or time zone may have changed while away.
+      _scheduleMidnightReload();
+      sl<WeeklySummaryService>().reportTimezone();
       context.read<WaterIntakeCubit>().reload();
       context.read<TrendCubit<SleepSessionInfo>>().load();
       context.read<TrendCubit<WeightLogCache>>().load();
@@ -364,6 +368,7 @@ class _HomeTabState extends State<_HomeTab> {
 
   StreamSubscription<HabitLogged>? _habits;
   StreamSubscription<String>? _pulls;
+  Timer? _midnight;
 
   @override
   void initState() {
@@ -374,6 +379,7 @@ class _HomeTabState extends State<_HomeTab> {
     // devices show up at once.
     _habits = sl<HabitEvents>().stream.listen((e) => _reloadHabit(e.habit));
     _pulls = sl<SyncService>().pulled.listen(_reloadTable);
+    _scheduleMidnightReload();
     if (widget.refreshOnShow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _reloadAll();
@@ -384,9 +390,24 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _midnight?.cancel();
     _habits?.cancel();
     _pulls?.cancel();
     super.dispose();
+  }
+
+  /// With the app left open across midnight, the cards would keep showing
+  /// yesterday's totals.
+  void _scheduleMidnightReload() {
+    _midnight?.cancel();
+    final now = DateTime.now();
+    final wait =
+        nextDay(startOfDay(now)).difference(now) + const Duration(seconds: 1);
+    _midnight = Timer(wait, () {
+      if (!mounted) return;
+      _reloadAll();
+      _scheduleMidnightReload();
+    });
   }
 
   void _reloadHabit(Habit habit) {

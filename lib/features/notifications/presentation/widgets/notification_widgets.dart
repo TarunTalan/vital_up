@@ -7,6 +7,7 @@ import 'package:vital_up/features/community/presentation/widgets/community_widge
 import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Routes an announcement's `data.route` may open.
 const notificationLinkableRoutes = {
@@ -356,9 +357,7 @@ String notificationTimeLabel(DateTime at, DateTime now) {
   final diff = now.difference(at);
   if (diff.inMinutes < 1) return 'Just now';
   if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(at.year, at.month, at.day);
-  final days = today.difference(day).inDays;
+  final days = calendarDaysBetween(at, now);
   if (days == 0) return '${diff.inHours}h ago';
   if (days == 1) return 'Yesterday';
   if (days < 7) return DateFormat('EEEE').format(at);

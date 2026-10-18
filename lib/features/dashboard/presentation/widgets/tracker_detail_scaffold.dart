@@ -509,7 +509,7 @@ class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
 
   String _dayLabel(DateTime day, DateTime now) {
     if (isSameDay(day, now)) return 'Today';
-    if (isSameDay(day, now.subtract(const Duration(days: 1)))) {
+    if (isSameDay(day, previousDay(now))) {
       return 'Yesterday';
     }
     return DateFormat(

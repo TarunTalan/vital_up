@@ -87,6 +87,52 @@ void main() {
     });
   });
 
+  group('screen estimate length', () {
+    test('a screen-off stretch over 18 hours is not a night', () {
+      // Screen off from 6 pm the day before to 1 pm: 19 hours.
+      expect(
+        estimateSleepFromScreen(_usage([(-7, -6), (13, 14)]), wakeDay: _day),
+        isNull,
+      );
+    });
+  });
+
+  group('healthNightsByWakeDay', () {
+    test('keeps a night that crosses midnight together', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.light, _at(-1.5), _at(-0.5)),
+        SleepSample(SleepStage.deep, _at(-0.5), _at(0.5)),
+        SleepSample(SleepStage.rem, _at(0.5), _at(6.5)),
+      ]);
+      expect(nights.keys, [_day]);
+      final night = nights[_day]!;
+      expect(night.bedTime, _at(-1.5));
+      expect(night.wakeTime, _at(6.5));
+      expect(night.lightSleepMinutes, 60);
+      expect(night.deepSleepMinutes, 60);
+      expect(night.duration, const Duration(hours: 8));
+    });
+
+    test('nights on different days stay apart', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.asleep, _at(-25), _at(-17)),
+        SleepSample(SleepStage.asleep, _at(-1), _at(7)),
+      ]);
+      expect(nights.keys.toSet(), {
+        DateTime(2026, 10, 8),
+        _day,
+      });
+    });
+
+    test('a nap and the night on one day: the night wins', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.asleep, _at(-1), _at(7)),
+        SleepSample(SleepStage.asleep, _at(14), _at(15)),
+      ]);
+      expect(nights[_day]!.wakeTime, _at(7));
+    });
+  });
+
   group('buildHealthNight', () {
     test('sums stages and leaves out a nap the same day', () {
       final night = buildHealthNight([

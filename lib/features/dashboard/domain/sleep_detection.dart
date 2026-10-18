@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'entities/sleep_session_info.dart';
+import 'tracker_input_rules.dart';
 
 /// Kinds of sleep sample a health store reports.
 enum SleepStage { asleep, inBed, deep, rem, light, awake }
@@ -20,13 +21,10 @@ class SleepSample {
 /// and a nap, say).
 const _sessionGap = Duration(hours: 2);
 
-/// The main night among [samples] (all ending on one wake-up day): samples
-/// are grouped into sessions and the longest one wins, so a nap never
-/// stretches the night. Null when there are no samples.
-SleepSessionInfo? buildHealthNight(List<SleepSample> samples) {
-  if (samples.isEmpty) return null;
+/// [samples] grouped into sessions (gaps over [_sessionGap] split them),
+/// oldest first.
+List<List<SleepSample>> _sessionsOf(List<SleepSample> samples) {
   final sorted = [...samples]..sort((a, b) => a.from.compareTo(b.from));
-
   final sessions = <List<SleepSample>>[];
   var end = sorted.first.to;
   for (final s in sorted) {
@@ -38,6 +36,36 @@ SleepSessionInfo? buildHealthNight(List<SleepSample> samples) {
       if (s.to.isAfter(end)) end = s.to;
     }
   }
+  return sessions;
+}
+
+/// The main night of each wake-up day (local midnight key) among
+/// [samples]. Samples are grouped into sessions before picking the day, so
+/// the stages of a night that crosses midnight stay together on the day
+/// the user woke up.
+Map<DateTime, SleepSessionInfo> healthNightsByWakeDay(
+  List<SleepSample> samples,
+) {
+  if (samples.isEmpty) return const {};
+  final byDay = <DateTime, List<SleepSample>>{};
+  for (final session in _sessionsOf(samples)) {
+    final wake = session
+        .map((e) => e.to)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    (byDay[DateTime(wake.year, wake.month, wake.day)] ??= []).addAll(session);
+  }
+  return {
+    for (final MapEntry(:key, :value) in byDay.entries)
+      key: ?buildHealthNight(value),
+  };
+}
+
+/// The main night among [samples] (all ending on one wake-up day): samples
+/// are grouped into sessions and the longest one wins, so a nap never
+/// stretches the night. Null when there are no samples.
+SleepSessionInfo? buildHealthNight(List<SleepSample> samples) {
+  if (samples.isEmpty) return null;
+  final sessions = _sessionsOf(samples);
 
   Duration span(List<SleepSample> s) => s
       .map((e) => e.to)
@@ -169,7 +197,9 @@ SleepSessionInfo? estimateSleepFromScreen(
     (n) =>
         !n.to.isBefore(earliestWake) &&
         !n.to.isAfter(latestWake) &&
-        n.to.difference(n.from) >= rules.minSleep,
+        n.to.difference(n.from) >= rules.minSleep &&
+        // Longer than any entry may be (the phone sat unused, say).
+        n.to.difference(n.from) <= maxSleepEntry,
   );
   if (candidates.isEmpty) return null;
   final best = candidates.reduce(

@@ -9,6 +9,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Brings weight entries and workouts from Health Connect / Apple Health
 /// into VitalUp, so people with a smart scale or watch don't log twice.
@@ -87,20 +88,29 @@ class HealthImportService {
 
   /// Imports what's new since the last run. Returns the number of entries
   /// added. Never throws.
+  /// Epoch ms; older installs saved a local ISO string (no offset).
+  DateTime? _lastImport() {
+    final raw = _prefs.get(_keyLastImport);
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
+
   Future<int> import({bool force = false}) =>
       _running ??= _import(force).whenComplete(() => _running = null);
 
   Future<int> _import(bool force) async {
     if (!_supported) return 0;
     final now = DateTime.now();
-    final last = DateTime.tryParse(_prefs.getString(_keyLastImport) ?? '');
-    if (!force && last != null && now.difference(last) < _minInterval) {
+    final last = _lastImport();
+    if (!force && last != null && isWithinLast(_minInterval, last, now: now)) {
       return 0;
     }
-    // Overlap a day so late-syncing devices (watches) aren't missed.
+    // Overlap a day so late-syncing devices (watches) aren't missed. A last
+    // import dated in the future (clock was ahead) must not skip the gap.
     final from = last == null
         ? now.subtract(_firstImport)
-        : last.subtract(const Duration(days: 1));
+        : (last.isAfter(now) ? now : last).subtract(const Duration(days: 1));
     var added = 0;
     try {
       final points = _health.removeDuplicates(
@@ -118,7 +128,7 @@ class HealthImportService {
           debugPrint('Health import skipped ${p.type.name}: $e');
         }
       }
-      await _prefs.setString(_keyLastImport, now.toIso8601String());
+      await _prefs.setInt(_keyLastImport, now.millisecondsSinceEpoch);
     } catch (e) {
       debugPrint('Health import failed: $e');
     }

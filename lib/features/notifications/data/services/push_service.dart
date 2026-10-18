@@ -12,6 +12,7 @@ import 'package:vital_up/features/notifications/domain/repositories/notification
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Pushes are shown by the system while the app is in the background; this
 /// only needs to exist so FCM can wake the app.
@@ -217,8 +218,10 @@ class PushService {
       if (token == _prefs.getString(_keyToken) &&
           user == _prefs.getString(_keyUser) &&
           at != null &&
-          DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(at)) <
-              _reregisterAfter) {
+          isWithinLast(
+            _reregisterAfter,
+            DateTime.fromMillisecondsSinceEpoch(at),
+          )) {
         return;
       }
       await _client
