@@ -9,6 +9,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
   final IsarService isarService;
@@ -43,7 +44,7 @@ class MealLogLocalDataSourceImpl implements MealLogLocalDataSource {
   @override
   Future<List<MealLogEntry>> getMealLogsForDate(DateTime date) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final endOfDay = nextDay(startOfDay);
 
     final caches = await isarService.isar.mealLogCaches
         .where()

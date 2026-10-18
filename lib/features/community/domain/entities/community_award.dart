@@ -60,14 +60,15 @@ int awardPrestige(AwardPeriod period, CommunityType type, int place) {
   return ((period == AwardPeriod.month ? 0 : 3) + scope) * 10 + place;
 }
 
-/// Award rules shared with `20261019_community_awards.sql`; a test keeps
-/// them in sync.
+/// Award rules shared with `20261019_community_awards.sql` (cutoff moved
+/// in `20261023_per_user_days.sql`); a test keeps them in sync.
 abstract final class AwardRules {
   /// Players with points a leaderboard needs that period.
   static const minPlayers = 5;
 
-  /// Days a period stays open for late logs after it ends.
-  static const lateDays = 2;
+  /// Days a period stays open for late logs after it ends (the oldest day
+  /// `submit_daily_report` still accepts is today - 3).
+  static const lateDays = 3;
 
   /// Scoring days are India days (`gamification_today()`).
   static const serverOffset = Duration(hours: 5, minutes: 30);

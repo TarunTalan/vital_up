@@ -297,13 +297,39 @@ void main() {
       expect(result?.pointsAwarded, 12);
     });
 
-    test('backfills at most two days', () async {
+    test('backfills at most three days', () async {
       await prefs.setString(
         'gamification_synced_day_u1',
         GamificationRemoteDataSource.dayParam(_daysAgo(10)),
       );
       await repo().sync();
-      expect(collector.collected, [_daysAgo(2), _daysAgo(1), _today()]);
+      expect(
+        collector.collected,
+        [_daysAgo(3), _daysAgo(2), _daysAgo(1), _today()],
+      );
+    });
+
+    test('a cursor saved with the clock ahead restarts at today', () async {
+      await prefs.setString(
+        'gamification_synced_day_u1',
+        GamificationRemoteDataSource.dayParam(_daysAgo(-5)),
+      );
+      await repo().sync();
+      expect(collector.collected, [_today()]);
+    });
+
+    test('a capped report is sent again on the next sync', () async {
+      remote.respond = (_) => {'points_awarded': 0, 'capped': true};
+      final r = repo();
+      await r.sync();
+      await r.sync();
+      expect(remote.submitted, hasLength(2));
+
+      // Once the logs have reached the server the day settles.
+      remote.respond = (_) => {'points_awarded': 6, 'capped': false};
+      await r.sync();
+      await r.sync();
+      expect(remote.submitted, hasLength(3));
     });
 
     test('a failed submit keeps the day for the next sync', () async {
@@ -336,7 +362,7 @@ void main() {
     });
 
     test('a day the server no longer accepts is skipped', () async {
-      final oldest = _daysAgo(2);
+      final oldest = _daysAgo(3);
       await prefs.setString(
         'gamification_synced_day_u1',
         GamificationRemoteDataSource.dayParam(oldest),
@@ -345,7 +371,7 @@ void main() {
           ? throw Exception('day out of range')
           : {'points_awarded': 6};
       final result = await repo().sync();
-      expect(result?.pointsAwarded, 12);
+      expect(result?.pointsAwarded, 18);
       expect(
         prefs.getString('gamification_synced_day_u1'),
         GamificationRemoteDataSource.dayParam(_today()),

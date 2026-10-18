@@ -17,6 +17,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class MealLogHistoryPage extends StatelessWidget {
   const MealLogHistoryPage({super.key});
@@ -153,7 +154,7 @@ class _MealLogTile extends StatelessWidget {
     if (date == today) {
       return 'Today · $timeStr';
     }
-    final yesterday = today.subtract(const Duration(days: 1));
+    final yesterday = previousDay(today);
     if (date == yesterday) {
       return 'Yesterday · $timeStr';
     }

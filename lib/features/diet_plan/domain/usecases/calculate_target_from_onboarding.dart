@@ -1,5 +1,6 @@
 import '../entities/nutrition_target.dart';
 import '../../../onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/features/profile/domain/profile_rules.dart';
 
 class CalculateTargetFromOnboarding {
   NutritionTarget call(OnboardingData data, {String goal = 'maintain'}) {
@@ -82,10 +83,7 @@ class CalculateTargetFromOnboarding {
       if (dob.isEmpty) return 30;
       // Profile stores ddMMyyyy without separators.
       if (RegExp(r'^\d{8}$').hasMatch(dob)) {
-        final first4 = int.parse(dob.substring(0, 4));
-        final year = first4 > 1900 ? first4 : int.parse(dob.substring(4));
-        final age = DateTime.now().year - year;
-        return age < 0 || age > 120 ? 30 : age;
+        return ProfileRules.ageFromDob(dob) ?? 30;
       }
       List<String> parts = dob.contains('/') ? dob.split('/') : dob.split('-');
       if (parts.length == 3) {

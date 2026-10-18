@@ -87,10 +87,10 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
   int _calculateThisWeekXp(GamificationState gameState) {
     final now = DateTime.now();
     // Start of current week (Monday)
-    final monday = now.subtract(Duration(days: now.weekday - 1));
     var sum = 0;
     for (var i = 0; i <= now.weekday - 1; i++) {
-      final day = monday.add(Duration(days: i));
+      // Calendar days, not 24 h steps: DST days are 23 or 25 hours.
+      final day = DateTime(now.year, now.month, now.day - now.weekday + 1 + i);
       sum += _getPointsForDate(day, gameState);
     }
     return sum;
@@ -129,9 +129,13 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
         // 7 rows: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
         const totalWeeks = 13;
         final currentWeekday = now.weekday; // 1 = Monday, 7 = Sunday
-        final currentWeekMonday = DateTime(now.year, now.month, now.day)
-            .subtract(Duration(days: currentWeekday - 1));
-        final startMonday = currentWeekMonday.subtract(const Duration(days: 7 * (totalWeeks - 1)));
+        // Calendar days, not 24 h steps: after a DST change a Duration
+        // lands on 11 pm the day before and every cell shifts a day.
+        final startMonday = DateTime(
+          now.year,
+          now.month,
+          now.day - (currentWeekday - 1) - 7 * (totalWeeks - 1),
+        );
 
         final selectedKey = _selectedDate != null
             ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
@@ -226,8 +230,11 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard> {
                               children: [
                                 for (var dayIdx = 0; dayIdx < 7; dayIdx++) ...[
                                   () {
-                                    final cellDate = startMonday
-                                        .add(Duration(days: weekIdx * 7 + dayIdx));
+                                    final cellDate = DateTime(
+                                      startMonday.year,
+                                      startMonday.month,
+                                      startMonday.day + weekIdx * 7 + dayIdx,
+                                    );
                                     final isFuture = cellDate.isAfter(now);
                                     final isToday = cellDate.year == now.year &&
                                         cellDate.month == now.month &&

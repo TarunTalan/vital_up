@@ -27,8 +27,10 @@ class GamificationRepositoryImpl implements GamificationRepository {
 
   /// Days before today the server still accepts a report for:
   /// `submit_daily_report` raises "day out of range" for
-  /// `p_day < today - 2`. Widening this needs that check relaxed first.
-  static const maxBackfillDays = 2;
+  /// `p_day < today - 3` (India days; one more than a phone west of India
+  /// needs for two local days). Widening this needs that check relaxed
+  /// first.
+  static const maxBackfillDays = 3;
 
   /// Levels, badges and point rules change with releases, not activity.
   static const catalogMaxAge = Duration(hours: 24);
@@ -75,9 +77,12 @@ class GamificationRepositoryImpl implements GamificationRepository {
       today.month,
       today.day - maxBackfillDays,
     );
-    final synced = DateTime.tryParse(
+    var synced = DateTime.tryParse(
       _prefs.getString(_syncedKey(userId)) ?? '',
     );
+    // Saved while the clock was set ahead: walking from there would skip
+    // every day until real time catches up.
+    if (synced != null && synced.isAfter(today)) synced = today;
 
     // Re-send the last synced day too: it was probably reported mid-day.
     var day = synced == null
@@ -101,12 +106,16 @@ class GamificationRepositoryImpl implements GamificationRepository {
         // user's data under another session.
         if (_remote.userId != userId) return total;
         try {
-          final result = AwardResult.fromJson(
-            await _remote.submitDailyReport(metrics),
-          );
+          final response = await _remote.submitDailyReport(metrics);
+          final result = AwardResult.fromJson(response);
           total = total == null ? result : total.merge(result);
-          sent[param] = fingerprint;
-          await _prefs.setString(_sentKey(userId), jsonEncode(sent));
+          // Capped: the server hasn't got every log behind these figures
+          // yet (uploads run on their own timer). Leave the day unmarked
+          // so the next sync, after the upload, sends it again.
+          if (response['capped'] != true) {
+            sent[param] = fingerprint;
+            await _prefs.setString(_sentKey(userId), jsonEncode(sent));
+          }
           await _markChanged(userId);
         } catch (e) {
           // Device clock / server timezone disagree about the oldest day:

@@ -6,6 +6,7 @@ import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/community/presentation/widgets/award_celebration.dart';
 import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
+import 'package:vital_up/features/gamification/data/repositories/gamification_repository_impl.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
 
@@ -187,20 +188,20 @@ void main() {
     DateTime ist(int y, int m, int d, [int h = 0, int min = 0]) =>
         DateTime.utc(y, m, d, h, min).subtract(AwardRules.serverOffset);
 
-    test('mid-week counts down to the Wednesday after the week', () {
+    test('mid-week counts down to the Thursday after the week', () {
       // Thursday 15 Oct 2026, noon India time.
       final next = nextAwardCountdown(AwardPeriod.week, ist(2026, 10, 15, 12));
       expect(next.ended, isFalse);
       expect(next.periodStart, DateTime(2026, 10, 12));
-      expect(next.announcesAt, ist(2026, 10, 21, 0, 5));
+      expect(next.announcesAt, ist(2026, 10, 22, 0, 5));
     });
 
-    test('Monday and Tuesday wait for last week, late logs still count', () {
-      final now = ist(2026, 10, 20, 9);
+    test('Monday to Wednesday wait for last week, late logs still count', () {
+      final now = ist(2026, 10, 21, 9);
       final next = nextAwardCountdown(AwardPeriod.week, now);
       expect(next.ended, isTrue);
       expect(next.periodStart, DateTime(2026, 10, 12));
-      expect(next.announcesAt, ist(2026, 10, 21, 0, 5));
+      expect(next.announcesAt, ist(2026, 10, 22, 0, 5));
       expect(
         awardCountdownMessage(next, now),
         "Last week's medals in 15h 5m. Late logs still count.",
@@ -210,20 +211,20 @@ void main() {
     test('just after the announcement moves on to the current week', () {
       final next = nextAwardCountdown(
         AwardPeriod.week,
-        ist(2026, 10, 21, 0, 6),
+        ist(2026, 10, 22, 0, 6),
       );
       expect(next.ended, isFalse);
       expect(next.periodStart, DateTime(2026, 10, 19));
     });
 
-    test('months announce on the 3rd, across the year end', () {
+    test('months announce on the 4th, across the year end', () {
       final dec = nextAwardCountdown(AwardPeriod.month, ist(2026, 12, 10));
       expect(dec.periodStart, DateTime(2026, 12));
-      expect(dec.announcesAt, ist(2027, 1, 3, 0, 5));
+      expect(dec.announcesAt, ist(2027, 1, 4, 0, 5));
 
-      final jan2 = nextAwardCountdown(AwardPeriod.month, ist(2027, 1, 2, 23));
-      expect(jan2.ended, isTrue);
-      expect(jan2.periodStart, DateTime(2026, 12));
+      final jan3 = nextAwardCountdown(AwardPeriod.month, ist(2027, 1, 3, 23));
+      expect(jan3.ended, isTrue);
+      expect(jan3.periodStart, DateTime(2026, 12));
     });
 
     test('India date wins over the UTC date', () {
@@ -270,10 +271,20 @@ void main() {
       sql,
       contains('v_min_players CONSTANT INTEGER := ${AwardRules.minPlayers};'),
     );
+    // The cutoff moved one day later with the wider report window.
+    final cutoff = File(
+      'supabase/migrations/20261023_per_user_days.sql',
+    ).readAsStringSync();
     expect(
-      sql,
+      cutoff,
       contains(
         'v_cutoff DATE := gamification_today() - ${AwardRules.lateDays};',
+      ),
+    );
+    expect(
+      cutoff,
+      contains(
+        'p_day < v_today - ${GamificationRepositoryImpl.maxBackfillDays}',
       ),
     );
     // :35 UTC is :05 India time.

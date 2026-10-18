@@ -136,7 +136,7 @@ class ChallengeException implements Exception {
     const messages = {
       'no_friends_selected': 'Pick at least one friend.',
       'too_many_friends': 'You can challenge up to 9 friends at once.',
-      'too_many_challenges': 'Daily challenge limit reached. Try tomorrow.',
+      'too_many_challenges': 'Challenge limit reached. Try again later.',
       'invite_not_found': 'That invite has ended or was already answered.',
       'challenge_not_found': "That challenge isn't available.",
       'challenge_not_active': 'That challenge has already ended.',

@@ -369,8 +369,8 @@ class AwardRulesSheet extends StatelessWidget {
         AwardIcons.starTrophy,
         'When winners are announced',
         'Results are final ${AwardRules.lateDays} days after the period '
-            'ends, so logs you sync late still count: Wednesday for the '
-            'week, the 3rd for the month (just after midnight India time).',
+            'ends, so logs you sync late still count: Thursday for the '
+            'week, the 4th for the month (just after midnight India time).',
       ),
       (
         AwardIcons.silver,
