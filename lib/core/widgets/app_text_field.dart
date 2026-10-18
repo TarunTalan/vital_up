@@ -382,7 +382,7 @@ class _AppTextFieldState extends State<AppTextField> {
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   onTap: widget.onTap,
-                  onTapOutside: (_) {},
+                  onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
                   cursorColor: hasError ? colors.error : colors.primary,
                   style: context.text.bodyMedium?.copyWith(color: textColor),
                   decoration: InputDecoration(

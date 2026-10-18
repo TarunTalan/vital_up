@@ -31,7 +31,10 @@ class BackIcon extends StatelessWidget {
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: onClick,
+            onTap: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              onClick();
+            },
             child: Icon(
               icon,
               size: AppDimens.iconLg,

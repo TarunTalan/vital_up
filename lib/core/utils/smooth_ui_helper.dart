@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
+/// Global key for the root ScaffoldMessenger to allow clearing/displaying snackbars
+/// from anywhere in the app (e.g. during navigation).
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 /// Guards against a double tap opening the same sheet or dialog twice: while
 /// a modal opened from a [BuildContext] is still showing, another open from
 /// that same context within [_reopenGuard] is ignored (returns null).
@@ -79,7 +84,8 @@ void showSmoothSnackBar(
   SnackBarAction? action,
 }) {
   if (!context.mounted) return;
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final messenger =
+      ScaffoldMessenger.maybeOf(context) ?? rootScaffoldMessengerKey.currentState;
   if (messenger == null) return;
   // Never show an empty bubble.
   if (message.trim().isEmpty) message = 'Something went wrong. Try again.';
@@ -167,6 +173,14 @@ void showErrorSnackBar(BuildContext context, String message) {
     iconColor: AppColors.error,
     icon: Icons.error_outline_rounded,
   );
+}
+
+/// Clears any active snackbars currently displayed across the app.
+void clearActiveSnackBars([BuildContext? context]) {
+  if (context != null && context.mounted) {
+    ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+  }
+  rootScaffoldMessengerKey.currentState?.clearSnackBars();
 }
 
 /// Shows a modal bottom sheet with the app-standard look: elevated surface,

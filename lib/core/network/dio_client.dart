@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logger/logger.dart';
 import 'package:vital_up/core/network/retry_interceptor.dart';
+import 'package:vital_up/core/services/app_loading_controller.dart';
 
 class DioClient {
   final Dio _dio;
@@ -57,6 +58,30 @@ class DioClient {
         },
         onError: (DioException error, handler) async {
           _logger.e('Error: [${error.response?.statusCode}] ${error.message}');
+          return handler.next(error);
+        },
+      ),
+    );
+
+    // 3. Global Loading & Screen Interactivity Interceptor
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.extra['silent'] != true) {
+            AppLoadingController.instance.startRequest();
+          }
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          if (response.requestOptions.extra['silent'] != true) {
+            AppLoadingController.instance.endRequest();
+          }
+          return handler.next(response);
+        },
+        onError: (DioException error, handler) {
+          if (error.requestOptions.extra['silent'] != true) {
+            AppLoadingController.instance.endRequest();
+          }
           return handler.next(error);
         },
       ),

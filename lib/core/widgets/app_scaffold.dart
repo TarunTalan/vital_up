@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/services/app_loading_controller.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -10,10 +11,10 @@ import 'package:vital_up/features/auth/presentation/widgets/auth_background.dart
 /// and capped at 600dp on tablets, and an optional pinned [bottomBar]
 /// (e.g. a primary CTA) that lifts above the keyboard.
 ///
-/// Set [scrollable] to false for bodies that manage their own scrolling
-/// (lists, maps); they still get the gutter + width cap unless
-/// [padBody] is false.
-class AppScaffold extends StatelessWidget {
+/// When [isLoading] or [isBusy] is true (or when [body] is a loader),
+/// the whole screen is rendered completely un-interactive: touches,
+/// taps, scrolling, and system back actions are disabled.
+class AppScaffold extends StatefulWidget {
   final Widget? header;
   final Widget body;
   final Widget? bottomBar;
@@ -24,6 +25,7 @@ class AppScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Future<void> Function()? onRefresh;
   final bool isLoading;
+  final bool isBusy;
 
   const AppScaffold({
     super.key,
@@ -37,13 +39,68 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.onRefresh,
     this.isLoading = false,
+    this.isBusy = false,
   });
+
+  @override
+  State<AppScaffold> createState() => _AppScaffoldState();
+}
+
+class _AppScaffoldState extends State<AppScaffold> {
+  bool get _isLoaderBody {
+    final w = widget.body;
+    if (w is VitalUpLoader) return true;
+    if (w is Center && w.child is VitalUpLoader) return true;
+    return false;
+  }
+
+  bool get _effectiveLoading =>
+      widget.isLoading || widget.isBusy || _isLoaderBody;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_effectiveLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _effectiveLoading) {
+          AppLoadingController.instance.setTokenLoading(this, true);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AppScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasLoading = oldWidget.isLoading ||
+        oldWidget.isBusy ||
+        (oldWidget.body is VitalUpLoader) ||
+        (oldWidget.body is Center &&
+            (oldWidget.body as Center).child is VitalUpLoader);
+    final nowLoading = _effectiveLoading;
+
+    if (wasLoading != nowLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          AppLoadingController.instance.setTokenLoading(this, nowLoading);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_effectiveLoading) {
+      AppLoadingController.instance.setTokenLoading(this, false);
+    }
+    super.dispose();
+  }
 
   /// Pull-to-refresh never spins forever and never surfaces an error from
   /// here: the page shows its own state once the reload settles.
   Future<void> _refresh() async {
     try {
-      await onRefresh!().timeout(kLoadTimeout);
+      await widget.onRefresh!().timeout(kLoadTimeout);
     } catch (e) {
       debugPrint('AppScaffold: refresh failed: $e');
     }
@@ -51,8 +108,8 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final padding = bodyPadding ??
-        (padBody
+    final padding = widget.bodyPadding ??
+        (widget.padBody
             ? EdgeInsets.fromLTRB(
                 context.gutter,
                 AppDimens.sectionGap,
@@ -62,20 +119,22 @@ class AppScaffold extends StatelessWidget {
             : EdgeInsets.zero);
 
     Widget content = ResponsiveCenter(
-      child: Padding(padding: padding, child: body),
+      child: Padding(padding: padding, child: widget.body),
     );
 
-    if (scrollable) {
+    if (widget.scrollable) {
       content = LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
-          physics: onRefresh != null ? const AlwaysScrollableScrollPhysics() : null,
+          physics: widget.onRefresh != null
+              ? const AlwaysScrollableScrollPhysics()
+              : null,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: ResponsiveCenter(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(padding: padding, child: body),
+                child: Padding(padding: padding, child: widget.body),
               ),
             ),
           ),
@@ -83,23 +142,25 @@ class AppScaffold extends StatelessWidget {
       );
     }
 
-    if (onRefresh != null) {
+    if (widget.onRefresh != null) {
       content = RefreshIndicator(
         onRefresh: _refresh,
         child: content,
       );
     }
 
+    final isPageLoading = widget.isLoading || _isLoaderBody;
+
     final page = Column(
       children: [
-        ?header,
-        if (header == null) SizedBox(height: context.safePadding.top),
+        ?widget.header,
+        if (widget.header == null) SizedBox(height: context.safePadding.top),
         Expanded(
-          child: isLoading
+          child: isPageLoading
               ? const Center(child: VitalUpLoader())
               : content,
         ),
-        if (bottomBar != null)
+        if (widget.bottomBar != null)
           SafeArea(
             top: false,
             child: ResponsiveCenter(
@@ -110,18 +171,51 @@ class AppScaffold extends StatelessWidget {
                   context.gutter,
                   AppDimens.space16,
                 ),
-                child: bottomBar,
+                child: widget.bottomBar,
               ),
             ),
           ),
       ],
     );
 
-    return Scaffold(
-      backgroundColor:
-          showBackground ? Colors.transparent : context.colors.surface,
-      floatingActionButton: floatingActionButton,
-      body: showBackground ? AuthBackground(child: page) : page,
+    final pageWithUnfocus = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: page,
+    );
+
+    final baseScaffold = Scaffold(
+      backgroundColor: widget.showBackground
+          ? Colors.transparent
+          : context.colors.surface,
+      floatingActionButton: widget.floatingActionButton,
+      body: widget.showBackground
+          ? AuthBackground(child: pageWithUnfocus)
+          : pageWithUnfocus,
+    );
+
+    final isUninteractive = _effectiveLoading;
+
+    final scaffoldWithOverlay = Stack(
+      children: [
+        baseScaffold,
+        if (widget.isBusy && !isPageLoading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.15),
+              alignment: Alignment.center,
+              child: const VitalUpLoader(),
+            ),
+          ),
+      ],
+    );
+
+    return PopScope(
+      canPop: !isUninteractive,
+      child: AbsorbPointer(
+        absorbing: isUninteractive,
+        child: scaffoldWithOverlay,
+      ),
     );
   }
 }

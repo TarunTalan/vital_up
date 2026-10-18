@@ -79,6 +79,39 @@ import 'package:vital_up/features/gamification/presentation/cubit/activity_calen
 import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/monitoring/analytics_service.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+
+/// Clears active snackbars and unfocuses active input fields whenever navigation occurs.
+class AppNavigationObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    _onNavigation();
+  }
+
+  void _onNavigation() {
+    clearActiveSnackBars();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+}
 
 class AppRouter {
   AppRouter._();
@@ -100,7 +133,10 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
-    observers: [AnalyticsService.observer],
+    observers: [
+      AnalyticsService.observer,
+      AppNavigationObserver(),
+    ],
     redirect: (context, state) {
       if (_publicPaths.contains(state.uri.path)) return null;
       final signedIn = Supabase.instance.client.auth.currentSession != null;

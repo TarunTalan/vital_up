@@ -278,7 +278,7 @@ class _AuthTextFieldState extends State<AuthTextField>
                             : widget.maxLength,
                         multiline: !widget.singleLine,
                       ),
-                      onTapOutside: (event) {},
+                      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
                       style: context.text.bodyMedium?.copyWith(
                         color: textColor,
                       ),
