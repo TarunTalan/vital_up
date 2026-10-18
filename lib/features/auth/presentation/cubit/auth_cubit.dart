@@ -272,6 +272,9 @@ class AuthCubit extends Cubit<AuthState> {
         msg.contains('google')) {
       return "Couldn't sign in with Google. Try again.";
     }
+    if (msg.contains('username_throttled')) {
+      return 'Too many tries. Sign in with your email instead.';
+    }
     if (msg.contains('rate limit') ||
         msg.contains('too many requests') ||
         msg.contains('too_many_requests') ||

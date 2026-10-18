@@ -71,8 +71,18 @@ class AccountService {
     return null;
   }
 
-  /// Removes the signed-in user's logs, workouts and reminders from this
-  /// device (sign-out). Settings and goals stay.
+  /// Personal goals (backed up per account as `goals`, restored on the next
+  /// sign-in). Cleared on sign-out so the next account here starts from
+  /// defaults instead of inheriting (and uploading) them.
+  static const goalKeys = [
+    'activity_goals_v1',
+    'daily_water_goal',
+    'daily_sleep_goal_min',
+    'daily_screen_time_limit_min',
+  ];
+
+  /// Removes the signed-in user's logs, workouts, goals and reminders from
+  /// this device (sign-out). Settings (theme, units...) stay.
   Future<void> clearLocalUserData() async {
     // First: a sync still running must not write rows back after the wipe.
     await _step('sync', _sync.stop);
@@ -87,6 +97,11 @@ class AccountService {
     // would hand this user's notes and plan to the next account here.
     await _step('workout notes', () async {
       await _prefs.remove(ActivityHistoryRepositoryImpl.annotationsKey);
+    });
+    await _step('goals', () async {
+      for (final key in goalKeys) {
+        await _prefs.remove(key);
+      }
     });
     await _step('diet plan preferences', () async {
       await _prefs.remove(DietPlanRepositoryImpl.preferencesKey);

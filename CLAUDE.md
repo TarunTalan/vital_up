@@ -248,8 +248,7 @@ Route names are GoRouter `name`s.
   `PushService.unregister` -> `SyncService.sync` ->
   `AccountService.clearLocalUserData` (`SyncService.stop` first; logs,
   workouts, reminders, onboarding answers, backup markers and queued
-  server writes wiped;
-  settings/goals kept). Signup terms: `terms_dialog.dart` + legal links.
+  server writes, goals wiped; settings kept). Signup terms: `terms_dialog.dart` + legal links.
 - **onboarding:** `health-onboarding` then `health-personal-details`,
   `health-height`, `health-weight`, `health-dietary-preference`,
   `health-goals`, `health-activity`, `health-info-permission`.
@@ -492,6 +491,12 @@ Route names are GoRouter `name`s.
   `prune-email-send-log` keeps 2 days.
   `20261024_challenge_request_id.sql`: `create_challenge(..., p_request_id)`
   is idempotent per creator (client `ChallengeRequestIds`).
+  `20261025_login_push_hardening.sql`: `login_email` throttles per
+  username + caller address (`_request_caller()` from the gateway headers;
+  10 per 15 min) with a 50 per username cap, raising `too_many_attempts`
+  (app: "Sign in with your email instead"); `register_push_token` may take
+  another account's token at most 3 times a day
+  (`push_token_takeovers`, service only).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -600,9 +605,8 @@ check comes first (postgrest retries 1+2+4 s);
 food scan has no long-wait hint or cancel; label-scan loader
   is a dialog; leaderboard jumps on reload; activity history shows a
   full-page loader on refresh; meal history pull spinner ends early;
-  meals/workouts not tied to a user id locally; a new account inherits the
-  previous account's goals/reminders; push tokens can be moved by someone
-  who knows the token; username login can be throttled by wrong guesses.
+  meals/workouts not tied to a user id locally; 50 wrong guesses in 15 min
+  from many addresses still block username sign-in (email still works).
 
 ### Remaining:
 1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).

@@ -89,5 +89,6 @@ class RemindersLocalDataSource {
     await _prefs.remove(_keyReminders);
     await _prefs.remove(_keyScheduledIds);
     await _prefs.remove(_keySkipped);
+    await _prefs.remove(_keySmartSkip);
   }
 }

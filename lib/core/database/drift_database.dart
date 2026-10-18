@@ -98,6 +98,8 @@ class AppDatabase extends _$AppDatabase {
           }
         },
         beforeOpen: (details) async {
+          // Prevent SQLITE_BUSY / database locked errors during concurrent startup.
+          await customStatement('PRAGMA busy_timeout = 5000');
           // SQLite ships with foreign keys off; without this the cascade on
           // track points never fires and deleted sessions leave them behind.
           await customStatement('PRAGMA foreign_keys = ON');
@@ -261,6 +263,12 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'vital_up_activity.db'));
-    return NativeDatabase.createInBackground(file);
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (rawDb) {
+        rawDb.execute('PRAGMA journal_mode = WAL;');
+        rawDb.execute('PRAGMA busy_timeout = 5000;');
+      },
+    );
   });
 }

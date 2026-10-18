@@ -483,14 +483,6 @@ Future<void> initDependencies() async {
       store: sl<WorkoutCheckpointStore>(),
     ),
   );
-  // A workout still open from a previous run means the app was killed
-  // mid-recording. A recent one stays open for the tracking screen to offer
-  // resuming; anything else is closed so its progress shows in history.
-  try {
-    await sl<WorkoutRecoveryService>().settleAtStartup();
-  } catch (e) {
-    debugPrint('Could not finalize interrupted activity sessions: $e');
-  }
   sl.registerLazySingleton<ActivityHistoryRepository>(
     () => ActivityHistoryRepositoryImpl(
       activityRepository: sl<ActivityRepository>(),
@@ -769,12 +761,11 @@ Future<void> initDependencies() async {
             ],
             onRestored: () => sl<SettingsCubit>().loadSettings(),
           ),
-          PrefsBackupSource('goals', sl<SharedPreferences>(), [
-            'activity_goals_v1',
-            'daily_water_goal',
-            'daily_sleep_goal_min',
-            'daily_screen_time_limit_min',
-          ]),
+          PrefsBackupSource(
+            'goals',
+            sl<SharedPreferences>(),
+            AccountService.goalKeys,
+          ),
           PrefsBackupSource(
             'reminders',
             sl<SharedPreferences>(),
@@ -901,12 +892,11 @@ Future<void> initDependencies() async {
           'settings_height_unit',
           SettingsLocalDataSourceImpl.keyAnalyticsEnabled,
         ]),
-        PrefsBackupSource('goals', sl<SharedPreferences>(), [
-          'activity_goals_v1',
-          'daily_water_goal',
-          'daily_sleep_goal_min',
-          'daily_screen_time_limit_min',
-        ]),
+        PrefsBackupSource(
+          'goals',
+          sl<SharedPreferences>(),
+          AccountService.goalKeys,
+        ),
         PrefsBackupSource('vita', sl<SharedPreferences>(), [
           'vita_chat_{user}',
           'vita_checkins_{user}',
@@ -931,4 +921,14 @@ Future<void> initDependencies() async {
       activityHistoryRepo: sl<ActivityHistoryRepository>(),
     ),
   );
+
+  // A workout still open from a previous run means the app was killed
+  // mid-recording. A recent one stays open for the tracking screen to offer
+  // resuming; anything else is closed so its progress shows in history.
+  // Run after all singletons (including SyncService and ActivityRepository) are ready.
+  try {
+    await sl<WorkoutRecoveryService>().settleAtStartup();
+  } catch (e) {
+    debugPrint('Could not finalize interrupted activity sessions: $e');
+  }
 }

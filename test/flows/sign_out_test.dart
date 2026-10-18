@@ -151,7 +151,8 @@ Future<void> main() async {
     await prefs.setString('active_plan_preferences', '{"diet":"veg"}');
     await prefs.setString('activity_in_progress_v1', '{"id":"ride-1"}');
     await prefs.setString('reminders_v1', '[]');
-    // Device settings and goals stay for whoever uses the phone next.
+    // Device settings stay for whoever uses the phone next; goals are the
+    // account's (restored from its backup on the next sign-in).
     await prefs.setString('settings_theme_mode', 'dark');
     await prefs.setInt('daily_water_goal', 3000);
     return photo;
@@ -176,7 +177,7 @@ Future<void> main() async {
     expect(keys, isNot(contains('activity_in_progress_v1')));
     expect(keys, isNot(contains('reminders_v1')));
     expect(phone.prefs.getString('settings_theme_mode'), 'dark');
-    expect(phone.prefs.getInt('daily_water_goal'), 3000);
+    expect(phone.prefs.getInt('daily_water_goal'), isNull);
   }
 
   test(

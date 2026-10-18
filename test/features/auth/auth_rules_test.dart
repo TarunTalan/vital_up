@@ -62,6 +62,13 @@ void main() {
         AuthCubit.messageForFailure('Invalid login credentials'),
         AuthCubit.credentialsMessage,
       );
+      // login_email throttled this username: email sign-in still works.
+      expect(
+        AuthCubit.messageForFailure(
+          'AuthException(message: username_throttled, statusCode: null)',
+        ),
+        'Too many tries. Sign in with your email instead.',
+      );
       expect(
         AuthCubit.messageForFailure('Token has expired or is invalid', otp: true),
         'Wrong or expired code. Try again.',

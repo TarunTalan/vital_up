@@ -40,12 +40,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       // server only returns the email together with the right password, so
       // usernames (shown on leaderboards) can't be turned into emails.
       if (!email.contains('@')) {
-         final response = await _supabaseClient
-             .rpc('login_email', params: {
-               'p_username': request.username.trim(),
-               'p_password': request.password,
-             })
-             .timeout(_timeout);
+         final Object? response;
+         try {
+           response = await _supabaseClient
+               .rpc('login_email', params: {
+                 'p_username': request.username.trim(),
+                 'p_password': request.password,
+               })
+               .timeout(_timeout);
+         } on PostgrestException catch (e) {
+           // Too many wrong tries for this username (20261025); email
+           // sign-in isn't throttled by it.
+           if (e.message.contains('too_many_attempts')) {
+             throw const AuthException('username_throttled');
+           }
+           rethrow;
+         }
          if (response != null && response is String && response.isNotEmpty) {
            email = response;
          } else {
