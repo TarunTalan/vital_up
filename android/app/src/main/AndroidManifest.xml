@@ -59,6 +59,11 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- ML Kit OCR and barcode models come from Google Play Services
+             (see build.gradle.kts); download them at install time. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr,barcode" />
         <meta-data
             android:name="com.pravera.flutter_foreground_task.NOTIFICATION_ICON"
             android:resource="@mipmap/ic_launcher" />

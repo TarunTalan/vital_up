@@ -772,6 +772,7 @@ Future<void> initDependencies() async {
             'activity_goals_v1',
             'daily_water_goal',
             'daily_sleep_goal_min',
+            'daily_screen_time_limit_min',
           ]),
           PrefsBackupSource(
             'reminders',
@@ -779,13 +780,24 @@ Future<void> initDependencies() async {
             ['reminders_v1', 'reminders_smart_skip'],
             onRestored: () => sl<RemindersService>().resync(),
           ),
-          PrefsBackupSource('stress', sl<SharedPreferences>(), [
-            'vita_checkins_{user}',
-            'vita_scores_{user}',
-          ]),
-          PrefsBackupSource('workout_notes', sl<SharedPreferences>(), [
-            ActivityHistoryRepositoryImpl.annotationsKey,
-          ]),
+          // Grow on every device: merged entry by entry, so check-ins or
+          // notes added on two phones are all kept.
+          PrefsBackupSource(
+            'stress',
+            sl<SharedPreferences>(),
+            ['vita_checkins_{user}', 'vita_scores_{user}'],
+            entryKeys: {
+              // One check-in per day; `d` is its local ISO date-time.
+              'vita_checkins_{user}': checkInDayId,
+              'vita_scores_{user}': null,
+            },
+          ),
+          PrefsBackupSource(
+            'workout_notes',
+            sl<SharedPreferences>(),
+            [ActivityHistoryRepositoryImpl.annotationsKey],
+            entryKeys: {ActivityHistoryRepositoryImpl.annotationsKey: null},
+          ),
           DietPlanBackupSource(sl<IsarService>(), sl<SharedPreferences>()),
         ]),
       ],

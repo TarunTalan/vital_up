@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
@@ -36,13 +37,28 @@ import 'package:vital_up/core/config/secure_session_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false; // bundled in assets/google_fonts
+  // OFL fonts ship with their licences; list them on the licences page.
+  LicenseRegistry.addLicense(() async* {
+    for (final (name, file) in [
+      ('Nunito', 'Nunito-OFL.txt'),
+      ('JetBrains Mono', 'JetBrainsMono-OFL.txt'),
+    ]) {
+      yield LicenseEntryWithLineBreaks([
+        name,
+      ], await rootBundle.loadString('assets/fonts/licenses/$file'));
+    }
+  });
   // debugPrint still writes to logcat in release builds, and error text can
   // carry server or health details. Real problems go to Crashlytics.
   if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
 
   // Uncaught errors go to Crashlytics (release builds, once configured).
-  await CrashReporter.init();
-  await AnalyticsService.init();
+  // Firebase and Supabase don't depend on each other: start both now and
+  // only wait for Firebase where it's needed.
+  final firebaseReady = CrashReporter.init().then(
+    (_) => AnalyticsService.init(),
+  );
 
   // A widget that fails to build shows a calm placeholder in release
   // builds instead of the grey/red error box with raw exception text.
@@ -55,7 +71,7 @@ void main() async {
   MapboxOptions.setAccessToken(SupabaseConfig.mapboxAccessToken);
 
   // Lock the app to Portrait mode
-  await SystemChrome.setPreferredOrientations([
+  final orientationSet = SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
@@ -73,13 +89,22 @@ void main() async {
 
     // Initialize dependency injection (database, network, storage, etc.)
     await di.initDependencies();
+    // Push and the user watchers below need Firebase.
+    await firebaseReady;
 
     // Push notifications (no-op until Firebase is configured).
     sl<PushService>().init().catchError((e) => debugPrint('Push init error: $e'));
 
-    // Re-apply reminders (app update, time-zone change).
-    sl<RemindersService>().resync().catchError((e) => debugPrint('Reminders resync error: $e'));
-    sl<RemindersService>().resyncOnNewDay();
+    // Re-apply reminders (app update, time-zone change). Loading the time
+    // zone database is heavy synchronous work: keep it off the first frames.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        sl<RemindersService>().resync().catchError(
+          (e) => debugPrint('Reminders resync error: $e'),
+        );
+        sl<RemindersService>().resyncOnNewDay();
+      });
+    });
 
     CrashReporter.watchUser(sl<SupabaseClient>());
     AnalyticsService.watchUser(sl<SupabaseClient>());
@@ -95,6 +120,9 @@ void main() async {
   } catch (e, stackTrace) {
     CrashReporter.report(e, stackTrace, reason: 'Initialization failed');
   }
+  // Both are quick and never throw; make sure they're done before the UI.
+  await firebaseReady.catchError((_) {});
+  await orientationSet;
 
   // Core services are missing (e.g. the database couldn't open): the app
   // can't work, so say so plainly instead of crashing on the first lookup.
@@ -103,11 +131,12 @@ void main() async {
     return;
   }
 
+  // Constant conditions: release builds drop device_preview entirely, and
+  // profile builds skip it so performance traces are honest.
   runApp(
-    DevicePreview(
-      enabled: !kReleaseMode,
-      builder: (context) => const MyApp(),
-    ),
+    !kDebugMode
+        ? const MyApp()
+        : DevicePreview(builder: (context) => const MyApp()),
   );
 }
 
@@ -148,13 +177,15 @@ class MyApp extends StatelessWidget {
             title: 'VitalUp',
             debugShowCheckedModeBanner: false,
             scaffoldMessengerKey: rootScaffoldMessengerKey,
-            locale: DevicePreview.locale(context),
+            locale: kDebugMode ? DevicePreview.locale(context) : null,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeMode,
             routerConfig: AppRouter.router,
             builder: (context, child) {
-              final previewChild = DevicePreview.appBuilder(context, child);
+              final previewChild = kDebugMode
+                  ? DevicePreview.appBuilder(context, child)
+                  : child!;
               return AppLoadingBarrier(
                 child: MultiBlocListener(
                   listeners: [

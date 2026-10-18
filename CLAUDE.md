@@ -125,7 +125,9 @@ supabase functions deploy <name>
     short text, note, chat message, city) and ranges (height, weight, age,
     water, calories, grams, steps goal, sleep goal).
   - `InputFormatters.text(max, multiline:)`: blocks invisible/control
-    characters, line breaks on single-line fields, and caps length.
+    characters (but keeps ZWJ/ZWNJ/LRM/RLM: emoji sequences and Indic or
+    Persian text need them), line breaks on single-line fields, and caps
+    length by characters (never `substring` user text).
   - `sanitizeText` / `sanitizeOptional`: clean typed text before saving or
     sending it anywhere (server, AI, prefs). `parseNumberInRange` for typed
     numbers (accepts `,` decimals, rejects NaN/out of range).
@@ -189,7 +191,12 @@ make one back press skip two tabs).
   `track*`, `stressLevels`, `scoreBonus`...), `app_dimens.dart` (`AppDimens`
   spacing/radii/sizes, `AppShadows`, `AppDurations`), `app_text_styles.dart`,
   `app_theme.dart` (`VitalUpColors` extension). `design/figma_tokens.md` maps
-  them to Figma. Font: SF Pro Rounded.
+  them to Figma. Font: Nunito (SIL OFL; replaced SF Pro Rounded, whose
+  Apple licence doesn't allow Android), weights 300-700 subset to Latin +
+  punctuation + currency (`assets/fonts`, widgets use `res/font/nunito_*`);
+  captions use JetBrains Mono bundled in `assets/google_fonts` (runtime
+  fetching off in `main.dart`). Figma must use Nunito too. Arrows and
+  geometric symbols aren't in the subset (system font fallback).
 - Lookups: `context.colors`, `context.text`, `context.vColors` (glassFill,
   glassBorder, grayText, primaryFill, track, success, warning, termsLink,
   `accentText` = primary as readable text, deeper in light mode...),
@@ -313,8 +320,12 @@ Route names are GoRouter `name`s.
   `flutter_foreground_task` location service (no battery exemption). That
   service is for workouts only: it's declared `location`, and starting it
   for anything else (audio downloads did) crashes on Android 14+ without
-  location permission. `getSessions(since:, withRoutes: false)` for
-  totals-only reads (activity goals, widgets).
+  location permission. `getSessions` / `GetActivityHistory` load no GPS
+  routes unless `withRoutes: true` (only the data export asks); always
+  pass `since:` (track points are read per session id in SQL). The
+  tracking page updates the route/puck annotations in place and holds map
+  calls while hidden. The activity calendar reads a month at once
+  (`DailyMetricsCollector.collectDays`).
   Mapbox map with offline packs, pedometer with glitch filtering, BLE
   heart-rate straps (`flutter_blue_plus`), TTS voice coach, music/local
   audio. Gotcha: geolocator has one position stream; cancel the map preview
@@ -381,7 +392,10 @@ Route names are GoRouter `name`s.
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
-  - **Achievement Badges (32 SVGs):** `assets/icons/badges/` contains 3D
+  - **Achievement Badges (32):** shipped as lossless WebP in
+    `assets/images/badges/` (converted pixel-identical from the source SVGs
+    in `assets/icons/badges/`, which stay in the repo but out of
+    pubspec; re-run the conversion if the SVGs change). 3D
     photorealistic badges with transparent backgrounds across streaks (`streak_3`,
     `streak_7`, `streak_30`, `streak_100`, `streak_365`), steps (`steps_10k`,
     `steps_20k`, `steps_30k`), workouts (`workouts_1`, `workouts_25`,
@@ -394,7 +408,8 @@ Route names are GoRouter `name`s.
   - **Badge Architecture:** Built as standalone SVGs embedding base64 high-res
     PNGs to preserve raytraced 3D glassmorphism, neon glows, and specular
     lighting without path degradation. `GameIcon` (`game_icon.dart`) renders
-    SVGs and PNGs, bypassing color tint filters for `/badges/` assets.
+    SVGs, PNGs and WebP (raster decoded at shown size), never tinting
+    badge/award art.
   - **Badge Widgets:** `lib/features/gamification/presentation/widgets/badge_widgets.dart`
     provides `BadgeEmblem` (greyscale + reduced opacity when locked), `BadgeTile`,
     `showBadgeDetailSheet`, and responsive `_BadgeGrid`.
@@ -473,6 +488,8 @@ Route names are GoRouter `name`s.
   `20261023_per_user_days.sql`: per-user days (above), live leaderboards
   end at the period's end, weekly summary falls back to IST, daily cron
   `prune-email-send-log` keeps 2 days.
+  `20261024_challenge_request_id.sql`: `create_challenge(..., p_request_id)`
+  is idempotent per creator (client `ChallengeRequestIds`).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -559,8 +576,16 @@ Route names are GoRouter `name`s.
 - Partial: 3 lifecycle/process death (code fixes; device tests pending),
   9 tests (code rules, sync/profile tests; no integration or Drift v1->v6
   migration test yet).
-- Not started: 5 input & display edge cases, 7 performance (skipped
-  frames, memory, 200 MB APK).
+- Done in code (Oct 18, device checks pending; `20261024` not deployed):
+  5 input & display (system text size honoured up to 2.0 in
+  `ResponsiveTextScale`, scrolling sheets/dialogs, no ellipsis on names or
+  stats, `NameWithYouTag`, meal macros summed, two-device merges in
+  `PrefsBackupSource`, profile saves send changed columns only, session
+  errors queued, timeouts on server writes) and 7 performance (startup
+  in parallel and deferred, Home reloads throttled to 30 s, no GPS routes
+  in history reads, camera NV21 without copies, image `cacheWidth`, fewer
+  blurs, Nunito instead of SF Pro (0.4 MB vs 28 MB), ML Kit from Play
+  Services, `device_preview` only in debug; arm64 download ~29 MB est.).
 - Decide: 10 iOS gaps (no Crashlytics, push or widgets).
 - Known leftovers: AI keys are one per function for every user (no
   premium routing; free-tier Gemini may use prompts); backup conflicts

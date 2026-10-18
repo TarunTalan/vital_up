@@ -88,3 +88,16 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
+
+// ML Kit through Google Play Services instead of bundling the OCR and
+// barcode models (about 7 MB less per device). Same Java API; Play Services
+// downloads the models at install (see com.google.mlkit.vision.DEPENDENCIES
+// in the manifest).
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.mlkit:text-recognition"))
+            .using(module("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1"))
+        substitute(module("com.google.mlkit:barcode-scanning"))
+            .using(module("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1"))
+    }
+}
