@@ -174,11 +174,15 @@ class _MealLogTile extends StatelessWidget {
           Row(
             children: [
               _MealTypeBadge(mealType: entry.mealType),
-              const Spacer(),
-              Text(
-                _formatDateTime(entry.capturedAt),
-                style: context.text.bodySmall?.copyWith(
-                  color: context.vColors.grayText,
+              const SizedBox(width: AppDimens.space8),
+              // Wraps at large text sizes instead of pushing the row wider.
+              Expanded(
+                child: Text(
+                  _formatDateTime(entry.capturedAt),
+                  textAlign: TextAlign.end,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
                 ),
               ),
               const SizedBox(width: AppDimens.space4),

@@ -250,6 +250,11 @@ class PendingWrites {
     ]);
   }
 
+  /// Drops every queued write (sign-out: the account's queued health and
+  /// profile edits must not stay on a shared phone, or be sent over newer
+  /// values if that account signs in here again).
+  Future<void> clear() => _prefs.remove(_storageKey);
+
   /// Writes queued for [userId].
   int countFor(String userId) => _all().where((w) => w.userId == userId).length;
 

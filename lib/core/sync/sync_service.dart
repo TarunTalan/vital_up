@@ -232,6 +232,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   /// Also forgets which backups ([BackupSyncAdapter]) were last seen: with
   /// no state, the next sign-in restores the cloud copy instead of
   /// uploading this device's now-empty reminders, notes and plan over it.
+  /// Queued server writes ([PendingWrites]) are dropped too.
   Future<void> reset() async {
     for (final key in _prefs.getKeys().toList()) {
       if (key.startsWith('sync_cursor_') || key.startsWith('backup_state_')) {
@@ -239,6 +240,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       }
     }
     await _prefs.remove(_keyDeletes);
+    await _writes.clear();
     _lastPull = null;
   }
 

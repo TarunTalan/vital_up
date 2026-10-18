@@ -124,9 +124,11 @@ class _ActivityHistoryView extends StatelessWidget {
                       ),
                     ),
                     if (entries.isEmpty)
-                      const SliverFillRemaining(
+                      SliverFillRemaining(
                         hasScrollBody: false,
-                        child: _EmptyHistory(),
+                        child: _EmptyHistory(
+                          noActivities: loaded.allEntries.isEmpty,
+                        ),
                       )
                     else
                       SliverPadding(
@@ -314,7 +316,10 @@ class _SummaryStat extends StatelessWidget {
 }
 
 class _EmptyHistory extends StatelessWidget {
-  const _EmptyHistory();
+  const _EmptyHistory({required this.noActivities});
+
+  /// True when nothing was ever recorded (vs. a filter hiding everything).
+  final bool noActivities;
 
   @override
   Widget build(BuildContext context) {
@@ -331,14 +336,16 @@ class _EmptyHistory extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space12),
             Text(
-              'No activities match',
+              noActivities ? 'No activities yet' : 'No activities match',
               style: context.text.titleSmall?.copyWith(
                 color: context.colors.onSurface,
               ),
             ),
             const SizedBox(height: AppDimens.space4),
             Text(
-              'Try a different filter or search term.',
+              noActivities
+                  ? 'Your finished workouts will show up here.'
+                  : 'Try a different filter or search term.',
               style: context.text.bodyMedium?.copyWith(color: v.grayText),
               textAlign: TextAlign.center,
             ),

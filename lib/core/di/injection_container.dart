@@ -242,6 +242,7 @@ Future<void> initDependencies() async {
     () => AuthRepositoryImpl(
       remoteDataSource: sl<AuthRemoteDataSource>(),
       localDataSource: sl<AuthLocalDataSource>(),
+      connectivity: sl<ConnectivityService>(),
     ),
   );
 

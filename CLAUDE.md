@@ -240,13 +240,15 @@ Route names are GoRouter `name`s.
   email OTP (taken email/username checked via `email_registered` /
   `signup_username_available` RPCs, never by reading `profiles`), password reset by OTP, Google (`signInWithIdToken`); no Apple.
   Splash -> `dashboard` / `health-onboarding` (by `hasCompletedOnboarding`:
-  local flag, then `user_health_data.onboarding_completed`, 8 s timeout,
+  local flag, then `user_health_data.onboarding_completed` (skipped
+  without a network, no automatic retries, 5 s timeout),
   offline defaults to true) / `onboarding`. Sign out (Profile) first
   uploads anything pending (`SyncService.pendingCount`, button spinner) and
   warns "Sign out anyway" if some entries couldn't be backed up; then
   `PushService.unregister` -> `SyncService.sync` ->
   `AccountService.clearLocalUserData` (`SyncService.stop` first; logs,
-  workouts, reminders, onboarding answers, backup markers wiped;
+  workouts, reminders, onboarding answers, backup markers and queued
+  server writes wiped;
   settings/goals kept). Signup terms: `terms_dialog.dart` + legal links.
 - **onboarding:** `health-onboarding` then `health-personal-details`,
   `health-height`, `health-weight`, `health-dietary-preference`,
@@ -573,9 +575,11 @@ Route names are GoRouter `name`s.
   Health Connect opt-in, analytics opt-out, export/deletion completeness,
   secure session, Mapbox telemetry off, privacy.html rewritten; website
   not yet redeployed).
-- Partial: 3 lifecycle/process death (code fixes; device tests pending),
-  9 tests (code rules, sync/profile tests; no integration or Drift v1->v6
-  migration test yet).
+- Partial: 3 lifecycle/process death (code fixes; device tests pending).
+- Done (Oct 18): 9 tests: Drift v1-v5 -> v6 migration test, page state
+  tests (loading/error/empty/loaded + 2.0 text on 360 dp), in-process flow
+  tests (`test/flows/`: offline -> online, two devices, sign-out, startup
+  routing, midnight). No on-device `integration_test/` yet.
 - Done in code (Oct 18, device checks pending; `20261024` not deployed):
   5 input & display (system text size honoured up to 2.0 in
   `ResponsiveTextScale`, scrolling sheets/dialogs, no ellipsis on names or
@@ -591,7 +595,9 @@ Route names are GoRouter `name`s.
   premium routing; free-tier Gemini may use prompts); backup conflicts
   use device clocks; widgets redraw after midnight only on their 30 min
   update or a tap; reminders don't see
-  widget logs; food scan has no long-wait hint or cancel; label-scan loader
+  widget logs; other offline GETs take ~7 s to fail where no connectivity
+check comes first (postgrest retries 1+2+4 s);
+food scan has no long-wait hint or cancel; label-scan loader
   is a dialog; leaderboard jumps on reload; activity history shows a
   full-page loader on refresh; meal history pull spinner ends early;
   meals/workouts not tied to a user id locally; a new account inherits the
@@ -629,6 +635,18 @@ per test (`_FakeRemote`, `FakeProfileRepository`...). Patterns:
 `SharedPreferences.setMockInitialValues`, `CacheStore(ConnectivityService(),
 directory: tmp)`, Drift `NativeDatabase.memory()`. `test/code_rules_test.dart`
 scans `lib` for patterns the analyzer misses.
+
+- `test/core/database/drift_migration_test.dart` builds every old schema
+  (v1-v5) and upgrades it; a schema change needs a new version there plus
+  `dart run drift_dev schema dump lib/core/database/drift_database.dart
+  drift_schemas/`.
+- `test/helpers/pump_app.dart` (`pumpPage`, `kSmallPhone`,
+  `kMaxTextScale`): page state tests (`*_states_test.dart`) check each
+  state and no overflow at 2.0 text. `testWidgets` takes only `skip: true`.
+- `test/flows/` run real services, Isar, Drift and the Supabase client
+  against `support/fake_backend.dart` (HTTP fake with RLS-like rules);
+  `support/test_device.dart` is one simulated phone. Isar loads the
+  Windows/Linux lib from `isar_community_flutter_libs` (skips if missing).
 
 SQL changes: run every migration on a throwaway local Postgres 18
 (`C:/Program Files/PostgreSQL/18/bin`; `initdb -A trust`, start on a spare
