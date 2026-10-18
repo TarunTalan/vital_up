@@ -73,7 +73,7 @@ supabase functions deploy <name>
   - Isar (`core/database/isar_service.dart`, `core/database/collections`):
     water, sleep, meals, weight, offline foods, barcode cache, diet plans,
     downloaded tracks.
-  - Drift (`core/database/drift_database.dart`, schema v6): workout sessions
+  - Drift (`core/database/drift_database.dart`, schema v7): workout sessions
     and GPS track points.
   - SharedPreferences: goals, settings, per-user Vita data, reminders.
   - `core/cache/cache_store.dart`: cached server JSON with max ages; offline
@@ -283,7 +283,7 @@ Route names are GoRouter `name`s.
   warns "Sign out anyway" if some entries couldn't be backed up; then
   `PushService.unregister` -> `SyncService.sync` ->
   `AccountService.clearLocalUserData` (`SyncService.stop` first; logs,
-  workouts, reminders, onboarding answers, backup markers and queued
+  workouts (and a running workout timer), reminders, onboarding answers, backup markers and queued
   server writes, goals wiped; settings kept). Signup terms: `terms_dialog.dart` + legal links.
 - **onboarding:** `health-onboarding` then `health-personal-details`,
   `health-height`, `health-weight`, `health-dietary-preference`,
@@ -348,10 +348,37 @@ Route names are GoRouter `name`s.
   `user_health_data`; goal weight in CacheStore (legacy pref
   `weight_target_kg` fallback).
 - **health_report / weekly_summary:** `health-report`
-  (`HealthReportService`, clinical text export); `weekly-summary`
+  (`HealthReportService`, clinical text export; page: 7/30/90-day picker,
+  one `_ReportSection` card per area with equal `AdaptiveRow` figures,
+  share pinned as the bottom bar); `weekly-summary`
   (`WeeklySummaryService`, computed on device; reports time zone via queued
   `set_my_timezone`; server sends a Sunday 18:00 local push).
 - **activity_tracking:** `activity-tracking`, `activity-history`.
+  `ActivityType`: five GPS types (`ActivityType.outdoor`: walk, run, cycle,
+  trekking, climbing) and workouts without a route (`ActivityType.workouts`:
+  strength, yoga, hiit, swimming, dance, sports, other). Stored by name;
+  read with `ActivityType.fromName` (unknown -> other). GPS pickers list
+  outdoor types only; `session.hasDistance` hides distance/pace for
+  workouts. History filters All / Outdoor / Workouts + a chip per recorded
+  type. Workouts are logged two ways, both through `LogWorkout` (same
+  repository, so sync, goals, challenges and badges count them):
+  `workout-timer` (`WorkoutTimerPage` / `WorkoutTimerCubit`, extra
+  `ActivityType`; wall-clock `WorkoutTimer` in pref `workout_timer_v1`, so
+  it survives app kills with no foreground service; caps at 6 h; the
+  tracking page reopens it; ongoing tray notification with a system
+  chronometer and Pause / Resume (`LocalWorkoutTimerNotifier`, channel
+  `vitalup_workout_timer`; actions `workout_pause` / `workout_resume`
+  handled by `handleWorkoutTimerAction` in both the foreground handler and
+  `reminderActionBackground`. On Android the buttons always run in a
+  separate engine, even with the app open, so that isolate pings the app
+  through `WorkoutTimerStore.notifyOtherIsolates` (IsolateNameServer;
+  the app reloads prefs); actions use `cancelNotification: false`; the page
+  also reloads on resume. Notification taps go through `openWorkoutTimer`
+  (brings an open timer back instead of stacking a second one, so Back
+  returns to the page below)) and `showLogWorkoutSheet` (history header +,
+  More activities dialog). Rules in `domain/services/workout_log_rules.dart`
+  (1 min-6 h, past only, 30 days back; calories = MET x `WorkoutIntensity`
+  factor x weight x hours). Intensity is stored on the session (Drift v7).
   `ActivityTrackingBloc` / `ActivityHistoryBloc` per page; sessions in Drift;
   notes/tags pref `activity_annotations`; workout prefs
   `core/preferences/workout_prefs_notifier.dart`. The bloc checkpoints the
@@ -360,10 +387,22 @@ Route names are GoRouter `name`s.
   Resume / Save / Discard (`WorkoutRecoveryService`, pure rules in
   `domain/services/workout_checkpoint.dart`; older than 12 h is saved at
   startup). GPS runs in a
-  `flutter_foreground_task` location service (no battery exemption). That
+  `flutter_foreground_task` location service (no battery exemption;
+  `ForegroundServiceManager`). Its notification has Pause / Resume
+  buttons: the task isolate forwards presses with `sendDataToMain`,
+  `ForegroundServiceManager.buttonPresses` delivers them to the tracking
+  page, which runs the same pause/resume as its controls (audio, voice
+  coach); `update(text, paused:)` picks the button. Only works while the
+  app process lives (the workout itself runs in the app isolate). That
   service is for workouts only: it's declared `location`, and starting it
   for anything else (audio downloads did) crashes on Android 14+ without
-  location permission. `getSessions` / `GetActivityHistory` load no GPS
+  location permission. Downloads therefore use no foreground service:
+  workout audio goes through `background_downloader` (WorkManager jobs,
+  "Downloads" channel with progress; `InAppAudioDownloader.start()` at
+  Home's deferred start settles ones that finished with the app closed;
+  its `dataSync` UIDTJobService is stripped in the manifest), and the
+  offline map pack shows progress via `MapDownloadNotifier` (channel
+  `vitalup_map_downloads`) while the process lives. `getSessions` / `GetActivityHistory` load no GPS
   routes unless `withRoutes: true` (only the data export asks); always
   pass `since:` (track points are read per session id in SQL). The
   tracking page updates the route/puck annotations in place and holds map
@@ -376,7 +415,8 @@ Route names are GoRouter `name`s.
 - **activity_goals:** `activity-goals`; `ActivityGoalsCubit`, pref
   `activity_goals_v1`, one goal per metric and period; daily resets at
   midnight, weekly Monday-Sunday; steps from `HealthVitalsService` + sessions.
-- **health_sync:** `HealthImportService` imports weight and workouts when
+- **health_sync:** `HealthImportService` imports weight and workouts (every
+  exercise type: `workoutTypeFor` maps gym/yoga/sports, others -> other) when
   Settings > Health Sync is on, at most hourly, on resume, idempotent (pref
   `health_import_last`).
 - **food_scanner:** Scan tab, `food-scan`, `meal-log-history`.
@@ -402,7 +442,10 @@ Route names are GoRouter `name`s.
   `StressEstimator` is pure. Stress check-ins: levels 1 very calm to 5 very
   stressed. `HealthVitalsService` only prompts from `connect()`.
   AI consent (`VitaAiConsent`, prefs `vita_ai_consent_v1_<uid>`,
-  `vita_ai_health_connect_v1_<uid>`; `ensureVitaAiConsent` sheet): nothing
+  `vita_ai_health_connect_v1_<uid>`; `ensureVitaAiConsent` shows a short
+  first-use sheet; Settings > Privacy & security opens the `ai-coach-data`
+  page (`VitaAiDataPage`: switches that save at once, what's sent, who
+  gets it)): nothing
   goes to vita-chat or generate-diet-plan before the user accepts, and
   `HealthSnapshot.forAi` drops Health Connect vitals, steps, sleep and
   imported workouts unless "Include Health Connect readings" is on.
@@ -413,7 +456,7 @@ Route names are GoRouter `name`s.
   `reminder_actions.dart` has background-isolate helpers (add water,
   save/reset mood, bedtime/wake, read today's water and mood) used by
   notifications and widgets (they also refresh the widgets afterwards).
-  Notification action ids: `log_water`, `sleep_bedtime`, `sleep_wake`.
+  Notification action ids: `log_water`, `sleep_bedtime`, `sleep_wake`, `workout_pause`, `workout_resume`.
 - **notifications:** `notifications`; `NotificationsCubit` reads table
   `notifications` + realtime channel `notifications:<uid>`; mark-read/delete
   queued offline. `PushService` (FCM; `register_push_token`), no-op without
@@ -627,7 +670,7 @@ Route names are GoRouter `name`s.
   secure session, Mapbox telemetry off, privacy.html rewritten; website
   not yet redeployed).
 - Partial: 3 lifecycle/process death (code fixes; device tests pending).
-- Done (Oct 18): 9 tests: Drift v1-v5 -> v6 migration test, page state
+- Done (Oct 18): 9 tests: Drift v1-v6 -> v7 migration test, page state
   tests (loading/error/empty/loaded + max text (1.5) on 360 dp), in-process flow
   tests (`test/flows/`: offline -> online, two devices, sign-out, startup
   routing, midnight). No on-device `integration_test/` yet.
@@ -687,7 +730,7 @@ directory: tmp)`, Drift `NativeDatabase.memory()`. `test/code_rules_test.dart`
 scans `lib` for patterns the analyzer misses.
 
 - `test/core/database/drift_migration_test.dart` builds every old schema
-  (v1-v5) and upgrades it; a schema change needs a new version there plus
+  (v1-v6) and upgrades it; a schema change needs a new version there plus
   `dart run drift_dev schema dump lib/core/database/drift_database.dart
   drift_schemas/`.
 - `test/helpers/pump_app.dart` (`pumpPage`, `kSmallPhone`,
@@ -738,6 +781,11 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
 - `CASE x WHEN NULL` never matches; use `CASE WHEN x IS NULL`.
 - A trigger that must tell client writes from SECURITY DEFINER functions
   can't be SECURITY DEFINER itself (`current_user` becomes the owner).
+- Never add a plugin that starts its own engine on the default entrypoint
+  (`audio_service` via `just_audio_background` did, unused: it ran
+  `main()` twice, two Supabase clients, and the copy stole IsolateNameServer
+  ports such as the GPS service's). One "Supabase init completed" per
+  launch in logcat. `ForegroundServiceManager.start` re-claims its port.
 - `UserAvatar` lives in `core/widgets/user_avatar.dart` (re-exported by
   `community_widgets.dart`).
 - Saved reminder presets keep their old text; changing a preset's copy only
