@@ -31,7 +31,10 @@ abstract final class CrashReporter {
       if (_enabled) {
         // Layout overflows and image errors aren't crashes; the app keeps
         // running (release builds show AppErrorFallback).
-        crashlytics.recordFlutterError(details);
+        // A Postgrest error thrown during a build carries row data.
+        crashlytics.recordFlutterError(
+          details.copyWith(exception: safeError(details.exception)),
+        );
       } else {
         FlutterError.presentError(details);
       }

@@ -1,6 +1,7 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Centralized analytics service powered by Firebase Analytics.
@@ -10,6 +11,11 @@ abstract final class AnalyticsService {
   static FirebaseAnalytics? _analytics;
   static FirebaseAnalyticsObserver? _observer;
   static bool _enabled = false;
+  static String? _userId;
+
+  /// Same key as `SettingsLocalDataSourceImpl.keyAnalyticsEnabled` (core
+  /// can't import a feature).
+  static const _prefKey = 'settings_analytics_enabled';
 
   /// Returns the GoRouter / Navigator observer for automatic screen tracking.
   static NavigatorObserver get observer {
@@ -28,8 +34,9 @@ abstract final class AnalyticsService {
   static Future<void> init() async {
     try {
       _analytics = FirebaseAnalytics.instance;
-      // Enable collection in release / profile mode, disable in debug
-      _enabled = !kDebugMode;
+      // Off in debug; otherwise the user's choice in Settings (default on).
+      final prefs = await SharedPreferences.getInstance();
+      _enabled = !kDebugMode && (prefs.getBool(_prefKey) ?? true);
       await _analytics!.setAnalyticsCollectionEnabled(_enabled);
       debugPrint(
         '[AnalyticsService] Firebase Analytics initialized (enabled: $_enabled)',
@@ -40,15 +47,35 @@ abstract final class AnalyticsService {
     }
   }
 
-  /// Links authenticated user id to analytics without collecting PII.
+  /// Settings > Privacy switch. Turning it off also clears the user id and
+  /// the data collected on this device so far.
+  static Future<void> setEnabled(bool enabled) async {
+    final analytics = _analytics;
+    final on = enabled && !kDebugMode;
+    if (analytics == null || on == _enabled) return;
+    _enabled = on;
+    try {
+      await analytics.setAnalyticsCollectionEnabled(on);
+      if (on) {
+        await analytics.setUserId(id: _userId);
+      } else {
+        await analytics.setUserId(id: null);
+        await analytics.resetAnalyticsData();
+      }
+    } catch (e) {
+      debugPrint('[AnalyticsService] Could not apply the setting: $e');
+    }
+  }
+
+  /// Links the pseudonymous account id (no email or name) while enabled.
   static void watchUser(SupabaseClient client) {
-    if (!_enabled || _analytics == null) return;
+    if (_analytics == null) return;
     client.auth.onAuthStateChange
         // A token refresh that fails offline arrives as an error; not a crash.
         .handleError((Object _) {})
         .listen((auth) {
-          final userId = auth.session?.user.id;
-          _analytics?.setUserId(id: userId);
+          _userId = auth.session?.user.id;
+          if (_enabled) _analytics?.setUserId(id: _userId);
         });
   }
 
@@ -66,6 +93,10 @@ abstract final class AnalyticsService {
   }
 
   /// Logs a custom event with optional parameters.
+  ///
+  /// Never pass health figures (weights, calories, water, sleep, mood,
+  /// workouts, food names), free text or Health Connect data: the privacy
+  /// policy and Health Connect rules forbid them in analytics.
   static Future<void> logEvent(
     String name, {
     Map<String, Object>? parameters,
@@ -97,66 +128,5 @@ abstract final class AnalyticsService {
         '[AnalyticsService] Error logging screen view $screenName: $e',
       );
     }
-  }
-
-  // ===========================================================================
-  // Domain Event Shortcuts
-  // ===========================================================================
-
-  /// Track workout completion.
-  static Future<void> logWorkoutCompleted({
-    required String activityType,
-    required int durationSeconds,
-    required double distanceMeters,
-    required int calories,
-  }) async {
-    await logEvent(
-      'workout_completed',
-      parameters: {
-        'activity_type': activityType,
-        'duration_seconds': durationSeconds,
-        'distance_meters': distanceMeters.round(),
-        'calories': calories,
-      },
-    );
-  }
-
-  /// Track food scanning actions.
-  static Future<void> logFoodScanned({
-    required String scanType, // barcode | nutrition_label | camera_food
-    required bool success,
-    String? foodName,
-  }) async {
-    final params = <String, Object>{
-      'scan_type': scanType,
-      'success': success ? 1 : 0,
-    };
-    if (foodName != null) {
-      params['food_name'] = foodName;
-    }
-    await logEvent('food_scanned', parameters: params);
-  }
-
-  /// Track water logging.
-  static Future<void> logWaterIntake({required int amountMl}) async {
-    await logEvent('water_logged', parameters: {'amount_ml': amountMl});
-  }
-
-  /// Track AI coach interaction.
-  static Future<void> logVitaInteraction({
-    required String interactionType,
-  }) async {
-    await logEvent('vita_interaction', parameters: {'type': interactionType});
-  }
-
-  /// Track badge unlock or challenge completion.
-  static Future<void> logAchievementUnlocked({
-    required String achievementId,
-    required String type, // badge | challenge
-  }) async {
-    await logEvent(
-      'achievement_unlocked',
-      parameters: {'achievement_id': achievementId, 'achievement_type': type},
-    );
   }
 }

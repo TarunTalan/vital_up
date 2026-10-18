@@ -19,6 +19,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_error_fallback.dart';
 import 'package:vital_up/core/widgets/biometric_lock_guard.dart';
+import 'package:vital_up/core/widgets/app_loading_barrier.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:vital_up/core/config/supabase_config.dart';
@@ -31,6 +32,7 @@ import 'package:vital_up/features/reminders/data/reminders_service.dart';
 
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/core/config/secure_session_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +66,9 @@ void main() async {
     await Supabase.initialize(
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.publishableKey,
+      authOptions: FlutterAuthClientOptions(
+        localStorage: SecureSessionStorage(supabaseUrl: SupabaseConfig.url),
+      ),
     );
 
     // Initialize dependency injection (database, network, storage, etc.)
@@ -142,6 +147,7 @@ class MyApp extends StatelessWidget {
           return MaterialApp.router(
             title: 'VitalUp',
             debugShowCheckedModeBanner: false,
+            scaffoldMessengerKey: rootScaffoldMessengerKey,
             locale: DevicePreview.locale(context),
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -149,27 +155,29 @@ class MyApp extends StatelessWidget {
             routerConfig: AppRouter.router,
             builder: (context, child) {
               final previewChild = DevicePreview.appBuilder(context, child);
-              return MultiBlocListener(
-                listeners: [
-                  BlocListener<AuthCubit, AuthState>(
-                    listener: (context, state) {
-                      if (state is AuthError) {
-                        showErrorSnackBar(context, state.message);
-                      }
-                    },
+              return AppLoadingBarrier(
+                child: MultiBlocListener(
+                  listeners: [
+                    BlocListener<AuthCubit, AuthState>(
+                      listener: (context, state) {
+                        if (state is AuthError) {
+                          showErrorSnackBar(context, state.message);
+                        }
+                      },
+                    ),
+                    BlocListener<OnboardingCubit, OnboardingData>(
+                      listenWhen: (previous, current) => previous.status != current.status,
+                      listener: (context, state) {
+                        // Errors are shown by the onboarding page itself.
+                        if (state.status == SubmissionStatus.success) {
+                          showSuccessSnackBar(context, 'Health profile saved.');
+                        }
+                      },
+                    ),
+                  ],
+                  child: BiometricLockGuard(
+                    child: ResponsiveTextScale(child: previewChild),
                   ),
-                  BlocListener<OnboardingCubit, OnboardingData>(
-                    listenWhen: (previous, current) => previous.status != current.status,
-                    listener: (context, state) {
-                      // Errors are shown by the onboarding page itself.
-                      if (state.status == SubmissionStatus.success) {
-                        showSuccessSnackBar(context, 'Health profile saved.');
-                      }
-                    },
-                  ),
-                ],
-                child: BiometricLockGuard(
-                  child: ResponsiveTextScale(child: previewChild),
                 ),
               );
             },

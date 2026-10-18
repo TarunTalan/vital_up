@@ -41,6 +41,7 @@ import 'package:vital_up/features/vita/data/datasources/vita_remote_datasource.d
 import 'package:vital_up/features/vita/data/repositories/vita_repository_impl.dart';
 import 'package:vital_up/features/vita/data/services/health_snapshot_builder.dart';
 import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
+import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -101,6 +102,7 @@ import 'package:vital_up/features/profile/domain/repositories/profile_repository
 import 'package:vital_up/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 
+import 'package:vital_up/core/monitoring/analytics_service.dart';
 import 'package:vital_up/features/settings/data/datasources/settings_local_datasource.dart';
 import 'package:vital_up/features/settings/data/datasources/settings_local_datasource_impl.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
@@ -395,7 +397,7 @@ Future<void> initDependencies() async {
   );
   // 9. Diet Plan
   sl.registerLazySingleton<DietPlanRemoteDataSource>(
-    () => DietPlanRemoteDataSourceImpl(sl<DioClient>()),
+    () => DietPlanRemoteDataSourceImpl(sl<DioClient>(), sl<VitaAiConsent>()),
   );
   sl.registerLazySingleton<DietPlanRepository>(
     () => DietPlanRepositoryImpl(
@@ -456,6 +458,7 @@ Future<void> initDependencies() async {
         await sl<PushService>().setEnabled(enabled);
         await sl<RemindersService>().resync();
       },
+      onAnalyticsChanged: AnalyticsService.setEnabled,
     ),
   );
 
@@ -614,6 +617,12 @@ Future<void> initDependencies() async {
       profiles: sl<ProfileRepository>(),
     ),
   );
+  sl.registerLazySingleton(
+    () => VitaAiConsent(
+      sl<SharedPreferences>(),
+      userId: () => sl<SupabaseClient>().auth.currentUser?.id,
+    ),
+  );
   sl.registerLazySingleton<VitaRepository>(
     () => VitaRepositoryImpl(
       remote: VitaRemoteDataSource(sl<SupabaseClient>()),
@@ -621,6 +630,7 @@ Future<void> initDependencies() async {
       snapshots: sl<HealthSnapshotBuilder>(),
       vitals: sl<HealthVitalsService>(),
       supabase: sl<SupabaseClient>(),
+      consent: sl<VitaAiConsent>(),
       events: sl<HabitEvents>(),
     ),
   );
@@ -754,6 +764,7 @@ Future<void> initDependencies() async {
               'settings_notifications_enabled',
               'settings_weight_unit',
               'settings_height_unit',
+              SettingsLocalDataSourceImpl.keyAnalyticsEnabled,
             ],
             onRestored: () => sl<SettingsCubit>().loadSettings(),
           ),
@@ -868,6 +879,32 @@ Future<void> initDependencies() async {
       sl<VitaRepository>(),
       sl<GamificationRepository>(),
       sl<RemindersService>(),
+      [
+        PrefsBackupSource('settings', sl<SharedPreferences>(), [
+          'settings_theme_mode',
+          'settings_notifications_enabled',
+          'settings_health_sync_enabled',
+          'settings_weight_unit',
+          'settings_height_unit',
+          SettingsLocalDataSourceImpl.keyAnalyticsEnabled,
+        ]),
+        PrefsBackupSource('goals', sl<SharedPreferences>(), [
+          'activity_goals_v1',
+          'daily_water_goal',
+          'daily_sleep_goal_min',
+          'daily_screen_time_limit_min',
+        ]),
+        PrefsBackupSource('vita', sl<SharedPreferences>(), [
+          'vita_chat_{user}',
+          'vita_checkins_{user}',
+          'vita_scores_{user}',
+          'vita_insights_{user}',
+        ]),
+        PrefsBackupSource('workout_notes', sl<SharedPreferences>(), [
+          ActivityHistoryRepositoryImpl.annotationsKey,
+        ]),
+        DietPlanBackupSource(sl<IsarService>(), sl<SharedPreferences>()),
+      ],
     ),
   );
 

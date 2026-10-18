@@ -17,9 +17,16 @@ flutter test                   # all tests; test/ mirrors lib/
 flutter test test/features/<feature>
 dart run build_runner build --delete-conflicting-outputs   # Isar/Drift codegen
 flutter build apk --debug
+flutter build appbundle --release --obfuscate --split-debug-info=build/symbols  # Play (APK is ~200 MB universal)
 cd android && ./gradlew.bat :app:compileDebugKotlin        # quick native check
 supabase db push               # apply new migrations (outward-facing: ask first)
+supabase functions deploy <name>
 ```
+
+- `supabase db push` asks for the database password interactively, which
+  hangs inside Claude Code: the user runs it in their own terminal. The CLI
+  is logged in, so `supabase functions deploy` / `functions list` work here.
+  Deploy migrations before edge functions that depend on them.
 
 - Environment variables & secrets: `.env` (copy `.env.example`); compiled
   and XOR-obfuscated via `envied` into `lib/core/config/env.dart`
@@ -39,7 +46,10 @@ supabase db push               # apply new migrations (outward-facing: ask first
 - `dart analyze lib test` has no warnings; only info lints remain
   (`prefer_initializing_formals`, deprecated `Share` API, a few in
   `activity_tracking_page.dart` / `customize_layout_page.dart`). Keep it
-  warning-free.
+  warning-free. `analysis_options.yaml` adds `cancel_subscriptions` and
+  `close_sinks` (`unawaited_futures` was tried: too noisy for intentional
+  fire-and-forget calls). `test/code_rules_test.dart` fails on
+  `setState(() => _future = ...)` (returns a Future, throws at runtime).
 
 ## Stack and architecture
 
@@ -65,26 +75,45 @@ supabase db push               # apply new migrations (outward-facing: ask first
     and GPS track points.
   - SharedPreferences: goals, settings, per-user Vita data, reminders.
   - `core/cache/cache_store.dart`: cached server JSON with max ages; offline
-    reads return the last copy.
+    reads return the last copy. `changes` / `watch(key)` announce every
+    write, update or remove, so any screen can follow a cached value.
   - `core/sync/sync_service.dart`: backs up logs to Supabase tables
     (`water_logs`, `sleep_logs`, `meal_logs`, `weight_logs`,
     `activity_sessions`) and pulls other devices' rows; `BackupSyncAdapter`
     stores settings/goals/reminders/stress/workout notes/diet plan in
     `user_backups`. `pending_writes.dart` queues offline server writes and
     RPCs (pref `pending_server_writes_v1`).
-  - `ProfileCache` (`features/profile/data/profile_cache.dart`): local profile cache
-    with `changes` broadcast stream so edits made anywhere (Home, Profile, Health details,
-    onboarding, or weight logging) update all listening screens immediately without stale values.
-    Local edits take precedence until committed to the server.
+    - `SyncService.pulled` (table names) fires after rows from the server
+      are applied; `stop()` (bumps a generation) makes a running sync bail
+      before writing anything else; `reset()` clears cursors and
+      `backup_state_*` (so the next sign-in restores backups instead of
+      uploading an empty device over them).
+    - Pulls page by `(updated_at, id)`; `ActivitySyncAdapter` implements
+      `SyncSizing` (5 per upload, 20 per page: routes are big).
+    - `PendingWrites.hasQueuedFor(userId, tables)`: a refresh must not
+      overwrite a local edit still queued (profile, goal weight do this).
+      5xx / 429 / PGRST00x throw `ServerUnavailable`: kept without using an
+      attempt, sync backs off (only real rejections count toward the 5).
+    - Deletes are always recorded (`recordDelete`), synced or not.
+  - Profile: `ProfileRepository.changes` follows the profile's CacheStore key,
+    so every `ProfileCubit` instance (dashboard, router pages) shows an edit
+    made anywhere (account details, onboarding, weight logging, refresh).
+    Read profiles via `state.shownProfile`, never one state subclass.
   - `HabitEvents` (`core/events`) broadcasts "something was logged" (water,
-    meal, activity, mood, weight, sleep); reminders and widgets listen.
+    meal, activity, mood, weight, sleep); reminders, widgets and the Home tab
+    listen. Not for sync pulls (reminders treat any event as done today).
 - **Backend:** Supabase (auth, Postgres + RLS, storage, realtime, pg_cron,
   edge functions). Firebase: FCM push and Crashlytics (Android). Health
   Connect / HealthKit via `health` (read-only everywhere).
 - **Bootstrap:** `lib/main.dart` (Supabase, DI, push, reminders, sync,
   foreground task init; global BlocProviders: Auth, Onboarding, ScreenTime,
   Settings; theme mode from `SettingsCubit`; `DevicePreview` only when
-  `!kReleaseMode`; `debugPrint` silenced in `kReleaseMode` to keep logs clean). `SleepCubit` is provided by the dashboard only (loading
+  `!kReleaseMode`; `debugPrint` is a no-op in release so server/health text
+  never reaches logcat; the Supabase session lives in
+  `SecureSessionStorage` (`core/config/secure_session_storage.dart`,
+  Keystore-backed; moves an old prefs session over; the widget engine uses
+  it too). Mapbox telemetry is switched off in `MainActivity`
+  (reflection: the SDK isn't on the app's classpath).) `SleepCubit` is provided by the dashboard only (loading
   it earlier would prompt for Health Connect before sign-in). Pages pushed
   through the router can't see dashboard providers: pass cubits as `extra`
   or keep them global.
@@ -122,7 +151,17 @@ supabase db push               # apply new migrations (outward-facing: ask first
   `LoadErrorView`. Release builds show `AppErrorFallback` instead of the red
   error screen; unknown routes show a calm page with "Go to Home".
 - Guard every submit against double taps, check `mounted` after `await`,
-  and never emit from a closed cubit.
+  and never emit from a closed cubit (cubits override `emit` with an
+  `isClosed` check).
+- Reloads keep data on screen: don't emit a Loading state when one with data
+  is already shown (MealLogBloc, DietPlanCubit, ScreenTimeCubit); a failed
+  refresh keeps the data and reports a notice. Cap long futures with
+  `withLoadTimeout()` (AI pages: 60 s).
+- Crash reporting (`core/monitoring/crash_reporter.dart`): `safeError` turns
+  Postgrest/Function/Auth exceptions into code-only errors (their details
+  carry row data = health data); Flutter framework errors are non-fatal;
+  every `onAuthStateChange` listener uses `.handleError` (offline token
+  refresh errors are not crashes).
 - Server side mirrors the limits: `20261016_input_constraints.sql` (CHECK
   constraints added `NOT VALID`; run its commented checks, then `VALIDATE`)
   and `supabase/functions/_shared/validate.ts` in every edge function. Sync
@@ -138,7 +177,11 @@ tabs with the floating `AppBottomNav`: 0 Home (`_HomeTab`), 1 Scan
 4 Profile (`ProfilePage(onOpenArena:)`). It owns the per-session cubits
 (water, sleep, trends, activity goals, gamification, notifications, stress,
 diet plan, profile), shows award snackbars, and prompts Google users to
-confirm a username.
+confirm a username. `_HomeTab` re-reads every card each time it is shown
+again (`refreshOnShow`), on resume, on `HabitEvents` (notification and
+widget logs, Health Connect imports) and on `SyncService.pulled`. Only the
+dashboard's `PopScope` handles back for tabs (a tab's own PopScope would
+make one back press skip two tabs).
 
 ## UI system (follow it; Figma is the source of truth)
 
@@ -191,14 +234,18 @@ Route names are GoRouter `name`s.
   `signup_username_available` RPCs, never by reading `profiles`), password reset by OTP, Google (`signInWithIdToken`); no Apple.
   Splash -> `dashboard` / `health-onboarding` (by `hasCompletedOnboarding`:
   local flag, then `user_health_data.onboarding_completed`, 8 s timeout,
-  offline defaults to true) / `onboarding`. Sign out runs
+  offline defaults to true) / `onboarding`. Sign out (Profile) first
+  uploads anything pending (`SyncService.pendingCount`, button spinner) and
+  warns "Sign out anyway" if some entries couldn't be backed up; then
   `PushService.unregister` -> `SyncService.sync` ->
-  `AccountService.clearLocalUserData` (logs, workouts, reminders wiped;
+  `AccountService.clearLocalUserData` (`SyncService.stop` first; logs,
+  workouts, reminders, onboarding answers, backup markers wiped;
   settings/goals kept). Signup terms: `terms_dialog.dart` + legal links.
 - **onboarding:** `health-onboarding` then `health-personal-details`,
   `health-height`, `health-weight`, `health-dietary-preference`,
   `health-goals`, `health-activity`, `health-info-permission`.
-  `OnboardingCubit` keeps answers in prefs `onboarding_*`, upserts
+  `OnboardingCubit` keeps answers in prefs `onboarding_*` (device-wide,
+  cleared on sign-out), upserts
   `user_health_data` via `PendingWrites` (works offline). Google users choose
   a username here (`set_username`, `username_available`).
 - **profile:** `ProfilePage` (identity card -> Account details, one-line Arena
@@ -210,13 +257,24 @@ Route names are GoRouter `name`s.
   Settings). Helpers: `presentation/utils/body_metrics.dart`. Pass the
   Profile tab's `ProfileCubit` as `extra` (`_withProfileCubit` in the
   router); `ProfileState.shownProfile`; a failed save emits `ProfileError`
-  then `ProfileLoaded(previous)`.
+  then `ProfileLoaded(previous)`. The profile's own email comes from the
+  session (`profiles.email` isn't readable by clients).
 - **account:** `AccountService` (`delete-account` function, then wipes the
-  device), `DataExportService` (zip of CSV + JSON via share sheet).
+  device), `DataExportService` (zip of CSV + JSON via share sheet; profile
+  by named columns, full points history paged by `fetchEvents`; `app_data.json`
+  = settings, goals, Vita history, workout notes, diet plan; `arena.json` =
+  stats, badges, reports, communities, friends, awards, challenges,
+  notifications, weekly summaries; the zip is deleted after sharing).
+  `clearLocalUserData` also deletes meal photos, temp files (picker/camera
+  photos, exports, reports, share_plus copies) and `vita_*_<uid>` history.
 - **settings:** Appearance, Units, Notifications, Connected (Health Sync),
-  Privacy & security (app lock, leaderboard visibility sheet), About.
-  `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`), notification
-  and health-sync flags.
+  Privacy & security (app lock, leaderboard visibility sheet, AI coach data,
+  "Share usage analytics"), About.
+  `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`), notification,
+  health-sync and analytics flags (`settings_analytics_enabled`, read by
+  `AnalyticsService.init` before DI; off clears the user id and data).
+  Analytics sends only automatic events: never log health figures, food
+  names, free text or Health Connect data.
 - **about:** rate (Play id from `PackageInfo.packageName`), feedback mailto
   `support@vitalup.live`, Legal links (`LegalLinks`).
 - **goals:** `my-goals` gathers every goal (plan, weight, activity, water,
@@ -252,7 +310,11 @@ Route names are GoRouter `name`s.
   Resume / Save / Discard (`WorkoutRecoveryService`, pure rules in
   `domain/services/workout_checkpoint.dart`; older than 12 h is saved at
   startup). GPS runs in a
-  `flutter_foreground_task` location service (no battery exemption).
+  `flutter_foreground_task` location service (no battery exemption). That
+  service is for workouts only: it's declared `location`, and starting it
+  for anything else (audio downloads did) crashes on Android 14+ without
+  location permission. `getSessions(since:, withRoutes: false)` for
+  totals-only reads (activity goals, widgets).
   Mapbox map with offline packs, pedometer with glitch filtering, BLE
   heart-rate straps (`flutter_blue_plus`), TTS voice coach, music/local
   audio. Gotcha: geolocator has one position stream; cancel the map preview
@@ -275,20 +337,29 @@ Route names are GoRouter `name`s.
   `diet-plan-manual`, `diet-plan-edit`, `diet-plan-result`. `DietPlanCubit`,
   Isar `MealPlanModel` by `dateKey`, prefs `active_plan`,
   `active_plan_preferences`. `generate-diet-plan` (75 s timeout, 15/day;
-  `instructions` + `basePlan` tweak a plan).
+  `instructions` + `basePlan` tweak a plan). The result page asks before
+  leaving mid-generation (it would waste a generation).
 - **vita:** `vita-chat` (extra `VitaChatArgs` or initial prompt String),
   `vita-analysis`, `vita-diet-plan`, `vita-stress`. Prefs
   `vita_{chat|checkins|scores|insights}_<userId>` (chat keeps 50 messages,
   history 90 days). `vita-chat` 45 s timeout, last 12 turns sent, 40 chats
-  and 6 insights a day. `HealthSnapshotBuilder` computes numbers on device;
+  and 6 insights a day. `HealthSnapshotBuilder` computes numbers on device
+  (profile from `ProfileRepository` first, onboarding answers as fallback);
   `StressEstimator` is pure. Stress check-ins: levels 1 very calm to 5 very
   stressed. `HealthVitalsService` only prompts from `connect()`.
+  AI consent (`VitaAiConsent`, prefs `vita_ai_consent_v1_<uid>`,
+  `vita_ai_health_connect_v1_<uid>`; `ensureVitaAiConsent` sheet): nothing
+  goes to vita-chat or generate-diet-plan before the user accepts, and
+  `HealthSnapshot.forAi` drops Health Connect vitals, steps, sleep and
+  imported workouts unless "Include Health Connect readings" is on.
+  Quota messages show the reset time from `core/utils/quota_reset.dart`
+  (server days are IST).
 - **reminders:** local notifications (`ReminderScheduler`, presets in
   `domain/reminder_presets.dart`, smart skip when the habit is done today).
   `reminder_actions.dart` has background-isolate helpers (add water,
   save/reset mood, bedtime/wake, read today's water and mood) used by
-  notifications and widgets. Notification action ids: `log_water`,
-  `sleep_bedtime`, `sleep_wake`.
+  notifications and widgets (they also refresh the widgets afterwards).
+  Notification action ids: `log_water`, `sleep_bedtime`, `sleep_wake`.
 - **notifications:** `notifications`; `NotificationsCubit` reads table
   `notifications` + realtime channel `notifications:<uid>`; mark-read/delete
   queued offline. `PushService` (FCM; `register_push_token`), no-op without
@@ -298,8 +369,14 @@ Route names are GoRouter `name`s.
   `points-history`, `activity-calendar`. `GamificationCubit` (stats,
   awards), `ScoreStreakCard`, `CommunityCubit`, `FriendsCubit`,
   `LeaderboardCubit`, `ChallengesCubit`. Scoring is server-side:
-  `submit_daily_report` (latest in `20261015_streak_rest_days.sql`) clamps a
-  day's metrics, awards points, streaks and badges. Rest days
+  `submit_daily_report` (wrapper in `20261021_...`, core logic
+  `_submit_daily_report_core`, both last redefined in
+  `20261023_per_user_days.sql`) clamps a day's metrics, awards points,
+  streaks and badges. Accepts IST today -3 to +1 (client
+  `maxBackfillDays = 3`); returns `capped` when figures exceed the uploaded
+  logs, and the client then doesn't record the day as sent (resent after
+  the logs upload). Streaks, rest days and cheers use the user's own day
+  (`user_today(profiles.timezone)`, IST fallback). Rest days
   (`player_stats.streak_freezes`, one per 7 active days, max 2, spent by the
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
@@ -336,7 +413,8 @@ Route names are GoRouter `name`s.
     section, `showAwardRulesSheet`) and `award_celebration.dart` (one-time
     dialog for a new trophy, pref `community_award_seen_<uid>`).
 - **help_support:** `help-support`, `support-chat` (local scripted bot),
-  `contact-support` (mailto); static FAQ.
+  `contact-support` (`EmailService.submitSupportTicket` -> `send-email`,
+  signed-in only; mailto fallback); static FAQ.
 - **home_widget (Android):** Today (4 sizes), My metrics / Custom (3 sizes,
   `custom-widget-builder`), Water, Mood check-in, Shortcuts (2 sizes each).
   Dart formats everything (`data/widget_data.dart`: `WidgetInputs` ->
@@ -348,6 +426,13 @@ Route names are GoRouter `name`s.
   (`data/widget_background.dart`). Taps go through `/open?route=` ->
   `HomeWidgetService.handleLink`. Each offered size is its own provider
   (`WidgetSizes.kt`, `res/xml/*_info.xml`). Details: `docs/ios-home-widget.md`.
+  Security: providers are exported (launcher), so button intents carry a
+  per-install token (`Wg.isOwnAction`); `HomeWidgetBackgroundReceiver` is not
+  exported. The background engine initialises Supabase with
+  `autoRefreshToken: false` and skips the full refresh with an expired
+  session (refresh tokens are single use; rotating one there would sign the
+  app out). Health Connect can't be read in the background, so the refresh
+  keeps the last step count instead of dropping to workout-only steps.
 
 ## Backend (supabase/)
 
@@ -361,13 +446,13 @@ Route names are GoRouter `name`s.
   `activity_sessions`); user backups; leave challenge; friend profiles and
   cheers; private profiles; streak rest days + badge progress (cron
   `use-streak-freezes`); input constraints (`20261016_input_constraints.sql`);
-  signed-out sign-up checks (`signup_username_available`, `email_registered`;
-  anon can't read `profiles`); friend ranks inside communities
+  signed-out sign-up checks (`signup_username_available`, `email_registered`);
+  friend ranks inside communities
   (`get_community_friend_ranks`, `get_my_community_standings`; friends who
   hide from leaderboards are left out); community awards
   (`20261019_community_awards.sql`: `community_awards`, hourly cron
   `finalize-community-awards` at :35 UTC = :05 IST finalises a period once
-  late reports close, i.e. Wednesday / the 3rd; min 5 players; ties share a
+  late reports close, i.e. Thursday / the 4th since `20261023`; min 5 players; ties share a
   place; `get_community_awards`, `get_player_awards`; notification type
   `award`); security hardening (`20261020_security_hardening.sql`,
   `20261021_profile_login_report_hardening.sql`): service-only tables
@@ -377,11 +462,17 @@ Route names are GoRouter `name`s.
   `profiles.email` / `username_confirmed` server-owned and limits
   `avatar_url` to the user's storage folder or Google; `submit_daily_report`
   is a wrapper that caps water / meal / workout figures at synced logs
-  before `_submit_daily_report_core`; AI refunds capped at 3 a day.
+  before `_submit_daily_report_core`; AI refunds capped at 3 a day; bad
+  `profiles.timezone` refused by trigger; impossible workouts refused
+  (`activity_sessions_sane_figures`, NOT VALID); avatars readable through
+  the API only in the owner's folder.
   `20261022_profiles_private_email.sql`: anon has no access to `profiles`;
   authenticated gets a column grant of everything except `email` (a new
   profiles column is private until granted; never `select('*')` profiles,
   and read the user's own email from the session).
+  `20261023_per_user_days.sql`: per-user days (above), live leaderboards
+  end at the period's end, weekly summary falls back to IST, daily cron
+  `prune-email-send-log` keeps 2 days.
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -399,7 +490,13 @@ Route names are GoRouter `name`s.
   `_shared/quota.ts` fails closed. AI nutrition estimates are never written
   to the shared `proprietary_products` catalogue. All
   validate input with `_shared/validate.ts` and return short JSON errors.
-  No deno locally: type-check with tsc + shims.
+  No deno locally: type-check with tsc + shims (see Tests).
+- Not in any migration (created in the dashboard): `profiles`,
+  `user_health_data`, `proprietary_products`, `get_email_by_username`
+  (closed). Their policies can differ from the repo: after deploying, probe
+  the live API with the publishable key (curl `rest/v1/<table>`) rather than
+  trusting the repo. Signed-in access to `user_health_data` /
+  `proprietary_products` hasn't been verified yet.
 
 ## Website & Legal Suite (vitalup.live)
 
@@ -442,9 +539,39 @@ Route names are GoRouter `name`s.
 11. **Tracker Trends & Sleep Insights:** Modernized `TrendBarChart`, detailed sleep card metrics, and proportional status bars in `ActivityCalendarPage`.
 12. **Play Store Pre-Release Suite:** Renamed application package to `com.vitalup.app`, upgraded to target SDK 36, enabled R8 minification with ProGuard keep rules, NDK symbol tables, GitHub Actions CI/CD workflows for release and Shorebird patches, and comprehensive `docs/PLAY_STORE_PRE_RELEASE_GUIDE.md`.
 13. **Play App Signing & Android OAuth Clients:** Registered Google Play App Signing key SHA-1 (`F9:63:25:22:11:92:D8:2E:5D:DA:DC:F7:10:FA:D1:07:91:54:7C:0C`), Upload key SHA-1/256, and local Debug keystore SHA-1/256 to Firebase `com.vitalup.app`, auto-provisioning Google Cloud OAuth clients.
-14. **Google Play Reviewer Account & 7-Day Seeded Dataset:** Created and email-confirmed `reviewer@vitalup.live` (Password: `VitalUpTest2026!`, username: `vitalup_reviewer`) with complete 7-day tracking records (49 water logs, 7 sleep logs, 28 macro-detailed meal logs, 7 GPS workouts, 7 weight check-ins, Level 3 / 620 points, 6 badges).
-15. **Dashboard & Stale Data Synchronization:** Broadcast stream on `ProfileCache.changes` ensures name and demographic edits propagate instantly across Home, Profile, and Health details; Weight card shows green "Logged today" chip with "Update" CTA; Dashboard workout button renamed to "Start activity".
+14. **Google Play Reviewer Account & 7-Day Seeded Dataset:** Created and email-confirmed `reviewer@vitalup.live` (username `vitalup_reviewer`; password kept only in Play Console > App access, never in the repo) with complete 7-day tracking records (49 water logs, 7 sleep logs, 28 macro-detailed meal logs, 7 GPS workouts, 7 weight check-ins, Level 3 / 620 points, 6 badges).
+15. **Dashboard & Stale Data Synchronization:** `CacheStore.changes` / `ProfileRepository.changes` keep every screen's profile current; Home re-reads on show, resume, habit events and sync pulls; reloads keep data on screen; Weight card shows "Logged today" with "Update"; "Start activity" label.
 16. **Pre-Release Security & Privacy Hardening:** Android data extraction rules (`data_extraction_rules.xml`) exclude health DBs/sharedprefs from cloud backup & device transfer; biometric app lock enforces `FLAG_SECURE` (`com.vitalup.app/window`) to hide recents previews and prevent screenshots; unused merged permissions (`RECORD_AUDIO`, `WRITE_EXTERNAL_STORAGE`, `AD_ID`) stripped; widget actions authenticated via per-install `action_token`; GoRouter protects deep links against unauthenticated access; Supabase migrations harden RLS on service-only tables, add `email_send_log` rate limiting, protect `login_email` RPC against username harvesting, and cap daily report stats.
+
+17. **Pre-release audits (Oct 2026):** data/storage, sync, widgets, error handling and loading states audited and fixed; server security (areas 1), release build (2) and async patterns (6) done and deployed (migrations `20261020`-`20261022`, edge functions redeployed and probed live). Fixed the open `send-email` relay, self-granted premium, public `profiles` emails, sign-out data loss / cross-account leaks, the Android 14 download-service crash and the `setState`-returns-Future crashes.
+
+### Pre-release audit plan (status):
+- Done: 1 server security, 2 release build (except a full release-build
+  pass on a device and Play Console declarations), 6 async patterns.
+- Done in code (Oct 18; `20261023` migration and scan-food logs not yet
+  deployed): 4 dates & time (midnight reload on Home, nights across
+  midnight, DST-safe day math via `date_range_utils.dart` `nextDay` /
+  `previousDay` / `calendarDaysBetween`, future timestamps count as stale
+  via `isWithinLast`, per-user server days) and 8 privacy (AI consent +
+  Health Connect opt-in, analytics opt-out, export/deletion completeness,
+  secure session, Mapbox telemetry off, privacy.html rewritten; website
+  not yet redeployed).
+- Partial: 3 lifecycle/process death (code fixes; device tests pending),
+  9 tests (code rules, sync/profile tests; no integration or Drift v1->v6
+  migration test yet).
+- Not started: 5 input & display edge cases, 7 performance (skipped
+  frames, memory, 200 MB APK).
+- Decide: 10 iOS gaps (no Crashlytics, push or widgets).
+- Known leftovers: AI keys are one per function for every user (no
+  premium routing; free-tier Gemini may use prompts); backup conflicts
+  use device clocks; widgets redraw after midnight only on their 30 min
+  update or a tap; reminders don't see
+  widget logs; food scan has no long-wait hint or cancel; label-scan loader
+  is a dialog; leaderboard jumps on reload; activity history shows a
+  full-page loader on refresh; meal history pull spinner ends early;
+  meals/workouts not tied to a user id locally; a new account inherits the
+  previous account's goals/reminders; push tokens can be moved by someone
+  who knows the token; username login can be throttled by wrong guesses.
 
 ### Remaining:
 1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).
@@ -475,9 +602,26 @@ Route names are GoRouter `name`s.
 input rules) and `test/features/<f>`. No mocking library: hand-written fakes
 per test (`_FakeRemote`, `FakeProfileRepository`...). Patterns:
 `SharedPreferences.setMockInitialValues`, `CacheStore(ConnectivityService(),
-directory: tmp)`, Drift `NativeDatabase.memory()`. SQL changes can be
-checked against a throwaway local Postgres 18 (`C:/Program
-Files/PostgreSQL/18/bin`) with stubbed `auth`/`cron` schemas.
+directory: tmp)`, Drift `NativeDatabase.memory()`. `test/code_rules_test.dart`
+scans `lib` for patterns the analyzer misses.
+
+SQL changes: run every migration on a throwaway local Postgres 18
+(`C:/Program Files/PostgreSQL/18/bin`; `initdb -A trust`, start on a spare
+port) after a stubs file that creates roles `anon` / `authenticated` /
+`service_role`, schemas `auth` (users with email, encrypted_password,
+email_confirmed_at, raw_*_meta_data; `uid()` / `role()` / `jwt()` reading
+`request.jwt.claim.sub` / `request.jwt.claims`), `storage` (buckets, objects,
+`foldername`), `cron`, `net`, `vault`, `extensions` (+ pgcrypto), the
+dashboard tables (`profiles`, `user_health_data`, `proprietary_products`)
+and publication `supabase_realtime`. Run migrations without ON_ERROR_STOP
+(pg_cron / pg_net lines fail locally), then test as `SET ROLE` + set_config
+claims.
+
+Edge functions: `npx -p typescript@5.6.3 tsc --noEmit --strict
+--noImplicitAny false --module es2022 --moduleResolution bundler
+--allowImportingTsExtensions --lib es2022,dom,dom.iterable --skipLibCheck
+shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
+`https://` imports as `any`.
 
 ## Gotchas
 
@@ -492,7 +636,15 @@ Files/PostgreSQL/18/bin`) with stubbed `auth`/`cron` schemas.
 - Never prompt for permissions from background work or app resume:
   `SleepService.getSleepDataForLastNight(requestPermission: false)`; closing
   a permission screen resumes the app and would loop.
-- `setState(() => future = load())` returns a Future and throws; use a block body.
+- `setState(() => future = load())` returns a Future and throws; use a block body
+  (also never call setState in `didUpdateWidget`: a build follows anyway).
+- Never `select('*')` from `profiles` (column grant without `email`).
+- A `try` doesn't catch an un-awaited future's error: await it or `.ignore()`.
+- Postgres doesn't short-circuit `AND` in CHECKs: guard casts with `CASE`
+  (a cast error is 22P02, which sync can't set aside like a 23514).
+- `CASE x WHEN NULL` never matches; use `CASE WHEN x IS NULL`.
+- A trigger that must tell client writes from SECURITY DEFINER functions
+  can't be SECURITY DEFINER itself (`current_user` becomes the owner).
 - `UserAvatar` lives in `core/widgets/user_avatar.dart` (re-exported by
   `community_widgets.dart`).
 - Saved reminder presets keep their old text; changing a preset's copy only

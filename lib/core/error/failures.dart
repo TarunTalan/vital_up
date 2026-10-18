@@ -46,5 +46,5 @@ class RecognitionUnavailableFailure extends Failure {
 }
 
 class ScanQuotaExceededFailure extends Failure {
-  const ScanQuotaExceededFailure([super.message = "No photo scans left today. They reset at midnight."]);
+  const ScanQuotaExceededFailure([super.message = "No photo scans left today. Try again later."]);
 }
