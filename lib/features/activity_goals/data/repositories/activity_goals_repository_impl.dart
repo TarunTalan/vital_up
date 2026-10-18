@@ -67,11 +67,15 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     final byDay = bucketByDay<ActivitySession>(sessions, (s) => s.startTime);
 
     double valueOn(GoalMetric metric, DateTime day) {
-      if (metric == GoalMetric.steps && healthSteps != null) {
-        return (healthSteps[day] ?? 0).toDouble();
-      }
-      return (byDay[day] ?? const <ActivitySession>[])
+      final tracked = (byDay[day] ?? const <ActivitySession>[])
           .fold(0.0, (sum, s) => sum + metric.fromSession(s));
+      if (metric == GoalMetric.steps && healthSteps != null) {
+        return dailySteps(
+          health: healthSteps[day],
+          tracked: tracked.round(),
+        ).toDouble();
+      }
+      return tracked;
     }
 
     final chartDays = days.sublist(days.length - range.days);

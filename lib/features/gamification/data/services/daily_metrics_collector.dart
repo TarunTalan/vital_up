@@ -179,7 +179,7 @@ class DailyMetricsCollector {
 
     return DailyMetrics(
       day: date,
-      steps: healthSteps ?? sessionSteps,
+      steps: dailySteps(health: healthSteps, tracked: sessionSteps),
       distanceMeters: sessions
           .fold<double>(0, (sum, s) => sum + s.totalDistanceMeters)
           .round(),

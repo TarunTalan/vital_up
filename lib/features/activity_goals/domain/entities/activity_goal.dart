@@ -55,6 +55,15 @@ enum GoalMetric {
       };
 }
 
+/// A day's steps from Health Connect ([health], null when not readable) and
+/// from workouts tracked in VitalUp ([tracked]). The larger one, not the
+/// sum: Health Connect usually already counts a tracked walk, but it reads 0
+/// when no app on the phone writes steps to it (VitalUp only reads).
+int dailySteps({required int? health, required int tracked}) {
+  final h = health ?? 0;
+  return h > tracked ? h : tracked;
+}
+
 /// Daily goals reset at midnight; weekly goals run Monday → Sunday.
 enum GoalPeriod {
   daily('Daily', 'Today'),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:isar_community/isar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/core/database/collections/sleep_log_cache.dart';
 import 'package:vital_up/core/database/collections/user_profile_cache.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
@@ -98,7 +99,12 @@ class HealthSnapshotBuilder {
       waterGoalMl: _water.getDailyGoal(),
       tracksWater: water?.tracks ?? false,
       screenTimeTodayMinutes: results[3] as int?,
-      stepsToday: healthSteps ?? activity?.stepsToday,
+      stepsToday: healthSteps == null && activity?.stepsToday == null
+          ? null
+          : dailySteps(
+              health: healthSteps,
+              tracked: activity?.stepsToday ?? 0,
+            ),
       stepsFromHealthConnect: healthSteps != null,
       workoutStepsToday: activity?.stepsToday,
       workoutsThisWeek: activity?.workouts ?? 0,
