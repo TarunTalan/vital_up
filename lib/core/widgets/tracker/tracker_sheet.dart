@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Layout of every tracker bottom sheet (log, goal, quick-log hub):
 /// metric badge + title + close, hairline, body, then a pinned action.
@@ -151,26 +152,20 @@ class TrackerPresetTile extends StatelessWidget {
                   children: [
                     Icon(icon, size: AppDimens.iconLg, color: color),
                     const SizedBox(height: AppDimens.space4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        style: context.text.labelMedium?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    FitText(
+                      label,
+                      maxLines: 1,
+                      style: context.text.labelMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (caption != null)
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          caption!,
-                          maxLines: 1,
-                          style: context.text.labelSmall?.copyWith(
-                            color: context.vColors.grayText,
-                          ),
+                      FitText(
+                        caption!,
+                        maxLines: 1,
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.vColors.grayText,
                         ),
                       ),
                   ],
@@ -299,13 +294,10 @@ class _GoalSheetState extends State<_GoalSheet> {
                 icon: const Icon(Icons.remove_rounded),
               ),
               Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    widget.format(_value),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.metricLarge.copyWith(color: color),
-                  ),
+                child: FitText(
+                  widget.format(_value),
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.metricLarge.copyWith(color: color),
                 ),
               ),
               IconButton.outlined(
@@ -346,10 +338,7 @@ class _GoalSheetState extends State<_GoalSheet> {
                     'assets/icons/nav/vita.svg',
                     width: AppDimens.iconMd,
                     height: AppDimens.iconMd,
-                    colorFilter: ColorFilter.mode(
-                      color,
-                      BlendMode.srcIn,
-                    ),
+                    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
                   ),
                   const SizedBox(width: AppDimens.space12),
                   Expanded(

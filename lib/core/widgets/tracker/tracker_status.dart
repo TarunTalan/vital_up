@@ -105,6 +105,7 @@ class TrackerStatusChip extends StatelessWidget {
           Text(
             label ?? status.label,
             maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: context.text.labelSmall?.copyWith(
               color: c,
               fontWeight: FontWeight.w600,
