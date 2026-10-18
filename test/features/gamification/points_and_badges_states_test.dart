@@ -200,8 +200,13 @@ void main() {
       );
       await settle(tester);
 
-      expect(shownTextScale(tester, find.byType(PointsHistoryPage)), 2.0);
+      expect(
+        shownTextScale(tester, find.byType(PointsHistoryPage)),
+        kMaxTextScale,
+      );
       expect(takeAllExceptions(tester), isEmpty);
+      // Every label, figure and button shows whole.
+      expect(truncatedTexts(tester), isEmpty);
       expect(find.text('128,450 pts'), findsOneWidget);
     });
   });
@@ -265,8 +270,10 @@ void main() {
       await pumpPage(tester, const BadgesPage(), textScale: kMaxTextScale);
       await settle(tester);
 
-      expect(shownTextScale(tester, find.byType(BadgesPage)), 2.0);
+      expect(shownTextScale(tester, find.byType(BadgesPage)), kMaxTextScale);
       expect(takeAllExceptions(tester), isEmpty);
+      // Every label, figure and button shows whole.
+      expect(truncatedTexts(tester), isEmpty);
       expect(find.text('1 of 3 earned'), findsOneWidget);
     });
   });

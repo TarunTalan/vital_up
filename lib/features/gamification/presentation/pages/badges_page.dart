@@ -12,6 +12,7 @@ import 'package:vital_up/features/community/presentation/widgets/award_widgets.d
 import 'package:vital_up/features/gamification/domain/entities/game_badge.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 /// Community awards (trophies and medals, most important first), then every
 /// badge: a summary, the closest one to unlock, then earned and locked
@@ -228,9 +229,12 @@ class _BadgeGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = (constraints.maxWidth / AppDimens.badgeGridMinWidth)
-            .floor()
-            .clamp(2, 4);
+        // Wider tiles with larger text, so names and dates stay whole.
+        final columns =
+            (constraints.maxWidth /
+                    context.textScaled(AppDimens.badgeGridMinWidth))
+                .floor()
+                .clamp(2, 4);
         return Column(
           children: [
             for (var i = 0; i < badges.length; i += columns) ...[

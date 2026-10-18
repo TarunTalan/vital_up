@@ -15,6 +15,7 @@ import 'package:vital_up/features/gamification/domain/entities/score_category.da
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -118,19 +119,14 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                 ],
               ),
               const SizedBox(height: AppDimens.cardInnerGap),
-              Row(
+              AdaptiveRow(
                 children: [
-                  for (final c in ScoreCategory.values) ...[
-                    if (c != ScoreCategory.values.first)
-                      const SizedBox(width: AppDimens.space8),
-                    Expanded(
-                      child: CategoryPointsTile(
-                        category: c,
-                        points: stats.pointsIn(c),
-                        signed: false,
-                      ),
+                  for (final c in ScoreCategory.values)
+                    CategoryPointsTile(
+                      category: c,
+                      points: stats.pointsIn(c),
+                      signed: false,
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),

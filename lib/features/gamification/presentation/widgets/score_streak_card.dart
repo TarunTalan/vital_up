@@ -9,6 +9,7 @@ import 'package:vital_up/features/gamification/domain/entities/player_stats.dart
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -420,20 +421,17 @@ class CategoryPointsTile extends StatelessWidget {
           const SizedBox(height: AppDimens.space6),
           // Narrow tiles (4 across on small phones): the total shrinks to
           // fit instead of breaking mid-number, and the label wraps.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '${signed ? '+' : ''}${_points.format(points)}',
-              maxLines: 1,
-              style: context.text.titleSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
+          FitText(
+            '${signed ? '+' : ''}${_points.format(points)}',
+            maxLines: 1,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           Text(
             category.label,
             maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: context.text.labelSmall?.copyWith(
               color: context.vColors.grayText,
             ),

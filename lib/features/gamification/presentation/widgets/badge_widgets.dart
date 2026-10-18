@@ -88,7 +88,7 @@ class BadgeTile extends StatelessWidget {
             const SizedBox(height: AppDimens.space8),
             Text(
               badge.name,
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: context.text.titleSmall?.copyWith(
@@ -112,8 +112,9 @@ class BadgeTile extends StatelessWidget {
               const SizedBox(height: AppDimens.space6),
               Text(
                 progress,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: context.text.labelSmall?.copyWith(color: grey),
               ),
             ] else
@@ -146,8 +147,9 @@ class _TileFooter extends StatelessWidget {
         Flexible(
           child: Text(
             label,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: context.text.labelSmall?.copyWith(color: color),
           ),
         ),
