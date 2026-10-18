@@ -51,11 +51,9 @@ extension Responsive on BuildContext {
   EdgeInsets get pagePadding => EdgeInsets.symmetric(horizontal: gutter);
 
   /// Responsive text factor applied app-wide (see `main.dart`).
-  double get textFactor {
-    if (isTablet) return 1.1;
-    if (isSmallPhone) return 0.9;
-    return 1.0;
-  }
+  /// Tablets get slightly larger text. Small phones keep the user's size:
+  /// shrinking below their accessibility setting would make text unreadable.
+  double get textFactor => isTablet ? 1.1 : 1.0;
 }
 
 /// Centres [child] and caps its width at [AppDimens.maxContentWidth] so pages
@@ -83,13 +81,13 @@ class ResponsiveCenter extends StatelessWidget {
 }
 
 /// Applies app-wide responsive text scaling: the device's accessibility
-/// text scale is respected but clamped (so layouts don't break), then
-/// multiplied by a screen-size factor (smaller on small phones, larger on
-/// tablets). Every `Text` in the app inherits this.
+/// text scale is respected up to [maxSystemScale] (200%, the Android
+/// maximum), and tablets get a little larger. Never smaller than the user's
+/// own setting. Every `Text` in the app inherits this.
 class ResponsiveTextScale extends StatelessWidget {
   final Widget child;
   static const double minSystemScale = 0.85;
-  static const double maxSystemScale = 1.1;
+  static const double maxSystemScale = 2.0;
 
   const ResponsiveTextScale({super.key, required this.child});
 
@@ -102,7 +100,9 @@ class ResponsiveTextScale extends StatelessWidget {
         14;
     return MediaQuery(
       data: mq.copyWith(
-        textScaler: TextScaler.linear(system * context.textFactor),
+        textScaler: TextScaler.linear(
+          (system * context.textFactor).clamp(system, maxSystemScale),
+        ),
       ),
       child: child,
     );

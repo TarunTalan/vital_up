@@ -44,7 +44,7 @@ How it fits together:
   cold start.
 - **Theme.** Colours come from `res/values/colors.xml` and
   `res/values-night/colors.xml` (VitalUp tokens), so widgets follow the
-  phone's light or dark setting. Text uses SF Pro Rounded from `res/font`.
+  phone's light or dark setting. Text uses Nunito from `res/font` (on iOS use the system rounded font or bundle Nunito).
 
 ### Saved keys
 

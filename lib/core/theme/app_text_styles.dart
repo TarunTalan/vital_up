@@ -24,7 +24,7 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTextStyles {
   AppTextStyles._();
 
-  static const String fontFamily = 'SFProRounded';
+  static const String fontFamily = 'Nunito';
 
   static const TextStyle largeTitle = TextStyle(
     fontFamily: fontFamily,
