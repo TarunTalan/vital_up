@@ -154,7 +154,7 @@ async function readCache(supabase: SupabaseClient, key: string): Promise<any | n
       .maybeSingle();
     if (data && new Date(data.expires_at) > new Date()) return data.search_results;
   } catch (e) {
-    console.error(`Cache read failed for "${key}":`, e);
+    console.error('Cache read failed:', e);
   }
   return null;
 }
@@ -167,7 +167,7 @@ function writeCache(supabase: SupabaseClient, key: string, value: unknown, days 
     supabase
       .from('food_search_cache')
       .upsert({ query_normalized: key, search_results: value, expires_at: expiresAt }, { onConflict: 'query_normalized' })
-      .then(({ error }) => error && console.error(`Cache write failed for "${key}": ${error.message}`)),
+      .then(({ error }) => error && console.error(`Cache write failed: ${error.message}`)),
   );
 }
 
@@ -183,7 +183,8 @@ async function searchUSDA(query: string, apiKey: string, supabase: SupabaseClien
 
   const foods = (await response.json()).foods ?? [];
   const results = scoreUsdaFoods(query, foods).slice(0, 5);
-  console.log(`USDA "${query}": ${results.slice(0, 3).map((f: any) => `${f.description} (${f.dataType}, ${f.score})`).join(', ')}`);
+  // Counts only: what people eat is health data and stays out of logs.
+  console.log(`USDA search: ${results.length} results`);
 
   writeCache(supabase, key, results);
   return results;
@@ -354,7 +355,7 @@ async function bestUsdaMatch(name: string, apiKey: string, supabase: SupabaseCli
       if (per100g) return { fdcId: String(food.fdcId), description: food.description, data, per100g };
     }
   } catch (e) {
-    console.warn(`USDA match for "${name}" failed: ${(e as Error).message}`);
+    console.warn(`USDA match failed: ${(e as Error).message}`);
   }
   return null;
 }
@@ -395,7 +396,7 @@ async function bestProprietaryMatch(
     const per100g = proprietaryPer100g(best.row);
     return per100g ? { name: best.row.product_name, per100g } : null;
   } catch (e) {
-    console.warn(`Proprietary match for "${name}" failed: ${(e as Error).message}`);
+    console.warn(`Proprietary match failed: ${(e as Error).message}`);
     return null;
   }
 }
@@ -420,7 +421,7 @@ async function handleImage(env: Env, userId: string, image: string, mimeType: st
   // the cap; refunded below if recognition fails or finds no food.
   const quota = await consumeDailyQuota(env.supabase, userId, 'photo_scan', dailyLimit('FREE_DAILY_SCANS', 25));
   if (!quota.allowed) {
-    console.log(`Daily scan limit (${quota.limit}) reached for ${userId}`);
+    console.log(`Daily scan limit (${quota.limit}) reached`);
     return jsonResponse({ error: 'Daily scan limit reached', code: 'daily_limit', limit: quota.limit }, 429);
   }
 
@@ -435,7 +436,7 @@ async function handleImage(env: Env, userId: string, image: string, mimeType: st
   const { items: visionItems, servedBy } = recognition;
   const latency = Date.now() - startTime;
   if (visionItems.length === 0) background(refundDailyQuota(env.supabase, userId, 'photo_scan'));
-  console.log(`Vision (${servedBy}, ${latency}ms): ${visionItems.map((v) => `${v.name} ${v.grams}g`).join(', ')}`);
+  console.log(`Vision (${servedBy}, ${latency}ms): ${visionItems.length} items`);
 
   background(
     env.supabase.from('recognition_logs').insert({
@@ -589,7 +590,7 @@ async function handleGetNutrition(env: Env, userId: string, request: NutritionRe
     const row = byBarcode.data?.[0] ?? byName.data?.[0];
     const per100g = row ? proprietaryPer100g(row) : null;
     if (per100g) {
-      console.log(`Proprietary hit in get_nutrition for "${idStr}"`);
+      console.log('Proprietary hit in get_nutrition');
       return respond(nutritionDataFromPer100g(per100g));
     }
   } catch (e) {
@@ -683,7 +684,7 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
     const { data } = await env.supabase.from('proprietary_products').select('*').eq('barcode', barcodeStr).limit(1);
     const row = data?.[0];
     if (row) {
-      console.log(`Proprietary hit for barcode "${barcodeStr}" -> "${row.product_name}"`);
+      console.log('Proprietary hit for barcode');
       return jsonResponse({
         productName: row.product_name,
         servingSize: row.serving_size || '100g',
@@ -732,7 +733,7 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
           sodium: sodiumG * 1000,
         });
         if (payload && (calories || val('proteins') || val('carbohydrates') || val('fat'))) {
-          console.log(`Open Food Facts hit for barcode "${barcodeStr}" -> "${payload.productName}"`);
+          console.log('Open Food Facts hit for barcode');
           saveToProprietary(payload.productName, payload.servingSize, payload.nutriments, 'off');
           return jsonResponse(payload, 200);
         }
@@ -764,7 +765,7 @@ async function handleBarcode(env: Env, barcodeStr: string): Promise<Response> {
         ? barcodePayload((parsed as any).productName, (parsed as any).servingSize, parsed as Record<string, unknown>)
         : null;
       if (payload) {
-        console.log(`Gemini grounding hit for barcode "${barcodeStr}" -> "${payload.productName}"`);
+        console.log('Gemini grounding hit for barcode');
         saveToProprietary(payload.productName, payload.servingSize, payload.nutriments, 'gemini_grounding');
         return jsonResponse(payload, 200);
       }
