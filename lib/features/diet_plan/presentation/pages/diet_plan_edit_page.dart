@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
@@ -11,6 +12,7 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/diet_plan/data/models/meal_plan_model.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/set_active_meal_plan.dart';
@@ -103,8 +105,25 @@ class _DietPlanEditPageState extends State<DietPlanEditPage> {
       }
     });
     if (meals.any((m) => m.nameError != null)) return;
+    if (!meals.every((m) => m.numbersValid)) {
+      showErrorSnackBar(
+        context,
+        'Meals go up to ${MealModel.maxCalories} kcal and '
+        '${MealModel.maxGrams} g each.',
+      );
+      return;
+    }
+    if (_saving) return;
     setState(() => _saving = true);
-    await sl<SetActiveMealPlan>()(_buildPlan(), preferences: _preferences);
+    try {
+      await sl<SetActiveMealPlan>()(_buildPlan(), preferences: _preferences);
+    } catch (e) {
+      debugPrint('Saving the edited plan failed: $e');
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showErrorSnackBar(context, "Couldn't save your plan. Try again.");
+      return;
+    }
     if (!mounted) return;
     showSuccessSnackBar(context, 'Diet plan updated');
     context.pop(true);
@@ -177,6 +196,17 @@ class _MealDraft {
         fat = TextEditingController(text: '${meal.fat}');
 
   static int _int(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
+
+  static bool _inRange(TextEditingController c, int max) =>
+      c.text.trim().isEmpty ||
+      parseNumberInRange(c.text, min: 0, max: max) != null;
+
+  /// Calories and grams within what a saved plan keeps.
+  bool get numbersValid =>
+      _inRange(calories, MealModel.maxCalories) &&
+      _inRange(protein, MealModel.maxGrams) &&
+      _inRange(carbs, MealModel.maxGrams) &&
+      _inRange(fat, MealModel.maxGrams);
 
   Meal toMeal() => Meal(
         name: name.text.trim(),

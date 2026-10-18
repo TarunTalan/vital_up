@@ -72,14 +72,16 @@ class MealModel {
     );
   }
 
+  /// Clamped like [MealModel.fromJson]: plans edited by hand are saved and
+  /// sent to the AI as a base plan too.
   factory MealModel.fromEntity(Meal meal) {
     return MealModel()
       ..name = meal.name
       ..items = meal.items
-      ..calories = meal.calories
-      ..protein = meal.protein
-      ..carbs = meal.carbs
-      ..fat = meal.fat;
+      ..calories = meal.calories.clamp(0, maxCalories)
+      ..protein = meal.protein.clamp(0, maxGrams)
+      ..carbs = meal.carbs.clamp(0, maxGrams)
+      ..fat = meal.fat.clamp(0, maxGrams);
   }
 }
 
@@ -153,10 +155,13 @@ class MealPlanModel {
   factory MealPlanModel.fromEntity(MealPlan plan, String dateKey) {
     return MealPlanModel()
       ..dateKey = dateKey
-      ..meals = plan.meals.map((e) => MealModel.fromEntity(e)).toList()
-      ..totalCalories = plan.totalCalories
-      ..totalProtein = plan.totalProtein
-      ..totalCarbs = plan.totalCarbs
-      ..totalFat = plan.totalFat;
+      ..meals = plan.meals
+          .take(maxMeals)
+          .map((e) => MealModel.fromEntity(e))
+          .toList()
+      ..totalCalories = plan.totalCalories.clamp(0, InputLimits.caloriesMax)
+      ..totalProtein = plan.totalProtein.clamp(0, 2000)
+      ..totalCarbs = plan.totalCarbs.clamp(0, 2000)
+      ..totalFat = plan.totalFat.clamp(0, 2000);
   }
 }

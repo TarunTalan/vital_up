@@ -185,7 +185,7 @@ class DataExportService {
       sleep: await _sleep.getSleepBetween(from, to),
       meals: (await _meals.callAll()).getOrElse(() => const []),
       weight: await _weight.between(from, to),
-      workouts: await _activity.getSessions(),
+      workouts: await _activity.getSessions(withRoutes: true),
       moods: _vita.getStressCheckIns(),
       points: points,
       reminders: _reminders.load(),

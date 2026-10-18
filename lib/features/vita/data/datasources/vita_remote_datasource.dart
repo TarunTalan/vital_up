@@ -15,6 +15,7 @@ class VitaRemoteDataSource {
 
   static const _function = 'vita-chat';
   static const _timeout = Duration(seconds: 45);
+  static const _refreshTimeout = Duration(seconds: 15);
 
   /// Last N turns sent as context (the server caps this too).
   static const maxContextMessages = 12;
@@ -84,7 +85,7 @@ class VitaRemoteDataSource {
       // An access token that expired while the app sat in the background is
       // rejected; refresh before calling rather than burning a 401 round trip.
       if (_client.auth.currentSession?.isExpired ?? false) {
-        await _client.auth.refreshSession();
+        await _client.auth.refreshSession().timeout(_refreshTimeout);
       }
       final response = await _client.functions
           .invoke(_function, body: body)

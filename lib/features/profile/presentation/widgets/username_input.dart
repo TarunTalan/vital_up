@@ -198,6 +198,8 @@ class _UsernamePromptState extends State<_UsernamePrompt> {
     return PopScope(
       canPop: false,
       child: AlertDialog(
+        // Scrolls when the keyboard leaves little room on short phones.
+        scrollable: true,
         title: const Text('Choose your username'),
         content: ListenableBuilder(
           listenable: _input,

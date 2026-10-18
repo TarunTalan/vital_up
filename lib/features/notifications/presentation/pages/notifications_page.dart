@@ -29,7 +29,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
   void _open(AppNotification n) {
     context.read<NotificationsCubit>().markRead(n);
     final route = notificationRoute(n.type, n.route);
-    if (route != null) context.pushNamed(route);
+    if (route != null) {
+      context.pushNamed(route);
+    } else if (n.body != null && n.body!.isNotEmpty) {
+      // The list shows three lines; with nowhere to go, show it all here.
+      showAppBottomSheet<void>(
+        context: context,
+        builder: (context) => _NotificationDetailSheet(n),
+      );
+    }
   }
 
   @override
@@ -161,4 +169,48 @@ class _DismissBackground extends StatelessWidget {
     ),
     child: Icon(Icons.delete_outline_rounded, color: context.colors.error),
   );
+}
+
+/// The full text of a notification that doesn't open a page.
+class _NotificationDetailSheet extends StatelessWidget {
+  final AppNotification n;
+
+  const _NotificationDetailSheet(this.n);
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        0,
+        context.gutter,
+        AppDimens.space24,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            n.title,
+            style: context.text.titleMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            n.body!,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          Text(
+            notificationTimeLabel(n.createdAt, DateTime.now()),
+            style: context.text.labelSmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

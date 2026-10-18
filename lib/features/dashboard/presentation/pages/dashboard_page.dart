@@ -77,6 +77,7 @@ class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
   late final ProfileCubit _profileCubit;
   StreamSubscription<PushOpen>? _pushOpens;
+  Timer? _deferredStart;
   int _selectedIndex = 0;
 
   /// Home was shown before, so showing it again re-reads every card
@@ -92,16 +93,9 @@ class _DashboardPageState extends State<DashboardPage> {
     // nutrition card reads.
     _profileCubit = sl<ProfileCubit>()..loadProfile();
 
-    sl<HealthImportService>().start();
-    // Both only reach the server when something changed (time zone, push
-    // token or account) since they last did.
-    sl<WeeklySummaryService>().reportTimezone();
-
     final push = sl<PushService>();
-    push.requestPermissionAndRegister();
     _pushOpens = push.opens.listen(_openPush);
 
-    sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
     // Opens a widget link that arrived while the app was starting.
     HomeWidgetService.markReady();
 
@@ -109,6 +103,18 @@ class _DashboardPageState extends State<DashboardPage> {
       final launch = push.takePendingOpen();
       if (launch != null) _openPush(launch);
       _askForUsernameIfNeeded();
+    });
+
+    // Not needed for the first frames, and each one reads several sources:
+    // start them once Home has settled instead of all at once.
+    _deferredStart = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      sl<HealthImportService>().start();
+      // Both only reach the server when something changed (time zone, push
+      // token or account) since they last did.
+      sl<WeeklySummaryService>().reportTimezone();
+      push.requestPermissionAndRegister();
+      sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
     });
   }
 
@@ -141,6 +147,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _pushOpens?.cancel();
+    _deferredStart?.cancel();
     // Sign-out leaves Home; links wait until it shows again.
     HomeWidgetService.markNotReady();
     _dietPlanCubit.close();
@@ -382,7 +389,9 @@ class _HomeTabState extends State<_HomeTab> {
     _scheduleMidnightReload();
     if (widget.refreshOnShow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _reloadAll();
+        // Tab switches rebuild this tab; within a few seconds of the last
+        // full reload, HabitEvents and sync pulls already cover changes.
+        if (mounted && !_reloadedRecently()) _reloadAll();
       });
     }
   }
@@ -467,7 +476,18 @@ class _HomeTabState extends State<_HomeTab> {
     if (mounted) showSuccessSnackBar(context, 'Your data is up to date');
   }
 
+  /// When Home last re-read every card; static because switching tabs
+  /// rebuilds this state.
+  static DateTime? _lastFullReload;
+
+  static bool _reloadedRecently() {
+    final last = _lastFullReload;
+    return last != null &&
+        isWithinLast(const Duration(seconds: 30), last);
+  }
+
   void _reloadAll() {
+    _lastFullReload = DateTime.now();
     context.read<WaterIntakeCubit>().reload();
     // Quiet and never prompting: the card keeps showing last night.
     context.read<SleepCubit>().loadSleepData(
@@ -770,8 +790,7 @@ class _Greeting extends StatelessWidget {
             const SizedBox(height: AppDimens.space4),
             Text(
               name.isEmpty ? greeting : '$greeting, $name',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
               style: context.text.headlineSmall?.copyWith(
                 color: context.colors.onSurface,
               ),

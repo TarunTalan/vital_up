@@ -59,7 +59,9 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
       // rejected by the function; refresh it first.
       if (Supabase.instance.client.auth.currentSession?.isExpired ?? false) {
         try {
-          await Supabase.instance.client.auth.refreshSession();
+          await Supabase.instance.client.auth
+              .refreshSession()
+              .timeout(const Duration(seconds: 15));
         } catch (e) {
           debugPrint('generate-diet-plan: session refresh failed: $e');
           return ApiError(

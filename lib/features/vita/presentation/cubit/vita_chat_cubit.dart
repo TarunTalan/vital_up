@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
@@ -89,12 +90,19 @@ class VitaChatCubit extends Cubit<VitaChatState> {
     await _ask([...rest, message.copyWith(failed: false)]);
   }
 
+  /// Longest a reply may take before the message is marked failed.
+  static const replyTimeout = Duration(seconds: 75);
+
   Future<void> _ask(List<VitaMessage> history) async {
     emit(state.copyWith(messages: history, isTyping: true, error: () => null));
     await _save(history);
 
     try {
-      final reply = await _repository.reply(history, draftPlan: _draftPlan);
+      // Whole answer, health snapshot and a retried request included: the
+      // typing dots must always end.
+      final reply = await _repository
+          .reply(history, draftPlan: _draftPlan)
+          .withLoadTimeout(replyTimeout);
       if (isClosed) return;
       final updated = [...history, reply];
       emit(state.copyWith(messages: updated, isTyping: false));

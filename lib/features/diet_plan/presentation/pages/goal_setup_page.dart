@@ -6,7 +6,9 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_ai_consent_sheet.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 
 class GoalSetupPage extends StatefulWidget {
   final Map<String, dynamic> preferences;
@@ -23,6 +25,20 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
   String? _weightError;
   String? _timeframeError;
 
+  /// The user's weight unit (Settings); the plan always gets kg.
+  WeightUnit _unit = WeightUnit.kg;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnit();
+  }
+
+  Future<void> _loadUnit() async {
+    final unit = await sl<WeightService>().unit();
+    if (mounted && unit != _unit) setState(() => _unit = unit);
+  }
+
   @override
   void dispose() {
     _weightController.dispose();
@@ -34,17 +50,14 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
   static const _maxWeeks = 104;
 
   Future<void> _submit() async {
-    final weight = parseNumberInRange(
+    final (kg: weight, error: weightError) = parseWeightEntry(
       _weightController.text,
-      min: InputLimits.weightKgMin,
-      max: InputLimits.weightKgMax,
+      _unit,
     );
     final timeframe = parseNumberInRange(_timeframeController.text, min: 1, max: _maxWeeks)?.round();
 
     setState(() {
-      _weightError = weight == null
-          ? 'Enter ${InputLimits.weightKgMin.round()} to ${InputLimits.weightKgMax.round()} kg'
-          : null;
+      _weightError = weightError;
       _timeframeError = timeframe == null ? 'Enter 1 to $_maxWeeks weeks' : null;
     });
     if (weight == null || timeframe == null) return;
@@ -76,7 +89,7 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
           AppTextField.decimal(
             controller: _weightController,
             hint: 'e.g. 65',
-            suffixText: 'kg',
+            suffixText: _unit.label,
             error: _weightError,
             textInputAction: TextInputAction.next,
             onChanged: (_) {

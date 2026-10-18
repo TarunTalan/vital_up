@@ -146,9 +146,7 @@ class _Summary extends StatelessWidget {
           title: 'Weight change',
           value: now.weightChangeKg == null
               ? '—'
-              : '${now.weightChangeKg! >= 0 ? '+' : '−'}'
-                    '${unit.fromKg(now.weightChangeKg!.abs()).toStringAsFixed(1)} '
-                    '${unit.label}',
+              : _signedWeight(unit, now.weightChangeKg!),
           detail: now.weightChangeKg == null
               ? 'Weigh in twice a week to see a change'
               : 'First to last weigh-in this week',
@@ -227,4 +225,15 @@ class _MetricCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "+0.4 kg", "−1.2 kg", or "0.0 kg" (no sign once it rounds to zero).
+String _signedWeight(WeightUnit unit, double kg) {
+  final v = double.parse(unit.fromKg(kg).toStringAsFixed(1));
+  final sign = v > 0
+      ? '+'
+      : v < 0
+      ? '−'
+      : '';
+  return '$sign${v.abs().toStringAsFixed(1)} ${unit.label}';
 }

@@ -159,10 +159,12 @@ class HealthSnapshotBuilder {
   }
 
   Future<_Sleep> _sleep(DateTime now) async {
-    final logs = await _isar.isar.sleepLogCaches.where().findAll();
     final weekAgo = now.subtract(const Duration(days: 7));
-    final recent = logs.where((l) => l.endTime.isAfter(weekAgo)).toList()
-      ..sort((a, b) => b.endTime.compareTo(a.endTime));
+    final recent = await _isar.isar.sleepLogCaches
+        .filter()
+        .endTimeGreaterThan(weekAgo)
+        .sortByEndTimeDesc()
+        .findAll();
 
     // Saved entries are manual or the phone's estimate, never Health Connect.
     final loggedLastNight =
@@ -192,10 +194,11 @@ class HealthSnapshotBuilder {
   Future<_Water> _waterData(DateTime today, DateTime weekStart) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return const _Water(todayMl: null, tracks: false);
-    final logs = await _isar.isar.waterLogCaches.where().findAll();
-    final mine = logs.where(
-      (l) => l.userId == userId && !l.timestamp.isBefore(weekStart),
-    );
+    final mine = await _isar.isar.waterLogCaches
+        .filter()
+        .userIdEqualTo(userId)
+        .timestampGreaterThan(weekStart, include: true)
+        .findAll();
     final todayMl = mine
         .where((l) => !l.timestamp.isBefore(today))
         .fold<int>(0, (s, l) => s + l.amountMl);
@@ -212,7 +215,8 @@ class HealthSnapshotBuilder {
   }
 
   Future<_Activity> _activityData(DateTime today, DateTime weekStart) async {
-    final history = await _activity();
+    // Totals only (no GPS routes), this week's sessions only.
+    final history = await _activity(since: weekStart);
     final week = history
         .map((h) => h.session)
         .where((s) => !s.startTime.isBefore(weekStart))

@@ -10,6 +10,54 @@ import 'package:vital_up/features/profile/data/services/username_service.dart';
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/domain/profile_rules.dart';
 
+/// `user_health_data` columns for [profile].
+Map<String, dynamic> _healthColumns(ProfileEntity profile) => {
+  'full_name': ProfileRules.cleanName(profile.fullName),
+  'dob': profile.dob,
+  'gender': profile.gender,
+  'weight': profile.weight,
+  'weight_unit': profile.weightUnit,
+  'height': profile.height,
+  'height_unit': profile.heightUnit,
+  'oxygen_level': profile.oxygenLevel,
+  'health_conditions': ProfileRules.cleanNote(profile.healthConditions),
+  'medicines': ProfileRules.cleanNote(profile.medicines),
+  'allergies': ProfileRules.cleanNote(profile.allergies),
+  'smokes': profile.smokes,
+  'blood_pressure_top': profile.bloodPressureTop,
+  'blood_pressure_bottom': profile.bloodPressureBottom,
+  'bpm': profile.bpm,
+  'activity': profile.activity,
+  'sleep': profile.sleep,
+};
+
+/// The `user_health_data` columns [profile] changes compared with
+/// [previous] (every column when there's no previous copy). Without the
+/// unchanged ones, an older copy on this phone can't overwrite edits made
+/// on another device, or a weight logged since the profile was loaded.
+Map<String, dynamic> healthDataChanges(
+  ProfileEntity profile,
+  ProfileEntity? previous,
+) {
+  final next = _healthColumns(profile);
+  if (previous == null) return {...next, 'onboarding_completed': true};
+  final before = _healthColumns(previous);
+  final changed = {
+    for (final e in next.entries)
+      if (before[e.key] != e.value) e.key: e.value,
+  };
+  // A unit travels with its number, so the pair stays consistent.
+  if (changed.containsKey('weight') || changed.containsKey('weight_unit')) {
+    changed['weight'] = next['weight'];
+    changed['weight_unit'] = next['weight_unit'];
+  }
+  if (changed.containsKey('height') || changed.containsKey('height_unit')) {
+    changed['height'] = next['height'];
+    changed['height_unit'] = next['height_unit'];
+  }
+  return changed;
+}
+
 /// A failure whose [message] is written for the user (shown as is).
 class ProfileUserError extends ServerException {
   const ProfileUserError(String message) : super(message: message);
@@ -23,6 +71,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   /// Public Supabase Storage bucket for profile photos; each user may only
   /// write inside their own `<userId>/` folder (see the avatars migration).
   static const _avatarBucket = 'avatars';
+
+  /// A photo on a slow connection; then the user can try again.
+  static const _photoTimeout = Duration(seconds: 60);
+  static const _requestTimeout = Duration(seconds: 20);
 
   static const _imageTypes = {
     'jpg': 'image/jpeg',
@@ -145,38 +197,21 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         );
       }
 
-      // 2. Update user_health_data table
-      final payload = {
-        'id': user.id,
-        'full_name': ProfileRules.cleanName(profile.fullName),
-        'dob': profile.dob,
-        'gender': profile.gender,
-        'weight': profile.weight,
-        'weight_unit': profile.weightUnit,
-        'height': profile.height,
-        'height_unit': profile.heightUnit,
-        'oxygen_level': profile.oxygenLevel,
-        'health_conditions': ProfileRules.cleanNote(profile.healthConditions),
-        'medicines': ProfileRules.cleanNote(profile.medicines),
-        'allergies': ProfileRules.cleanNote(profile.allergies),
-        'smokes': profile.smokes,
-        'blood_pressure_top': profile.bloodPressureTop,
-        'blood_pressure_bottom': profile.bloodPressureBottom,
-        'bpm': profile.bpm,
-        'activity': profile.activity,
-        'sleep': profile.sleep,
-        'onboarding_completed': true,
-      };
-
-      sent &= await pendingWrites.sendOrQueue(
-        supabaseClient,
-        PendingWrite.upsert(
-          'user_health_data',
-          values: payload,
-          userId: user.id,
-          key: ProfileCache.healthWriteKey(user.id),
-        ),
-      );
+      // 2. Update user_health_data table: only the fields this edit
+      // changed, so an older copy on this phone can't put back values
+      // edited on another device (or a weight logged since).
+      final payload = healthDataChanges(profile, previous);
+      if (payload.isNotEmpty) {
+        sent &= await pendingWrites.sendOrQueue(
+          supabaseClient,
+          PendingWrite.upsert(
+            'user_health_data',
+            values: {'id': user.id, ...payload},
+            userId: user.id,
+            key: ProfileCache.healthWriteKey(user.id),
+          ),
+        );
+      }
 
       // 3. Auth metadata mirrors the name (the profile reads
       // user_health_data first). It can't be queued, so it's best effort.
@@ -184,9 +219,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
           previous == null || previous.fullName != profile.fullName;
       if (nameChanged && sent) {
         try {
-          await supabaseClient.auth.updateUser(
-            UserAttributes(data: {'full_name': profile.fullName}),
-          );
+          await supabaseClient.auth
+              .updateUser(UserAttributes(data: {'full_name': profile.fullName}))
+              .timeout(const Duration(seconds: 15));
         } catch (e) {
           logger.w('Could not sync name to auth metadata: $e');
         }
@@ -226,19 +261,21 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final path =
           '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final bucket = supabaseClient.storage.from(_avatarBucket);
-      await bucket.upload(
-        path,
-        imageFile,
-        fileOptions: FileOptions(
-          contentType: contentType,
-          cacheControl: '3600',
-        ),
-      );
+      await bucket
+          .upload(
+            path,
+            imageFile,
+            fileOptions: FileOptions(
+              contentType: contentType,
+              cacheControl: '3600',
+            ),
+          )
+          .timeout(_photoTimeout);
       final url = bucket.getPublicUrl(path);
 
-      await supabaseClient.auth.updateUser(
-        UserAttributes(data: {'avatar_url': url}),
-      );
+      await supabaseClient.auth
+          .updateUser(UserAttributes(data: {'avatar_url': url}))
+          .timeout(_requestTimeout);
       await _syncLeaderboardAvatar(userId, url);
       await _deleteAvatarFiles(userId, keep: path);
 

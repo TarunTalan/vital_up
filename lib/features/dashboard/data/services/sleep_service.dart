@@ -14,6 +14,7 @@ import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import '../../../../core/database/isar_service.dart';
 import '../../../../core/database/collections/sleep_log_cache.dart';
 import '../../../../core/events/habit_events.dart';
+import '../../../../core/sync/sync_adapters.dart' show syncId;
 import '../../../../core/sync/sync_hooks.dart';
 import '../../../reminders/data/reminder_scheduler.dart';
 import '../../domain/entities/sleep_session_info.dart';
@@ -374,9 +375,32 @@ class SleepService {
       ..source = source == SleepDataSource.phone ? 'phone' : 'manual'
       ..isSynced = false;
 
+    // An edit of a night replaces the entries saved for it before; reads
+    // pick the latest wake time, so an earlier corrected wake time would
+    // otherwise lose to the old entry.
+    final userId = _userId;
+    final dayStart = startOfDay(wakeTime);
+    final replaced = <SleepLogCache>[];
     await _isarService.isar.writeTxn(() async {
+      final sameNight = await _isarService.isar.sleepLogCaches
+          .filter()
+          .group((q) => q.userIdEqualTo(userId).or().userIdEqualTo(_legacyUserId))
+          .endTimeBetween(dayStart, nextDay(dayStart), includeUpper: false)
+          .findAll();
+      replaced.addAll(sameNight);
+      await _isarService.isar.sleepLogCaches.deleteAll([
+        for (final old in sameNight) old.id,
+      ]);
       await _isarService.isar.sleepLogCaches.put(log);
     });
+    if (userId != _legacyUserId) {
+      final keptId = syncId('sleep', userId, bedTime);
+      for (final old in replaced) {
+        final id = syncId('sleep', userId, old.startTime);
+        // Same start: the new entry's upload replaces that row.
+        if (id != keptId) await _sync?.recordDelete('sleep_logs', id);
+      }
+    }
     _sync?.schedule();
 
     // This night closes an open "Going to bed".

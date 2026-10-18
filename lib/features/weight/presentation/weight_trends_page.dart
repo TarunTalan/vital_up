@@ -22,7 +22,8 @@ const _metric = TrackerMetric.weight;
 const _goalReachedKg = 0.5;
 
 String _signed(WeightUnit unit, double kg) {
-  final v = unit.fromKg(kg);
+  // Round first: 0.04 kg must read "0.0 kg", not "+0.0 kg".
+  final v = double.parse(unit.fromKg(kg).toStringAsFixed(1));
   final sign = v > 0
       ? '+'
       : v < 0

@@ -112,11 +112,12 @@ class UsernameService {
 
   /// Whether [username] is free for the caller (their own counts as free).
   Future<bool> isAvailable(String username) async =>
-      await _client.rpc(
-            'username_available',
-            params: {'p_username': username.trim()},
-          )
+      await _client
+              .rpc('username_available', params: {'p_username': username.trim()})
+              .timeout(_timeout)
           as bool;
+
+  static const _timeout = Duration(seconds: 15);
 
   /// Saves and confirms the caller's username. Throws [UsernameException].
   Future<String> setUsername(String username) async {
@@ -124,10 +125,9 @@ class UsernameService {
     if (error != null) throw UsernameException(error);
     try {
       final saved =
-          await _client.rpc(
-                'set_username',
-                params: {'p_username': username.trim()},
-              )
+          await _client
+                  .rpc('set_username', params: {'p_username': username.trim()})
+                  .timeout(_timeout)
               as String;
       final userId = _client.auth.currentUser?.id;
       if (userId != null) await _remember(userId, saved);

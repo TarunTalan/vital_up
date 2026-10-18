@@ -257,11 +257,14 @@ class _SummaryItem extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                goal,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.labelSmall?.copyWith(color: grey),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  goal,
+                  maxLines: 1,
+                  style: context.text.labelSmall?.copyWith(color: grey),
+                ),
               ),
               const SizedBox(height: AppDimens.space8),
               TweenAnimationBuilder<double>(
