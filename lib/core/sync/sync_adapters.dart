@@ -183,6 +183,16 @@ class SleepSyncAdapter implements SyncAdapter {
                 ..source = row['source'] as String? ?? 'manual'
                 ..isSynced = true,
             );
+          } else if (existing.every((e) => e.isSynced)) {
+            // The same night edited on another device (an unsent local
+            // edit is kept and uploads next).
+            await _isar.sleepLogCaches.putAll([
+              for (final e in existing)
+                e
+                  ..endTime = _time(row['end_time'])
+                  ..durationMinutes = (row['duration_minutes'] as num).toInt()
+                  ..source = row['source'] as String? ?? e.source,
+            ]);
           }
         }
       });

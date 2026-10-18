@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -184,18 +185,25 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Every track point of every session, grouped by session id and in
-  /// time order. One query instead of one per session.
-  Future<Map<String, List<DriftTrackPoint>>> getAllTrackPointsBySession() async {
-    final rows = await (select(driftTrackPoints)
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.sessionId),
-            (t) => OrderingTerm(expression: t.timestamp),
-          ]))
-        .get();
+  /// Track points of [sessionIds], grouped by session id and in time
+  /// order. One query per 500 sessions (SQLite caps bound variables)
+  /// instead of one per session.
+  Future<Map<String, List<DriftTrackPoint>>> getTrackPointsBySession(
+    List<String> sessionIds,
+  ) async {
     final grouped = <String, List<DriftTrackPoint>>{};
-    for (final row in rows) {
-      (grouped[row.sessionId] ??= []).add(row);
+    for (var i = 0; i < sessionIds.length; i += 500) {
+      final chunk = sessionIds.sublist(i, min(i + 500, sessionIds.length));
+      final rows = await (select(driftTrackPoints)
+            ..where((t) => t.sessionId.isIn(chunk))
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.sessionId),
+              (t) => OrderingTerm(expression: t.timestamp),
+            ]))
+          .get();
+      for (final row in rows) {
+        (grouped[row.sessionId] ??= []).add(row);
+      }
     }
     return grouped;
   }

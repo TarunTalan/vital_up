@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/sync/backup_sync.dart';
 import 'package:vital_up/core/sync/pending_writes.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
@@ -246,6 +247,10 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     if (userId == null) return;
     final generation = _generation;
     bool stale() => _userId != userId || _generation != generation;
+    // Before the network check: an offline edit keeps its real time.
+    for (final adapter in _adapters) {
+      if (adapter case final PullBeforePush p) await p.noteEdits(userId);
+    }
     // No network at all: wait for the reconnect event instead of retrying.
     if (!_connectivity.hasNetwork) return;
 
@@ -258,11 +263,18 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
         // old account lands in the (wiped) local data.
         if (stale()) return;
         try {
+          // Backups merge with other devices' edits before uploading, so
+          // an upload never replaces an edit it hasn't seen.
+          final pullFirst = adapter is PullBeforePush;
+          if (pullFirst) await _pull(adapter, userId, stale);
+          if (stale()) return;
           await _uploader.push(adapter, userId);
-          if (pull) await _pull(adapter, userId, stale);
+          if (pull && !pullFirst) await _pull(adapter, userId, stale);
         } catch (e, stack) {
           if (isOfflineError(e)) rethrow;
           failed = true;
+          // An expired session just waits for the next refresh.
+          if (PendingWrites.isSessionError(e)) continue;
           CrashReporter.report(
             e,
             stack,
@@ -277,7 +289,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       failed = true;
       if (isOfflineError(e)) {
         _connectivity.reportFailure();
-      } else if (e is! ServerUnavailable) {
+      } else if (e is! ServerUnavailable && !PendingWrites.isSessionError(e)) {
         // An outage just backs off; anything else is a bug worth seeing.
         CrashReporter.report(e, stack, reason: 'Sync failed');
       }
@@ -352,7 +364,12 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
       if (rows.isEmpty) break;
       if (stale()) return;
-      await adapter.apply(userId, rows);
+      // A delete that couldn't be sent yet: don't put the row back.
+      final deleting = _queuedDeleteIds(adapter.table);
+      await adapter.apply(userId, [
+        for (final row in rows)
+          if (!deleting.contains('${row['id']}')) row,
+      ]);
       _pulled.add(adapter.table);
       final last = rows.last['updated_at'];
       final id = rows.last['id'];
@@ -365,6 +382,11 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
       if (rows.length < pageSize) break;
     }
   }
+
+  Set<String> _queuedDeleteIds(String table) => queuedDeleteIds(
+    _prefs.getStringList(_keyDeletes) ?? const <String>[],
+    table,
+  );
 
   Future<void> _pushDeletes(String userId) async {
     final queued = _prefs.getStringList(_keyDeletes) ?? const [];
@@ -411,4 +433,19 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
   /// One request with a timeout; transient network failures retry quickly.
   Future<T> _retryOperation<T>(Future<T> Function() action) =>
       retrySyncRequest(action, timeout: _requestTimeout);
+}
+
+/// Ids of [table] rows in the stored delete [queue] (entries recorded by
+/// [SyncService.recordDelete]). A pull must not put these rows back while
+/// their delete is still waiting to be sent.
+@visibleForTesting
+Set<String> queuedDeleteIds(List<String> queue, String table) {
+  final ids = <String>{};
+  for (final raw in queue) {
+    try {
+      final d = jsonDecode(raw) as Map<String, dynamic>;
+      if (d['table'] == table && d['id'] is String) ids.add(d['id'] as String);
+    } catch (_) {}
+  }
+  return ids;
 }

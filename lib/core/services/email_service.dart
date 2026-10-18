@@ -47,10 +47,9 @@ class EmailService {
 
   Future<bool> _dispatch(Map<String, dynamic> body) async {
     try {
-      final res = await _supabase.functions.invoke(
-        'send-email',
-        body: body,
-      );
+      final res = await _supabase.functions
+          .invoke('send-email', body: body)
+          .timeout(const Duration(seconds: 30));
 
       if (res.status == 200) {
         _logger.i('Support ticket sent.');

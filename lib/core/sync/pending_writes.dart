@@ -102,6 +102,30 @@ class PendingWrite {
          queuedAt: DateTime.now(),
        );
 
+  /// The row an `update` / `upsert` / `delete` touches; null for RPCs.
+  String? get rowId => switch (kind) {
+    'upsert' => '$target:${values[onConflict ?? 'id']}',
+    'update' || 'delete' => '$target:${jsonEncode(match)}',
+    _ => null,
+  };
+
+  /// Whether this queued write sets any field [other] also sets on the
+  /// same row (sending them out of order would leave an old value).
+  bool overlaps(PendingWrite other) =>
+      userId == other.userId &&
+      rowId != null &&
+      _rowKey == other._rowKey &&
+      values.keys.any(other.values.containsKey);
+
+  /// Row identity across kinds: an update matched by id and an upsert of
+  /// that id are the same row.
+  String? get _rowKey {
+    final id = kind == 'upsert'
+        ? values[onConflict ?? 'id']
+        : (match.length == 1 && match.containsKey('id') ? match['id'] : null);
+    return id == null ? rowId : '$target:id=$id';
+  }
+
   PendingWrite _copy({Map<String, dynamic>? values, int? attempts}) =>
       PendingWrite(
         kind: kind,
@@ -253,6 +277,25 @@ class PendingWrites {
       all[i] = merges
           ? old._copy(values: {...old.values, ...write.values}, attempts: 0)
           : write;
+      // Writes queued after that position for the same row still carry
+      // the older values of these fields: give them the new ones, or they
+      // would be sent last and win.
+      if (write.kind == 'update' || write.kind == 'upsert') {
+        for (var j = i + 1; j < all.length; j++) {
+          final later = all[j];
+          if ((later.kind != 'update' && later.kind != 'upsert') ||
+              !later.overlaps(write)) {
+            continue;
+          }
+          all[j] = later._copy(
+            values: {
+              ...later.values,
+              for (final e in write.values.entries)
+                if (later.values.containsKey(e.key)) e.key: e.value,
+            },
+          );
+        }
+      }
     }
     await _save(all);
     _hooks?.schedule();
@@ -263,9 +306,12 @@ class PendingWrites {
   ///
   /// Returns true if it reached the server.
   Future<bool> sendOrQueue(SupabaseClient client, PendingWrite write) async {
-    // An older queued write for the same key must go first, so queue behind it.
+    // An older queued write for the same key, or one setting the same
+    // fields of the same row, must go first: queue behind it.
     final queuedAhead = _all().any(
-      (w) => w.key == write.key && w.userId == write.userId,
+      (w) =>
+          (w.key == write.key && w.userId == write.userId) ||
+          w.overlaps(write),
     );
     if (!_connectivity.hasNetwork || queuedAhead) {
       await enqueue(write);
@@ -276,8 +322,9 @@ class PendingWrites {
       _connectivity.reportSuccess();
       return true;
     } catch (e) {
-      // An outage is as temporary as being offline: keep the edit.
-      if (_isServerTrouble(e)) {
+      // An outage or an expired session is as temporary as being offline:
+      // keep the edit (the flush retries once the session is refreshed).
+      if (_isServerTrouble(e) || isSessionError(e)) {
         await enqueue(write);
         return false;
       }
@@ -329,7 +376,7 @@ class PendingWrites {
           stop = true;
           continue;
         }
-        if (_isSessionError(e)) {
+        if (isSessionError(e)) {
           // Expired session: not the write's fault, try again later.
           stop = true;
           continue;
@@ -384,7 +431,8 @@ class PendingWrites {
     return status != null && status >= 500 && status < 600;
   }
 
-  static bool _isSessionError(Object e) {
+  /// The sign-in token expired or is invalid: not the request's fault.
+  static bool isSessionError(Object e) {
     if (e is AuthException) return true;
     if (e is PostgrestException) {
       return const {'PGRST301', 'PGRST302', 'PGRST303', '401'}.contains(e.code);
