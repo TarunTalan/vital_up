@@ -71,14 +71,18 @@ class AppDimens {
   // ---------------------------------------------------------------------------
   /// Figma button/pri & button/sec.
   static const double buttonHeight = 48.0;
-  static const EdgeInsets buttonPadding =
-      EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0);
+  static const EdgeInsets buttonPadding = EdgeInsets.symmetric(
+    horizontal: 16.0,
+    vertical: 12.0,
+  );
   static const double buttonGap = 8.0;
 
   /// Figma input/text field.
   static const double inputHeight = 56.0;
-  static const EdgeInsets inputPadding =
-      EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0);
+  static const EdgeInsets inputPadding = EdgeInsets.symmetric(
+    horizontal: 16.0,
+    vertical: 20.0,
+  );
   static const double inputLabelGap = 6.0;
 
   /// Figma button/ArrowLeft (24 icon + 12 padding).
@@ -97,12 +101,17 @@ class AppDimens {
   static const double iconBadge = 40.0;
   static const double iconBadgeLarge = 48.0;
 
+  /// Badge in half-width tile headers, leaving the title room.
+  static const double iconBadgeSmall = 32.0;
+
   static const double quickActionWidth = 100.0;
 
   /// Figma bottom nav bar (bars & panels/tab).
   static const double navBarItemHeight = 42.0;
-  static const EdgeInsets navBarPadding =
-      EdgeInsets.symmetric(horizontal: 32.0, vertical: 8.0);
+  static const EdgeInsets navBarPadding = EdgeInsets.symmetric(
+    horizontal: 32.0,
+    vertical: 8.0,
+  );
   static const double navBarBottomOffset = 16.0;
 
   /// Figma segmented tab (Move / Rest / Fuel / Vitals).
@@ -139,14 +148,18 @@ class AppDimens {
   // Card padding (Figma card/big: px-12 py-20, card/small: px-20 py-16)
   // ---------------------------------------------------------------------------
   static const EdgeInsets cardPadding = EdgeInsets.all(16.0);
-  static const EdgeInsets cardPaddingCompact =
-      EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0);
+  static const EdgeInsets cardPaddingCompact = EdgeInsets.symmetric(
+    horizontal: 16.0,
+    vertical: 12.0,
+  );
   static const EdgeInsets cardPaddingLarge = EdgeInsets.all(20.0);
   static const double cardInnerGap = 12.0;
 
   /// Figma toast/info.
-  static const EdgeInsets toastPadding =
-      EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0);
+  static const EdgeInsets toastPadding = EdgeInsets.symmetric(
+    horizontal: 8.0,
+    vertical: 6.0,
+  );
 
   // ---------------------------------------------------------------------------
   // Borders / effects
@@ -181,7 +194,7 @@ class AppDimens {
   static const double waterWaveHeight = 120.0;
 
   /// Dashboard: height of a half-width tracker tile at 1x text scale.
-  static const double dashboardTileHeight = 200.0;
+  static const double dashboardTileHeight = 216.0;
 
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.
@@ -375,8 +388,10 @@ class VitaDimens {
 
   /// Diet plan calorie pill + indented meal items.
   static const double pillRadius = 30.0;
-  static const EdgeInsets pillPadding =
-      EdgeInsets.symmetric(horizontal: 10, vertical: 8);
+  static const EdgeInsets pillPadding = EdgeInsets.symmetric(
+    horizontal: 10,
+    vertical: 8,
+  );
   static const double mealItemIndent = 17.0;
 }
 

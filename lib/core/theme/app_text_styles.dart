@@ -26,6 +26,13 @@ class AppTextStyles {
 
   static const String fontFamily = 'Nunito';
 
+  /// Smallest size text may shrink to when it doesn't fit (before the
+  /// system text size is applied); past it, text ends in an ellipsis.
+  static const double minFontSize = 12;
+
+  /// How far a larger style may shrink, as a share of its own size.
+  static const double minShrink = 0.75;
+
   static const TextStyle largeTitle = TextStyle(
     fontFamily: fontFamily,
     fontWeight: FontWeight.w600,
@@ -102,11 +109,11 @@ class AppTextStyles {
   /// Figma "caption 12" — JetBrains Mono Medium, used for uppercase card
   /// eyebrows like "TODAY'S INSIGHTS". Falls back to the app font offline.
   static TextStyle get caption => GoogleFonts.jetBrainsMono(
-        fontWeight: FontWeight.w500,
-        fontSize: 12,
-        height: 1.35,
-        letterSpacing: 0.5,
-      ).copyWith(fontFamilyFallback: const [fontFamily]);
+    fontWeight: FontWeight.w500,
+    fontSize: 12,
+    height: 1.35,
+    letterSpacing: 0.5,
+  ).copyWith(fontFamilyFallback: const [fontFamily]);
 
   static const TextTheme textTheme = TextTheme(
     displayLarge: largeTitle,
