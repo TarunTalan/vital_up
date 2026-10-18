@@ -27,7 +27,9 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  static const int _totalMs = 2400;
+  // 0-1950ms logo animation & tagline fade-in, 1950-3200ms static readable
+  // tagline hold (~1.25s), 3200-3500ms exit fade-out.
+  static const int _totalMs = 3500;
 
   // Logo viewBox geometry (500x500 space).
   static const double _viewBox = 500.0;
@@ -114,7 +116,7 @@ class _SplashPageState extends State<SplashPage>
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(2150, _totalMs, Curves.easeInOut),
+        curve: _interval(3200, _totalMs, Curves.easeInOut),
       ),
     );
 
