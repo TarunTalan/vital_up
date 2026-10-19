@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
@@ -17,9 +16,10 @@ import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
-import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_summary.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
-import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 
@@ -197,26 +197,20 @@ class _ActivityGoalsView extends StatelessWidget {
                     ],
                     const SizedBox(height: AppDimens.sectionGap),
                     TrackerSectionTitle(
-                      "Today's log",
+                      'Today',
                       actionLabel: 'See all',
                       onAction: () => context.pushNamed('activity-history'),
                     ),
                     const SizedBox(height: AppDimens.cardGap),
                     if (todays.isEmpty)
-                      const AppInfoNote(message: 'No workouts today.'),
+                      const AppInfoNote(message: 'No activities today.'),
+                    // The same cards as history; tap for the summary.
                     for (final s in todays) ...[
-                      TrackerLogTile(
-                        id: s.startTime.millisecondsSinceEpoch,
-                        icon: _metric.icon,
-                        color: AppColors.activityWorkouts,
-                        title: s.activityType.label,
-                        subtitle:
-                            '${DateFormat('EEE d MMM, h:mm a').format(s.startTime)} · '
-                            '${formatDashboardDuration(Duration(seconds: s.totalDurationSeconds))}',
-                        trailing:
-                            '${(s.totalDistanceMeters / 1000).toStringAsFixed(1)} km',
+                      ActivityHistoryCard(
+                        entry: HistoryEntry(session: s),
+                        onTap: () => showActivitySummarySheet(context, s),
                       ),
-                      const SizedBox(height: AppDimens.space8),
+                      const SizedBox(height: AppDimens.cardGap),
                     ],
                   ],
                 ),

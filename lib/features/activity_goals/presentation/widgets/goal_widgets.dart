@@ -25,13 +25,10 @@ extension GoalMetricStyle on GoalMetric {
     _ => null,
   };
 
-  Color get color => switch (this) {
-    GoalMetric.steps => AppColors.activitySteps,
-    GoalMetric.distance => AppColors.activityDistance,
-    GoalMetric.calories => AppColors.activityCalories,
-    GoalMetric.activeMinutes => AppColors.activityMinutes,
-    GoalMetric.workouts => AppColors.activityWorkouts,
-  };
+  /// Every activity goal uses the activity accent: one calm colour across
+  /// Home, the activity page, charts and widgets (the icon tells them
+  /// apart).
+  Color get color => TrackerMetric.activity.color;
 
   /// Number only, e.g. "6,240" or "2.4".
   String format(double value) => switch (this) {

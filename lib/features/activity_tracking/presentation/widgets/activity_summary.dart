@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/adaptive_row.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
@@ -9,6 +11,26 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
+
+/// [ActivitySummary] in a bottom sheet, read-only (tags and notes are
+/// edited from history).
+Future<void> showActivitySummarySheet(
+  BuildContext context,
+  ActivitySession session,
+) {
+  return showAppBottomSheet<void>(
+    context: context,
+    builder: (context) => SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        0,
+        context.gutter,
+        AppDimens.sectionGap + context.safePadding.bottom,
+      ),
+      child: ActivitySummary(session: session),
+    ),
+  );
+}
 
 /// One activity's summary, the same for every kind (GPS, timed, logged)
 /// and wherever it shows (after a workout, from history): the activity and

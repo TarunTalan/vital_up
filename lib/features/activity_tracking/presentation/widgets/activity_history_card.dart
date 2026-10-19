@@ -17,13 +17,15 @@ import 'package:vital_up/features/activity_tracking/presentation/utils/activity_
 class ActivityHistoryCard extends StatelessWidget {
   final HistoryEntry entry;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+
+  /// Null on read-only lists: no delete button.
+  final VoidCallback? onDelete;
 
   const ActivityHistoryCard({
     super.key,
     required this.entry,
     required this.onTap,
-    required this.onDelete,
+    this.onDelete,
   });
 
   Future<void> _confirmDelete(BuildContext context) async {
@@ -47,7 +49,7 @@ class ActivityHistoryCard extends StatelessWidget {
         ],
       ),
     );
-    if (delete == true) onDelete();
+    if (delete == true) onDelete?.call();
   }
 
   @override
@@ -104,16 +106,17 @@ class ActivityHistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'Delete',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _confirmDelete(context),
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  size: AppDimens.iconMd,
-                  color: v.grayText,
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'Delete',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _confirmDelete(context),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: AppDimens.iconMd,
+                    color: v.grayText,
+                  ),
                 ),
-              ),
             ],
           ),
           if (tag != null && tag.isNotEmpty) ...[
