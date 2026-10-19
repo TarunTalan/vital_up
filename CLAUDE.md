@@ -474,7 +474,11 @@ Route names are GoRouter `name`s.
   `MealLogBloc`. Isar `MealLogCache`, `OfflineFood` (synced from
   `proprietary_products`), `BarcodeCache`. `scan-food` responses cached
   (`FoodCacheKeys`); barcode falls back to OpenFoodFacts (read only: user
-  products are never uploaded there). Photo scans: 5 a day free, 100 with
+  products are never uploaded there). The camera reads EAN/UPC and GS1
+  Digital Link QR codes (`normalizeProductBarcode`, check digit) only inside
+  the scan frame (`presentation/utils/scan_frame.dart`, shared with the
+  overlay and photo crop); gallery photos are checked for a barcode before
+  going to the AI; the camera is let go in the background. Photo scans: 5 a day free, 100 with
   Pro (`get_remaining_scans`); a 429 opens the Pro sheet (`offerProForLimit`).
 - **diet_plan:** `diet-plan-prefs`, `diet-plan-mode`, `diet-plan-goal`,
   `diet-plan-manual`, `diet-plan-edit`, `diet-plan-result`. `DietPlanCubit`,

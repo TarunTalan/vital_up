@@ -99,7 +99,7 @@ const List<FaqItem> kFaqDatabase = [
     category: FaqCategory.nutrition,
     question: 'How does the AI Food & Nutrition Scanner work?',
     answer:
-        'Open the Food Scanner and aim your camera at a meal or a packaged food item. Google ML Kit processes barcodes or extracts nutritional text from labels (Calories, Protein, Carbs, Fats, Fiber) in sub-second offline processing.',
+        "Point the camera at a packet's barcode inside the frame and the product opens at once, without using a photo scan. For a meal, tap Capture or pick a photo for an AI estimate of calories, protein, carbs and fat. If a product isn't found, scan its nutrition label or add it yourself.",
     tags: ['food scanner', 'camera', 'barcode', 'ocr', 'macros'],
     actionLabel: 'Open Scanner',
     actionRoute: 'food-scan',

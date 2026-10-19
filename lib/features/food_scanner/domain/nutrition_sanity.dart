@@ -170,27 +170,48 @@ String _saneUnit(String unit) {
 }
 
 /// Extracts a product code (GTIN / EAN / UPC, 6 to 14 digits) from a scanned
-/// value, including GS1 Digital Link URLs that carry the code in their path.
-/// Null when the value is not a product barcode (e.g. a plain QR code).
+/// or typed value, including GS1 Digital Link QR codes
+/// (`https://<any domain>/01/<GTIN>/...`). Null when the value is not a
+/// product barcode (e.g. a website QR code).
 String? normalizeProductBarcode(String raw) {
-  var value = raw.trim();
+  final value = raw.trim();
   if (value.isEmpty || value.length > 2048) return null;
   if (value.startsWith('http://') || value.startsWith('https://')) {
-    final uri = Uri.tryParse(value);
-    if (uri == null) return null;
-    String? found;
-    for (final segment in uri.pathSegments.reversed) {
-      final digits = segment.replaceAll(RegExp(r'\D'), '');
-      if (digits.length >= 8 && digits.length <= 14 && RegExp(r'^\d+$').hasMatch(segment)) {
-        found = digits;
-        break;
-      }
-    }
-    if (found == null) return null;
-    value = found;
+    return _digitalLinkGtin(value);
   }
-  value = value.replaceAll(RegExp(r'[\s-]'), '');
-  return RegExp(r'^\d{6,14}$').hasMatch(value) ? value : null;
+  final digits = value.replaceAll(RegExp(r'[\s-]'), '');
+  return RegExp(r'^\d{6,14}$').hasMatch(digits) ? digits : null;
+}
+
+/// The GTIN after the `01` (or legacy `gtin`) key of a GS1 Digital Link URL,
+/// when its check digit is right. A zero-padded GTIN-14 becomes the 13 digits
+/// printed under the same package's EAN barcode, so both scans find one product.
+String? _digitalLinkGtin(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.host.isEmpty) return null;
+  final segments = uri.pathSegments;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (segments[i] != '01' && segments[i].toLowerCase() != 'gtin') continue;
+    var gtin = segments[i + 1];
+    if (!RegExp(r'^(\d{8}|\d{12,14})$').hasMatch(gtin) || !isValidGtin(gtin)) {
+      return null;
+    }
+    if (gtin.length == 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
+    return gtin;
+  }
+  return null;
+}
+
+/// Whether [code] (GTIN-8, -12, -13 or -14) ends with the right GS1 check digit.
+bool isValidGtin(String code) {
+  if (!RegExp(r'^\d{8,14}$').hasMatch(code)) return false;
+  final digits = code.codeUnits.map((c) => c - 48).toList();
+  var sum = 0;
+  // Weights 3, 1, 3... from the digit left of the check digit.
+  for (var i = digits.length - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+    sum += digits[i] * weight;
+  }
+  return (10 - sum % 10) % 10 == digits.last;
 }
 
 /// Splits a serving text such as "1 bowl (150g)", "2 pieces", "100 g" or
