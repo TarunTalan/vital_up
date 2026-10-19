@@ -314,6 +314,8 @@ Route names are GoRouter `name`s.
 - **settings:** Appearance, Units, Notifications, Connected (Health Sync),
   Privacy & security (app lock, leaderboard visibility sheet, AI coach data,
   "Share usage analytics"), About.
+  Units also has Distance (km / mi, `DistanceUnitNotifier`, pref
+  `activity_distance_unit`, read by the workout screens).
   `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`), notification,
   health-sync and analytics flags (`settings_analytics_enabled`, read by
   `AnalyticsService.init` before DI; off clears the user id and data).
@@ -354,17 +356,61 @@ Route names are GoRouter `name`s.
   (`WeeklySummaryService`, computed on device; reports time zone via queued
   `set_my_timezone`; server sends a Sunday 18:00 local push).
 - **activity_tracking:** `activity-tracking`, `activity-history`.
+  One activity screen, two modes: `ActivityTrackingPage` (bloc at page
+  level) shows `_ActivityTrackingView` (GPS: map, location service,
+  recovery; its logic is unchanged by the modes) for outdoor types and
+  `WorkoutTimerPage` (timer cubit) for workouts. Picking a workout on the
+  GPS view (tiles or More) switches to the timer; an outdoor tile on the
+  timer switches back (`initialType`, wins over the goal's pick). A
+  running timer always opens the timer. Route `workout-timer` builds the
+  same page with `workout:`; `openWorkoutTimer` pops back to an open
+  `activity-tracking` or `workout-timer` instead of stacking. Every
+  activity (GPS, timed, logged) shows one `ActivitySummary`
+  (`widgets/activity_summary.dart`: type and date, main figure = km or
+  time, equal neutral figures, target result) on `ActivityCompletionPage`
+  (after GPS and timed workouts alike) and in the history detail sheet.
+  Settings follow the type (`ActivitySettingsPage(activityType:)`):
+  workouts get a Time (minutes, `WorkoutTargetType.duration`) or calories
+  target kept apart from GPS targets (`timerTargetType/Value`, prefs
+  `workout_timer_target_*`, cleared after finish or discard, saved on the
+  session), no metrics layout or map rows; with none set the timer starts
+  with `timerTargetFromGoals` (today's active minutes left, else calories).
   `ActivityType`: five GPS types (`ActivityType.outdoor`: walk, run, cycle,
   trekking, climbing) and workouts without a route (`ActivityType.workouts`:
   strength, yoga, hiit, swimming, dance, sports, other). Stored by name;
   read with `ActivityType.fromName` (unknown -> other). GPS pickers list
   outdoor types only; `session.hasDistance` hides distance/pace for
-  workouts. History filters All / Outdoor / Workouts + a chip per recorded
-  type. Workouts are logged two ways, both through `LogWorkout` (same
+  workouts. History (`activity-history`) is laid out like meal history (no
+  summary card): an All / Outdoor / Workouts `AppSegmentedControl` and a
+  search button (type, tag or note) as the first list item, then one
+  `ActivityHistoryCard` per entry: icon, type, `formatLogDateTime` date, a
+  grey delete button, the tag, then three neutral equal columns
+  (`AdaptiveRow`: km / time / calories, or time / calories / effort).
+  Meal history uses `LogHistoryCard` / `LogTypeBadge` / `LogValuePill`
+  (`core/widgets/tracker/log_history_card.dart`). Live workout stats
+  default to `defaultStatsFor(type)` (steps on foot, pace for runs, speed
+  for rides) until the user saves a layout. The GPS screen opens with
+  `activityForGoals` (steps goal: walk; distance or calories goal: run;
+  else the last GPS activity, then walk) and, with no target set by hand,
+  starts with `targetFromGoals` (what's left of today's distance goal,
+  else calories goal) in `activity_target_rules.dart`; the old "Daily
+  target", "Default activity type", soundtrack and distance-unit settings
+  are gone (prefs removed on load). Both workout screens share
+  `StartPauseControl` (music / start / settings, slide to unlock, finish /
+  lock / pause), `ActivitySelector` above it (walk / run / cycle + More
+  with every activity and "Log a past workout", in both modes), the `CountdownOverlay` 3-2-1 on Start
+  (countdown also on the timer's settings page) and `WorkoutMusic` + `WorkoutMusicBar`
+  (`widgets/workout_music.dart`); both open the same
+  `ActivitySettingsPage`; the timer has the GPS view's top (round back and
+  history buttons while idle, no title) and its card
+  shows live calories (`WorkoutTimerState.caloriesSoFar`, moderate effort).
+  Workouts are logged two ways, both through `LogWorkout` (same
   repository, so sync, goals, challenges and badges count them):
   `workout-timer` (`WorkoutTimerPage` / `WorkoutTimerCubit`, extra
   `ActivityType`; wall-clock `WorkoutTimer` in pref `workout_timer_v1`, so
-  it survives app kills with no foreground service; caps at 6 h; the
+  it survives app kills with no foreground service; caps at 6 h; locked
+  like a GPS workout: back is blocked until it's finished or discarded and
+  controls need a slide to unlock (`SlidingButton`); the
   tracking page reopens it; ongoing tray notification with a system
   chronometer and Pause / Resume (`LocalWorkoutTimerNotifier`, channel
   `vitalup_workout_timer`; actions `workout_pause` / `workout_resume`
