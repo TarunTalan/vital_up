@@ -80,7 +80,22 @@ void main() {
     });
 
     test('reads GS1 Digital Link URLs', () {
-      expect(normalizeProductBarcode('https://id.gs1.org/01/09506000134352'), '09506000134352');
+      // Zero-padded GTIN-14 becomes the EAN-13 on the same pack.
+      expect(normalizeProductBarcode('https://id.gs1.org/01/09506000134352'), '9506000134352');
+      expect(
+        normalizeProductBarcode('https://brand.example/qr/01/09506000134352/10/ABC123?linkType=all'),
+        '9506000134352',
+      );
+      expect(normalizeProductBarcode('https://id.gs1.org/01/19506000134359'), '19506000134359');
+      expect(normalizeProductBarcode('https://id.gs1.org/gtin/8901058851427'), '8901058851427');
+      expect(normalizeProductBarcode('https://id.gs1.org/01/12345670'), '12345670');
+    });
+
+    test('rejects Digital Links with a wrong check digit or no GTIN key', () {
+      expect(normalizeProductBarcode('https://id.gs1.org/01/09506000134353'), isNull);
+      expect(normalizeProductBarcode('https://id.gs1.org/01/123'), isNull);
+      expect(normalizeProductBarcode('https://brand.example/products/8901058851427'), isNull);
+      expect(normalizeProductBarcode('https://id.gs1.org/01'), isNull);
     });
 
     test('rejects plain QR content', () {
@@ -89,6 +104,14 @@ void main() {
       expect(normalizeProductBarcode('12'), isNull);
       expect(normalizeProductBarcode(''), isNull);
     });
+  });
+
+  test('isValidGtin checks the GS1 check digit', () {
+    expect(isValidGtin('8901058851427'), isTrue);
+    expect(isValidGtin('8901058851428'), isFalse);
+    expect(isValidGtin('036000291452'), isTrue); // UPC-A
+    expect(isValidGtin('12345670'), isTrue); // EAN-8
+    expect(isValidGtin('abc'), isFalse);
   });
 
   group('parseServingSize', () {

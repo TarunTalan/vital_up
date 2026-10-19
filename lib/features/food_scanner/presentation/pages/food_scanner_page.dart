@@ -35,14 +35,9 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/food_scanner/domain/ml_kit_errors.dart';
+import 'package:vital_up/features/food_scanner/presentation/utils/scan_frame.dart';
 
 final GetIt _sl = GetIt.instance;
-
-/// Scan-frame geometry, shared by the overlay painter, the captured preview
-/// card and [cropCapturedImage] so the crop always matches what is drawn.
-const double _scanFrameInset = AppDimens.gutter;
-const double _scanFrameHeightFraction = 0.35;
-const double _scanFrameLift = AppDimens.space40;
 
 class FoodScannerPage extends StatelessWidget {
   final VoidCallback? onBack;
@@ -72,7 +67,7 @@ class FoodScannerView extends StatefulWidget {
   State<FoodScannerView> createState() => _FoodScannerViewState();
 }
 
-class _FoodScannerViewState extends State<FoodScannerView> {
+class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingObserver {
   final ImagePicker _imagePicker = ImagePicker();
   CameraController? _cameraController;
   Future<void>? _cameraInitFuture;
@@ -91,7 +86,15 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   String? _errorMessage;
 
   CameraDescription? _cameraDescription;
-  final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
+  /// Retail barcodes, plus QR for GS1 Digital Link codes on newer packs
+  /// (`normalizeProductBarcode` ignores other QR codes).
+  final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [
+    BarcodeFormat.ean13,
+    BarcodeFormat.ean8,
+    BarcodeFormat.upca,
+    BarcodeFormat.upce,
+    BarcodeFormat.qrCode,
+  ]);
   final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   bool _isStreaming = false;
   bool _isProcessingFrame = false;
@@ -102,14 +105,69 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   String? _currentFailedBarcode;
   List<Offset> _detectedQrPoints = [];
 
+  /// Whether barcode reading should run once the camera is ready; kept while
+  /// the camera is let go in the background.
+  bool _wantsBarcodeReading = true;
+
+  /// The camera was let go when the app left the screen; start it on resume.
+  bool _cameraReleased = false;
+
+  /// Bumped when the camera is let go, so a start still in progress stops.
+  int _cameraGeneration = 0;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      // Not on inactive: the notification shade and permission dialogs
+      // only make the app inactive, and restarting the camera there flickers.
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        _releaseCamera();
+      case AppLifecycleState.resumed:
+        _restoreCamera();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  /// Lets the camera go in the background (other apps can use it, and no
+  /// frames are read while nobody sees the screen).
+  Future<void> _releaseCamera() async {
+    if (_permissionDenied || _cameraReleased) return;
+    _cameraGeneration++;
+    _cameraReleased = true;
+    final controller = _cameraController;
+    await _stopImageStream(keepWanted: true);
+    _cameraController = null;
+    _cameraInitFuture = null;
+    _torchEnabled = false;
+    if (mounted) setState(() {});
+    await controller?.dispose();
+  }
+
+  /// Starts the camera again after [_releaseCamera], or after the user
+  /// granted the permission in system settings. Never asks for it here:
+  /// closing a permission screen resumes the app and would loop.
+  Future<void> _restoreCamera() async {
+    if (!_cameraReleased && !_permissionDenied) return;
+    final status = await Permission.camera.status;
+    if (!mounted || _cameraController != null || !status.isGranted) return;
+    if (!_cameraReleased && !_permissionDenied) return;
+    _cameraReleased = false;
     _initializeCamera();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopImageStream();
     _cameraController?.dispose();
     _barcodeScanner.close();
@@ -118,13 +176,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   }
 
   Future<void> _initializeCamera() async {
+    final generation = _cameraGeneration;
     setState(() {
       _permissionDenied = false;
       _errorMessage = null;
     });
 
     final permission = await Permission.camera.request();
-    if (!mounted) return;
+    if (!mounted || generation != _cameraGeneration) return;
 
     if (!permission.isGranted) {
       setState(() {
@@ -136,7 +195,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
     try {
       final cameras = await availableCameras();
-      if (!mounted) return;
+      if (!mounted || generation != _cameraGeneration) return;
 
       if (cameras.isEmpty) {
         setState(() => _errorMessage = 'No camera found. Pick a photo from your gallery.');
@@ -159,9 +218,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
             : ImageFormatGroup.bgra8888,
       );
 
-      _cameraInitFuture = controller.initialize();
-      await _cameraInitFuture;
-      if (!mounted) {
+      final initFuture = controller.initialize();
+      _cameraInitFuture = initFuture;
+      await initFuture;
+      if (!mounted || generation != _cameraGeneration) {
         await controller.dispose();
         return;
       }
@@ -172,15 +232,23 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         _cameraDescription = backCamera;
       });
 
-      _startImageStream(controller);
+      if (_wantsBarcodeReading) _startImageStream(controller);
     } catch (error) {
       debugPrint('Camera start failed: $error');
-      if (!mounted) return;
+      if (!mounted || generation != _cameraGeneration) return;
       setState(() => _errorMessage = "Couldn't start the camera. Try again.");
     }
   }
 
+  /// Reads barcodes again (now, or once the camera is back from the background).
+  void _resumeBarcodeReading() {
+    _wantsBarcodeReading = true;
+    final controller = _cameraController;
+    if (controller != null && controller.value.isInitialized) _startImageStream(controller);
+  }
+
   void _startImageStream(CameraController controller) {
+    _wantsBarcodeReading = true;
     if (_isStreaming) return;
     _isStreaming = true;
     _isProcessingFrame = false;
@@ -191,7 +259,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     });
   }
 
-  Future<void> _stopImageStream() async {
+  Future<void> _stopImageStream({bool keepWanted = false}) async {
+    if (!keepWanted) _wantsBarcodeReading = false;
     if (!_isStreaming) return;
     _isStreaming = false;
     _isProcessingFrame = false;
@@ -233,39 +302,36 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
       final barcodes = await _barcodeScanner.processImage(inputImage);
 
-      if (barcodes.isNotEmpty && mounted) {
-        final qr = barcodes.first;
-        final corners = qr.cornerPoints;
-        final barcodeVal = qr.rawValue ?? qr.displayValue;
+      if (!mounted) return;
+      final screen = MediaQuery.sizeOf(context);
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final placed = <PlacedCode>[
+        for (final code in barcodes)
+          if ((code.rawValue ?? code.displayValue)?.isNotEmpty ?? false)
+            (
+              value: (code.rawValue ?? code.displayValue)!,
+              points: [
+                for (final p in _codeCorners(code))
+                  mapCameraPoint(p, imageSize, cameraDesc.sensorOrientation, screen),
+              ],
+            ),
+      ];
+      // Only codes inside the scan frame count, and a pack's website QR
+      // there loses to its EAN.
+      final picked = pickCodeInFrame(placed, scanFrameRect(screen));
 
-        if (corners.length == 4) {
-          final screenW = MediaQuery.sizeOf(context).width;
-          final screenH = MediaQuery.sizeOf(context).height;
+      if (picked != null) {
+        setState(() {
+          _detectedQrPoints = picked.code.points;
+        });
 
-          final screenPoints = corners.map((p) {
-            return _mapPoint(
-              p,
-              Size(image.width.toDouble(), image.height.toDouble()),
-              cameraDesc.sensorOrientation,
-              Size(screenW, screenH),
-            );
-          }).toList();
-
-          if (mounted) {
-            setState(() {
-              _detectedQrPoints = screenPoints;
-            });
-          }
-
-          if (barcodeVal != null && barcodeVal.isNotEmpty) {
-            final productCode = normalizeProductBarcode(barcodeVal);
-            if (productCode != null) {
-              _onBarcodeDetected(productCode);
-            } else if (_ignoredCode != barcodeVal && mounted) {
-              _ignoredCode = barcodeVal;
-              showErrorSnackBar(context, "That isn't a food barcode. Try another.");
-            }
-          }
+        final productCode = picked.product;
+        final barcodeVal = picked.code.value;
+        if (productCode != null) {
+          _onBarcodeDetected(productCode);
+        } else if (_ignoredCode != barcodeVal) {
+          _ignoredCode = barcodeVal;
+          showErrorSnackBar(context, "That isn't a food barcode. Try another.");
         }
       } else {
         if (_detectedQrPoints.isNotEmpty && mounted) {
@@ -314,43 +380,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     }
   }
 
-  Offset _mapPoint(math.Point<int> point, Size imageSize, int sensorOrientation, Size widgetSize) {
-    final double imgW = imageSize.width;
-    final double imgH = imageSize.height;
-    final double widgetW = widgetSize.width;
-    final double widgetH = widgetSize.height;
-
-    final double previewW = imgH;
-    final double previewH = imgW;
-
-    final double scaleX = widgetW / previewW;
-    final double scaleY = widgetH / previewH;
-    final double scale = math.max(scaleX, scaleY);
-
-    final double scaledW = previewW * scale;
-    final double scaledH = previewH * scale;
-    final double dx = (widgetW - scaledW) / 2;
-    final double dy = (widgetH - scaledH) / 2;
-
-    double x = point.x.toDouble();
-    double y = point.y.toDouble();
-
-    if (sensorOrientation == 90) {
-      return Offset(
-        (imgH - y) * scale + dx,
-        x * scale + dy,
-      );
-    } else if (sensorOrientation == 270) {
-      return Offset(
-        y * scale + dx,
-        (imgW - x) * scale + dy,
-      );
-    } else {
-      return Offset(
-        x * scale + dx,
-        y * scale + dy,
-      );
+  /// A code's corners in the camera frame (its box when ML Kit gives none).
+  List<Offset> _codeCorners(Barcode code) {
+    final corners = code.cornerPoints;
+    if (corners.length == 4) {
+      return [for (final p in corners) Offset(p.x.toDouble(), p.y.toDouble())];
     }
+    final box = code.boundingBox;
+    return [box.topLeft, box.topRight, box.bottomRight, box.bottomLeft];
   }
 
   void _onBarcodeDetected(String barcode) async {
@@ -403,7 +440,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       debugPrint('Photo capture failed: $e');
       if (!mounted) return;
       showErrorSnackBar(context, "Couldn't take the photo. Try again.");
-      _startImageStream(controller);
+      _resumeBarcodeReading();
     } finally {
       if (mounted) setState(() => _isCapturing = false);
     }
@@ -430,10 +467,11 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     if (!mounted) return;
     if (image == null) {
       // Cancelled: keep scanning barcodes.
-      final controller = _cameraController;
-      if (controller != null && controller.value.isInitialized) _startImageStream(controller);
+      _resumeBarcodeReading();
       return;
     }
+    if (!_isScanningNutritionLabel && await _lookUpBarcodeInPhoto(image.path)) return;
+    if (!mounted) return;
 
     setState(() {
       _selectedImage = image;
@@ -445,6 +483,26 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     } else {
       _analyzeImage(image.path);
     }
+  }
+
+  /// Looks up a product barcode found in a picked photo instead of sending
+  /// the photo to the AI: exact, and it keeps one of the day's photo scans.
+  /// True when a lookup started.
+  Future<bool> _lookUpBarcodeInPhoto(String path) async {
+    try {
+      final codes = await _barcodeScanner.processImage(InputImage.fromFilePath(path));
+      for (final code in codes) {
+        final value = code.rawValue ?? code.displayValue;
+        final product = value == null ? null : normalizeProductBarcode(value);
+        if (product == null) continue;
+        if (!mounted) return false;
+        _onBarcodeDetected(product);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Barcode check on photo failed: $e');
+    }
+    return false;
   }
 
   Future<void> _processNutritionLabelOcr(String path) async {
@@ -590,10 +648,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     _detectedQrPoints = [];
                   });
                   // Restart stream to let them take photo of label
-                  final controller = _cameraController;
-                  if (controller != null && controller.value.isInitialized) {
-                    _startImageStream(controller);
-                  }
+                  _resumeBarcodeReading();
                 },
               ),
               const SizedBox(height: AppDimens.space12),
@@ -642,10 +697,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       _currentFailedBarcode = null;
       _detectedQrPoints = [];
     });
-    final controller = _cameraController;
-    if (controller != null && controller.value.isInitialized) {
-      _startImageStream(controller);
-    }
+    _resumeBarcodeReading();
   }
 
   void _analyzeImage(String path) {
@@ -672,10 +724,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
           _isScanningBarcode = false;
           _detectedQrPoints = [];
         });
-        final controller = _cameraController;
-        if (controller != null && controller.value.isInitialized) {
-          _startImageStream(controller);
-        }
+        _resumeBarcodeReading();
       }
     });
   }
@@ -821,9 +870,29 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                     ),
                   ),
                 ),
+              // Tells first-time users the camera reads barcodes by itself.
+              if (_cameraController != null &&
+                  _cameraController!.value.isInitialized &&
+                  !isRecognizing &&
+                  !_isScanningNutritionLabel &&
+                  !_isScanningBarcode &&
+                  _selectedImage == null &&
+                  _croppedImage == null &&
+                  _detectedQrPoints.isEmpty)
+                Positioned(
+                  top: scanFrameRect(MediaQuery.sizeOf(context)).bottom + AppDimens.space16,
+                  left: kScanFrameInset,
+                  right: kScanFrameInset,
+                  child: const IgnorePointer(
+                    child: _ScannerHint(
+                      icon: Icons.qr_code_scanner_rounded,
+                      text: 'Point at a barcode, or tap Capture for a meal',
+                    ),
+                  ),
+                ),
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.all(_scanFrameInset),
+                  padding: const EdgeInsets.all(kScanFrameInset),
                   child: Column(
                     children: [
                       Row(
@@ -845,7 +914,11 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                       ),
                       if (_isScanningNutritionLabel) ...[
                         const SizedBox(height: AppDimens.space16),
-                        const _NutritionLabelHint(),
+                        const _ScannerHint(
+                          icon: Icons.document_scanner_rounded,
+                          text: 'Align the nutrition facts table inside the frame and tap Capture.',
+                          highlighted: true,
+                        ),
                       ],
                       const Spacer(),
                       if (_croppedImage != null || _selectedImage != null) ...[
@@ -1088,8 +1161,14 @@ class _ScannerMessage extends StatelessWidget {
 }
 
 /// Hint banner shown while the user frames a nutrition-facts label.
-class _NutritionLabelHint extends StatelessWidget {
-  const _NutritionLabelHint();
+/// A short instruction over the camera. [highlighted] (a primary border)
+/// marks a mode the user picked, such as label scanning.
+class _ScannerHint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool highlighted;
+
+  const _ScannerHint({required this.icon, required this.text, this.highlighted = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1109,19 +1188,22 @@ class _NutritionLabelHint extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.black.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-            border: Border.all(color: primary, width: AppDimens.borderThick),
+            border: Border.all(
+              color: highlighted ? primary : AppColors.white.withValues(alpha: 0.12),
+              width: highlighted ? AppDimens.borderThick : AppDimens.borderThin,
+            ),
           ),
           child: Row(
             children: [
               Icon(
-                Icons.document_scanner_rounded,
+                icon,
                 color: primary,
                 size: AppDimens.iconLg,
               ),
               const SizedBox(width: AppDimens.space12),
               Expanded(
                 child: Text(
-                  'Align the nutrition facts table inside the frame and tap Capture.',
+                  text,
                   style: context.text.bodyMedium?.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -1250,7 +1332,7 @@ class _ScannedPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardHeight = context.screenHeight * _scanFrameHeightFraction;
+    final cardHeight = context.screenHeight * kScanFrameHeightFraction;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppDimens.radiusCard),
@@ -1337,11 +1419,11 @@ class ScannerOverlayPainter extends CustomPainter {
     final double height = size.height;
 
     // Viewport has the exact same dimensions as the captured preview card
-    final double boxWidth = width - 2 * _scanFrameInset;
-    final double boxHeight = height * _scanFrameHeightFraction;
-    final double left = (width - boxWidth) / 2;
-    final double top = (height - boxHeight) / 2 - _scanFrameLift;
-    final Rect rect = Rect.fromLTWH(left, top, boxWidth, boxHeight);
+    final Rect rect = scanFrameRect(size);
+    final double left = rect.left;
+    final double top = rect.top;
+    final double boxWidth = rect.width;
+    final double boxHeight = rect.height;
     final RRect rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
 
     // 1. Draw the darkened background mask with cutout for viewport
@@ -1437,10 +1519,11 @@ Uint8List? _cropToScanFrame(Uint8List bytes, double sw, double sh) {
   final double imgH = originalImage.height.toDouble();
 
   // Viewport coordinates matching the custom painter overlay
-  final double boxWidth = sw - 2 * _scanFrameInset;
-  final double boxHeight = sh * _scanFrameHeightFraction;
-  final double boxLeft = (sw - boxWidth) / 2;
-  final double boxTop = (sh - boxHeight) / 2 - _scanFrameLift;
+  final frame = scanFrameRect(Size(sw, sh));
+  final double boxWidth = frame.width;
+  final double boxHeight = frame.height;
+  final double boxLeft = frame.left;
+  final double boxTop = frame.top;
 
   // Camera preview uses BoxFit.cover, so we calculate the scale and offsets
   final double scale = math.max(sw / imgW, sh / imgH);

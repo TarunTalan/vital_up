@@ -147,7 +147,7 @@ class SupportBotService {
         isUser: false,
         text:
             '**Food Scanner & AI Diet Plan:**\n\n'
-            '• **Offline OCR Scanner**: Point your camera at food nutrition labels or barcodes for sub-second macro extraction.\n'
+            "• **Food Scanner**: Point the camera at a packet's barcode to open it at once, or tap Capture on a meal for an AI estimate.\n"
             '• **Vita Diet Planner**: AI plans customized recipes with exact calorie and protein targets tailored to your goals.',
         actionLabel: 'Open Food Scanner',
         actionRoute: 'food-scan',
