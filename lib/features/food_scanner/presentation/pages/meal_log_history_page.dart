@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
@@ -18,7 +17,6 @@ import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.da
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
-import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class MealLogHistoryPage extends StatelessWidget {
   const MealLogHistoryPage({super.key});
@@ -147,178 +145,46 @@ class _MealLogTile extends StatelessWidget {
     bloc.add(DeleteMealLogEntry(entry.id));
   }
 
-  String _formatDateTime(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dt.year, dt.month, dt.day);
-    final timeStr = DateFormat('h:mm a').format(dt);
-    if (date == today) {
-      return 'Today · $timeStr';
-    }
-    final yesterday = previousDay(today);
-    if (date == yesterday) {
-      return 'Yesterday · $timeStr';
-    }
-    return '${DateFormat('EEE, MMM d').format(dt)} · $timeStr';
-  }
+  String get _mealLabel => switch (entry.mealType) {
+    MealType.breakfast => 'Breakfast',
+    MealType.lunch => 'Lunch',
+    MealType.dinner => 'Dinner',
+    MealType.snack => 'Snack',
+  };
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return AppCard(
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _MealTypeBadge(mealType: entry.mealType),
-              const SizedBox(width: AppDimens.space8),
-              // Wraps at large text sizes instead of pushing the row wider.
-              Expanded(
-                child: Text(
-                  _formatDateTime(entry.capturedAt),
-                  textAlign: TextAlign.end,
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppDimens.space4),
-              IconButton(
-                tooltip: 'Delete',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _confirmDelete(context),
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  size: AppDimens.iconMd,
-                  color: colors.error,
-                ),
-              ),
-            ],
+    return LogHistoryCard(
+      badge: LogTypeBadge(label: _mealLabel),
+      at: entry.capturedAt,
+      title: entry.items.map((i) => i.name).join(', '),
+      onDelete: () => _confirmDelete(context),
+      figures: [
+        LogValuePill(
+          label: 'Cals',
+          value: '${entry.totalCalories.round()}',
+          color: colors.primary,
+        ),
+        if (entry.nutrition.isNotEmpty) ...[
+          LogValuePill(
+            label: 'P',
+            value: '${_sum(entry, (n) => n.proteinG)}g',
+            color: AppColors.scanProtein,
           ),
-          const SizedBox(height: AppDimens.space8),
-          Text(
-            entry.items.map((i) => i.name).join(', '),
-            style: context.text.titleSmall,
+          LogValuePill(
+            label: 'C',
+            value: '${_sum(entry, (n) => n.carbsG)}g',
+            color: AppColors.scanCarbs,
           ),
-          const SizedBox(height: AppDimens.space12),
-          Wrap(
-            spacing: AppDimens.space8,
-            runSpacing: AppDimens.space8,
-            children: [
-              _MacroPill(
-                label: 'Cals',
-                value: '${entry.totalCalories.round()}',
-                color: colors.primary,
-              ),
-              if (entry.nutrition.isNotEmpty) ...[
-                _MacroPill(
-                  label: 'P',
-                  value: '${_sum(entry, (n) => n.proteinG)}g',
-                  color: AppColors.scanProtein,
-                ),
-                _MacroPill(
-                  label: 'C',
-                  value: '${_sum(entry, (n) => n.carbsG)}g',
-                  color: AppColors.scanCarbs,
-                ),
-                _MacroPill(
-                  label: 'F',
-                  value: '${_sum(entry, (n) => n.fatG)}g',
-                  color: AppColors.scanFat,
-                ),
-              ],
-            ],
+          LogValuePill(
+            label: 'F',
+            value: '${_sum(entry, (n) => n.fatG)}g',
+            color: AppColors.scanFat,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MealTypeBadge extends StatelessWidget {
-  final MealType mealType;
-
-  const _MealTypeBadge({required this.mealType});
-
-  String get _label {
-    switch (mealType) {
-      case MealType.breakfast: return 'Breakfast';
-      case MealType.lunch:     return 'Lunch';
-      case MealType.dinner:    return 'Dinner';
-      case MealType.snack:     return 'Snack';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space12,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: v.primaryFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-        border: Border.all(color: v.primaryBorder!),
-      ),
-      child: Text(
-        _label,
-        style: context.text.bodySmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: context.colors.onPrimaryContainer,
-        ),
-      ),
-    );
-  }
-}
-
-class _MacroPill extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MacroPill({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space8,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-        border: Border.all(color: color.withValues(alpha: 0.27)),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: context.text.bodySmall?.copyWith(
-                color: context.vColors.grayText,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
