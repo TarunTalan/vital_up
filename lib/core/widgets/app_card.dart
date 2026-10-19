@@ -116,6 +116,11 @@ class AppIconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = color ?? context.colors.primary;
+    // The brand cyan is too light for an icon on its own tint in light
+    // mode; draw the glyph in the readable shade.
+    final glyph = accent == AppColors.primary
+        ? context.vColors.accentText ?? accent
+        : accent;
     return Container(
       width: size,
       height: size,
@@ -125,7 +130,7 @@ class AppIconBadge extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: IconTheme(
-        data: IconThemeData(color: accent, size: size / 2),
+        data: IconThemeData(color: glyph, size: size / 2),
         child: icon,
       ),
     );
@@ -161,18 +166,24 @@ class AppProgressBar extends StatelessWidget {
   }
 }
 
-/// Uppercase eyebrow label used at the top of cards
-/// (Figma "caption 12", e.g. "TODAY'S INSIGHTS").
+/// Eyebrow label used at the top of cards
+/// (Figma "caption 12", e.g. "TODAY'S INSIGHTS" or sentence case).
 class AppCaption extends StatelessWidget {
   final String text;
   final Color? color;
+  final bool uppercase;
 
-  const AppCaption(this.text, {super.key, this.color});
+  const AppCaption(
+    this.text, {
+    super.key,
+    this.color,
+    this.uppercase = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      uppercase ? text.toUpperCase() : text,
       style: AppTextStyles.caption.copyWith(
         color: color ?? context.vColors.grayText,
       ),

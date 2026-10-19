@@ -118,9 +118,7 @@ class _StreakPill extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              active
-                  ? Icons.local_fire_department_rounded
-                  : Icons.local_fire_department_outlined,
+              Icons.local_fire_department_rounded,
               size: AppDimens.iconXs,
               color: color,
             ),
@@ -256,7 +254,7 @@ class _Logged extends StatelessWidget {
         TextButton.icon(
           onPressed: onEdit,
           icon: SvgPicture.asset(
-            'assets/icons/edit.svg',
+            'assets/icons/ui/edit.svg',
             width: AppDimens.iconSm,
             height: AppDimens.iconSm,
             colorFilter: ColorFilter.mode(

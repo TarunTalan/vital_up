@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health/health.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 
@@ -46,16 +47,60 @@ void main() {
     expect(session.calories, 250);
   });
 
-  test('workout types VitalUp does not track are skipped', () {
+  test('workouts without a route keep their type and drop distance', () {
+    ActivitySession? import(HealthWorkoutActivityType t, {double? km}) =>
+        HealthImportService.workoutToSession(
+          'w',
+          start,
+          end,
+          WorkoutHealthValue(
+            workoutActivityType: t,
+            totalDistance: km == null ? null : (km * 1000).round(),
+            totalDistanceUnit: HealthDataUnit.METER,
+          ),
+        );
+
     expect(
-      HealthImportService.workoutToSession(
-        'y',
-        start,
-        end,
-        WorkoutHealthValue(workoutActivityType: HealthWorkoutActivityType.YOGA),
-      ),
-      isNull,
+      import(HealthWorkoutActivityType.YOGA)!.activityType,
+      ActivityType.yoga,
     );
+    expect(
+      import(HealthWorkoutActivityType.WEIGHTLIFTING)!.activityType,
+      ActivityType.strength,
+    );
+    expect(
+      import(HealthWorkoutActivityType.CRICKET)!.activityType,
+      ActivityType.sports,
+    );
+    expect(
+      import(HealthWorkoutActivityType.ROWING_MACHINE)!.activityType,
+      ActivityType.other,
+    );
+    // A gym session never has a distance; a swim does.
+    final gym = import(HealthWorkoutActivityType.STRENGTH_TRAINING, km: 2)!;
+    expect(gym.totalDistanceMeters, 0);
+    expect(gym.hasDistance, isFalse);
+    final swim = import(HealthWorkoutActivityType.SWIMMING_POOL, km: 1.5)!;
+    expect(swim.totalDistanceMeters, 1500);
+    expect(swim.hasDistance, isTrue);
+  });
+
+  test('records that are not exercise are skipped', () {
+    for (final t in [
+      HealthWorkoutActivityType.GUIDED_BREATHING,
+      HealthWorkoutActivityType.COOLDOWN,
+    ]) {
+      expect(
+        HealthImportService.workoutToSession(
+          'n',
+          start,
+          end,
+          WorkoutHealthValue(workoutActivityType: t),
+        ),
+        isNull,
+        reason: t.name,
+      );
+    }
   });
 
   test('implausible watch data is not imported as-is', () {

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class BiometricAuthService {
   static const String _keyBiometricEnabled = 'vitalup_biometric_lock_enabled';
+  static const _window = MethodChannel('com.vitalup.app/window');
 
   final LocalAuthentication _auth;
   final SharedPreferences _prefs;
@@ -29,7 +30,19 @@ class BiometricAuthService {
       if (!success) return false;
     }
     await _prefs.setBool(_keyBiometricEnabled, enabled);
+    await applyScreenPrivacy();
     return true;
+  }
+
+  /// With app lock on, Android hides the app in the recent-apps preview and
+  /// blocks screenshots (FLAG_SECURE), so health data isn't visible behind
+  /// the lock. Never throws: a missing channel (iOS, tests) just skips it.
+  Future<void> applyScreenPrivacy() async {
+    try {
+      await _window.invokeMethod<void>('setSecure', {
+        'secure': isBiometricEnabled(),
+      });
+    } catch (_) {}
   }
 
   /// Check if hardware supports biometrics

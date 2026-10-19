@@ -69,7 +69,7 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
 
     final fraction = normalized / (2 * math.pi);
     var totalMinutes = (fraction * 24 * 60).round();
-    
+
     // Snap to nearest 5 minutes
     totalMinutes = ((totalMinutes + 2) ~/ 5) * 5;
     if (totalMinutes >= 24 * 60) totalMinutes = 0;
@@ -183,10 +183,14 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
               width: clockSize,
               height: clockSize,
               child: GestureDetector(
-                onPanStart: (details) =>
-                    _onPanStart(details.localPosition, Size(clockSize, clockSize)),
-                onPanUpdate: (details) =>
-                    _onPanUpdate(details.localPosition, Size(clockSize, clockSize)),
+                onPanStart: (details) => _onPanStart(
+                  details.localPosition,
+                  Size(clockSize, clockSize),
+                ),
+                onPanUpdate: (details) => _onPanUpdate(
+                  details.localPosition,
+                  Size(clockSize, clockSize),
+                ),
                 onPanEnd: (_) => _onPanEnd(),
                 child: CustomPaint(
                   size: Size(clockSize, clockSize),
@@ -224,8 +228,9 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
                             ),
                             decoration: BoxDecoration(
                               color: _getScoreColor(score).withAlpha(35),
-                              borderRadius:
-                                  BorderRadius.circular(AppDimens.radiusToast),
+                              borderRadius: BorderRadius.circular(
+                                AppDimens.radiusToast,
+                              ),
                             ),
                             child: Text(
                               'Score: $score% · ${_getScoreLabel(score)}',
@@ -250,7 +255,7 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
           children: [
             Expanded(
               child: _ScheduleTimeCard(
-                icon: Icons.nightlight_round,
+                icon: Icons.bedtime_rounded,
                 iconColor: AppColors.sleep,
                 title: 'Bedtime',
                 time: _bedTime,
@@ -375,7 +380,7 @@ class _ScheduleTimeCard extends StatelessWidget {
                 ),
               ),
               SvgPicture.asset(
-                'assets/icons/edit.svg',
+                'assets/icons/ui/edit.svg',
                 width: AppDimens.iconXs,
                 height: AppDimens.iconXs,
                 colorFilter: ColorFilter.mode(v.grayText!, BlendMode.srcIn),
@@ -428,12 +433,7 @@ class _SleepClockPainter extends CustomPainter {
       textAlign: TextAlign.center,
     );
 
-    const labels = {
-      0: '12A',
-      6: '6A',
-      12: '12P',
-      18: '6P',
-    };
+    const labels = {0: '12A', 6: '6A', 12: '12P', 18: '6P'};
 
     for (int hour = 0; hour < 24; hour++) {
       final angle = (hour / 24.0) * 2 * math.pi - (math.pi / 2);
@@ -443,17 +443,22 @@ class _SleepClockPainter extends CustomPainter {
       final innerR = radius - (isMajor ? 12 : (isQuarter ? 8 : 4));
       final outerR = radius - (strokeWidth / 2) - 2;
 
-      final p1 = Offset(center.dx + innerR * math.cos(angle), center.dy + innerR * math.sin(angle));
-      final p2 = Offset(center.dx + outerR * math.cos(angle), center.dy + outerR * math.sin(angle));
+      final p1 = Offset(
+        center.dx + innerR * math.cos(angle),
+        center.dy + innerR * math.sin(angle),
+      );
+      final p2 = Offset(
+        center.dx + outerR * math.cos(angle),
+        center.dy + outerR * math.sin(angle),
+      );
       canvas.drawLine(p1, p2, markerPaint);
 
       if (labels.containsKey(hour)) {
         textPainter.text = TextSpan(
           text: labels[hour],
-          style: TextStyle(
+          style: AppTextStyles.small12.copyWith(
             color: dialTextColor,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
           ),
         );
         textPainter.layout();
@@ -475,16 +480,14 @@ class _SleepClockPainter extends CustomPainter {
     final arcGradient = SweepGradient(
       startAngle: bedAngle,
       endAngle: bedAngle + sweepAngle,
-      colors: [
-        arcColor,
-        AppColors.teal,
-        AppColors.primary,
-      ],
+      colors: [arcColor, AppColors.teal, AppColors.primary],
       transform: GradientRotation(bedAngle),
     );
 
     final arcPaint = Paint()
-      ..shader = arcGradient.createShader(Rect.fromCircle(center: center, radius: radius))
+      ..shader = arcGradient.createShader(
+        Rect.fromCircle(center: center, radius: radius),
+      )
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
@@ -506,7 +509,7 @@ class _SleepClockPainter extends CustomPainter {
       canvas,
       bedPos,
       AppColors.sleep,
-      Icons.nightlight_round,
+      Icons.bedtime_rounded,
       Colors.white,
     );
 
@@ -557,7 +560,7 @@ class _SleepClockPainter extends CustomPainter {
     textPainter.text = TextSpan(
       text: String.fromCharCode(icon.codePoint),
       style: TextStyle(
-        fontSize: 16,
+        fontSize: AppDimens.iconXs,
         fontFamily: icon.fontFamily,
         package: icon.fontPackage,
         color: iconColor,

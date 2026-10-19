@@ -12,6 +12,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 const _metric = TrackerMetric.nutrition;
 
@@ -60,7 +61,10 @@ class NutritionSummaryCard extends StatelessWidget {
   /// Opens the nutrition detail page.
   final VoidCallback? onOpenProgress;
 
-  /// Starts the diet plan flow (shown when there's no plan).
+  /// Opens the active diet plan or generator.
+  final VoidCallback? onOpenDietPlan;
+
+  /// Creates a new diet plan.
   final VoidCallback? onCreatePlan;
 
   const NutritionSummaryCard({
@@ -70,6 +74,7 @@ class NutritionSummaryCard extends StatelessWidget {
     this.plan,
     this.onOpenProgress,
     this.onCreatePlan,
+    this.onOpenDietPlan,
   });
 
   @override
@@ -96,7 +101,6 @@ class NutritionSummaryCard extends StatelessWidget {
     final left = goal == null ? null : goal - kcal;
     return TrackerCard(
       metric: _metric,
-      title: plan != null ? 'Diet plan' : null,
       status: TrackerStatus.of(
         value: state.entries.isEmpty ? null : kcal,
         goal: goal,
@@ -111,20 +115,14 @@ class NutritionSummaryCard extends StatelessWidget {
           filled: true,
           onTap: onScanMeal,
         ),
-        if (plan == null && onCreatePlan != null)
-          TrackerQuickAction(
-            label: 'Get a plan',
-            icon: Icons.auto_awesome_rounded,
-            color: _metric.color,
-            onTap: onCreatePlan,
-          )
-        else
-          TrackerQuickAction(
-            label: 'History',
-            icon: Icons.history_rounded,
-            color: _metric.color,
-            onTap: onViewAll,
-          ),
+        TrackerQuickAction(
+          label: plan != null ? 'Diet plan' : 'Get a plan',
+          svgAsset: 'assets/icons/nav/vita.svg',
+          color: _metric.color,
+          onTap: plan != null
+              ? (onOpenDietPlan ?? onOpenProgress)
+              : onCreatePlan,
+        ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -241,13 +239,10 @@ class MacroBar extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: context.text.labelSmall?.copyWith(color: context.vColors.grayText),
     );
-    final figure = Text(
-      '${value.round()} / ${maxValue.round()}g',
-      maxLines: 1,
-      style: context.text.labelSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: context.colors.onSurface,
-      ),
+    final figureText = '${value.round()} / ${maxValue.round()}g';
+    final figureStyle = context.text.labelSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: context.colors.onSurface,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,16 +250,17 @@ class MacroBar extends StatelessWidget {
         if (compact) ...[
           name,
           const SizedBox(height: AppDimens.space2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: figure,
-          ),
+          FitText(figureText, style: figureStyle),
         ] else
           Row(
             children: [
               Expanded(child: name),
-              figure,
+              Text(
+                figureText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: figureStyle,
+              ),
             ],
           ),
         const SizedBox(height: AppDimens.space4),
@@ -330,25 +326,19 @@ class _MealSlot extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppDimens.space4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  style: context.text.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: logged ? accent : v.grayText,
-                  ),
+              FitText(
+                name,
+                maxLines: 1,
+                style: context.text.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: logged ? accent : v.grayText,
                 ),
               ),
               if (caption != null)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    caption!,
-                    maxLines: 1,
-                    style: context.text.labelSmall?.copyWith(color: v.grayText),
-                  ),
+                FitText(
+                  caption!,
+                  maxLines: 1,
+                  style: context.text.labelSmall?.copyWith(color: v.grayText),
                 ),
             ],
           ),

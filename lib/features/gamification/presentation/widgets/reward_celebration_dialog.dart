@@ -3,6 +3,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/features/gamification/domain/entities/award_result.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 /// One-line note for [award], shown as a snackbar. Rewards stay quiet; only
@@ -63,17 +64,23 @@ class RewardCelebrationDialog extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: award.levelUp || badge == null
-                  ? Text(
-                      '${award.level}',
-                      style: context.text.headlineLarge?.copyWith(
-                        color: AppColors.rankGold,
-                      ),
-                    )
-                  : GameIcon(
-                      GamificationIcons.badge(badge.iconKey),
-                      fallback: Icons.military_tech_rounded,
-                      size: AppDimens.iconXxl,
+                  ? GameIcon(
+                      GamificationIcons.levelHexagon(award.level),
+                      fallback: Icons.stars_rounded,
+                      size: AppDimens.iconXxl * 1.5,
                       color: AppColors.rankGold,
+                    )
+                  : GestureDetector(
+                      onTap: () => showBadgeDetailSheet(context, badge),
+                      child: Tooltip(
+                        message: badge.name,
+                        child: GameIcon(
+                          GamificationIcons.badge(badge.iconKey),
+                          fallback: Icons.military_tech_rounded,
+                          size: AppDimens.celebrationBadge * 0.75,
+                          color: AppColors.rankGold,
+                        ),
+                      ),
                     ),
             ),
             const SizedBox(height: AppDimens.space16),
@@ -98,14 +105,17 @@ class RewardCelebrationDialog extends StatelessWidget {
                 runSpacing: AppDimens.space8,
                 children: [
                   for (final b in award.newBadges)
-                    Chip(
-                      avatar: GameIcon(
-                        GamificationIcons.badge(b.iconKey),
-                        fallback: Icons.military_tech_rounded,
-                        size: AppDimens.iconSm,
-                        color: AppColors.rankGold,
+                    GestureDetector(
+                      onTap: () => showBadgeDetailSheet(context, b),
+                      child: Chip(
+                        avatar: GameIcon(
+                          GamificationIcons.badge(b.iconKey),
+                          fallback: Icons.military_tech_rounded,
+                          size: AppDimens.iconSm,
+                          color: AppColors.rankGold,
+                        ),
+                        label: Text(b.name),
                       ),
-                      label: Text(b.name),
                     ),
                 ],
               ),

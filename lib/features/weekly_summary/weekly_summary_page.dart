@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
@@ -23,7 +24,8 @@ class _WeeklySummaryPageState extends State<WeeklySummaryPage> {
   late Future<(WeeklySummary, WeightUnit)> _data = _load();
 
   Future<(WeeklySummary, WeightUnit)> _load() async => (
-    await sl<WeeklySummaryService>().load(),
+    // Reads Health Connect, which can hang; the error view offers Retry.
+    await sl<WeeklySummaryService>().load().withLoadTimeout(),
     await sl<WeightService>().unit(),
   );
 
@@ -98,7 +100,7 @@ class _Summary extends StatelessWidget {
         ),
         const SizedBox(height: AppDimens.sectionGap),
         _MetricCard(
-          icon: Icons.directions_run_rounded,
+          iconAsset: 'assets/icons/trackers/activity.svg',
           color: AppColors.activitySteps,
           title: 'Workouts',
           value: '${now.workouts}',
@@ -139,13 +141,12 @@ class _Summary extends StatelessWidget {
         ),
         _MetricCard(
           icon: Icons.monitor_weight_rounded,
+          iconAsset: 'assets/icons/trackers/weight_icon.svg',
           color: AppColors.teal,
           title: 'Weight change',
           value: now.weightChangeKg == null
               ? '—'
-              : '${now.weightChangeKg! >= 0 ? '+' : '−'}'
-                    '${unit.fromKg(now.weightChangeKg!.abs()).toStringAsFixed(1)} '
-                    '${unit.label}',
+              : _signedWeight(unit, now.weightChangeKg!),
           detail: now.weightChangeKg == null
               ? 'Weigh in twice a week to see a change'
               : 'First to last weigh-in this week',
@@ -165,7 +166,8 @@ class _Summary extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final Color color;
   final String title;
   final String value;
@@ -176,14 +178,15 @@ class _MetricCard extends StatelessWidget {
   final String changeUnit;
 
   const _MetricCard({
-    required this.icon,
+    this.icon,
+    this.iconAsset,
     required this.color,
     required this.title,
     required this.value,
     required this.detail,
     this.change,
     this.changeUnit = '',
-  });
+  }) : assert(icon != null || iconAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -199,6 +202,7 @@ class _MetricCard extends StatelessWidget {
             DashboardCardHeader(
               title: title,
               icon: icon,
+              iconAsset: iconAsset,
               badgeColor: color,
               trailing: change == null || change == 0
                   ? null
@@ -221,4 +225,15 @@ class _MetricCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "+0.4 kg", "−1.2 kg", or "0.0 kg" (no sign once it rounds to zero).
+String _signedWeight(WeightUnit unit, double kg) {
+  final v = double.parse(unit.fromKg(kg).toStringAsFixed(1));
+  final sign = v > 0
+      ? '+'
+      : v < 0
+      ? '−'
+      : '';
+  return '$sign${v.abs().toStringAsFixed(1)} ${unit.label}';
 }

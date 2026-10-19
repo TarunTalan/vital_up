@@ -7,11 +7,15 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_bubble.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_composer.dart';
+import 'package:vital_up/features/vita/presentation/widgets/vita_ai_consent_sheet.dart';
 
 /// `vita-chat` route extra when opened to tweak an unsaved [draftPlan]:
 /// "Update My Plan" then pops back with the change instructions
@@ -34,17 +38,19 @@ class VitaChatPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<VitaChatCubit>()
-        ..load(initialPrompt: initialPrompt, draftPlan: draftPlan),
-      child: _VitaChatView(returnsTweak: draftPlan != null),
+      create: (_) => sl<VitaChatCubit>(),
+      child: _VitaChatView(initialPrompt: initialPrompt, draftPlan: draftPlan),
     );
   }
 }
 
 class _VitaChatView extends StatefulWidget {
-  final bool returnsTweak;
+  final String? initialPrompt;
+  final MealPlan? draftPlan;
 
-  const _VitaChatView({required this.returnsTweak});
+  const _VitaChatView({this.initialPrompt, this.draftPlan});
+
+  bool get returnsTweak => draftPlan != null;
 
   @override
   State<_VitaChatView> createState() => _VitaChatViewState();
@@ -58,6 +64,27 @@ class _VitaChatViewState extends State<_VitaChatView> {
   ];
 
   final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  /// Nothing is sent before the user has accepted the AI data notice.
+  Future<void> _start() async {
+    if (!mounted) return;
+    final allowed = await ensureVitaAiConsent(context);
+    if (!mounted) return;
+    if (!allowed) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    await context.read<VitaChatCubit>().load(
+      initialPrompt: widget.initialPrompt,
+      draftPlan: widget.draftPlan,
+    );
+  }
 
   @override
   void dispose() {
@@ -74,6 +101,20 @@ class _VitaChatViewState extends State<_VitaChatView> {
         curve: Curves.easeOutCubic,
       );
     });
+  }
+
+  /// Today's chat limit: free users can start Pro, then the unanswered
+  /// message is sent again.
+  Future<void> _offerPro(String message) async {
+    final started = await offerProForLimit(
+      context,
+      reason: ProReason.vitaChats,
+      message: message,
+    );
+    if (!started || !mounted) return;
+    final cubit = context.read<VitaChatCubit>();
+    final failed = cubit.state.messages.where((m) => m.failed).lastOrNull;
+    if (failed != null) await cubit.retry(failed);
   }
 
   void _onAction(VitaMessage message, VitaAction action) {
@@ -114,7 +155,12 @@ class _VitaChatViewState extends State<_VitaChatView> {
               listener: (context, state) {
                 _scrollToEnd();
                 final error = state.error;
-                if (error != null) showErrorSnackBar(context, error);
+                if (error == null) return;
+                if (state.limitReached) {
+                  _offerPro(error);
+                } else {
+                  showErrorSnackBar(context, error);
+                }
               },
               listenWhen: (prev, next) =>
                   prev.messages.length != next.messages.length ||
@@ -122,7 +168,7 @@ class _VitaChatViewState extends State<_VitaChatView> {
                   (next.error != null && prev.error != next.error),
               builder: (context, state) {
                 if (state.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: VitalUpLoader());
                 }
                 final messages = state.messages;
                 final typing = state.isTyping ? 1 : 0;

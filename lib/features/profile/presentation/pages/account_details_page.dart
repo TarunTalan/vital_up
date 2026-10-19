@@ -49,14 +49,11 @@ class AccountDetailsPage extends StatelessWidget {
         if (profile == null) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is ProfileError
-                  ? LoadErrorView(
-                      onRetry: () => cubit.loadProfile(forceRefresh: true),
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is ProfileError
+                ? LoadErrorView(
+                    onRetry: () => cubit.loadProfile(forceRefresh: true),
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
         return _AccountForm(profile: profile, header: header);
@@ -79,9 +76,7 @@ class _AccountFormState extends State<_AccountForm> {
   final _formKey = GlobalKey<FormState>();
   late ProfileEntity _saved = widget.profile;
   late final _name = TextEditingController(text: _saved.fullName);
-  late final _usernameController = TextEditingController(
-    text: _saved.username,
-  );
+  late final _usernameController = TextEditingController(text: _saved.username);
   late final _username = UsernameInput(sl<UsernameService>());
   late final _dob = TextEditingController(text: _formatDob(_saved.dob));
   late final _email = TextEditingController(text: _saved.email);
@@ -412,6 +407,7 @@ class _AccountFormState extends State<_AccountForm> {
                               child: CircularProgressIndicator(
                                 strokeWidth: AppDimens.borderThick,
                                 color: context.colors.primary,
+                                strokeCap: StrokeCap.round,
                               ),
                             )
                           : null,

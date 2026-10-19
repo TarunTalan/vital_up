@@ -9,6 +9,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
@@ -31,6 +32,13 @@ class MyGoalsPage extends StatefulWidget {
 
 class _MyGoalsPageState extends State<MyGoalsPage> {
   late Future<Map<TrackerMetric, String?>> _goals = _load();
+
+  // Block body: an arrow body would hand setState the Future and throw.
+  void _reload() {
+    setState(() {
+      _goals = _load();
+    });
+  }
 
   Future<Map<TrackerMetric, String?>> _load() =>
       _read().withLoadTimeout().catchError((Object e, StackTrace stack) {
@@ -77,7 +85,7 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
       return;
     }
     if (await editTrackerGoal(context, metric) && mounted) {
-      setState(() => _goals = _load());
+      _reload();
     }
   }
 
@@ -90,7 +98,9 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
       ),
       onRefresh: () async {
         final next = _load();
-        setState(() => _goals = next);
+        setState(() {
+          _goals = next;
+        });
         try {
           await next;
         } catch (_) {
@@ -103,12 +113,12 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
           if (snap.hasError) {
             return LoadErrorView(
               onRetry: () {
-                setState(() => _goals = _load());
+                _reload();
               },
             );
           }
           final goals = snap.data;
-          if (goals == null) return const TrackerLoading();
+          if (goals == null) return const Center(child: VitalUpLoader());
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -179,7 +189,7 @@ class _GoalRow extends StatelessWidget {
               : goal == null
               ? Icon(Icons.add_circle_outline_rounded, size: AppDimens.iconMd, color: metric.color)
               : SvgPicture.asset(
-                  'assets/icons/edit.svg', 
+                  'assets/icons/ui/edit.svg', 
                   width: AppDimens.iconMd, 
                   height: AppDimens.iconMd, 
                   colorFilter: ColorFilter.mode(grey!, BlendMode.srcIn),

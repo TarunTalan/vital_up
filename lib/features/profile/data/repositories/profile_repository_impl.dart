@@ -8,6 +8,7 @@ import 'package:vital_up/core/database/collections/user_profile_cache.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/features/community/data/repositories/community_repository_impl.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:vital_up/features/profile/data/datasources/profile_remote_datasource_impl.dart';
 import 'package:vital_up/features/profile/data/profile_cache.dart';
@@ -26,15 +27,35 @@ class ProfileRepositoryImpl implements ProfileRepository {
   /// The signed-in user's id, or null (scopes the cache per account).
   final String? Function() currentUserId;
 
+  /// Whether profile edits for this user are still waiting in the offline
+  /// queue; the server copy is stale until they're sent.
+  final bool Function(String userId) hasQueuedEdits;
+
   ProfileRepositoryImpl({
     required this.remoteDataSource,
     required this.isarService,
     required this.cacheStore,
     required this.currentUserId,
     required this.logger,
-  });
+    bool Function(String userId)? hasQueuedEdits,
+  }) : hasQueuedEdits = hasQueuedEdits ?? ((_) => false);
 
   static const _offlineMessage = "You're offline. Try again when connected.";
+
+  @override
+  Stream<ProfileEntity> get changes => cacheStore.changes
+      .where((key) {
+        final userId = currentUserId();
+        return userId != null && key == ProfileCache.key(userId);
+      })
+      .asyncMap(
+        (key) async => (await cacheStore.read<ProfileEntity>(
+          key,
+          decode: ProfileCache.decode,
+        ))?.value,
+      )
+      .where((profile) => profile != null)
+      .cast<ProfileEntity>();
 
   @override
   Future<Either<Failure, ProfileEntity>> getProfile({
@@ -48,6 +69,12 @@ class ProfileRepositoryImpl implements ProfileRepository {
       final profile = await cacheStore.fetch<ProfileEntity>(
         ProfileCache.key(userId),
         remote: () async {
+          // An edit made offline hasn't reached the server yet: keep it
+          // rather than let the older server copy overwrite it.
+          if (hasQueuedEdits(userId)) {
+            final local = await _cached(userId);
+            if (local != null) return local;
+          }
           final remote = await remoteDataSource.getProfile();
           await _mirrorToIsar(remote);
           return remote;
@@ -69,9 +96,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
         }
       }
       logger.e('Profile load failed: $e');
-      return Left(ServerFailure(
-        _messageFor(e, fallback: "Couldn't load your profile. Try again."),
-      ));
+      return Left(
+        ServerFailure(
+          _messageFor(e, fallback: "Couldn't load your profile. Try again."),
+        ),
+      );
     }
   }
 
@@ -88,6 +117,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
         previous: previous,
       );
       if (!sent) logger.i('Profile edit queued until the device is online.');
+      if (previous?.username != profile.username) {
+        // Arena reads the username from its own cache.
+        await cacheStore.update(
+          CommunityRepositoryImpl.settingsKey(profile.id),
+          (data) =>
+              data is Map ? {...data, 'username': profile.username} : data,
+        );
+      }
       await _mirrorToIsar(profile);
       return const Right(null);
     } catch (e) {
@@ -131,8 +168,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
       (await cacheStore.read<ProfileEntity>(
         ProfileCache.key(userId),
         decode: ProfileCache.decode,
-      ))
-          ?.value;
+      ))?.value;
 
   /// Other features (meal log, Vita, gamification) still read the calorie
   /// goal and name from the Isar profile mirror, so keep it current.
@@ -157,8 +193,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   Future<ProfileEntity?> _legacyProfile(String userId) async {
     try {
-      final user = await isarService.isar.userProfileCaches
-          .getBySupabaseId(userId);
+      final user = await isarService.isar.userProfileCaches.getBySupabaseId(
+        userId,
+      );
       if (user == null) return null;
       return ProfileEntity(
         id: user.supabaseId,
@@ -200,7 +237,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
     logger.e('Profile photo change failed: $error');
     return isOfflineError(error)
         ? "You're offline. Connect to change your photo."
-        : _messageFor(error, fallback: "Couldn't update your photo. Try again.");
+        : _messageFor(
+            error,
+            fallback: "Couldn't update your photo. Try again.",
+          );
   }
 
   /// Short message for the user. [ProfileUserError]s are already written

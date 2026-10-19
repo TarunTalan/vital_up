@@ -7,18 +7,22 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
-/// Bottom sheet for selecting a workout target (distance or calories).
-/// Pops `(type, value)` on save, `(WorkoutTargetType.none, 0)` on Clear,
-/// or null when dismissed.
+/// Bottom sheet for selecting a workout target: distance or calories for
+/// GPS workouts, time (minutes) or calories for timed ones ([timed], saved
+/// as the timer's own target). Pops `(type, value)` on save,
+/// `(WorkoutTargetType.none, 0)` on Clear, or null when dismissed.
 class TargetPickerSheet extends StatefulWidget {
   final WorkoutPrefs current;
   final DistanceUnit distanceUnit;
+  final bool timed;
 
   const TargetPickerSheet({
     super.key,
     required this.current,
     required this.distanceUnit,
+    this.timed = false,
   });
 
   static Future<void> show(
@@ -26,18 +30,24 @@ class TargetPickerSheet extends StatefulWidget {
     required WorkoutPrefs current,
     required DistanceUnit distanceUnit,
     required WorkoutPrefsNotifier notifier,
+    bool timed = false,
   }) async {
     await showAppBottomSheet<(WorkoutTargetType, double)?>(
       context: context,
-      builder: (_) =>
-          TargetPickerSheet(current: current, distanceUnit: distanceUnit),
+      builder: (_) => TargetPickerSheet(
+        current: current,
+        distanceUnit: distanceUnit,
+        timed: timed,
+      ),
     ).then((result) {
       if (result == null) return;
       final (WorkoutTargetType type, double val) = result;
       if (type == WorkoutTargetType.none) {
-        notifier.clearTarget();
+        timed ? notifier.clearTimerTarget() : notifier.clearTarget();
       } else {
-        notifier.setTarget(type, val);
+        timed
+            ? notifier.setTimerTarget(type, val)
+            : notifier.setTarget(type, val);
       }
     });
   }
@@ -49,6 +59,8 @@ class TargetPickerSheet extends StatefulWidget {
 class _TargetPickerSheetState extends State<TargetPickerSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+
+  /// Distance, or minutes for a timed workout.
   final _distCtrl = TextEditingController();
   final _calCtrl = TextEditingController();
 
@@ -64,7 +76,16 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
       });
 
     // Pre-fill existing values
-    if (widget.current.targetType == WorkoutTargetType.distance) {
+    if (widget.timed) {
+      final current = widget.current;
+      if (current.timerTargetType == WorkoutTargetType.duration) {
+        _distCtrl.text = current.timerTargetValue.toStringAsFixed(0);
+        _tabs.animateTo(0);
+      } else if (current.timerTargetType == WorkoutTargetType.calories) {
+        _calCtrl.text = current.timerTargetValue.toStringAsFixed(0);
+        _tabs.animateTo(1);
+      }
+    } else if (widget.current.targetType == WorkoutTargetType.distance) {
       final displayVal = widget.distanceUnit == DistanceUnit.miles
           ? widget.current.targetValue / ActivityTargetLimits.kmPerMile
           : widget.current.targetValue;
@@ -91,7 +112,7 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
   void _confirm(WorkoutTargetType type) {
     final result = parseActivityTarget(
       type,
-      type == WorkoutTargetType.distance ? _distCtrl.text : _calCtrl.text,
+      type == WorkoutTargetType.calories ? _calCtrl.text : _distCtrl.text,
       widget.distanceUnit,
     );
     final value = result.value;
@@ -108,7 +129,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
     final v = context.vColors;
     final distUnitLabel = widget.distanceUnit.label.toUpperCase();
     final fieldHeight =
-        MediaQuery.textScalerOf(context).scale(AppDimens.inputHeight) +
+        context
+            .textScaled(AppDimens.inputHeight)
+            .clamp(AppDimens.inputHeight, double.infinity) +
         AppDimens.space16;
 
     return SafeArea(
@@ -152,17 +175,13 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                 tabs: [
                   Tab(
                     height: AppDimens.segmentHeight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('Distance ($distUnitLabel)'),
+                    child: FitText(
+                      widget.timed ? 'Time (min)' : 'Distance ($distUnitLabel)',
                     ),
                   ),
                   const Tab(
                     height: AppDimens.segmentHeight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('Calories (kcal)'),
-                    ),
+                    child: FitText('Calories (kcal)'),
                   ),
                 ],
               ),
@@ -172,18 +191,16 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
             AnimatedContainer(
               duration: AppDurations.medium,
               // Room for the error line under the field.
-              height: fieldHeight +
-                  (_error == null
-                      ? 0
-                      : MediaQuery.textScalerOf(context)
-                          .scale(AppDimens.space32)),
+              height:
+                  fieldHeight +
+                  (_error == null ? 0 : context.textScaled(AppDimens.space32)),
               child: TabBarView(
                 controller: _tabs,
                 children: [
                   _NumberField(
                     controller: _distCtrl,
-                    hint: 'e.g. 5.0',
-                    suffix: distUnitLabel,
+                    hint: widget.timed ? 'e.g. 45' : 'e.g. 5.0',
+                    suffix: widget.timed ? 'min' : distUnitLabel,
                     error: _error,
                     onChanged: _clearError,
                   ),
@@ -205,8 +222,9 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                   child: AppSecondaryButton(
                     label: 'Clear',
                     // Null would read as "dismissed" and keep the target.
-                    onTap: () =>
-                        Navigator.of(context).pop((WorkoutTargetType.none, 0.0)),
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pop((WorkoutTargetType.none, 0.0)),
                   ),
                 ),
                 const SizedBox(width: AppDimens.space12),
@@ -214,9 +232,11 @@ class _TargetPickerSheetState extends State<TargetPickerSheet>
                   child: AppPrimaryButton(
                     label: 'Set Target',
                     onTap: () {
-                      final type = _tabs.index == 0
-                          ? WorkoutTargetType.distance
-                          : WorkoutTargetType.calories;
+                      final type = _tabs.index == 1
+                          ? WorkoutTargetType.calories
+                          : widget.timed
+                          ? WorkoutTargetType.duration
+                          : WorkoutTargetType.distance;
                       _confirm(type);
                     },
                   ),

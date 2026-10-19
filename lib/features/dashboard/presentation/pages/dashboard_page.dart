@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
+import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/widgets/tracker/quick_log_hub.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:intl/intl.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_sheets.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
@@ -15,13 +20,13 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weekly_summary/weekly_summary_service.dart';
 import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_bottom_nav.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
@@ -44,7 +49,6 @@ import 'package:vital_up/features/activity_goals/presentation/widgets/activity_g
 import 'package:vital_up/features/dashboard/presentation/widgets/nutrition_summary_card.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/mood_card.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/today_summary_card.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
@@ -63,6 +67,7 @@ import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import '../widgets/screen_time_card.dart';
 import '../widgets/sleep_card.dart';
 import '../widgets/water_intake_card.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -75,7 +80,12 @@ class _DashboardPageState extends State<DashboardPage> {
   late final DietPlanCubit _dietPlanCubit;
   late final ProfileCubit _profileCubit;
   StreamSubscription<PushOpen>? _pushOpens;
+  Timer? _deferredStart;
   int _selectedIndex = 0;
+
+  /// Home was shown before, so showing it again re-reads every card
+  /// (edits made on other tabs or pushed pages).
+  bool _homeShown = false;
   final List<int> _navigationQueue = [0];
 
   @override
@@ -86,16 +96,9 @@ class _DashboardPageState extends State<DashboardPage> {
     // nutrition card reads.
     _profileCubit = sl<ProfileCubit>()..loadProfile();
 
-    sl<HealthImportService>().start();
-    // Both only reach the server when something changed (time zone, push
-    // token or account) since they last did.
-    sl<WeeklySummaryService>().reportTimezone();
-
     final push = sl<PushService>();
-    push.requestPermissionAndRegister();
     _pushOpens = push.opens.listen(_openPush);
 
-    sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
     // Opens a widget link that arrived while the app was starting.
     HomeWidgetService.markReady();
 
@@ -103,6 +106,20 @@ class _DashboardPageState extends State<DashboardPage> {
       final launch = push.takePendingOpen();
       if (launch != null) _openPush(launch);
       _askForUsernameIfNeeded();
+    });
+
+    // Not needed for the first frames, and each one reads several sources:
+    // start them once Home has settled instead of all at once.
+    _deferredStart = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      sl<HealthImportService>().start();
+      // Both only reach the server when something changed (time zone, push
+      // token or account) since they last did.
+      sl<WeeklySummaryService>().reportTimezone();
+      push.requestPermissionAndRegister();
+      sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
+      // Track downloads that finished while the app was closed.
+      sl<InAppAudioDownloader>().start();
     });
   }
 
@@ -129,12 +146,19 @@ class _DashboardPageState extends State<DashboardPage> {
   void _openPush(PushOpen open) {
     if (!mounted) return;
     final route = notificationRoute(open.type, open.route);
-    if (route != null) context.pushNamed(route);
+    if (route == null) return;
+    // The timer notification can be tapped with its screen already open.
+    if (route == LocalWorkoutTimerNotifier.route) {
+      openWorkoutTimer(context);
+    } else {
+      context.pushNamed(route);
+    }
   }
 
   @override
   void dispose() {
     _pushOpens?.cancel();
+    _deferredStart?.cancel();
     // Sign-out leaves Home; links wait until it shows again.
     HomeWidgetService.markNotReady();
     _dietPlanCubit.close();
@@ -145,11 +169,11 @@ class _DashboardPageState extends State<DashboardPage> {
   static const _arenaTab = 3;
 
   static const _items = [
-    AppBottomNavItem('Home', 'assets/icons/home.svg'),
-    AppBottomNavItem('Scan', 'assets/icons/scanner.svg'),
-    AppBottomNavItem('Vita', 'assets/icons/vita.svg'),
+    AppBottomNavItem('Home', 'assets/icons/nav/home.svg'),
+    AppBottomNavItem('Scan', 'assets/icons/nav/scanner.svg'),
+    AppBottomNavItem('Vita', 'assets/icons/nav/vita.svg'),
     AppBottomNavItem('Arena', GamificationIcons.community),
-    AppBottomNavItem('Profile', 'assets/icons/profile.svg'),
+    AppBottomNavItem('Profile', 'assets/icons/nav/profile.svg'),
   ];
 
   void _selectTab(int index) {
@@ -292,16 +316,24 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildSelectedTab(BuildContext context) {
+    final refreshHome = _homeShown;
+    if (_selectedIndex == 0) _homeShown = true;
     return switch (_selectedIndex) {
       0 => BlocProvider<MealLogBloc>(
         create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
         child: BlocListener<ProfileCubit, ProfileState>(
           bloc: _profileCubit,
-          listenWhen: (_, state) => state is ProfileLoaded,
+          listenWhen: (prev, next) =>
+              (next is ProfileLoaded || next is ProfileSaveSuccess) &&
+              next.shownProfile?.dailyCalorieGoal !=
+                  prev.shownProfile?.dailyCalorieGoal,
           // Re-read so the calorie goal appears once the profile syncs.
           listener: (context, _) =>
               context.read<MealLogBloc>().add(const LoadTodaysMeals()),
-          child: _HomeTab(onScanMeal: () => _selectTab(1)),
+          child: _HomeTab(
+            onScanMeal: () => _selectTab(1),
+            refreshOnShow: refreshHome,
+          ),
         ),
       ),
       1 => FoodScannerPage(onBack: _handlePop),
@@ -317,7 +349,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _HomeTab extends StatefulWidget {
   final VoidCallback? onScanMeal;
-  const _HomeTab({this.onScanMeal});
+
+  /// Re-read every card when the tab mounts (not on the first show, when
+  /// the cubits have just loaded).
+  final bool refreshOnShow;
+
+  const _HomeTab({this.onScanMeal, this.refreshOnShow = false});
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -328,11 +365,18 @@ class _HomeTabState extends State<_HomeTab> {
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(
     onResume: () {
       if (!mounted) return;
+      // The day or time zone may have changed while away.
+      _scheduleMidnightReload();
+      sl<WeeklySummaryService>().reportTimezone();
       context.read<WaterIntakeCubit>().reload();
       context.read<TrendCubit<SleepSessionInfo>>().load();
+      context.read<TrendCubit<WeightLogCache>>().load();
       context.read<ActivityGoalsCubit>().load();
       context.read<StressCheckInCubit>().reload();
       context.read<MealLogBloc>().add(const LoadTodaysMeals());
+      context.read<TrendCubit<MealLogEntry>>().load();
+      context.read<DietPlanCubit>().loadActiveMealPlan();
+      context.read<ScreenTimeCubit>().loadStats();
       context.read<GamificationCubit>().sync();
       // The realtime feed can drop while backgrounded; cache-first, so this
       // only refetches when the inbox is a few minutes old.
@@ -340,16 +384,93 @@ class _HomeTabState extends State<_HomeTab> {
     },
   );
 
+  StreamSubscription<HabitLogged>? _habits;
+  StreamSubscription<String>? _pulls;
+  Timer? _midnight;
+
   @override
   void initState() {
     super.initState();
     _lifecycle;
+    // Logs made outside these cards (notification actions, home widgets,
+    // Health Connect imports, other pages) and rows synced from other
+    // devices show up at once.
+    _habits = sl<HabitEvents>().stream.listen((e) => _reloadHabit(e.habit));
+    _pulls = sl<SyncService>().pulled.listen(_reloadTable);
+    _scheduleMidnightReload();
+    if (widget.refreshOnShow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Tab switches rebuild this tab; within a few seconds of the last
+        // full reload, HabitEvents and sync pulls already cover changes.
+        if (mounted && !_reloadedRecently()) _reloadAll();
+      });
+    }
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
+    _midnight?.cancel();
+    _habits?.cancel();
+    _pulls?.cancel();
     super.dispose();
+  }
+
+  /// With the app left open across midnight, the cards would keep showing
+  /// yesterday's totals.
+  void _scheduleMidnightReload() {
+    _midnight?.cancel();
+    final now = DateTime.now();
+    final wait =
+        nextDay(startOfDay(now)).difference(now) + const Duration(seconds: 1);
+    _midnight = Timer(wait, () {
+      if (!mounted) return;
+      _reloadAll();
+      _scheduleMidnightReload();
+    });
+  }
+
+  void _reloadHabit(Habit habit) {
+    if (!mounted) return;
+    switch (habit) {
+      case Habit.water:
+        context.read<WaterIntakeCubit>().reload();
+      case Habit.meal:
+        context.read<MealLogBloc>().add(const RefreshAfterSave());
+        context.read<TrendCubit<MealLogEntry>>().load();
+      case Habit.activity:
+        context.read<ActivityGoalsCubit>().load();
+      case Habit.mood:
+        context.read<StressCheckInCubit>().reload();
+      case Habit.weight:
+        context.read<TrendCubit<WeightLogCache>>().load();
+      case Habit.sleep:
+        // SleepCubit follows SleepService.changes; the trend follows it.
+        break;
+    }
+  }
+
+  void _reloadTable(String table) {
+    if (!mounted) return;
+    switch (table) {
+      case 'water_logs':
+        _reloadHabit(Habit.water);
+      case 'meal_logs':
+        _reloadHabit(Habit.meal);
+      case 'weight_logs':
+        _reloadHabit(Habit.weight);
+      case 'activity_sessions':
+        _reloadHabit(Habit.activity);
+      case 'sleep_logs':
+        context.read<SleepCubit>().loadSleepData(
+          requestPermission: false,
+          silent: true,
+        );
+        context.read<TrendCubit<SleepSessionInfo>>().load();
+      default:
+        // Restored goals, mood check-ins or diet plan.
+        _reloadAll();
+    }
   }
 
   Future<void> _refreshAllData() async {
@@ -366,15 +487,30 @@ class _HomeTabState extends State<_HomeTab> {
     if (mounted) showSuccessSnackBar(context, 'Your data is up to date');
   }
 
+  /// When Home last re-read every card; static because switching tabs
+  /// rebuilds this state.
+  static DateTime? _lastFullReload;
+
+  static bool _reloadedRecently() {
+    final last = _lastFullReload;
+    return last != null && isWithinLast(const Duration(seconds: 30), last);
+  }
+
   void _reloadAll() {
+    _lastFullReload = DateTime.now();
     context.read<WaterIntakeCubit>().reload();
-    context.read<SleepCubit>().loadSleepData();
+    // Quiet and never prompting: the card keeps showing last night.
+    context.read<SleepCubit>().loadSleepData(
+      requestPermission: false,
+      silent: true,
+    );
     context.read<TrendCubit<SleepSessionInfo>>().load();
     context.read<ScreenTimeCubit>().loadStats();
     context.read<TrendCubit<WeightLogCache>>().load();
     context.read<ActivityGoalsCubit>().load();
     context.read<StressCheckInCubit>().reload();
     context.read<MealLogBloc>().add(const LoadTodaysMeals());
+    context.read<TrendCubit<MealLogEntry>>().load();
     context.read<DietPlanCubit>().loadActiveMealPlan();
     context.read<GamificationCubit>().sync();
     context.read<NotificationsCubit>().load();
@@ -454,6 +590,7 @@ class _HomeTabState extends State<_HomeTab> {
   Widget _buildSectionTitle(
     BuildContext context,
     String title, {
+    String? note,
     String? actionLabel,
     VoidCallback? onAction,
   }) {
@@ -466,8 +603,21 @@ class _HomeTabState extends State<_HomeTab> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title.toUpperCase(),
+            child: Text.rich(
+              TextSpan(
+                text: title.toUpperCase(),
+                children: [
+                  // e.g. today's date beside "TODAY", in plain case.
+                  if (note != null)
+                    TextSpan(
+                      text: '  ·  $note',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                ],
+              ),
               style: context.text.labelMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -577,6 +727,7 @@ class _HomeTabState extends State<_HomeTab> {
                         _buildSectionTitle(
                           context,
                           'Today',
+                          note: DateFormat('EEE, d MMM').format(DateTime.now()),
                           // Day-by-day history of every goal, not just activity.
                           actionLabel: 'History',
                           onAction: () async {
@@ -599,11 +750,11 @@ class _HomeTabState extends State<_HomeTab> {
                               plan: state is DietPlanLoaded
                                   ? state.mealPlan
                                   : null,
-                              onViewAll: () => _push('meal-log-history'),
                               onOpenProgress: () =>
                                   _push(TrackerMetric.nutrition.route),
                               onScanMeal: onScanMeal,
                               onCreatePlan: () => _push('diet-plan-prefs'),
+                              onOpenDietPlan: () => _push('vita-diet-plan'),
                             ),
                           ),
                         ),
@@ -614,12 +765,15 @@ class _HomeTabState extends State<_HomeTab> {
                         const SizedBox(height: AppDimens.sectionGap),
 
                         _buildSectionTitle(context, 'Body & Wellbeing'),
-                        const _TileRow(
+                        const TrackerTilePair(
                           left: WaterIntakeCard(),
                           right: WeightCard(),
                         ),
                         const SizedBox(height: AppDimens.cardGap),
-                        const _TileRow(left: SleepCard(), right: MoodCard()),
+                        const TrackerTilePair(
+                          left: SleepCard(),
+                          right: MoodCard(),
+                        ),
                         const SizedBox(height: AppDimens.cardGap),
                         const ScreenTimeSummaryRow(),
                       ],
@@ -635,7 +789,7 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-/// Header title: today's date over a time-of-day greeting.
+/// Header title: a time-of-day greeting with the first name.
 class _Greeting extends StatelessWidget {
   const _Greeting();
 
@@ -648,58 +802,24 @@ class _Greeting extends StatelessWidget {
         ? 'Good afternoon'
         : 'Good evening';
     return BlocBuilder<ProfileCubit, ProfileState>(
+      // Keep the last name on screen while the profile reloads or saves.
+      buildWhen: (_, next) => next.shownProfile != null,
       builder: (context, state) {
-        final name = switch (state) {
-          ProfileLoaded(:final profile) =>
-            profile.fullName.trim().isNotEmpty
-                ? profile.fullName.trim().split(' ').first
-                : profile.username,
-          ProfilePhotoUpdated(:final profile) => profile.username,
-          _ => '',
-        };
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppCaption(DateFormat('EEE, d MMM').format(now)),
-            const SizedBox(height: AppDimens.space4),
-            Text(
-              name.isEmpty ? greeting : '$greeting, $name',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
-            ),
-          ],
+        final profile = state.shownProfile;
+        final fullName = profile?.fullName.trim() ?? '';
+        final name = fullName.isNotEmpty
+            ? fullName.split(RegExp(r'\s+')).first
+            : profile?.username ?? '';
+        // Today's date sits beside the Today section label below.
+        return Text(
+          name.isEmpty ? greeting : '$greeting, $name',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.headlineSmall?.copyWith(
+            color: context.colors.onSurface,
+          ),
         );
       },
-    );
-  }
-}
-
-/// Two half-width tracker tiles side by side at a shared height, which
-/// grows with the system text size so tile content never clips.
-class _TileRow extends StatelessWidget {
-  final Widget left;
-  final Widget right;
-
-  const _TileRow({required this.left, required this.right});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.textScalerOf(
-        context,
-      ).scale(AppDimens.dashboardTileHeight),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: AppDimens.cardGap),
-          Expanded(child: right),
-        ],
-      ),
     );
   }
 }

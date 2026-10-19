@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Top header for auth screens (Figma login / sign up frames):
 /// 48dp back button, then a centred "Large Title".
@@ -36,15 +37,11 @@ class AuthHeader extends StatelessWidget {
               child: BackIcon(onClick: onBackClick),
             ),
             SizedBox(height: context.h(AppDimens.space32)),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Text(
-                headerText,
-                textAlign: TextAlign.center,
-                style: context.text.displayLarge?.copyWith(
-                  color: context.colors.onSurface,
-                ),
+            FitText(
+              headerText,
+              textAlign: TextAlign.center,
+              style: context.text.displayLarge?.copyWith(
+                color: context.colors.onSurface,
               ),
             ),
           ],

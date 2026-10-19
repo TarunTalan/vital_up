@@ -6,13 +6,14 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/features/community/presentation/cubit/community_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 
-/// Arena section: global and city leaderboards, then joined communities
-/// and ones to discover, all as list rows.
+/// Arena section: one list with the global board, your city and the
+/// communities you joined (your rank this week on each), ending in "Find
+/// communities", which lists the ones you can join in a sheet.
 class CommunityLeaderboardsSection extends StatelessWidget {
   const CommunityLeaderboardsSection({super.key});
 
@@ -47,69 +48,62 @@ class CommunityLeaderboardsSection extends StatelessWidget {
     }
   }
 
+  void _openDiscover(BuildContext context) {
+    final cubit = context.read<CommunityCubit>();
+    showAppBottomSheet<void>(
+      context: context,
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: _DiscoverSheet(
+          onOpen: (c) {
+            Navigator.of(context).pop();
+            _openLeaderboard(context, c);
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CommunityCubit, CommunityState>(
       builder: (context, state) {
-        final cubit = context.read<CommunityCubit>();
-        Widget gap() => const SizedBox(height: AppDimens.cardGap);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        final discover = state.discover.length;
+        return AppListGroup(
+          title: 'Leaderboards',
           children: [
-            const AppSectionHeader('Leaderboards'),
-            if (state.global case final global?) ...[
+            if (state.global case final global?)
               CommunityTile(
                 community: global,
+                standing: state.standings[global.id],
                 onTap: () => _openLeaderboard(context, global),
               ),
-              gap(),
-            ],
             if (state.local case final local?)
               CommunityTile(
                 community: local,
+                standing: state.standings[local.id],
                 onTap: () => _openLeaderboard(context, local),
               )
             else
-              _SetCityTile(onTap: () => _editCity(context)),
-
-            if (state.joined.isNotEmpty) ...[
-              const SizedBox(height: AppDimens.sectionGap),
-              AppSectionHeader('Your communities', count: state.joined.length),
-              for (final c in state.joined) ...[
-                CommunityTile(
-                  community: c,
-                  onTap: () => _openLeaderboard(context, c),
-                ),
-                gap(),
-              ],
-            ],
-
-            if (state.discover.isNotEmpty) ...[
-              const SizedBox(height: AppDimens.sectionGap),
-              const AppSectionHeader('Discover'),
-              for (final c in state.discover) ...[
-                CommunityTile(
-                  community: c,
-                  onTap: () => _openLeaderboard(context, c),
-                  trailing: state.busy.contains(c.id)
-                      ? const SizedBox.square(
-                          dimension: AppDimens.iconMd,
-                          child: CircularProgressIndicator(
-                            strokeWidth: AppDimens.borderThick,
-                          ),
-                        )
-                      : TextButton(
-                          onPressed: () => cubit.toggleMembership(c),
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Join'),
-                        ),
-                ),
-                gap(),
-              ],
-            ],
+              _ActionRow(
+                icon: Icons.location_city_rounded,
+                title: 'Add your city',
+                subtitle: 'See how you rank near you',
+                onTap: () => _editCity(context),
+              ),
+            for (final c in state.joined)
+              CommunityTile(
+                community: c,
+                standing: state.standings[c.id],
+                onTap: () => _openLeaderboard(context, c),
+              ),
+            if (discover > 0)
+              _ActionRow(
+                icon: Icons.explore_rounded,
+                title: 'Find communities',
+                subtitle: '$discover to join',
+                onTap: () => _openDiscover(context),
+              ),
           ],
         );
       },
@@ -117,54 +111,132 @@ class CommunityLeaderboardsSection extends StatelessWidget {
   }
 }
 
-/// Stand-in for the city board until the user has picked a city.
-class _SetCityTile extends StatelessWidget {
+/// A list row that leads somewhere new (set a city, find communities).
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
-  const _SetCityTile({required this.onTap});
+  const _ActionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
+    final grey = context.vColors.grayText;
+    return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          AppIconBadge(
-            icon: const Icon(Icons.location_city_rounded),
-            color: context.colors.primary,
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your city',
-                  style: context.text.titleSmall?.copyWith(
-                    color: context.colors.onSurface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+          vertical: AppDimens.space10,
+        ),
+        child: Row(
+          children: [
+            AppIconBadge(icon: Icon(icon), color: context.colors.primary),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: context.text.titleSmall?.copyWith(
+                      color: context.vColors.accentText,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppDimens.space2),
-                Text(
-                  'Set your city to see the local leaderboard',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.vColors.grayText,
+                  const SizedBox(height: AppDimens.space2),
+                  Text(
+                    subtitle,
+                    style: context.text.bodySmall?.copyWith(color: grey),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: context.vColors.grayText,
-          ),
-        ],
+            const SizedBox(width: AppDimens.space8),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: AppDimens.iconMd,
+              color: grey,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Interest communities the caller hasn't joined, each with Join.
+class _DiscoverSheet extends StatelessWidget {
+  final ValueChanged<Community> onOpen;
+
+  const _DiscoverSheet({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CommunityCubit, CommunityState>(
+      builder: (context, state) {
+        final cubit = context.read<CommunityCubit>();
+        final discover = state.discover;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            context.gutter,
+            0,
+            context.gutter,
+            AppDimens.sectionGap,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Find communities', style: context.text.headlineSmall),
+              const SizedBox(height: AppDimens.space4),
+              Text(
+                'Join one to rank with people who share your goals.',
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.vColors.grayText,
+                ),
+              ),
+              const SizedBox(height: AppDimens.space16),
+              if (discover.isEmpty)
+                const AppInfoNote(
+                  message: "You've joined every community. Nice.",
+                )
+              else
+                AppListGroup(
+                  children: [
+                    for (final c in discover)
+                      CommunityTile(
+                        community: c,
+                        onTap: () => onOpen(c),
+                        trailing: state.busy.contains(c.id)
+                            ? const SizedBox.square(
+                                dimension: AppDimens.iconMd,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: AppDimens.borderThick,
+                                  strokeCap: StrokeCap.round,
+                                ),
+                              )
+                            : FilledButton(
+                                onPressed: () => cubit.toggleMembership(c),
+                                style: FilledButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Join'),
+                              ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

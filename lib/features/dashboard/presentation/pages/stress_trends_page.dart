@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
@@ -72,9 +73,15 @@ class StressTrendsPage extends StatelessWidget {
             },
             goalLabel: (_) => 'Goal · check in once a day',
             insights: (data) => _tagInsights(data.logs),
-            sections: (context, data) => [_TagSummary(checkIns: data.logs)],
-            logsTitle: 'Check-ins',
-            emptyLogs: 'No check-ins yet. Tap Check in to log how you feel.',
+            sections: (context, data) => [
+              if (data.logs.any((c) => c.tags.isNotEmpty))
+                _TagSummary(checkIns: data.logs),
+            ],
+            emptyLogs: 'No check-in today. Tap Check in to add one.',
+            editLabel: 'Edit check-in',
+            dateOf: (c) => c.date,
+            allLogs: () async =>
+                sl<VitaRepository>().getStressCheckIns().reversed.toList(),
             onLog: () async {
               if (await showMoodLogSheet(
                 context,
@@ -144,21 +151,13 @@ class _TagSummary extends StatelessWidget {
         children: [
           const AppCaption("What's been on your mind"),
           const SizedBox(height: AppDimens.space12),
-          if (top.isEmpty)
-            Text(
-              'Add tags when you check in to spot patterns.',
-              style: context.text.bodyMedium?.copyWith(
-                color: context.vColors.grayText,
-              ),
-            )
-          else
-            Wrap(
-              spacing: AppDimens.space8,
-              runSpacing: AppDimens.space8,
-              children: [
-                for (final e in top) StressTagChip(e.key, suffix: '${e.value}'),
-              ],
-            ),
+          Wrap(
+            spacing: AppDimens.space8,
+            runSpacing: AppDimens.space8,
+            children: [
+              for (final e in top) StressTagChip(e.key, suffix: '${e.value}'),
+            ],
+          ),
         ],
       ),
     );

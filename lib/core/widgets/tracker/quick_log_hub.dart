@@ -6,6 +6,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_sheet.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// What the person picked in the quick-log hub.
 sealed class QuickLogChoice {
@@ -101,15 +102,12 @@ class _HubTile extends StatelessWidget {
             children: [
               TrackerBadge(metric),
               const SizedBox(height: AppDimens.space8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  metric.logLabel,
-                  maxLines: 1,
-                  style: context.text.labelMedium?.copyWith(
-                    color: context.colors.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
+              FitText(
+                metric.logLabel,
+                maxLines: 1,
+                style: context.text.labelMedium?.copyWith(
+                  color: context.colors.onSurface,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

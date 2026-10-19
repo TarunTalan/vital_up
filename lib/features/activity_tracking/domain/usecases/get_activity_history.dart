@@ -16,8 +16,14 @@ class GetActivityHistory {
 
   GetActivityHistory(this.repository);
 
-  Future<List<HistoryEntry>> call() async {
-    final sessions = await repository.getSessions();
+  Future<List<HistoryEntry>> call({
+    DateTime? since,
+    bool withRoutes = false,
+  }) async {
+    final sessions = await repository.getSessions(
+      since: since,
+      withRoutes: withRoutes,
+    );
     final annotations = await repository.getAllAnnotations();
 
     final entries = sessions

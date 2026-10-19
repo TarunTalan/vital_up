@@ -457,9 +457,9 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     children: [
                       AppIconBadge(
                         icon: widget.parsedNutrition != null
-                            ? Icon(Icons.document_scanner_outlined, color: primary)
+                            ? Icon(Icons.document_scanner_rounded, color: primary)
                             : SvgPicture.asset(
-                                'assets/icons/edit.svg',
+                                'assets/icons/ui/edit.svg',
                                 width: AppDimens.iconMd,
                                 height: AppDimens.iconMd,
                                 colorFilter: ColorFilter.mode(primary, BlendMode.srcIn),
@@ -540,7 +540,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                                 style: context.text.bodySmall?.copyWith(color: tone),
                                               ),
                                               trailing: Icon(
-                                                option.isOffline ? Icons.offline_bolt_outlined : Icons.cloud_queue_rounded,
+                                                option.isOffline ? Icons.offline_bolt_rounded : Icons.cloud_queue_rounded,
                                                 size: AppDimens.iconXs,
                                                 color: tone,
                                               ),
@@ -578,6 +578,7 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                       child: CircularProgressIndicator(
                                         strokeWidth: AppDimens.borderThick,
                                         color: primary,
+                                        strokeCap: StrokeCap.round,
                                       ),
                                     )
                                   : null,

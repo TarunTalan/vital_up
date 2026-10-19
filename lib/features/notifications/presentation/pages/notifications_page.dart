@@ -7,6 +7,8 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
 import 'package:vital_up/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:vital_up/features/notifications/presentation/widgets/notification_widgets.dart';
@@ -27,16 +29,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
   void _open(AppNotification n) {
     context.read<NotificationsCubit>().markRead(n);
     final route = notificationRoute(n.type, n.route);
-    if (route != null) context.pushNamed(route);
+    if (route != null) {
+      context.pushNamed(route);
+    } else if (n.body != null && n.body!.isNotEmpty) {
+      // The list shows three lines; with nowhere to go, show it all here.
+      showAppBottomSheet<void>(
+        context: context,
+        builder: (context) => _NotificationDetailSheet(n),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<NotificationsCubit, NotificationsState>(
       listenWhen: (prev, next) => next.messageId != prev.messageId,
-      listener: (context, s) => ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(s.message!))),
+      listener: (context, s) {
+        if (s.message != null && s.message!.isNotEmpty) {
+          showSuccessSnackBar(context, s.message!);
+        }
+      },
       builder: (context, state) {
         final cubit = context.read<NotificationsCubit>();
         final items = state.items;
@@ -66,9 +78,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             children: [
               const SizedBox(height: AppDimens.space16),
               SizedBox(
-                height: MediaQuery.textScalerOf(
-                  context,
-                ).scale(AppDimens.headerActionSize - AppDimens.space4),
+                height: context
+                    .textScaled(AppDimens.headerActionSize - AppDimens.space4)
+                    .clamp(
+                      AppDimens.headerActionSize - AppDimens.space4,
+                      double.infinity,
+                    ),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: context.pagePadding,
@@ -89,7 +104,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 child: items == null
                     ? state.failed
                           ? LoadErrorView(onRetry: cubit.load)
-                          : const Center(child: CircularProgressIndicator())
+                          : const Center(child: VitalUpLoader())
                     : RefreshIndicator(
                         onRefresh: cubit.refresh,
                         child: ListView.separated(
@@ -157,4 +172,48 @@ class _DismissBackground extends StatelessWidget {
     ),
     child: Icon(Icons.delete_outline_rounded, color: context.colors.error),
   );
+}
+
+/// The full text of a notification that doesn't open a page.
+class _NotificationDetailSheet extends StatelessWidget {
+  final AppNotification n;
+
+  const _NotificationDetailSheet(this.n);
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        0,
+        context.gutter,
+        AppDimens.space24,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            n.title,
+            style: context.text.titleMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            n.body!,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space12),
+          Text(
+            notificationTimeLabel(n.createdAt, DateTime.now()),
+            style: context.text.labelSmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -13,6 +13,8 @@ import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/features/home_widget/data/widget_data.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
+import 'package:vital_up/core/config/secure_session_storage.dart';
 
 /// Runs when a widget button is tapped (or a widget asks for a refresh), in
 /// a background isolate.
@@ -86,6 +88,13 @@ Future<bool> _refreshWithAppServices() async {
       await Supabase.initialize(
         url: SupabaseConfig.url,
         publishableKey: SupabaseConfig.publishableKey,
+        // Only the app refreshes the session. Refresh tokens are single use:
+        // if this engine rotated one, the app would still hold the old one
+        // and its next refresh could sign the user out.
+        authOptions: FlutterAuthClientOptions(
+          autoRefreshToken: false,
+          localStorage: SecureSessionStorage(supabaseUrl: SupabaseConfig.url),
+        ),
       );
       _supabaseReady = true;
     }
@@ -93,7 +102,10 @@ Future<bool> _refreshWithAppServices() async {
       await di.initDependencies();
       _appServicesReady = true;
     }
-    if (Supabase.instance.client.auth.currentUser == null) return false;
+    final auth = Supabase.instance.client.auth;
+    if (auth.currentUser == null) return false;
+    // An expired token would be refreshed by the first request (see above).
+    if (auth.currentSession?.isExpired ?? true) return false;
     await di.sl<HomeWidgetService>().refresh();
     return true;
   } catch (e) {
@@ -116,7 +128,11 @@ Future<void> refreshFromDevice(String userId) async {
   final start = DateTime(now.year, now.month, now.day);
   final meals = await isar.mealLogCaches
       .where()
-      .capturedAtBetween(start, start.add(const Duration(days: 1)))
+      .capturedAtBetween(
+        start,
+        nextDay(start),
+        includeUpper: false,
+      )
       .findAll();
   final calories = meals.fold<double>(0, (sum, m) => sum + m.totalCalories);
   final weight = await isar.weightLogCaches

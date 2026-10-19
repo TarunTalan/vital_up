@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 
 class OnboardingEntryPoint extends StatefulWidget {
@@ -71,7 +72,7 @@ class _OnboardingEntryPointState extends State<OnboardingEntryPoint> {
       listener: (context, state) {
         _navigate(state.currentStep);
       },
-      child: const Scaffold(
+      child: const AppScaffold(
         body: Center(
           child: VitalUpLoader(),
         ),

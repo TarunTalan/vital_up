@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
@@ -52,10 +53,7 @@ class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
         body: BlocBuilder<DietPlanCubit, DietPlanState>(
           builder: (context, state) {
             if (state is DietPlanLoading) {
-              return const Padding(
-                padding: EdgeInsets.only(top: AppDimens.space48),
-                child: Center(child: CircularProgressIndicator()),
-              );
+              return const Center(child: VitalUpLoader());
             }
             if (state is! DietPlanLoaded) return const _NoPlan();
 
@@ -80,9 +78,13 @@ class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
                 AppPrimaryButton(
                   label: 'Ask Vita to tweak this plan',
                   leadingIcon: SvgPicture.asset(
-                    VitaIcons.caretLeft,
-                    width: AppDimens.iconXs,
-                    height: AppDimens.iconXs,
+                    VitaIcons.vita,
+                    width: AppDimens.iconLg,
+                    height: AppDimens.iconLg,
+                    colorFilter: ColorFilter.mode(
+                      context.vColors.buttonText ?? Colors.black,
+                      BlendMode.srcIn,
+                    ),
                   ),
                   onTap: _askVita,
                 ),
@@ -154,7 +156,6 @@ class _MealCard extends StatelessWidget {
     );
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,

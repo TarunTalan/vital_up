@@ -145,8 +145,8 @@ const List<FaqItem> kFaqDatabase = [
     category: FaqCategory.account,
     question: 'Is my health data stored privately and offline?',
     answer:
-        'Yes. VitalUp uses local high-speed encrypted Isar databases on your device for immediate offline access. When connected to the internet, data safely synchronizes with your personal Supabase cloud profile with end-to-end Row-Level Security (RLS).',
-    tags: ['privacy', 'offline', 'encryption', 'supabase', 'security'],
+        'Yes. VitalUp stores your data locally on your device in high-speed offline databases for immediate access. When connected to the internet, data safely synchronizes with your personal Supabase cloud profile protected by Row-Level Security (RLS) and encrypted in transit.',
+    tags: ['privacy', 'offline', 'storage', 'supabase', 'security'],
   ),
   FaqItem(
     id: 'acc_2',

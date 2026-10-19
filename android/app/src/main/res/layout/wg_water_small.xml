@@ -20,11 +20,11 @@
     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
         android:layout_marginStart="10dp" android:orientation="vertical">
         <TextView android:id="@+id/wg_water_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="20dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="20dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="—" />
         <TextView android:id="@+id/wg_water_detail" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" android:layout_marginTop="2dp"/>
     </LinearLayout>
@@ -41,7 +41,7 @@
     <ImageView android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/wg_ic_add" android:tint="@color/wg_on_primary"
         android:importantForAccessibility="no"/>
     <TextView android:id="@+id/wg_add2_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_medium" android:textSize="12dp" android:textColor="@color/wg_on_primary"
+    android:fontFamily="@font/nunito_medium" android:textSize="12dp" android:textColor="@color/wg_on_primary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="250 ml" android:layout_marginStart="4dp"/>
 </LinearLayout>

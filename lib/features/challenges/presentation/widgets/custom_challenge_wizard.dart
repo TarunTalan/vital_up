@@ -44,6 +44,7 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
   var _days = 7;
   final _selected = <String>{};
   bool _sending = false;
+  final _requestIds = ChallengeRequestIds();
 
   Future<List<Friend>> _loadFriends() async {
     final all = await sl<CommunityRepository>().getFriends();
@@ -66,6 +67,7 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
         metric: _metric,
         days: _days,
         friendIds: _selected.toList(),
+        requestId: _requestIds.forChallenge(_metric, _days, _selected),
       );
       if (mounted) navigator.pop();
       if (rootContext.mounted) {

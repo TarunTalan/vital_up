@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
 
 abstract class ActivityHistoryEvent extends Equatable {
   const ActivityHistoryEvent();
@@ -11,7 +12,19 @@ abstract class ActivityHistoryEvent extends Equatable {
 /// Loads (or reloads) the full session history.
 class LoadActivityHistory extends ActivityHistoryEvent {}
 
-/// Filters the visible list by activity type. Pass null to clear the filter.
+/// Filters the visible list to outdoor activities or workouts. Pass null to
+/// clear every filter. Replaces a type filter.
+class FilterByActivityGroup extends ActivityHistoryEvent {
+  final ActivityGroup? group;
+
+  const FilterByActivityGroup(this.group);
+
+  @override
+  List<Object?> get props => [group];
+}
+
+/// Filters the visible list by activity type. Pass null to clear every
+/// filter. Replaces a group filter.
 class FilterByActivityType extends ActivityHistoryEvent {
   final ActivityType? activityType;
 

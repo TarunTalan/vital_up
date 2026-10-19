@@ -9,8 +9,7 @@ final _day = DateTime(2026, 10, 9);
 
 /// [hour] on the wake day; negative or fractional hours reach back into
 /// the evening before (e.g. -1 is 11 pm).
-DateTime _at(num hour) =>
-    _day.add(Duration(minutes: (hour * 60).round()));
+DateTime _at(num hour) => _day.add(Duration(minutes: (hour * 60).round()));
 
 List<ScreenEvent> _usage(List<(num, num)> onPeriods) => [
   for (final (from, to) in onPeriods) ...[
@@ -55,10 +54,9 @@ void main() {
     test('no night while still asleep or after a sleepless night', () {
       // Screen went off at 11 pm and has not come back on.
       expect(
-        estimateSleepFromScreen(
-          [ScreenEvent(_at(-1), on: false)],
-          wakeDay: _day,
-        ),
+        estimateSleepFromScreen([
+          ScreenEvent(_at(-1), on: false),
+        ], wakeDay: _day),
         isNull,
       );
       // Only short gaps.
@@ -84,6 +82,49 @@ void main() {
         wakeDay: _day,
       )!;
       expect(night.wakeTime, _at(6));
+    });
+  });
+
+  group('screen estimate length', () {
+    test('a screen-off stretch over 18 hours is not a night', () {
+      // Screen off from 6 pm the day before to 1 pm: 19 hours.
+      expect(
+        estimateSleepFromScreen(_usage([(-7, -6), (13, 14)]), wakeDay: _day),
+        isNull,
+      );
+    });
+  });
+
+  group('healthNightsByWakeDay', () {
+    test('keeps a night that crosses midnight together', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.light, _at(-1.5), _at(-0.5)),
+        SleepSample(SleepStage.deep, _at(-0.5), _at(0.5)),
+        SleepSample(SleepStage.rem, _at(0.5), _at(6.5)),
+      ]);
+      expect(nights.keys, [_day]);
+      final night = nights[_day]!;
+      expect(night.bedTime, _at(-1.5));
+      expect(night.wakeTime, _at(6.5));
+      expect(night.lightSleepMinutes, 60);
+      expect(night.deepSleepMinutes, 60);
+      expect(night.duration, const Duration(hours: 8));
+    });
+
+    test('nights on different days stay apart', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.asleep, _at(-25), _at(-17)),
+        SleepSample(SleepStage.asleep, _at(-1), _at(7)),
+      ]);
+      expect(nights.keys.toSet(), {DateTime(2026, 10, 8), _day});
+    });
+
+    test('a nap and the night on one day: the night wins', () {
+      final nights = healthNightsByWakeDay([
+        SleepSample(SleepStage.asleep, _at(-1), _at(7)),
+        SleepSample(SleepStage.asleep, _at(14), _at(15)),
+      ]);
+      expect(nights[_day]!.wakeTime, _at(7));
     });
   });
 
@@ -124,10 +165,7 @@ void main() {
 
   group('bedtimeConsistency', () {
     test('uses the spread in minutes, across midnight', () {
-      expect(
-        bedtimeConsistency([_at(-1), _at(-1), _at(-1)]),
-        100,
-      );
+      expect(bedtimeConsistency([_at(-1), _at(-1), _at(-1)]), 100);
       // 11 pm and 1 am: one hour either side of midnight.
       expect(bedtimeConsistency([_at(-1), _at(1)]), 80);
       expect(bedtimeConsistency([_at(-0.5), _at(0)]), 95);
@@ -143,5 +181,27 @@ void main() {
     expect(readBedtime(prefs, 'u1', _at(17.5)), isNull);
     await clearBedtime(prefs, 'u1');
     expect(readBedtime(prefs, 'u1', _at(7)), isNull);
+  });
+
+  group('unreviewed estimates saved automatically', () {
+    test('in the morning only yesterday, today is still open', () {
+      expect(estimateDaysToAutoSave(DateTime(2026, 10, 18, 9, 30)), [
+        DateTime(2026, 10, 17),
+      ]);
+    });
+
+    test('after the latest wake hour today is saved too', () {
+      final now = DateTime(2026, 10, 18, ScreenSleepRules().latestWakeHour);
+      expect(estimateDaysToAutoSave(now), [
+        DateTime(2026, 10, 17),
+        DateTime(2026, 10, 18),
+      ]);
+    });
+
+    test('yesterday is a calendar day across month ends', () {
+      expect(estimateDaysToAutoSave(DateTime(2026, 11, 1, 8)), [
+        DateTime(2026, 10, 31),
+      ]);
+    });
   });
 }

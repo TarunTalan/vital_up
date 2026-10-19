@@ -4,7 +4,9 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Card overlaid on top of the map showing the live duration, distance,
 /// calories, and average pace while an activity is idle/in-progress/paused.
@@ -20,7 +22,7 @@ class TopStats extends StatelessWidget {
   final double currentSpeed;
   final double elevationGain;
 
-  final String activityTypeName;
+  final ActivityType activityType;
 
   const TopStats({
     super.key,
@@ -34,7 +36,7 @@ class TopStats extends StatelessWidget {
     this.steps = 0,
     this.currentSpeed = 0.0,
     this.elevationGain = 0.0,
-    this.activityTypeName = 'Walk',
+    this.activityType = ActivityType.walk,
   });
 
   double get _targetProgress {
@@ -88,7 +90,7 @@ class TopStats extends StatelessWidget {
         final elevLabel = distanceUnit == DistanceUnit.miles ? 'FT' : 'M';
         return (elevVal.toStringAsFixed(0), 'ELEV. GAIN ($elevLabel)');
       case StatMetric.activityType:
-        return (activityTypeName, 'ACTIVITY');
+        return (activityType.label, 'ACTIVITY');
     }
   }
 
@@ -100,7 +102,7 @@ class TopStats extends StatelessWidget {
     final hasBpm = heartRateBpm != null;
 
     final metrics = workoutPrefs.selectedMetrics.isEmpty
-        ? const [StatMetric.distance, StatMetric.calories, StatMetric.avgPace]
+        ? defaultStatsFor(activityType)
         : workoutPrefs.selectedMetrics;
 
     // Chunk metrics into rows of up to 3 columns.
@@ -115,58 +117,56 @@ class TopStats extends StatelessWidget {
       child: AppCard(
         margin: context.pagePadding,
         padding: AppDimens.cardPaddingCompact,
+        // 90% opaque over a live map: a blur here was invisible but
+        // re-rendered the map behind it every frame.
         tint: v.surfaceElevated!.withValues(alpha: 0.9),
-        blur: true,
         shadow: AppShadows.elevated,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Duration + optional BPM
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: FitText(
                     formatDuration(elapsed),
                     style: AppTextStyles.metricLarge.copyWith(
                       color: colors.onSurface,
                     ),
                   ),
-                  if (hasBpm) ...[
-                    const SizedBox(width: AppDimens.space12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space8,
-                        vertical: AppDimens.space4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: v.errorFill,
-                        borderRadius: BorderRadius.circular(
-                          AppDimens.radiusPill,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.favorite_rounded,
-                            color: colors.error,
-                            size: AppDimens.iconXs,
-                          ),
-                          const SizedBox(width: AppDimens.space4),
-                          Text(
-                            '$heartRateBpm',
-                            style: context.text.titleSmall?.copyWith(
-                              color: colors.error,
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+                if (hasBpm) ...[
+                  const SizedBox(width: AppDimens.space12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space8,
+                      vertical: AppDimens.space4,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: v.errorFill,
+                      borderRadius: BorderRadius.circular(AppDimens.radiusPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite_rounded,
+                          color: colors.error,
+                          size: AppDimens.iconXs,
+                        ),
+                        const SizedBox(width: AppDimens.space4),
+                        Text(
+                          '$heartRateBpm',
+                          style: context.text.titleSmall?.copyWith(
+                            color: colors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
             const SizedBox(height: AppDimens.space4),
             const AppCaption('Duration'),
@@ -236,14 +236,11 @@ class StatColumn extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: context.text.headlineSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
+          FitText(
+            value,
+            maxLines: 1,
+            style: context.text.headlineSmall?.copyWith(
+              color: context.colors.onSurface,
             ),
           ),
           const SizedBox(height: AppDimens.space4),

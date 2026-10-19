@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_item_dto.dart';
 import 'package:vital_up/features/food_scanner/data/models/nutrition_response_parser.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_ocr_parser.dart';
 
@@ -15,6 +16,19 @@ const _item = FoodItem(
 );
 
 void main() {
+  group('mealTotalCalories', () {
+    test('sums the foods', () {
+      expect(mealTotalCalories([_kcal(300), _kcal(450.5)]), 750.5);
+    });
+
+    test('caps a whole meal at what the server keeps', () {
+      expect(
+        mealTotalCalories([_kcal(8000), _kcal(9000)]),
+        NutritionLimits.mealCaloriesMax,
+      );
+    });
+  });
+
   group('saneAmount', () {
     test('reads numbers and numeric strings', () {
       expect(saneAmount(12.5), 12.5);
@@ -139,3 +153,14 @@ void main() {
     });
   });
 }
+
+NutritionInfo _kcal(double calories) => NutritionInfo(
+  calories: calories,
+  proteinG: 0,
+  carbsG: 0,
+  fatG: 0,
+  fiberG: 0,
+  sugarG: 0,
+  sodiumMg: 0,
+  per: _item,
+);

@@ -24,7 +24,11 @@ class VitaStressGuidePage extends StatefulWidget {
 
 class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   final _repository = sl<VitaRepository>();
-  late Future<StressReport> _report = _repository.getStressReport();
+  late Future<StressReport> _report = _load();
+
+  /// Caps the whole fetch so the loader can never spin forever.
+  Future<StressReport> _load() =>
+      _repository.getStressReport().timeout(const Duration(seconds: 60));
   late final Future<VitaDailyInsights?> _insights =
       _repository.getDailyInsights();
   bool _connecting = false;
@@ -32,7 +36,7 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   // Block body: an arrow body would hand setState the Future and throw.
   void _reload() {
     setState(() {
-      _report = _repository.getStressReport();
+      _report = _load();
     });
   }
 
@@ -72,6 +76,7 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
       bodyPadding: vitaBodyPadding(context),
       body: VitaFutureBody<StressReport>(
         future: _report,
+        onRetry: _reload,
         builder: (context, report) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -130,7 +135,6 @@ class _StressLevelCard extends StatelessWidget {
     final grey = context.vColors.grayText;
 
     return AppCard(
-      blur: true,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
       child: Column(
@@ -183,7 +187,6 @@ class _CheckInCard extends StatelessWidget {
     final onSurface = context.colors.onSurface;
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
@@ -238,7 +241,6 @@ class _TriggersCard extends StatelessWidget {
     final rowStyle = context.text.bodyMedium?.copyWith(color: onSurface);
 
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,
@@ -281,7 +283,6 @@ class _ConnectWearableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      blur: true,
       sheen: false,
       shadow: AppShadows.soft,
       padding: VitaDimens.cardPadding,

@@ -14,10 +14,17 @@ class GamificationRemoteDataSource {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<Map<String, dynamic>> submitDailyReport(DailyMetrics metrics) async {
-    final result = await _client.rpc(
-      'submit_daily_report',
-      params: {'p_day': dayParam(metrics.day), 'p_metrics': metrics.toJson()},
-    );
+    // Callers share one in-flight report; a hung socket must not block
+    // every later sync for the rest of the session.
+    final result = await _client
+        .rpc(
+          'submit_daily_report',
+          params: {
+            'p_day': dayParam(metrics.day),
+            'p_metrics': metrics.toJson(),
+          },
+        )
+        .timeout(const Duration(seconds: 20));
     return Map<String, dynamic>.from(result as Map);
   }
 
@@ -41,20 +48,32 @@ class GamificationRemoteDataSource {
     return [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
   }
 
+  /// Every event in the range. PostgREST caps one response (1000 rows by
+  /// default), which silently cut long histories (e.g. the data export), so
+  /// this pages until a short page comes back.
   Future<List<Map<String, dynamic>>> fetchEvents(
     String userId, {
     required DateTime from,
     DateTime? to,
-  }) {
-    var query = _client
-        .from('point_events')
-        .select('day, source, category, points')
-        .eq('user_id', userId)
-        .gte('day', dayParam(from));
-    if (to != null) query = query.lte('day', dayParam(to));
-    return query
-        .order('day', ascending: false)
-        .order('points', ascending: false);
+  }) async {
+    const page = 1000;
+    final rows = <Map<String, dynamic>>[];
+    for (var offset = 0; ; offset += page) {
+      var query = _client
+          .from('point_events')
+          .select('day, source, category, points')
+          .eq('user_id', userId)
+          .gte('day', dayParam(from));
+      if (to != null) query = query.lte('day', dayParam(to));
+      final batch = await query
+          .order('day', ascending: false)
+          .order('points', ascending: false)
+          // Primary key last, so pages never overlap or skip a row.
+          .order('id')
+          .range(offset, offset + page - 1);
+      rows.addAll(batch);
+      if (batch.length < page) return rows;
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchRules() =>

@@ -13,6 +13,9 @@ enum NotificationType {
   /// A friend cheered the user on (route: friends).
   cheer('cheer'),
 
+  /// A weekly medal or monthly trophy from a community (route: badges).
+  award('award'),
+
   /// Sent by the VitalUp team (app news, tips, reminders).
   announcement('announcement');
 
@@ -28,7 +31,8 @@ enum NotificationType {
       this == friendAccepted ||
       this == challenge ||
       this == cheer;
-  bool get isAchievement => this == badge || this == levelUp || this == streak;
+  bool get isAchievement =>
+      this == badge || this == levelUp || this == streak || this == award;
 }
 
 /// One row of the caller's `notifications` inbox.
@@ -81,6 +85,10 @@ class AppNotification extends Equatable {
 
   /// `badges.icon_key` for badge notifications.
   String? get badgeIconKey => data['icon_key'] as String?;
+
+  /// `week` / `month` and place 1-3 for community awards.
+  String? get awardPeriod => data['period'] as String?;
+  int? get awardPlace => (data['place'] as num?)?.toInt();
 
   /// Optional in-app route name an announcement links to.
   String? get route => data['route'] as String?;

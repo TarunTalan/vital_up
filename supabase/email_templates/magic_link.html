@@ -1,0 +1,114 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your VitalUp Magic Login Link</title>
+  <style type="text/css">
+    @media only screen and (max-width: 600px) {
+      .container-table { width: 100% !important; max-width: 100% !important; }
+      .content-padding { padding: 24px 20px !important; }
+      .header-padding { padding: 26px 20px 18px !important; }
+      .otp-digit { font-size: 28px !important; letter-spacing: 6px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#0B0F19; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#F1F5F9; -webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#0B0F19; padding:32px 14px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container: AppCard Glass Theme (radius: 16px, border: 1px solid #1F293D) -->
+        <table role="presentation" class="container-table" width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width:540px; background-color:#111827; border:1px solid #1F293D; border-radius:16px; overflow:hidden; box-shadow:0 12px 36px rgba(0,0,0,0.45);">
+          
+          <!-- Header with App Light Logo -->
+          <tr>
+            <td class="header-padding" align="center" style="padding:32px 28px 22px; border-bottom:1px solid #1F293D; background-color:#111827;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <img src="https://vitalup.live/assets/vitalup_light_logo.png" alt="VitalUp Logo" width="52" height="52" style="display:block; border-radius:14px; border:1px solid rgba(255,255,255,0.12); box-shadow:0 4px 16px rgba(25,195,224,0.25); background:#FFFFFF;" />
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:12px;">
+                    <span style="font-size:22px; font-weight:800; color:#FFFFFF; letter-spacing:-0.02em;">VitalUp</span>
+                    <span style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#19C3E0; margin-top:3px;">Health &amp; Fitness</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td class="content-padding" style="padding:34px 32px 28px;">
+              <h1 style="margin:0 0 12px; font-size:20px; font-weight:700; color:#FFFFFF; letter-spacing:-0.01em;">Sign In to VitalUp</h1>
+              <p style="margin:0 0 24px; font-size:15px; line-height:1.65; color:#94A3B8;">
+                Click the button below to sign in instantly, or enter the 6-digit one-time code in your app:
+              </p>
+              
+              <!-- Primary Magic Link Button (AppPrimaryButton style: 14px radius, #19C3E0 fill, #0C0C0C text) -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin-bottom:22px;">
+                <tr>
+                  <td align="center" style="border-radius:14px; background-color:#19C3E0; box-shadow:0 4px 14px rgba(25,195,224,0.3);">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="font-size:15px; font-weight:700; color:#0C0C0C; text-decoration:none; padding:14px 28px; display:inline-block; border-radius:14px; letter-spacing:0.01em;">
+                      Sign In Instantly &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alternative OTP Code Box (AppCard component) -->
+              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#162032; border:1px solid rgba(25,195,224,0.3); border-radius:14px; margin-bottom:22px;">
+                <tr>
+                  <td align="center" style="padding:20px 16px;">
+                    <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#94A3B8; margin-bottom:8px;">Or Enter This One-Time Code</div>
+                    <span class="otp-digit" style="font-family:'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace; font-size:32px; font-weight:800; letter-spacing:8px; color:#19C3E0; display:inline-block; margin-left:8px;">{{ .Token }}</span>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- App Info Card Component (Full 4-corner rounded card, no vertical bar) -->
+              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#162032; border:1px solid rgba(186,186,186,0.16); border-radius:14px; margin-bottom:24px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td width="36" valign="top" style="padding-right:12px;">
+                          <div style="width:32px; height:32px; border-radius:8px; background:rgba(25,195,224,0.15); border:1px solid rgba(25,195,224,0.3); text-align:center; line-height:30px; font-size:15px;">
+                            ⏱️
+                          </div>
+                        </td>
+                        <td valign="middle" style="font-size:13px; line-height:1.55; color:#E2E8F0;">
+                          <strong>Valid for 10 minutes.</strong> Never share this link or code with anyone.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0; font-size:13px; line-height:1.55; color:#64748B;">
+                If you didn't request this sign-in link, you can safely ignore this email or reach us at <a href="mailto:support@vitalup.live" style="color:#19C3E0; text-decoration:none;">support@vitalup.live</a>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:22px 24px; border-top:1px solid #1F293D; background-color:#0B0F19;">
+              <p style="margin:0 0 8px; font-size:12px; color:#64748B;">
+                Sent from <strong style="color:#94A3B8;">noreply@vitalup.live</strong> &bull; Reply to: <a href="mailto:support@vitalup.live" style="color:#19C3E0; text-decoration:none;">support@vitalup.live</a>
+              </p>
+              <p style="margin:0; font-size:11px; color:#475569;">
+                &copy; 2026 VitalUp Platform &bull; <a href="https://vitalup.live/privacy" style="color:#64748B; text-decoration:none;">Privacy Policy</a> &bull; <a href="https://vitalup.live/terms" style="color:#64748B; text-decoration:none;">Terms</a> &bull; <a href="https://vitalup.live" style="color:#19C3E0; text-decoration:none;">vitalup.live</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

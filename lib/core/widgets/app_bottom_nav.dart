@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 class AppBottomNavItem {
   final String label;
@@ -38,7 +39,9 @@ class AppBottomNav extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         heightFactor: 1.0,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+          constraints: const BoxConstraints(
+            maxWidth: AppDimens.maxContentWidth,
+          ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               context.gutter,
@@ -46,31 +49,31 @@ class AppBottomNav extends StatelessWidget {
               context.gutter,
               AppDimens.navBarBottomOffset,
             ),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: AppDimens.navBarPadding.vertical / 2,
-            ),
-            decoration: BoxDecoration(
-              color: v.navBg,
-              borderRadius: BorderRadius.circular(AppDimens.radiusNavBar),
-              boxShadow: AppShadows.elevated,
-            ),
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: _NavItem(
-                      item: items[i],
-                      selected: selectedIndex == i,
-                      onTap: () => onItemSelected(i),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: AppDimens.navBarPadding.vertical / 2,
+              ),
+              decoration: BoxDecoration(
+                color: v.navBg,
+                borderRadius: BorderRadius.circular(AppDimens.radiusNavBar),
+                boxShadow: AppShadows.elevated,
+              ),
+              child: Row(
+                children: [
+                  for (var i = 0; i < items.length; i++)
+                    Expanded(
+                      child: _NavItem(
+                        item: items[i],
+                        selected: selectedIndex == i,
+                        onTap: () => onItemSelected(i),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -103,8 +106,9 @@ class _NavItem extends StatelessWidget {
         onTap: onTap,
         customBorder: const StadiumBorder(),
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(minHeight: AppDimens.navBarItemHeight),
+          constraints: const BoxConstraints(
+            minHeight: AppDimens.navBarItemHeight,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -131,13 +135,15 @@ class _NavItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppDimens.space4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
+              // Tab labels grow up to the large-text point, like system
+              // tab bars; past it a bar of five would cut every label.
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: AppTextScaler.largeTextScale,
                 child: AnimatedDefaultTextStyle(
                   duration: AppDurations.medium,
                   curve: Curves.easeOut,
                   style: context.text.labelSmall!.copyWith(color: labelColor),
-                  child: Text(item.label, maxLines: 1),
+                  child: FitText(item.label),
                 ),
               ),
             ],

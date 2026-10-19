@@ -8,12 +8,14 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/point_event.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 
 final _points = NumberFormat.decimalPattern();
 
@@ -43,9 +45,18 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      onRefresh: () async => setState(() {
-        _data = _load();
-      }),
+      // Keeps the pull spinner up until the new data has arrived.
+      onRefresh: () async {
+        final next = _load();
+        setState(() {
+          _data = next;
+        });
+        try {
+          await next;
+        } catch (_) {
+          // Shown by the FutureBuilder below.
+        }
+      },
       header: const AppPageHeader(title: 'Points'),
       body: FutureBuilder<_HistoryData>(
         future: _data,
@@ -59,10 +70,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
           }
           final data = snapshot.data;
           if (data == null) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppDimens.space48),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            return const Center(child: VitalUpLoader());
           }
           final (stats, events, rules) = data;
           final names = {for (final r in rules) r.source: r.name};
@@ -84,11 +92,24 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                           '${_points.format(stats.totalPoints)} pts',
                           style: context.text.headlineSmall,
                         ),
-                        Text(
-                          'Level ${stats.level.level} · ${stats.level.title}',
-                          style: context.text.bodyMedium?.copyWith(
-                            color: context.vColors.grayText,
-                          ),
+                        Row(
+                          children: [
+                            GameIcon(
+                              GamificationIcons.levelHexagon(stats.level.level),
+                              fallback: Icons.shield_rounded,
+                              size: AppDimens.iconSm,
+                              color: context.colors.primary,
+                            ),
+                            const SizedBox(width: AppDimens.space6),
+                            Flexible(
+                              child: Text(
+                                'Level ${stats.level.level} · ${stats.level.title}',
+                                style: context.text.bodyMedium?.copyWith(
+                                  color: context.vColors.grayText,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: AppDimens.space8),
                         StreakPill(streak: stats.streak),
@@ -98,19 +119,14 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                 ],
               ),
               const SizedBox(height: AppDimens.cardInnerGap),
-              Row(
+              AdaptiveRow(
                 children: [
-                  for (final c in ScoreCategory.values) ...[
-                    if (c != ScoreCategory.values.first)
-                      const SizedBox(width: AppDimens.space8),
-                    Expanded(
-                      child: CategoryPointsTile(
-                        category: c,
-                        points: stats.pointsIn(c),
-                        signed: false,
-                      ),
+                  for (final c in ScoreCategory.values)
+                    CategoryPointsTile(
+                      category: c,
+                      points: stats.pointsIn(c),
+                      signed: false,
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),

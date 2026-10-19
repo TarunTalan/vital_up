@@ -39,13 +39,13 @@ Future<void> showProfilePhotoOptions(
             AppListGroup(
               children: [
                 AppListTile(
-                  icon: Icons.photo_camera_outlined,
+                  icon: Icons.photo_camera_rounded,
                   title: 'Take photo',
                   onTap: () =>
                       Navigator.of(sheetContext).pop(_PhotoAction.camera),
                 ),
                 AppListTile(
-                  icon: Icons.photo_library_outlined,
+                  icon: Icons.photo_library_rounded,
                   title: 'Choose from gallery',
                   onTap: () =>
                       Navigator.of(sheetContext).pop(_PhotoAction.gallery),
@@ -79,9 +79,7 @@ Future<void> showProfilePhotoOptions(
             child: const Text('Cancel'),
           ),
           TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: context.colors.error,
-            ),
+            style: TextButton.styleFrom(foregroundColor: context.colors.error),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Remove'),
           ),
@@ -148,7 +146,6 @@ class ProfileAvatar extends StatelessWidget {
               username: name,
               url: profile.photoUrl,
               size: AppDimens.avatarLarge,
-              borderRadius: AppDimens.radiusCard,
               initialStyle: context.text.headlineMedium,
             ),
             if (uploading)
@@ -156,7 +153,7 @@ class ProfileAvatar extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: context.vColors.glassFill,
-                    borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+                    shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: SizedBox.square(
@@ -164,6 +161,7 @@ class ProfileAvatar extends StatelessWidget {
                       child: CircularProgressIndicator(
                         strokeWidth: AppDimens.borderThick,
                         color: colors.primary,
+                        strokeCap: StrokeCap.round,
                       ),
                     ),
                   ),

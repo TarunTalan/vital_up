@@ -208,7 +208,11 @@ class ReminderScheduler {
           id: entry.id,
           title: r.title,
           body: r.body.isEmpty ? null : r.body,
-          scheduledDate: _nextInstance(skip ? tomorrow : now, entry),
+          // Just before midnight, so a 00:00 reminder still fires tomorrow.
+          scheduledDate: _nextInstance(
+            skip ? tomorrow.subtract(const Duration(microseconds: 1)) : now,
+            entry,
+          ),
           payload: jsonEncode({
             'type': 'reminder',
             'route': r.route,

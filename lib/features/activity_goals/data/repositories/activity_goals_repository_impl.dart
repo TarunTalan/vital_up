@@ -52,7 +52,12 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     // Each source is optional: a slow or failing one leaves its part empty
     // rather than holding up the whole card.
     final (history, healthSteps) = await (
-      _history().orFallback(const <HistoryEntry>[]),
+      // Only the days shown, and only totals: no GPS routes (this runs on
+      // every widget refresh).
+      _history(
+        since: from,
+        withRoutes: false,
+      ).orFallback(const <HistoryEntry>[]),
       _dailySteps(days).orFallback(null),
     ).wait;
     final sessions = [
@@ -62,11 +67,15 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     final byDay = bucketByDay<ActivitySession>(sessions, (s) => s.startTime);
 
     double valueOn(GoalMetric metric, DateTime day) {
-      if (metric == GoalMetric.steps && healthSteps != null) {
-        return (healthSteps[day] ?? 0).toDouble();
-      }
-      return (byDay[day] ?? const <ActivitySession>[])
+      final tracked = (byDay[day] ?? const <ActivitySession>[])
           .fold(0.0, (sum, s) => sum + metric.fromSession(s));
+      if (metric == GoalMetric.steps && healthSteps != null) {
+        return dailySteps(
+          health: healthSteps[day],
+          tracked: tracked.round(),
+        ).toDouble();
+      }
+      return tracked;
     }
 
     final chartDays = days.sublist(days.length - range.days);

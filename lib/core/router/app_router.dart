@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/subscription/presentation/pages/pro_page.dart';
 import 'package:vital_up/core/router/app_page_transitions.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
 import 'package:vital_up/features/auth/presentation/utils/post_sign_in_navigation.dart';
@@ -11,6 +12,7 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_tracking_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_history_page.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_goals/presentation/pages/activity_goals_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/diet_progress_page.dart';
@@ -41,6 +43,7 @@ import 'package:vital_up/features/help_support/presentation/pages/support_chat_p
 import 'package:vital_up/features/help_support/presentation/pages/contact_support_page.dart';
 import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
 import 'package:vital_up/features/about/presentation/pages/about_page.dart';
+import 'package:vital_up/features/vita/presentation/pages/vita_ai_data_page.dart';
 import 'package:vital_up/features/health_report/presentation/pages/health_report_page.dart';
 import 'package:vital_up/features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'package:vital_up/features/reminders/presentation/pages/reminders_page.dart';
@@ -78,20 +81,73 @@ import 'package:vital_up/features/gamification/presentation/cubit/gamification_c
 import 'package:vital_up/features/gamification/presentation/cubit/activity_calendar_cubit.dart';
 import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/monitoring/analytics_service.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+
+/// Clears active snackbars and unfocuses active input fields whenever navigation occurs.
+class AppNavigationObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    _onNavigation();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    _onNavigation();
+  }
+
+  void _onNavigation() {
+    clearActiveSnackBars();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+}
 
 class AppRouter {
   AppRouter._();
 
+  /// Reachable without a session. Everything else needs one: a
+  /// `vitalup://` link must not open a signed-in page on a signed-out app.
+  /// (/open and /widget/open send signed-out users to login themselves.)
+  static const _publicPaths = {
+    '/splash',
+    '/onboarding',
+    '/login',
+    '/forgot-password',
+    '/verify-otp',
+    '/reset-password',
+    '/reset-completed',
+    '/open',
+    '/widget/open',
+  };
+
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    observers: [AnalyticsService.observer, AppNavigationObserver()],
+    redirect: (context, state) {
+      if (_publicPaths.contains(state.uri.path)) return null;
+      final signedIn = Supabase.instance.client.auth.currentSession != null;
+      return signedIn ? null : '/login';
+    },
     routes: [
       GoRoute(
         path: '/splash',
         name: 'splash',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const SplashPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const SplashPage()),
       ),
       GoRoute(
         path: '/onboarding',
@@ -110,20 +166,14 @@ class AppRouter {
         path: '/login',
         name: 'login',
         pageBuilder: (context, state) {
-          return AppPage(
-            key: state.pageKey,
-            child: const LoginPage(),
-          );
+          return AppPage(key: state.pageKey, child: const LoginPage());
         },
       ),
       GoRoute(
         path: '/forgot-password',
         name: 'forgot-password',
         pageBuilder: (context, state) {
-          return AppPage(
-            key: state.pageKey,
-            child: const ForgotPasswordPage(),
-          );
+          return AppPage(key: state.pageKey, child: const ForgotPasswordPage());
         },
       ),
       GoRoute(
@@ -132,14 +182,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final email = state.uri.queryParameters['email'] ?? '';
           final token = state.uri.queryParameters['token'] ?? '';
-          final flow = state.uri.queryParameters['flow'] ?? 'signup'; // 'signup' or 'forgot'
+          final flow =
+              state.uri.queryParameters['flow'] ??
+              'signup'; // 'signup' or 'forgot'
           return AppPage(
             key: state.pageKey,
-            child: OtpScreen(
-              email: email,
-              token: token,
-              flow: flow,
-            ),
+            child: OtpScreen(email: email, token: token, flow: flow),
           );
         },
       ),
@@ -157,26 +205,20 @@ class AppRouter {
       GoRoute(
         path: '/reset-completed',
         name: 'reset-completed',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const ResetCompletedPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ResetCompletedPage()),
       ),
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const DashboardPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const DashboardPage()),
       ),
       GoRoute(
         path: '/dashboard/water',
         name: 'water-trends',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const WaterTrendsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const WaterTrendsPage()),
       ),
       GoRoute(
         path: '/challenges',
@@ -192,82 +234,62 @@ class AppRouter {
       GoRoute(
         path: '/weekly-summary',
         name: 'weekly-summary',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const WeeklySummaryPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const WeeklySummaryPage()),
       ),
       GoRoute(
         path: '/dashboard/weight',
         name: 'weight-trends',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const WeightTrendsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const WeightTrendsPage()),
       ),
       GoRoute(
         path: '/dashboard/sleep',
         name: 'sleep-trends',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const SleepTrendsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const SleepTrendsPage()),
       ),
       GoRoute(
         path: '/dashboard/screen-time',
         name: 'screen-time-trends',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const ScreenTimeTrendsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ScreenTimeTrendsPage()),
       ),
       GoRoute(
         path: '/dashboard/stress',
         name: 'stress-trends',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const StressTrendsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const StressTrendsPage()),
       ),
       GoRoute(
         path: '/dashboard/activity-goals',
         name: 'activity-goals',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const ActivityGoalsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ActivityGoalsPage()),
       ),
       GoRoute(
         path: '/dashboard/diet',
         name: 'diet-progress',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const DietProgressPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const DietProgressPage()),
       ),
       GoRoute(
         path: '/goals',
         name: 'my-goals',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const MyGoalsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const MyGoalsPage()),
       ),
       GoRoute(
         path: '/dashboard/badges',
         name: 'badges',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const BadgesPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const BadgesPage()),
       ),
       GoRoute(
         path: '/dashboard/points',
         name: 'points-history',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const PointsHistoryPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const PointsHistoryPage()),
       ),
       GoRoute(
         path: '/activity-calendar',
@@ -334,6 +356,12 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/profile/pro',
+        name: 'vitalup-pro',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ProPage()),
+      ),
+      GoRoute(
         path: '/friends',
         name: 'friends',
         pageBuilder: (context, state) => AppPage(
@@ -359,68 +387,64 @@ class AppRouter {
       GoRoute(
         path: '/activity-tracking',
         name: 'activity-tracking',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const ActivityTrackingPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ActivityTrackingPage()),
       ),
       GoRoute(
         path: '/activity-history',
         name: 'activity-history',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ActivityHistoryPage()),
+      ),
+      GoRoute(
+        path: '/workout-timer',
+        name: 'workout-timer',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: const ActivityHistoryPage(),
+          // The activity screen, on its workout timer (notification taps).
+          child: ActivityTrackingPage(
+            workout: state.extra is ActivityType
+                ? state.extra! as ActivityType
+                : ActivityType.strength,
+          ),
         ),
       ),
       GoRoute(
         path: '/food-scan',
         name: 'food-scan',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const FoodScannerPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const FoodScannerPage()),
       ),
       GoRoute(
         path: '/meal-log-history',
         name: 'meal-log-history',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const MealLogHistoryPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const MealLogHistoryPage()),
       ),
       GoRoute(
         path: '/health-onboarding',
         name: 'health-onboarding',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const OnboardingEntryPoint(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const OnboardingEntryPoint()),
       ),
       GoRoute(
         path: '/health-onboarding/personal-details',
         name: 'health-personal-details',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const PersonalDetailsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const PersonalDetailsPage()),
       ),
       GoRoute(
         path: '/health-onboarding/height',
         name: 'health-height',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const HeightPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const HeightPage()),
       ),
       GoRoute(
         path: '/health-onboarding/weight',
         name: 'health-weight',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const WeightPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const WeightPage()),
       ),
-
 
       GoRoute(
         path: '/health-onboarding/dietary-preference',
@@ -474,10 +498,8 @@ class AppRouter {
       GoRoute(
         path: '/diet-plan-prefs',
         name: 'diet-plan-prefs',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const DietPlanPreferencesPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const DietPlanPreferencesPage()),
       ),
       GoRoute(
         path: '/diet-plan-mode',
@@ -515,10 +537,8 @@ class AppRouter {
       GoRoute(
         path: '/diet-plan-edit',
         name: 'diet-plan-edit',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const DietPlanEditPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const DietPlanEditPage()),
       ),
       GoRoute(
         path: '/diet-plan-result',
@@ -534,10 +554,8 @@ class AppRouter {
       GoRoute(
         path: '/settings',
         name: 'settings',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const SettingsPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const SettingsPage()),
       ),
       GoRoute(
         path: '/settings/reminders',
@@ -553,34 +571,26 @@ class AppRouter {
       GoRoute(
         path: '/settings/widgets',
         name: 'home-widgets',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const WidgetsPreviewPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const WidgetsPreviewPage()),
       ),
       GoRoute(
         path: '/settings/widgets/custom',
         name: 'custom-widget-builder',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const CustomWidgetBuilderPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const CustomWidgetBuilderPage()),
       ),
       GoRoute(
         path: '/settings/help',
         name: 'help-support',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const HelpSupportPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const HelpSupportPage()),
       ),
       GoRoute(
         path: '/settings/help/chat',
         name: 'support-chat',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const SupportChatPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const SupportChatPage()),
       ),
       GoRoute(
         path: '/settings/help/contact',
@@ -588,26 +598,31 @@ class AppRouter {
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: ContactSupportPage(
-            args: _extraAs<ContactSupportArgs>(state) ??
-                const ContactSupportArgs(initialCategory: SupportCategory.general),
+            args:
+                _extraAs<ContactSupportArgs>(state) ??
+                const ContactSupportArgs(
+                  initialCategory: SupportCategory.general,
+                ),
           ),
         ),
       ),
       GoRoute(
+        path: '/settings/ai-coach-data',
+        name: 'ai-coach-data',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const VitaAiDataPage()),
+      ),
+      GoRoute(
         path: '/settings/about',
         name: 'about',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const AboutPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const AboutPage()),
       ),
       GoRoute(
         path: '/dashboard/health-report',
         name: 'health-report',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const HealthReportPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const HealthReportPage()),
       ),
       GoRoute(
         path: '/vita/chat',
@@ -629,10 +644,8 @@ class AppRouter {
       GoRoute(
         path: '/vita/analysis',
         name: 'vita-analysis',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const VitaHealthAnalysisPage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const VitaHealthAnalysisPage()),
       ),
       GoRoute(
         path: '/vita/diet-plan',
@@ -645,10 +658,8 @@ class AppRouter {
       GoRoute(
         path: '/vita/stress',
         name: 'vita-stress',
-        pageBuilder: (context, state) => AppPage(
-          key: state.pageKey,
-          child: const VitaStressGuidePage(),
-        ),
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const VitaStressGuidePage()),
       ),
       // Home screen widget taps (vitalup://widget/open?route=...). Flutter
       // passes the link as /open?...; HomeWidgetService decides where it goes.

@@ -27,7 +27,9 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  static const int _totalMs = 2400;
+  // 0-1950ms logo animation & tagline fade-in, 1950-3200ms static readable
+  // tagline hold (~1.25s), 3200-3500ms exit fade-out.
+  static const int _totalMs = 3500;
 
   // Logo viewBox geometry (500x500 space).
   static const double _viewBox = 500.0;
@@ -114,10 +116,11 @@ class _SplashPageState extends State<SplashPage>
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: _interval(2150, _totalMs, Curves.easeInOut),
+        curve: _interval(3200, _totalMs, Curves.easeInOut),
       ),
     );
 
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefetchOnboarding());
     _controller.forward().then((_) {
       if (mounted) {
         setState(() => _animationCompleted = true);
@@ -127,6 +130,20 @@ class _SplashPageState extends State<SplashPage>
   }
 
   bool _navigating = false;
+
+  /// Started as soon as the session is known, so the server check runs
+  /// during the animation instead of after it.
+  Future<bool>? _onboardingCheck;
+
+  void _prefetchOnboarding() {
+    if (!mounted || _onboardingCheck != null) return;
+    final cubit = context.read<AuthCubit>();
+    if (cubit.state is AuthAuthenticated) {
+      // Unlike an awaited call, an error here would go unhandled until the
+      // animation ends; offline already means "completed".
+      _onboardingCheck = cubit.hasCompletedOnboarding().catchError((_) => true);
+    }
+  }
 
   Future<void> _checkSessionAndNavigate() async {
     if (!mounted || !_animationCompleted || _navigating) return;
@@ -139,7 +156,10 @@ class _SplashPageState extends State<SplashPage>
 
     _navigating = true;
     if (authState is AuthAuthenticated) {
-      final completed = await context.read<AuthCubit>().hasCompletedOnboarding();
+      _prefetchOnboarding();
+      final completed =
+          await (_onboardingCheck ??
+              context.read<AuthCubit>().hasCompletedOnboarding());
       if (!mounted) return;
       context.goNamed(completed ? 'dashboard' : 'health-onboarding');
     } else {
@@ -162,6 +182,7 @@ class _SplashPageState extends State<SplashPage>
 
     return BlocListener<AuthCubit, AuthState>(
       listener: (context, state) {
+        _prefetchOnboarding();
         _checkSessionAndNavigate();
       },
       child: Scaffold(
@@ -214,7 +235,7 @@ class _SplashPageState extends State<SplashPage>
                     child: Opacity(
                       opacity: _logoBottomOpacity.value.clamp(0.0, 1.0),
                       child: SvgPicture.asset(
-                        'assets/icons/logo_bottom.svg',
+                        'assets/icons/app/logo_bottom.svg',
                         fit: BoxFit.contain,
                       ),
                     ),

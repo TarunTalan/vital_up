@@ -210,7 +210,7 @@ class HealthReportService {
         (await weightService.latest())?.weightKg;
 
     // 5. Activity sessions
-    final sessions = await activityHistoryRepo.getSessions();
+    final sessions = await activityHistoryRepo.getSessions(since: from);
     final recentSessions = sessions
         .where((s) => !s.startTime.isBefore(from))
         .toList();

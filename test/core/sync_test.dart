@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/core/sync/sync_adapters.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
+import 'package:vital_up/core/sync/sync_service.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/activity_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -47,6 +50,16 @@ class _Hooks implements SyncHooks {
 }
 
 void main() {
+  test('rows with an unsent delete are not pulled back', () {
+    final queue = [
+      jsonEncode({'table': 'meal_logs', 'id': 'a', 'user': 'u1'}),
+      jsonEncode({'table': 'water_logs', 'id': 'b', 'user': 'u1'}),
+      'not json',
+    ];
+    expect(queuedDeleteIds(queue, 'meal_logs'), {'a'});
+    expect(queuedDeleteIds(queue, 'sleep_logs'), isEmpty);
+  });
+
   group('syncId', () {
     test('is stable and differs by kind, user and time', () {
       final at = DateTime(2026, 10, 2, 9, 30, 0, 0, 123);
@@ -117,7 +130,7 @@ void main() {
         {...row, 'deleted_at': null},
       ]);
 
-      final restored = (await ActivityRepositoryImpl(otherPhone).getSessions())
+      final restored = (await ActivityRepositoryImpl(otherPhone).getSessions(withRoutes: true))
           .single;
       expect(restored.id, 'trip');
       expect(restored.totalDistanceMeters, 2500);
@@ -126,19 +139,23 @@ void main() {
       expect(await ActivitySyncAdapter(otherPhone).pending('u'), isEmpty);
     });
 
-    test('deleting a synced workout tells the other devices', () async {
-      await repo.saveSession(
-        _session('a', endTime: _start.add(const Duration(minutes: 15))),
-      );
-      await repo.deleteSession('a'); // never uploaded: nothing to tell
-      expect(hooks.deletes, isEmpty);
-
+    test('deleting a workout tells the other devices', () async {
       await repo.saveSession(
         _session('b', endTime: _start.add(const Duration(minutes: 15))),
       );
       await adapter.markSynced('u', ['b']);
       await repo.deleteSession('b');
       expect(hooks.deletes, [('activity_sessions', 'b')]);
+    });
+
+    test('a delete is recorded even before the upload was confirmed', () async {
+      // The upload may have reached the server while its response was lost,
+      // so the row could exist there without being marked synced here.
+      await repo.saveSession(
+        _session('a', endTime: _start.add(const Duration(minutes: 15))),
+      );
+      await repo.deleteSession('a');
+      expect(hooks.deletes, [('activity_sessions', 'a')]);
     });
 
     test('a deletion from another device removes the workout', () async {

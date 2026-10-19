@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
@@ -9,6 +8,7 @@ import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
 import 'mood_widgets.dart';
 import 'tracker_log_sheets.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 const _metric = TrackerMetric.mood;
 
@@ -46,7 +46,7 @@ class MoodCard extends StatelessWidget {
               label: today == null ? _metric.logLabel : 'Edit',
               icon: today == null ? _metric.logIcon : Icons.edit_rounded,
               color: _metric.color,
-              filled: today == null,
+              filled: true,
               onTap: () => _log(context),
             ),
           ],
@@ -58,7 +58,6 @@ class MoodCard extends StatelessWidget {
                 if (today == null)
                   TrackerPrompt(
                     title: 'How are you feeling?',
-                    message: 'Check in to track your mood.',
                     color: _metric.color,
                   )
                 else ...[
@@ -71,26 +70,17 @@ class MoodCard extends StatelessWidget {
                       ),
                       const SizedBox(width: AppDimens.space8),
                       Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            today.label,
-                            maxLines: 1,
-                            style: AppTextStyles.metric.copyWith(
-                              color: context.colors.onSurface,
-                            ),
+                        // Same size as other cards' figures: a long
+                        // mood ("Very stressed") wraps rather than shrinks.
+                        child: FitText(
+                          today.label,
+                          maxLines: 2,
+                          style: AppTextStyles.metric.copyWith(
+                            color: context.colors.onSurface,
                           ),
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: AppDimens.space6),
-                  Text(
-                    'Checked in at ${DateFormat.jm().format(today.date)}',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
                   ),
                 ],
               ],

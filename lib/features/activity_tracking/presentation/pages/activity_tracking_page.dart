@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
@@ -13,11 +12,17 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
-import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
+import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
@@ -30,32 +35,85 @@ import 'package:vital_up/features/activity_tracking/presentation/widgets/countdo
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/interrupted_workout_dialog.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
-import 'package:isar_community/isar.dart';
-import 'package:vital_up/core/database/isar_service.dart';
-import 'package:vital_up/core/database/collections/favorite_audio.dart';
-import 'package:vital_up/core/database/collections/downloaded_track.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music_player.dart';
-import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
-import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
-import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 
 const String kOfflineRegionId = 'local_workout_region_10k';
 
+/// The one screen for every activity. Outdoor types use the GPS view (map,
+/// location service, recovery); workouts without a route use the workout
+/// timer, on the same screen: picking a type switches between them while
+/// nothing is running. A workout being timed always opens the timer.
 class ActivityTrackingPage extends StatelessWidget {
-  const ActivityTrackingPage({super.key});
+  /// Open on the workout timer with this type (the `workout-timer` route).
+  final ActivityType? workout;
+
+  const ActivityTrackingPage({super.key, this.workout});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<ActivityTrackingBloc>(),
-      child: const _ActivityTrackingView(),
+      child: _ActivityModes(workout: workout),
+    );
+  }
+}
+
+class _ActivityModes extends StatefulWidget {
+  final ActivityType? workout;
+
+  const _ActivityModes({this.workout});
+
+  @override
+  State<_ActivityModes> createState() => _ActivityModesState();
+}
+
+class _ActivityModesState extends State<_ActivityModes> {
+  /// Non-null: the timer for this workout; null: the GPS view.
+  ActivityType? _workout;
+
+  /// The outdoor type picked on the timer, for the GPS view to open with.
+  ActivityType? _outdoor;
+
+  @override
+  void initState() {
+    super.initState();
+    _workout = sl<WorkoutTimerStore>().read()?.type ?? widget.workout;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final workout = _workout;
+    if (workout != null) {
+      return WorkoutTimerPage(
+        key: const ValueKey('timer'),
+        type: workout,
+        onOutdoorSelected: (type) => setState(() {
+          _workout = null;
+          _outdoor = type;
+        }),
+      );
+    }
+    return _ActivityTrackingView(
+      key: const ValueKey('gps'),
+      initialType: _outdoor,
+      onWorkoutSelected: (type) => setState(() => _workout = type),
     );
   }
 }
 
 class _ActivityTrackingView extends StatefulWidget {
-  const _ActivityTrackingView();
+  /// Picked on the timer before switching here; wins over the goal's pick.
+  final ActivityType? initialType;
+
+  /// A workout without a route was picked: the page shows the timer.
+  final ValueChanged<ActivityType> onWorkoutSelected;
+
+  const _ActivityTrackingView({
+    super.key,
+    this.initialType,
+    required this.onWorkoutSelected,
+  });
 
   @override
   State<_ActivityTrackingView> createState() => _ActivityTrackingViewState();
@@ -78,8 +136,13 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   final HeartRateManager _hrManager = HeartRateManager();
   int? _liveHeartRate;
   StreamSubscription<int?>? _hrSubscription;
-  bool _isCurrentTrackFavorited = false;
-  bool _isPlayerMinimized = false;
+  late final WorkoutMusic _music = WorkoutMusic(
+    _prefsNotifier,
+    voiceCoach: _voiceCoach,
+    onError: (message) {
+      if (mounted) showErrorSnackBar(context, message);
+    },
+  );
 
   mbx.MapboxMap? _mapboxMap;
   mbx.PolylineAnnotationManager? _polylineAnnotationManager;
@@ -89,11 +152,42 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   TrackPoint? _currentPosition;
   TrackPoint? _startPoint;
 
+  /// The drawn route and puck, updated in place: re-creating them sent the
+  /// whole route over the platform channel on every tick.
+  mbx.PolylineAnnotation? _routeLine;
+  Future<void>? _routeCreating;
+  int _drawnRouteLength = 0;
+  mbx.CircleAnnotation? _puck;
+  Future<void>? _puckCreating;
+
+  /// No map calls while the app is hidden; [_onShown] redraws once.
+  bool _appHidden = false;
+  List<TrackPoint>? _hiddenRoute;
+  TrackPoint? _hiddenPuck;
+
+  /// Built once: the map must not be rebuilt by the per-second ticks.
+  late final Widget _mapLayer = Positioned.fill(
+    child: mbx.MapWidget(
+      key: const ValueKey("mapWidget"),
+      onMapCreated: _onMapCreated,
+      onTapListener: (context) {
+        if (mounted) {
+          setState(() {
+            _isUiVisible = !_isUiVisible;
+          });
+        }
+      },
+    ),
+  );
+
   /// Map-preview position feed while no workout is running. It must be
   /// cancelled before a workout starts: geolocator shares one native stream
   /// and would hand the workout this low-precision, foreground-only feed.
   StreamSubscription<Position>? _positionSubscription;
   late final AppLifecycleListener _lifecycleListener;
+
+  /// Pause / Resume tapped on the workout notification.
+  StreamSubscription<String>? _notificationButtons;
 
   /// Set once Start or Resume is tapped, so the map preview never
   /// subscribes while the workout's own GPS stream is starting.
@@ -107,6 +201,11 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   @override
   void initState() {
     super.initState();
+    final picked = widget.initialType;
+    if (picked != null) {
+      _typePicked = true;
+      context.read<ActivityTrackingBloc>().add(SelectActivityType(picked));
+    }
     _unitNotifier.load();
     _prefsLoaded = _prefsNotifier.load().then((_) {
       _checkIfCurrentTrackFavorited();
@@ -116,179 +215,104 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
+    _notificationButtons = ForegroundServiceManager.buttonPresses.listen(
+      _onNotificationButton,
+    );
     // Settle an interrupted workout first: its resume needs the GPS stream
     // and the location prompt to itself.
     _checkInterruptedWorkout().whenComplete(() {
-      if (mounted) _startLocationUpdates();
+      if (!mounted) return;
+      _selectActivityForGoals();
+      _loadGoalTarget();
+      _startLocationUpdates();
     });
     // Checkpoint the workout whenever the app leaves the foreground — the
     // OS may kill a backgrounded app without further notice.
     _lifecycleListener = AppLifecycleListener(
       onHide: () {
-        if (mounted) context.read<ActivityTrackingBloc>().add(PersistProgress());
+        _appHidden = true;
+        if (mounted)
+          context.read<ActivityTrackingBloc>().add(PersistProgress());
       },
+      onShow: _onShown,
     );
   }
 
   void _onPrefsChanged() {
-    if (mounted) {
-      _checkIfCurrentTrackFavorited();
-      final defaultType = _prefsNotifier.value.defaultActivityType;
-      final bloc = context.read<ActivityTrackingBloc>();
-      if (bloc.state is TrackingIdle) {
-        bloc.add(SelectActivityType(defaultType));
-      }
-    }
+    if (mounted) _checkIfCurrentTrackFavorited();
   }
 
-  Future<void> _checkIfCurrentTrackFavorited() async {
-    final track = _prefsNotifier.value.backgroundAudioTrack;
-    final isar = sl<IsarService>().isar;
-    final FavoriteAudio? existing;
+  /// A type was picked on this screen: the goal's pick doesn't override it.
+  bool _typePicked = false;
+
+  /// What's left of today's distance or calories goal, used as the target
+  /// of a workout started without one set by hand.
+  ({WorkoutTargetType type, double value})? _goalTarget;
+
+  /// Opens with the activity the user's goals point to (steps: walk;
+  /// distance or calories: run), else their last GPS activity.
+  Future<void> _selectActivityForGoals() async {
+    final goals = sl<ActivityGoalsRepository>().getGoals();
+    ActivityType? last;
     try {
-      existing = await isar.favoriteAudios
-          .filter()
-          .trackIdEqualTo(track)
-          .findFirst();
+      final history = await sl<GetActivityHistory>()(
+        since: DateTime.now().subtract(const Duration(days: 90)),
+      );
+      last = history
+          .map((e) => e.session.activityType)
+          .where((t) => t.isGpsBased)
+          .firstOrNull;
     } catch (e) {
-      debugPrint('Reading favourite tracks failed: $e');
-      return;
+      debugPrint('Reading the last activity failed: $e');
     }
-    if (mounted) {
-      setState(() {
-        _isCurrentTrackFavorited = existing != null;
-      });
+    if (!mounted || _typePicked) return;
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingIdle) return;
+    bloc.add(SelectActivityType(activityForGoals(goals, lastOutdoor: last)));
+  }
+
+  Future<void> _loadGoalTarget() async {
+    try {
+      final snapshot = await sl<ActivityGoalsRepository>().getProgress(
+        TrendRange.week,
+      );
+      if (mounted) _goalTarget = targetFromGoals(snapshot.goals);
+    } catch (e) {
+      debugPrint('Reading activity goals failed: $e');
     }
   }
 
-  static const _audioChannel = MethodChannel(
-    'com.example.vital_up/audio_intent',
-  );
+  void _checkIfCurrentTrackFavorited() => _music.refreshFavorite();
+  void _playWorkoutAudio() => _music.play();
+  void _pauseWorkoutAudio() => _music.pause();
+  void _resumeWorkoutAudio() => _music.resume();
+  void _stopWorkoutAudio() => _music.stop();
 
-  /// Opens the user's chosen music app. The app may have been uninstalled
-  /// since it was picked, so failures are logged rather than thrown.
-  void _launchExternalPlayer(String packageName) {
-    _audioChannel
-        .invokeMethod('launchAudioApp', {'packageName': packageName})
-        .catchError((Object e) {
-          debugPrint('Launching music app failed: $e');
-          if (mounted) {
-            showErrorSnackBar(context, "Couldn't open your music app.");
-          }
-          return null;
-        });
+  /// Pause / Resume, from the controls or the workout notification.
+  void _pauseTracking() {
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingInProgress) return;
+    bloc.add(PauseTracking());
+    _pauseWorkoutAudio();
   }
 
-  void _playWorkoutAudio({bool play = true}) {
-    final prefs = _prefsNotifier.value;
-    if (prefs.preferredPlayerPackage != 'builtIn') {
-      _launchExternalPlayer(prefs.preferredPlayerPackage);
-    } else {
-      sl<IsarService>().isar.downloadedTracks
-          .filter()
-          .trackIdEqualTo(prefs.backgroundAudioTrack)
-          .findFirst()
-          .then((downloaded) {
-            final localPath = downloaded?.localFilePath;
-            final source = downloaded != null
-                ? 'download'
-                : (prefs.backgroundAudioTrack.startsWith('Local:')
-                      ? 'local'
-                      : 'preset');
-            sl<WorkoutAudioService>().playTrack(
-              prefs.backgroundAudioTrack,
-              source: source,
-              localPath: localPath,
-              play: play,
-            );
-          })
-          .catchError((Object e) {
-            debugPrint('Starting workout audio failed: $e');
-          });
+  void _resumeTracking() {
+    final bloc = context.read<ActivityTrackingBloc>();
+    if (bloc.state is! TrackingPaused) return;
+    bloc.add(ResumeTracking());
+    if (_prefsNotifier.value.voiceCoachEnabled) {
+      _voiceCoach.announceResume();
     }
+    _resumeWorkoutAudio();
   }
 
-  void _pauseWorkoutAudio() {
-    final prefs = _prefsNotifier.value;
-    if (prefs.preferredPlayerPackage == 'builtIn') {
-      sl<WorkoutAudioService>().pause();
+  void _onNotificationButton(String id) {
+    if (!mounted) return;
+    if (id == ForegroundServiceManager.pauseButton) {
+      _pauseTracking();
+    } else if (id == ForegroundServiceManager.resumeButton) {
+      _resumeTracking();
     }
-    _voiceCoach.stop();
-  }
-
-  void _resumeWorkoutAudio() {
-    final prefs = _prefsNotifier.value;
-    if (prefs.preferredPlayerPackage != 'builtIn') {
-      _launchExternalPlayer(prefs.preferredPlayerPackage);
-    } else {
-      sl<WorkoutAudioService>().resume();
-    }
-  }
-
-  void _stopWorkoutAudio() {
-    final prefs = _prefsNotifier.value;
-    if (prefs.preferredPlayerPackage == 'builtIn') {
-      sl<WorkoutAudioService>().stop();
-    }
-  }
-
-  Future<void> _cycleTrack({required bool next}) async {
-    final prefs = _prefsNotifier.value;
-    final queueType = prefs.backgroundAudioQueueType;
-    final currentTrack = prefs.backgroundAudioTrack;
-
-    List<String> queue = [];
-
-    if (queueType == 'stories' || queueType == 'curated') {
-      queue = [
-        'Story: It\'s Possible',
-        'Story: Goals',
-        'Story: Light Up the Darkness',
-        'Story: Without Limits',
-        'Story: Best Speeches',
-      ];
-    } else if (queueType == 'favorite') {
-      final favs = await sl<IsarService>().isar.favoriteAudios
-          .where()
-          .findAll();
-      queue = favs.map((f) => f.trackId).toList();
-    } else if (queueType == 'local') {
-      final songs = await sl<LocalAudioQueryService>().getLocalSongs();
-      queue = songs.map((s) => 'Local:${s.id}').toList();
-    }
-
-    if (queue.isEmpty) {
-      queue = [
-        'Story: It\'s Possible',
-        'Story: Goals',
-        'Story: Light Up the Darkness',
-        'Story: Without Limits',
-        'Story: Best Speeches',
-      ];
-    }
-
-    int currentIndex = queue.indexOf(currentTrack);
-    int targetIndex;
-
-    if (currentIndex == -1) {
-      targetIndex = next ? 0 : queue.length - 1;
-    } else {
-      if (next) {
-        targetIndex = (currentIndex + 1) % queue.length;
-      } else {
-        targetIndex = (currentIndex - 1 + queue.length) % queue.length;
-      }
-    }
-
-    final targetTrack = queue[targetIndex];
-    await _prefsNotifier.setBackgroundAudioTrack(
-      targetTrack,
-      queueType: queueType,
-    );
-
-    _voiceCoach.stop();
-
-    _playWorkoutAudio();
   }
 
   @override
@@ -303,8 +327,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _lifecycleListener.dispose();
     _positionSubscription?.cancel();
     _hrSubscription?.cancel();
+    _notificationButtons?.cancel();
     _hrManager.dispose();
     _voiceCoach.dispose();
+    _music.dispose();
     _unitNotifier.dispose();
     _prefsNotifier.dispose();
     super.dispose();
@@ -373,7 +399,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _beginTracking() {
     _workoutRequested = true;
     _stopLocationUpdates();
-    _prefsNotifier.applyDailyTargetIfEnabled();
+    // Today's goal is the target unless one was set by hand.
+    final goal = _goalTarget;
+    if (goal != null &&
+        _prefsNotifier.value.targetType == WorkoutTargetType.none) {
+      _prefsNotifier.setTarget(goal.type, goal.value);
+    }
     context.read<ActivityTrackingBloc>().add(StartTracking());
     if (_prefsNotifier.value.voiceCoachEnabled) {
       _voiceCoach.announceStart();
@@ -426,10 +457,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     // geolocator has one native stream: the preview must let go of it
     // before the workout subscribes.
     _stopLocationUpdates();
-    bloc.add(RestoreTracking(
-      checkpoint: workout.checkpoint,
-      session: workout.session,
-    ));
+    bloc.add(
+      RestoreTracking(checkpoint: workout.checkpoint, session: workout.session),
+    );
   }
 
   Future<void> _finishInterrupted(
@@ -448,7 +478,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
         workout,
         targetType: hasTarget ? prefs.targetType.name : null,
         targetValue: hasTarget ? prefs.targetValue : null,
-        targetAchieved: hasTarget &&
+        targetAchieved:
+            hasTarget &&
             isActivityTargetMet(
               prefs.targetType,
               prefs.targetValue,
@@ -608,26 +639,56 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     } catch (_) {}
   }
 
+  void _onShown() {
+    _appHidden = false;
+    final route = _hiddenRoute;
+    final puck = _hiddenPuck;
+    _hiddenRoute = null;
+    _hiddenPuck = null;
+    if (route != null) _updateRoute(route);
+    if (puck != null) _updatePuck(puck);
+  }
+
   void _updateRoute(List<TrackPoint> points) {
-    if (_polylineAnnotationManager == null || points.length < 2 || !mounted)
+    final manager = _polylineAnnotationManager;
+    if (manager == null || points.length < 2 || !mounted) return;
+    if (_appHidden) {
+      _hiddenRoute = points;
       return;
+    }
+    // Ticks and step updates re-emit the same route.
+    if (points.length == _drawnRouteLength) return;
+    // A create still in flight: the next new point draws the latest route.
+    if (_routeCreating != null) return;
+    _drawnRouteLength = points.length;
 
-    _polylineAnnotationManager!.deleteAll();
-
-    final coordinates = points.map((p) => [p.longitude, p.latitude]).toList();
-    final primaryColor = context.colors.primary;
-
-    _polylineAnnotationManager!.create(
-      mbx.PolylineAnnotationOptions(
-        geometry: mbx.LineString(
-          coordinates: coordinates
-              .map((c) => mbx.Position(c[0], c[1]))
-              .toList(),
-        ),
-        lineColor: primaryColor.toARGB32(),
-        lineWidth: ActivityMapDimens.routeWidth,
-      ),
+    final geometry = mbx.LineString(
+      coordinates: [
+        for (final p in points) mbx.Position(p.longitude, p.latitude),
+      ],
     );
+    final line = _routeLine;
+    if (line != null) {
+      line.geometry = geometry;
+      manager.update(line).ignore();
+      return;
+    }
+    _routeCreating = manager
+        .create(
+          mbx.PolylineAnnotationOptions(
+            geometry: geometry,
+            lineColor: context.colors.primary.toARGB32(),
+            lineWidth: ActivityMapDimens.routeWidth,
+          ),
+        )
+        .then<void>((created) {
+          _routeLine = created;
+        })
+        .catchError((Object e) {
+          _drawnRouteLength = 0;
+          debugPrint('Drawing the route failed: $e');
+        })
+        .whenComplete(() => _routeCreating = null);
   }
 
   void _updateStartPoint(TrackPoint? point) {
@@ -650,22 +711,42 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   }
 
   void _updatePuck(TrackPoint? point) {
-    if (_circleAnnotationManager == null || point == null || !mounted) return;
-
-    _circleAnnotationManager!.deleteAll();
-    final primaryColor = context.colors.primary;
-
-    _circleAnnotationManager!.create(
-      mbx.CircleAnnotationOptions(
-        geometry: mbx.Point(
-          coordinates: mbx.Position(point.longitude, point.latitude),
-        ),
-        circleRadius: ActivityMapDimens.puckRadius,
-        circleColor: primaryColor.toARGB32(),
-        circleStrokeWidth: ActivityMapDimens.puckStroke,
-        circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
-      ),
+    final manager = _circleAnnotationManager;
+    if (manager == null || point == null || !mounted) return;
+    if (_appHidden) {
+      _hiddenPuck = point;
+      return;
+    }
+    final geometry = mbx.Point(
+      coordinates: mbx.Position(point.longitude, point.latitude),
     );
+    final puck = _puck;
+    if (puck != null) {
+      puck.geometry = geometry;
+      manager.update(puck).ignore();
+      return;
+    }
+    if (_puckCreating != null) return;
+    _puckCreating = manager
+        .create(
+          mbx.CircleAnnotationOptions(
+            geometry: geometry,
+            circleRadius: ActivityMapDimens.puckRadius,
+            circleColor: context.colors.primary.toARGB32(),
+            circleStrokeWidth: ActivityMapDimens.puckStroke,
+            circleStrokeColor: ActivityColors.mapMarkerStroke.toARGB32(),
+          ),
+        )
+        .then<void>((created) {
+          _puck = created;
+          // A newer fix may have arrived while it was being created.
+          final latest = _currentPosition;
+          if (latest != null && !identical(latest, point)) {
+            _updatePuck(latest);
+          }
+        })
+        .catchError((Object e) => debugPrint('Drawing the position failed: $e'))
+        .whenComplete(() => _puckCreating = null);
   }
 
   void _centerCamera(double lat, double lng, {double? zoom}) {
@@ -681,6 +762,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _polylineAnnotationManager?.deleteAll();
     _circleAnnotationManager?.deleteAll();
     _startPointAnnotationManager?.deleteAll();
+    _routeLine = null;
+    _drawnRouteLength = 0;
+    _puck = null;
+    _hiddenRoute = null;
     setState(() {
       _startPoint = null;
     });
@@ -756,6 +841,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           context.read<ActivityTrackingBloc>().add(ResetTracking());
         } else if (state is TrackingCompleted) {
           _gpsLostNotified = false;
+          // The next workout's target is what's left after this one.
+          _loadGoalTarget();
           if (!state.saved) {
             showErrorSnackBar(
               context,
@@ -842,19 +929,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             body: Stack(
               children: [
                 // Map fills the background
-                Positioned.fill(
-                  child: mbx.MapWidget(
-                    key: const ValueKey("mapWidget"),
-                    onMapCreated: _onMapCreated,
-                    onTapListener: (context) {
-                      if (mounted) {
-                        setState(() {
-                          _isUiVisible = !_isUiVisible;
-                        });
-                      }
-                    },
-                  ),
-                ),
+                _mapLayer,
 
                 // Back Button (only in Idle)
                 if (state is TrackingIdle)
@@ -922,7 +997,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                               steps: steps,
                               currentSpeed: currentSpeed,
                               elevationGain: elevationGain,
-                              activityTypeName: state.activityType.label,
+                              activityType: state.activityType,
                             ),
                           );
                         },
@@ -986,190 +1061,32 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    ValueListenableBuilder<WorkoutPrefs>(
-                                      valueListenable: _prefsNotifier,
-                                      builder: (context, prefs, __) {
-                                        final isExternal =
-                                            prefs.preferredPlayerPackage !=
-                                            'builtIn';
-                                        final displayTrack = isExternal
-                                            ? 'Player: ${prefs.preferredPlayerPackage.split('.').last.toUpperCase()}'
-                                            : prefs.backgroundAudioTrack;
-
-                                        return StreamBuilder<bool>(
-                                          stream: sl<WorkoutAudioService>()
-                                              .playingStream,
-                                          initialData: sl<WorkoutAudioService>()
-                                              .isPlaying,
-                                          builder: (context, playingSnapshot) {
-                                            final isPlaying =
-                                                playingSnapshot.data ?? false;
-                                            return WorkoutMusicPlayer(
-                                              trackName: displayTrack,
-                                              isPlaying: isExternal
-                                                  ? false
-                                                  : isPlaying,
-                                              isFavorited: isExternal
-                                                  ? false
-                                                  : _isCurrentTrackFavorited,
-                                              isMinimized: _isPlayerMinimized,
-                                              onMinimizeToggle: () {
-                                                setState(() {
-                                                  _isPlayerMinimized =
-                                                      !_isPlayerMinimized;
-                                                });
-                                              },
-                                              onTap: () {
-                                                Navigator.of(context)
-                                                    .push(
-                                                      MaterialPageRoute(
-                                                        builder: (_) =>
-                                                            WorkoutAudioPage(
-                                                              current: prefs,
-                                                              notifier:
-                                                                  _prefsNotifier,
-                                                            ),
-                                                      ),
-                                                    )
-                                                    .then((_) {
-                                                      _checkIfCurrentTrackFavorited();
-                                                    });
-                                              },
-                                              onDiscard: () {
-                                                _prefsNotifier
-                                                    .setBackgroundAudioTrack(
-                                                      'None',
-                                                    );
-                                                _stopWorkoutAudio();
-                                                _voiceCoach.stop();
-                                              },
-                                              onPlayPause: () {
-                                                if (isExternal) {
-                                                  _playWorkoutAudio();
-                                                } else {
-                                                  final audioService =
-                                                      sl<WorkoutAudioService>();
-                                                  if (audioService.isPlaying) {
-                                                    _pauseWorkoutAudio();
-                                                    sl<VoiceCoachService>()
-                                                        .stop();
-                                                  } else {
-                                                    _playWorkoutAudio();
-                                                  }
-                                                }
-                                              },
-                                              onNext: isExternal
-                                                  ? () {}
-                                                  : () =>
-                                                        _cycleTrack(next: true),
-                                              onPrevious: isExternal
-                                                  ? () {}
-                                                  : () => _cycleTrack(
-                                                      next: false,
-                                                    ),
-                                              onFavoriteToggle: isExternal
-                                                  ? () {}
-                                                  : () async {
-                                                      try {
-                                                        final track = prefs
-                                                            .backgroundAudioTrack;
-                                                        final isar =
-                                                            sl<IsarService>()
-                                                                .isar;
-                                                        final existing =
-                                                            await isar
-                                                                .favoriteAudios
-                                                                .filter()
-                                                                .trackIdEqualTo(
-                                                                  track,
-                                                                )
-                                                                .findFirst();
-                                                        await isar.writeTxn(() async {
-                                                          if (existing != null) {
-                                                            await isar
-                                                                .favoriteAudios
-                                                                .delete(
-                                                                  existing.id,
-                                                                );
-                                                          } else {
-                                                            final title = track
-                                                                .replaceFirst(
-                                                                  'Story: ',
-                                                                  '',
-                                                                )
-                                                                .replaceFirst(
-                                                                  'Music: ',
-                                                                  '',
-                                                                );
-                                                            final source =
-                                                                track.startsWith(
-                                                                  'Local:',
-                                                                )
-                                                                ? 'local'
-                                                                : 'preset';
-                                                            final fav = FavoriteAudio()
-                                                              ..trackId = track
-                                                              ..title = title
-                                                              ..subtitle =
-                                                                  source ==
-                                                                      'local'
-                                                                  ? 'Local Track'
-                                                                  : 'Curated Audio'
-                                                              ..audioSource =
-                                                                  source
-                                                              ..favoritedAt =
-                                                                  DateTime.now();
-                                                            await isar
-                                                                .favoriteAudios
-                                                                .put(fav);
-                                                          }
-                                                        });
-                                                      } catch (e) {
-                                                        debugPrint(
-                                                          'Updating favourites failed: $e',
-                                                        );
-                                                        if (context.mounted) {
-                                                          showErrorSnackBar(
-                                                            context,
-                                                            "Couldn't update favourites. Try again.",
-                                                          );
-                                                        }
-                                                      }
-                                                      _checkIfCurrentTrackFavorited();
-                                                    },
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ),
+                                    WorkoutMusicBar(music: _music),
                                     if (state is TrackingIdle) ...[
                                       ActivitySelector(
                                         selected: state.activityType,
                                         enabled: true,
-                                        onSelected: (type) =>
-                                            bloc.add(SelectActivityType(type)),
+                                        onSelected: (type) {
+                                          if (!type.isGpsBased) {
+                                            widget.onWorkoutSelected(type);
+                                            return;
+                                          }
+                                          _typePicked = true;
+                                          bloc.add(SelectActivityType(type));
+                                        },
                                       ),
                                       const SizedBox(height: AppDimens.space8),
                                     ],
                                     StartPauseControl(
-                                      state: state,
+                                      isIdle:
+                                          state is TrackingIdle ||
+                                          state is TrackingCompleted,
+                                      isRunning: state is TrackingInProgress,
+                                      startLabel:
+                                          'Start ${state.activityType.label}',
                                       isLocked: _isLocked,
-                                      onMusicTap: () {
-                                        Navigator.of(context)
-                                            .push(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    WorkoutAudioPage(
-                                                      current:
-                                                          _prefsNotifier.value,
-                                                      notifier: _prefsNotifier,
-                                                    ),
-                                              ),
-                                            )
-                                            .then((_) {
-                                              _checkIfCurrentTrackFavorited();
-                                            });
-                                      },
+                                      onMusicTap: () =>
+                                          _music.openPicker(context),
                                       onLockToggle: (locked) {
                                         setState(() {
                                           _isLocked = locked;
@@ -1187,20 +1104,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                           _beginTracking();
                                         }
                                       },
-                                      onPause: () {
-                                        bloc.add(PauseTracking());
-                                        _pauseWorkoutAudio();
-                                      },
-                                      onResume: () {
-                                        bloc.add(ResumeTracking());
-
-                                        if (_prefsNotifier
-                                            .value
-                                            .voiceCoachEnabled) {
-                                          _voiceCoach.announceResume();
-                                        }
-                                        _resumeWorkoutAudio();
-                                      },
+                                      onPause: _pauseTracking,
+                                      onResume: _resumeTracking,
                                       onStop: () {
                                         final prefs = _prefsNotifier.value;
                                         String? tType;

@@ -149,7 +149,7 @@ class _PermissionRationaleContent extends StatelessWidget {
                   const SizedBox(width: AppDimens.space8),
                   Expanded(
                     child: Text(
-                      'Your data stays strictly private & encrypted on your device.',
+                      'Your data stays strictly private on your device.',
                       style: context.text.labelSmall?.copyWith(
                         color: context.colors.onSurface.withAlpha(200),
                       ),

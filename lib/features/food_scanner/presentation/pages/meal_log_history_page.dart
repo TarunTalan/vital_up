@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
+import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
@@ -21,7 +24,7 @@ class MealLogHistoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<MealLogBloc>()..add(const LoadTodaysMeals()),
+      create: (_) => sl<MealLogBloc>()..add(const LoadAllMealLogs()),
       child: const _MealLogHistoryView(),
     );
   }
@@ -34,7 +37,7 @@ class _MealLogHistoryView extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       header: AppPageHeader(
-        title: "Today's Meals",
+        title: 'Meal history',
         onBack: () => context.pop(),
       ),
       scrollable: false,
@@ -43,7 +46,7 @@ class _MealLogHistoryView extends StatelessWidget {
         top: false,
         child: RefreshIndicator(
           onRefresh: () async {
-            context.read<MealLogBloc>().add(const LoadTodaysMeals());
+            context.read<MealLogBloc>().add(const LoadAllMealLogs());
           },
           child: BlocConsumer<MealLogBloc, MealLogState>(
             listenWhen: (_, state) => state is MealLogLoaded && state.notice != null,
@@ -53,7 +56,7 @@ class _MealLogHistoryView extends StatelessWidget {
             },
             builder: (context, state) {
               if (state is MealLogLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: VitalUpLoader());
               }
 
               if (state is MealLogError) {
@@ -65,7 +68,7 @@ class _MealLogHistoryView extends StatelessWidget {
                     padding: context.pagePadding,
                     child: LoadErrorView(
                       message: state.message,
-                      onRetry: () => context.read<MealLogBloc>().add(const LoadTodaysMeals()),
+                      onRetry: () => context.read<MealLogBloc>().add(const LoadAllMealLogs()),
                     ),
                   ),
                 );
@@ -78,21 +81,9 @@ class _MealLogHistoryView extends StatelessWidget {
                     child: Container(
                       height: MediaQuery.of(context).size.height * 0.6,
                       alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AppIconBadge(
-                            size: AppDimens.iconBadgeLarge,
-                            icon: const Icon(Icons.restaurant_menu_rounded),
-                          ),
-                          const SizedBox(height: AppDimens.space16),
-                          Text(
-                            'No meals logged today.',
-                            style: context.text.bodyLarge?.copyWith(
-                              color: context.vColors.grayText,
-                            ),
-                          ),
-                        ],
+                      child: const TrackerEmptyState(
+                        metric: TrackerMetric.nutrition,
+                        message: 'What you log will show up here.',
                       ),
                     ),
                   );
@@ -154,160 +145,50 @@ class _MealLogTile extends StatelessWidget {
     bloc.add(DeleteMealLogEntry(entry.id));
   }
 
+  String get _mealLabel => switch (entry.mealType) {
+    MealType.breakfast => 'Breakfast',
+    MealType.lunch => 'Lunch',
+    MealType.dinner => 'Dinner',
+    MealType.snack => 'Snack',
+  };
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final timeFormat = DateFormat('h:mm a');
 
-    return AppCard(
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _MealTypeBadge(mealType: entry.mealType),
-              const Spacer(),
-              Text(
-                timeFormat.format(entry.capturedAt),
-                style: context.text.bodySmall?.copyWith(
-                  color: context.vColors.grayText,
-                ),
-              ),
-              const SizedBox(width: AppDimens.space4),
-              IconButton(
-                tooltip: 'Delete',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _confirmDelete(context),
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  size: AppDimens.iconMd,
-                  color: colors.error,
-                ),
-              ),
-            ],
+    return LogHistoryCard(
+      badge: LogTypeBadge(label: _mealLabel),
+      at: entry.capturedAt,
+      title: entry.items.map((i) => i.name).join(', '),
+      onDelete: () => _confirmDelete(context),
+      figures: [
+        LogValuePill(
+          label: 'Cals',
+          value: '${entry.totalCalories.round()}',
+          color: colors.primary,
+        ),
+        if (entry.nutrition.isNotEmpty) ...[
+          LogValuePill(
+            label: 'P',
+            value: '${_sum(entry, (n) => n.proteinG)}g',
+            color: AppColors.scanProtein,
           ),
-          const SizedBox(height: AppDimens.space8),
-          Text(
-            entry.items.map((i) => i.name).join(', '),
-            style: context.text.titleSmall,
+          LogValuePill(
+            label: 'C',
+            value: '${_sum(entry, (n) => n.carbsG)}g',
+            color: AppColors.scanCarbs,
           ),
-          const SizedBox(height: AppDimens.space12),
-          Wrap(
-            spacing: AppDimens.space8,
-            runSpacing: AppDimens.space8,
-            children: [
-              _MacroPill(
-                label: 'Cals',
-                value: '${entry.totalCalories.toInt()}',
-                color: colors.primary,
-              ),
-              if (entry.nutrition.isNotEmpty) ...[
-                _MacroPill(
-                  label: 'P',
-                  value: '${entry.nutrition.first.proteinG.toInt()}g',
-                  color: AppColors.scanProtein,
-                ),
-                _MacroPill(
-                  label: 'C',
-                  value: '${entry.nutrition.first.carbsG.toInt()}g',
-                  color: AppColors.scanCarbs,
-                ),
-                _MacroPill(
-                  label: 'F',
-                  value: '${entry.nutrition.first.fatG.toInt()}g',
-                  color: AppColors.scanFat,
-                ),
-              ],
-            ],
+          LogValuePill(
+            label: 'F',
+            value: '${_sum(entry, (n) => n.fatG)}g',
+            color: AppColors.scanFat,
           ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _MealTypeBadge extends StatelessWidget {
-  final MealType mealType;
-
-  const _MealTypeBadge({required this.mealType});
-
-  String get _label {
-    switch (mealType) {
-      case MealType.breakfast: return 'Breakfast';
-      case MealType.lunch:     return 'Lunch';
-      case MealType.dinner:    return 'Dinner';
-      case MealType.snack:     return 'Snack';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space12,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: v.primaryFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-        border: Border.all(color: v.primaryBorder!),
-      ),
-      child: Text(
-        _label,
-        style: context.text.bodySmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: context.colors.onPrimaryContainer,
-        ),
-      ),
-    );
-  }
-}
-
-class _MacroPill extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MacroPill({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space8,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-        border: Border.all(color: color.withValues(alpha: 0.27)),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: context.text.bodySmall?.copyWith(
-                color: context.vColors.grayText,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            TextSpan(
-              text: value,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+/// A macro over every item of the meal (the calories shown are the total).
+int _sum(MealLogEntry entry, double Function(NutritionInfo n) of) =>
+    entry.nutrition.fold<double>(0, (sum, n) => sum + of(n)).round();

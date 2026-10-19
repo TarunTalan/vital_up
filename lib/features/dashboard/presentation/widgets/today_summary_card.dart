@@ -1,10 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -23,6 +28,7 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.d
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
 import 'dashboard_card_header.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
 
 const _placeholder = '—';
 const _quickWaterMl = 250;
@@ -56,6 +62,12 @@ Duration? _lastNight(SleepState state) => switch (state) {
 
 /// Home hero: today's activity, calories, water and sleep against their
 /// goals, in one row. Each figure opens its tracker via [onOpen].
+///
+/// Labels, values and goals each use one size across all four columns:
+/// when one of them doesn't fit, every column shrinks by the same amount so
+/// the row stays even, down to the [FitText] minimum. A figure that still
+/// doesn't fit switches to a shorter form ("12.3K", "of 10K") rather than
+/// ending in "...".
 class TodaySummaryCard extends StatelessWidget {
   final ValueChanged<TrackerMetric> onOpen;
 
@@ -63,202 +75,309 @@ class TodaySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      _ActivityItem(onOpen: onOpen),
-      _CaloriesItem(onOpen: onOpen),
-      _WaterItem(onOpen: onOpen),
-      _SleepItem(onOpen: onOpen),
+    final items = [
+      _activityItem(context),
+      _caloriesItem(context),
+      _waterItem(context),
+      _sleepItem(context),
     ];
     return AppCard(
       width: double.infinity,
       padding: AppDimens.cardPaddingCompact,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppDimens.space4),
-            Expanded(child: items[i]),
-          ],
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = AppDimens.space4;
+          // Large text gets a 2 x 2 grid: twice the width per figure.
+          final perRow = context.isLargeText ? 2 : items.length;
+          final column =
+              (constraints.maxWidth - gap * (perRow - 1)) / perRow -
+              _SummaryItem.padding * 2;
+          final layout = _SummaryLayout.fitting(context, items, column);
+          return Column(
+            children: [
+              for (var row = 0; row < items.length; row += perRow) ...[
+                if (row > 0) const SizedBox(height: AppDimens.space8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = row; i < row + perRow; i++) ...[
+                      if (i > row) const SizedBox(width: gap),
+                      Expanded(
+                        child: _SummaryItem(
+                          data: items[i],
+                          layout: layout,
+                          index: i,
+                          onTap: () => onOpen(items[i].metric),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
-}
 
-class _ActivityItem extends StatelessWidget {
-  final ValueChanged<TrackerMetric> onOpen;
-  const _ActivityItem({required this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
+  _SummaryData _activityItem(BuildContext context) {
     final goal = _headlineGoal(context.watch<ActivityGoalsCubit>().state);
     final metric = goal?.goal.metric;
-    return _SummaryItem(
+    final isSteps = metric == null || metric == GoalMetric.steps;
+    return (
       metric: TrackerMetric.activity,
       label: metric?.label ?? TrackerMetric.activity.label,
-      value: goal == null ? _placeholder : metric!.format(goal.current),
-      goal: goal == null
-          ? TrackerStatus.noGoal.label
-          : 'of ${metric!.formatWithUnit(goal.goal.target)}',
+      values: goal == null
+          ? const [_placeholder]
+          : [
+              metric!.format(goal.current),
+              if (metric != GoalMetric.distance)
+                formatCompactCount(goal.current),
+            ],
+      goals: goal == null
+          ? [TrackerStatus.noGoal.label]
+          : [
+              'of ${metric!.formatWithUnit(goal.goal.target)}',
+              'of ${metric.formatShortWithUnit(goal.goal.target)}',
+              if (metric != GoalMetric.distance)
+                'of ${formatCompactCount(goal.goal.target)}',
+            ],
       fraction: goal?.fraction,
-      onTap: () => onOpen(TrackerMetric.activity),
+      iconAsset: isSteps ? 'assets/icons/trackers/step.svg' : null,
     );
   }
-}
 
-class _CaloriesItem extends StatelessWidget {
-  final ValueChanged<TrackerMetric> onOpen;
-  const _CaloriesItem({required this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
+  _SummaryData _caloriesItem(BuildContext context) {
     final state = context.watch<MealLogBloc>().state;
     final meals = state is MealLogLoaded ? state : null;
     final goal = meals == null ? null : _calorieGoal(context, meals);
-    final number = NumberFormat.decimalPattern();
-    return _SummaryItem(
+    return (
       metric: TrackerMetric.nutrition,
       label: 'Calories',
-      value: meals == null
-          ? _placeholder
-          : number.format(meals.totalCalories.round()),
-      goal: goal == null
-          ? TrackerStatus.noGoal.label
-          : 'of ${number.format(goal.round())} kcal',
+      values: meals == null
+          ? const [_placeholder]
+          : [
+              formatCount(meals.totalCalories),
+              formatCompactCount(meals.totalCalories),
+            ],
+      goals: goal == null
+          ? [TrackerStatus.noGoal.label]
+          : [
+              'of ${formatCount(goal)} kcal',
+              'of ${formatCount(goal)}',
+              'of ${NumberFormat.compact().format(goal.round())}',
+            ],
       fraction: meals == null || goal == null || goal <= 0
           ? null
           : meals.totalCalories / goal,
-      onTap: () => onOpen(TrackerMetric.nutrition),
+      iconAsset: null,
     );
   }
-}
 
-class _WaterItem extends StatelessWidget {
-  final ValueChanged<TrackerMetric> onOpen;
-  const _WaterItem({required this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
+  _SummaryData _waterItem(BuildContext context) {
     final state = context.watch<WaterIntakeCubit>().state;
     final water = state is WaterIntakeLoaded ? state : null;
-    return _SummaryItem(
+    return (
       metric: TrackerMetric.water,
       label: TrackerMetric.water.label,
-      value: water == null
-          ? _placeholder
-          : WaterTrendsPage.formatMl(water.currentIntakeMl.toDouble()),
-      goal: water == null
-          ? TrackerStatus.notLogged.label
-          : 'of ${WaterTrendsPage.formatMl(water.dailyGoalMl.toDouble())}',
+      values: [
+        water == null
+            ? _placeholder
+            : WaterTrendsPage.formatMl(water.currentIntakeMl.toDouble()),
+      ],
+      goals: [
+        water == null
+            ? TrackerStatus.notLogged.label
+            : 'of ${WaterTrendsPage.formatMl(water.dailyGoalMl.toDouble())}',
+      ],
       fraction: water == null || water.dailyGoalMl <= 0
           ? null
           : water.currentIntakeMl / water.dailyGoalMl,
-      onTap: () => onOpen(TrackerMetric.water),
+      iconAsset: null,
+    );
+  }
+
+  _SummaryData _sleepItem(BuildContext context) {
+    final slept = _lastNight(context.watch<SleepCubit>().state);
+    final goalMinutes = sl<SleepService>().getGoalMinutes();
+    return (
+      metric: TrackerMetric.sleep,
+      label: TrackerMetric.sleep.label,
+      values: [slept == null ? _placeholder : formatDashboardDuration(slept)],
+      goals: slept == null
+          ? [TrackerStatus.notLogged.label]
+          : [
+              'of ${formatDashboardDuration(Duration(minutes: goalMinutes))}',
+              if (goalMinutes % 60 == 0) 'of ${goalMinutes ~/ 60}h',
+            ],
+      fraction: slept == null || goalMinutes <= 0
+          ? null
+          : slept.inMinutes / goalMinutes,
+      iconAsset: null,
     );
   }
 }
 
-class _SleepItem extends StatelessWidget {
-  final ValueChanged<TrackerMetric> onOpen;
-  const _SleepItem({required this.onOpen});
+/// One summary column. [values] and [goals] list the same figure from
+/// longest to shortest; the card shows the first one that fits.
+typedef _SummaryData = ({
+  TrackerMetric metric,
+  String label,
+  List<String> values,
+  List<String> goals,
+  double? fraction,
+  String? iconAsset,
+});
 
-  @override
-  Widget build(BuildContext context) {
-    final slept = _lastNight(context.watch<SleepCubit>().state);
-    final goalMinutes = sl<SleepService>().getGoalMinutes();
-    return _SummaryItem(
-      metric: TrackerMetric.sleep,
-      label: TrackerMetric.sleep.label,
-      value: slept == null ? _placeholder : formatDashboardDuration(slept),
-      goal: slept == null
-          ? TrackerStatus.notLogged.label
-          : 'of ${formatDashboardDuration(Duration(minutes: goalMinutes))}',
-      fraction: slept == null || goalMinutes <= 0
-          ? null
-          : slept.inMinutes / goalMinutes,
-      onTap: () => onOpen(TrackerMetric.sleep),
+/// Text styles shared by every summary column, already sized for the
+/// system text scale (render them with [TextScaler.noScaling]), and the
+/// form of each figure that fits.
+class _SummaryLayout {
+  final TextStyle label;
+  final TextStyle value;
+  final TextStyle goal;
+  final List<String> values;
+  final List<String> goals;
+
+  const _SummaryLayout(
+    this.label,
+    this.value,
+    this.goal,
+    this.values,
+    this.goals,
+  );
+
+  factory _SummaryLayout.fitting(
+    BuildContext context,
+    List<_SummaryData> items,
+    double columnWidth,
+  ) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final grey = context.vColors.grayText;
+    final caption = context.text.labelSmall!.copyWith(color: grey);
+    final value = context.text.titleMedium!.copyWith(
+      color: context.colors.onSurface,
+      fontWeight: FontWeight.w600,
     );
+    final labelWidth = columnWidth - AppDimens.iconXs - AppDimens.space4;
+    final labels = _fit(caption, scaler, [
+      for (final i in items) [i.label],
+    ], labelWidth);
+    final values = _fit(value, scaler, [
+      for (final i in items) i.values,
+    ], columnWidth);
+    final goals = _fit(caption, scaler, [
+      for (final i in items) i.goals,
+    ], columnWidth);
+    return _SummaryLayout(
+      labels.style,
+      values.style,
+      goals.style,
+      values.texts,
+      goals.texts,
+    );
+  }
+
+  /// For each column, the longest of its [options] that fits [width] at
+  /// the smallest allowed size, and one [style] size for all of them:
+  /// shrunk just enough for the widest to fit, never below the minimum.
+  static ({TextStyle style, List<String> texts}) _fit(
+    TextStyle style,
+    TextScaler scaler,
+    List<List<String>> options,
+    double width,
+  ) {
+    final size = scaler.scale(style.fontSize!);
+    final sized = style.copyWith(fontSize: size);
+    final floor = FitText.minFactor(scaler, style.fontSize!);
+    double measure(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: sized),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      final w = painter.width;
+      painter.dispose();
+      return w;
+    }
+
+    final texts = [
+      for (final o in options)
+        o.firstWhere((t) => measure(t) * floor <= width, orElse: () => o.last),
+    ];
+    final widest = texts.map(measure).fold(0.0, math.max);
+    if (width <= 0 || widest <= width) return (style: sized, texts: texts);
+    // Round down so the widest text never ends up a fraction too wide.
+    final factor = math.max(floor, (width / widest * 100).floor() / 100);
+    return (style: sized.copyWith(fontSize: size * factor), texts: texts);
   }
 }
 
 /// One column of the summary: label, value, "of goal" and a progress bar.
 class _SummaryItem extends StatelessWidget {
-  final TrackerMetric metric;
-  final String label;
-  final String value;
-  final String goal;
-  final double? fraction;
+  static const double padding = AppDimens.space4;
+
+  final _SummaryData data;
+  final _SummaryLayout layout;
+  final int index;
   final VoidCallback onTap;
 
   const _SummaryItem({
-    required this.metric,
-    required this.label,
-    required this.value,
-    required this.goal,
-    required this.fraction,
+    required this.data,
+    required this.layout,
+    required this.index,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final grey = context.vColors.grayText;
+    final fraction = data.fraction;
     return Semantics(
       button: true,
-      label: '$label $value $goal',
+      label: '${data.label} ${data.values.first} ${data.goals.first}',
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppDimens.radiusSm),
         child: Padding(
-          padding: const EdgeInsets.all(AppDimens.space4),
+          padding: const EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  TrackerIcon(metric, size: AppDimens.iconXs),
+                  if (data.iconAsset != null)
+                    SvgPicture.asset(
+                      data.iconAsset!,
+                      width: AppDimens.iconXs,
+                      height: AppDimens.iconXs,
+                      colorFilter: ColorFilter.mode(
+                        data.metric.color,
+                        BlendMode.srcIn,
+                      ),
+                    )
+                  else
+                    TrackerIcon(data.metric, size: AppDimens.iconXs),
                   const SizedBox(width: AppDimens.space4),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.labelSmall?.copyWith(color: grey),
-                    ),
-                  ),
+                  Expanded(child: _line(data.label, layout.label)),
                 ],
               ),
               const SizedBox(height: AppDimens.space8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  style: context.text.titleMedium?.copyWith(
-                    color: context.colors.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                goal,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.labelSmall?.copyWith(color: grey),
-              ),
+              _line(layout.values[index], layout.value),
+              _line(layout.goals[index], layout.goal),
               const SizedBox(height: AppDimens.space8),
               TweenAnimationBuilder<double>(
                 tween: Tween(
                   begin: 0,
-                  end: fraction != null && fraction!.isFinite
-                      ? fraction!.clamp(0.0, 1.0)
+                  end: fraction != null && fraction.isFinite
+                      ? fraction.clamp(0.0, 1.0)
                       : 0.0,
                 ),
                 duration: AppDurations.slow,
                 curve: Curves.easeOutCubic,
                 builder: (context, v, _) =>
-                    AppProgressBar(value: v, color: metric.color),
+                    AppProgressBar(value: v, color: data.metric.color),
               ),
             ],
           ),
@@ -266,6 +385,15 @@ class _SummaryItem extends StatelessWidget {
       ),
     );
   }
+
+  Widget _line(String text, TextStyle style) => Text(
+    text,
+    maxLines: 1,
+    softWrap: false,
+    overflow: TextOverflow.ellipsis,
+    textScaler: TextScaler.noScaling,
+    style: style,
+  );
 }
 
 /// The single most useful next step for today, or nothing when there
@@ -284,7 +412,8 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
   final sleep = context.watch<SleepCubit>().state;
   if (hour < 12 && sleep is SleepNeedsConfirmation) {
     return (
-      message: 'Your phone noticed about '
+      message:
+          'Your phone noticed about '
           '${formatDashboardDuration(sleep.estimate.duration)} of sleep. '
           'Check it looks right.',
       metric: TrackerMetric.sleep,

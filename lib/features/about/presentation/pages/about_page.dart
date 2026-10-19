@@ -86,7 +86,7 @@ class _AboutPageState extends State<AboutPage> {
     }
   }
 
-  static const _fallbackPackage = 'com.tarun_siddhi.vital_up';
+  static const _fallbackPackage = 'com.vitalup.app';
 
   void _onRate(int stars) {
     setState(() => _selectedRating = stars);
@@ -239,7 +239,7 @@ class _HeroBanner extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppDimens.radiusSheet),
             child: SvgPicture.asset(
-              'assets/icons/app_icon.svg',
+              'assets/icons/app/app_icon.svg',
               width: logoSize,
               height: logoSize,
               fit: BoxFit.contain,
@@ -465,7 +465,7 @@ class _FeatureHighlights extends StatelessWidget {
       color: AppColors.success,
       title: 'Offline First & Health Sync',
       desc:
-          'Encrypted Isar databases with Health Connect and Supabase cloud sync.',
+          'Offline-first local storage with Health Connect and Supabase cloud sync.',
     ),
   ];
 
@@ -544,13 +544,13 @@ class _LegalLinks extends StatelessWidget {
       title: 'Legal',
       children: [
         AppListTile(
-          icon: Icons.privacy_tip_outlined,
+          icon: Icons.privacy_tip_rounded,
           title: 'Privacy policy',
           trailing: const Icon(Icons.open_in_new_rounded),
           onTap: () => _open(context, LegalLinks.privacyPolicy),
         ),
         AppListTile(
-          icon: Icons.description_outlined,
+          icon: Icons.description_rounded,
           title: 'Terms of use',
           trailing: const Icon(Icons.open_in_new_rounded),
           onTap: () => _open(context, LegalLinks.terms),

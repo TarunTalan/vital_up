@@ -5,6 +5,9 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 
 /// The metric's SVG tinted with its accent (or [color]).
 class TrackerIcon extends StatelessWidget {
@@ -72,25 +75,77 @@ class TrackerCardHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 200;
+        final titleText = title ?? metric.label;
+        final titleStyle = context.text.titleSmall?.copyWith(
+          color: context.colors.onSurface,
+        );
+        final badge = isCompact
+            ? AppDimens.iconBadgeSmall
+            : AppDimens.iconBadge;
+        final gap = isCompact ? AppDimens.space8 : AppDimens.space12;
+        final chip = status != null && !isCompact
+            ? TrackerStatusChip(status!, label: statusLabel, color: statusColor)
+            : null;
+        final chevron = showChevron && !isCompact;
+        // The chip moves under the title when both don't fit one row
+        // (large text), so the title stays whole.
+        var chipBelow = false;
+        if (chip != null) {
+          final chipWidth =
+              _textWidth(
+                context,
+                statusLabel ?? status!.label,
+                context.text.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+              ) +
+              AppDimens.iconXs +
+              AppDimens.space4 +
+              AppDimens.space8 * 2 +
+              AppDimens.borderThin * 2;
+          final titleRoom =
+              constraints.maxWidth -
+              badge -
+              gap -
+              AppDimens.space8 -
+              chipWidth -
+              (chevron ? AppDimens.space4 + AppDimens.iconMd : 0);
+          chipBelow = !FitText.fits(
+            context,
+            TextSpan(text: titleText, style: titleStyle),
+            titleRoom,
+          );
+        }
+        final titleWidget = FitText(titleText, style: titleStyle);
+        // Half-width tiles get a smaller badge and gap so the title fits
+        // whole at its normal size.
         return Row(
           children: [
-            TrackerBadge(metric),
-            const SizedBox(width: AppDimens.space12),
+            TrackerBadge(metric, size: badge),
+            SizedBox(width: gap),
             Expanded(
-              child: Text(
-                title ?? metric.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.titleSmall?.copyWith(
-                  color: context.colors.onSurface,
-                ),
-              ),
+              child: chipBelow
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleWidget,
+                        const SizedBox(height: AppDimens.space4),
+                        chip!,
+                      ],
+                    )
+                  : titleWidget,
             ),
-            if (status != null && !isCompact) ...[
+            if (chip != null && !chipBelow) ...[
               const SizedBox(width: AppDimens.space8),
-              TrackerStatusChip(status!, label: statusLabel, color: statusColor),
+              chip,
+            ] else if (chip == null && status == TrackerStatus.done) ...[
+              const SizedBox(width: AppDimens.space8),
+              Icon(
+                Icons.check_circle_rounded,
+                size: AppDimens.iconSm,
+                color: statusColor ?? context.vColors.success,
+                semanticLabel: statusLabel ?? status!.label,
+              ),
             ],
-            if (showChevron && !isCompact) ...[
+            if (chevron) ...[
               const SizedBox(width: AppDimens.space4),
               Icon(
                 Icons.chevron_right_rounded,
@@ -105,9 +160,23 @@ class TrackerCardHeader extends StatelessWidget {
   }
 }
 
+/// Width of [text] in [style] at the current text size.
+double _textWidth(BuildContext context, String text, TextStyle? style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final width = painter.width;
+  painter.dispose();
+  return width;
+}
+
 /// Home card shell for a tracker: tapping anywhere opens its detail page;
 /// [actions] (quick logs) sit at the bottom. A met goal mutes the card a
-/// little so unfinished trackers stand out without reordering.
+/// little, adds a check to the header and turns filled actions into
+/// outlined ones, so only unfinished trackers carry a call to action.
 class TrackerCard extends StatelessWidget {
   final TrackerMetric metric;
   final TrackerStatus? status;
@@ -161,7 +230,10 @@ class TrackerCard extends StatelessWidget {
               ],
               if (actions.isNotEmpty) ...[
                 const SizedBox(height: AppDimens.cardInnerGap),
-                TrackerActionRow(actions: actions),
+                _GoalMetScope(
+                  goalMet: done,
+                  child: TrackerActionRow(actions: actions),
+                ),
               ],
             ],
           ),
@@ -169,6 +241,20 @@ class TrackerCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Tells a [TrackerCard]'s actions that its goal is met.
+class _GoalMetScope extends InheritedWidget {
+  final bool goalMet;
+
+  const _GoalMetScope({required this.goalMet, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_GoalMetScope>()?.goalMet ??
+      false;
+
+  @override
+  bool updateShouldNotify(_GoalMetScope old) => old.goalMet != goalMet;
 }
 
 /// Lays quick actions out in equal-width columns.
@@ -191,12 +277,14 @@ class TrackerActionRow extends StatelessWidget {
 }
 
 /// Compact tinted button for one-tap logging on cards and sheets
-/// ("+250 ml", "Log sleep"). [filled] marks the card's main action.
+/// ("+250 ml", "Log sleep"). [filled] marks the card's main action; on a
+/// card whose goal is met it shows outlined instead.
 class TrackerQuickAction extends StatelessWidget {
   final String label;
   final IconData? icon;
   final String? svgAsset;
-  final Color color; // We will keep the property for compatibility, but override it visually if we want.
+  final Color
+  color; // We will keep the property for compatibility, but override it visually if we want.
   final VoidCallback? onTap;
   final bool filled;
   final String? semanticLabel;
@@ -215,14 +303,18 @@ class TrackerQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppDimens.radiusButton);
-    final actionColor = context.colors.primary; // Always use primary for actions
+    final filled = this.filled && !_GoalMetScope.of(context);
+    final actionColor =
+        context.colors.primary; // Always use primary for actions
     final fg = filled ? context.vColors.buttonText! : actionColor;
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
       excludeSemantics: true,
       child: Material(
-        color: filled ? actionColor : actionColor.withValues(alpha: AppDimens.tintAlpha),
+        color: filled
+            ? actionColor
+            : actionColor.withValues(alpha: AppDimens.tintAlpha),
         shape: RoundedRectangleBorder(
           borderRadius: radius,
           side: BorderSide(
@@ -257,15 +349,12 @@ class TrackerQuickAction extends StatelessWidget {
                     Icon(icon, size: AppDimens.iconSm, color: fg),
                   const SizedBox(width: AppDimens.space6),
                   Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        style: context.text.labelMedium?.copyWith(
-                          color: fg,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    child: FitText(
+                      label,
+                      maxLines: 1,
+                      style: context.text.labelMedium?.copyWith(
+                        color: fg,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -300,30 +389,36 @@ class TrackerProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
+    final valueStyle = AppTextStyles.metric.copyWith(
+      color: context.colors.onSurface,
+    );
+    final goalStyle = context.text.bodyMedium?.copyWith(color: grey);
+    final inline = TextSpan(
+      children: [
+        TextSpan(text: value, style: valueStyle),
+        if (goal != null) TextSpan(text: '  / $goal', style: goalStyle),
+      ],
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text.rich(
-            TextSpan(
+        // The figure keeps the same size on every card: when "value / goal"
+        // doesn't fit one line, the goal moves to its own line instead of
+        // shrinking the figure.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (goal == null ||
+                FitText.fits(context, inline, constraints.maxWidth)) {
+              return Text.rich(inline, maxLines: 1);
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextSpan(
-                  text: value,
-                  style: AppTextStyles.metric.copyWith(
-                    color: context.colors.onSurface,
-                  ),
-                ),
-                if (goal != null)
-                  TextSpan(
-                    text: '  / $goal',
-                    style: context.text.bodyMedium?.copyWith(color: grey),
-                  ),
+                FitText(value, style: valueStyle),
+                FitText('of $goal', style: goalStyle),
               ],
-            ),
-            maxLines: 1,
-          ),
+            );
+          },
         ),
         if (fraction != null) ...[
           const SizedBox(height: AppDimens.space8),
@@ -348,6 +443,7 @@ class TrackerFigure extends StatelessWidget {
   final String label;
   final String value;
   final IconData? icon;
+  final String? iconAsset;
   final Color? color;
 
   const TrackerFigure({
@@ -355,6 +451,7 @@ class TrackerFigure extends StatelessWidget {
     required this.label,
     required this.value,
     this.icon,
+    this.iconAsset,
     this.color,
   });
 
@@ -363,7 +460,15 @@ class TrackerFigure extends StatelessWidget {
     final grey = context.vColors.grayText;
     return Row(
       children: [
-        if (icon != null) ...[
+        if (iconAsset != null) ...[
+          SvgPicture.asset(
+            iconAsset!,
+            width: AppDimens.iconSm,
+            height: AppDimens.iconSm,
+            colorFilter: ColorFilter.mode(color ?? grey!, BlendMode.srcIn),
+          ),
+          const SizedBox(width: AppDimens.space6),
+        ] else if (icon != null) ...[
           Icon(icon, size: AppDimens.iconSm, color: color ?? grey),
           const SizedBox(width: AppDimens.space6),
         ],
@@ -378,15 +483,11 @@ class TrackerFigure extends StatelessWidget {
                 style: context.text.bodySmall?.copyWith(color: grey),
               ),
               const SizedBox(height: AppDimens.space2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  style: context.text.titleSmall?.copyWith(
-                    color: context.colors.onSurface,
-                  ),
+              FitText(
+                value,
+                maxLines: 1,
+                style: context.text.titleSmall?.copyWith(
+                  color: context.colors.onSurface,
                 ),
               ),
             ],
@@ -404,16 +505,7 @@ class TrackerFigureRow extends StatelessWidget {
   const TrackerFigureRow({super.key, required this.figures});
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < figures.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppDimens.space8),
-          Expanded(child: figures[i]),
-        ],
-      ],
-    );
-  }
+  Widget build(BuildContext context) => AdaptiveRow(children: figures);
 }
 
 /// Circular progress with the value in the middle — detail-page hero.
@@ -592,6 +684,50 @@ class TrackerLogTile extends StatelessWidget {
   }
 }
 
+/// Empty screen of a tracker's history page: metric badge, title and one
+/// line, centred. Every history page uses it so they read the same.
+class TrackerEmptyState extends StatelessWidget {
+  final TrackerMetric metric;
+  final String title;
+  final String message;
+
+  const TrackerEmptyState({
+    super.key,
+    required this.metric,
+    this.title = 'Nothing logged yet',
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.space32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TrackerBadge(metric, size: AppDimens.iconBadgeLarge),
+          const SizedBox(height: AppDimens.space16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Spinner sized like a card body while a tracker loads.
 class TrackerLoading extends StatelessWidget {
   final Color? color;
@@ -606,6 +742,7 @@ class TrackerLoading extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           color: color ?? context.colors.primary,
+          strokeCap: StrokeCap.round,
         ),
       ),
     );
@@ -627,40 +764,74 @@ class TrackerCardPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TrackerCard(
-      metric: metric,
-      title: title,
-      child: onRetry == null
-          ? TrackerLoading(color: metric.color)
-          : LoadErrorView(onRetry: onRetry!),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fixed-height Home tiles: same shape as a loaded tile, with Retry
+        // as the card's one button, so the error view can't overflow.
+        if (constraints.hasBoundedHeight) {
+          return TrackerCard(
+            metric: metric,
+            title: title,
+            actions: [
+              if (onRetry != null)
+                TrackerQuickAction(
+                  label: 'Retry',
+                  icon: Icons.refresh_rounded,
+                  color: metric.color,
+                  onTap: onRetry,
+                ),
+            ],
+            child: Expanded(
+              child: Center(
+                child: onRetry == null
+                    ? TrackerLoading(color: metric.color)
+                    : TrackerPrompt(
+                        title: "Couldn't load",
+                        color: metric.color,
+                      ),
+              ),
+            ),
+          );
+        }
+        return TrackerCard(
+          metric: metric,
+          title: title,
+          child: onRetry == null
+              ? TrackerLoading(color: metric.color)
+              : LoadErrorView(onRetry: onRetry!),
+        );
+      },
     );
   }
 }
 
-/// Inline prompt inside a card or page: icon, message and an optional
-/// action — empty states and permission requests.
+/// Inline prompt inside a card or page: icon, title, optional message and
+/// an optional action — empty states and permission requests.
 class TrackerPrompt extends StatelessWidget {
   final IconData? icon;
   final String title;
-  final String message;
+  final String? message;
   final Color color;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final int? maxLines;
 
   const TrackerPrompt({
     super.key,
     this.icon,
     required this.title,
-    required this.message,
+    this.message,
     required this.color,
     this.actionLabel,
     this.onAction,
+    this.maxLines = 3,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,15 +843,25 @@ class TrackerPrompt extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title, style: context.text.titleSmall),
-                  const SizedBox(height: AppDimens.space4),
                   Text(
-                    message,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
+                    title,
+                    style: context.text.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (message != null) ...[
+                    const SizedBox(height: AppDimens.space4),
+                    Text(
+                      message!,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: context.vColors.grayText,
+                      ),
+                      maxLines: maxLines,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -696,6 +877,43 @@ class TrackerPrompt extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Two half-width tracker tiles side by side at a shared height, which
+/// grows with the system text size so tile content never clips (never
+/// below the base height: icons, padding and buttons don't shrink). With
+/// large text the two stack as full-width tiles, so titles and figures
+/// stay whole instead of ending in "...".
+class TrackerTilePair extends StatelessWidget {
+  final Widget left;
+  final Widget right;
+
+  const TrackerTilePair({super.key, required this.left, required this.right});
+
+  @override
+  Widget build(BuildContext context) {
+    final height = context.textScaled(AppDimens.dashboardTileHeight);
+    if (context.isLargeText) {
+      return Column(
+        children: [
+          SizedBox(height: height, child: left),
+          const SizedBox(height: AppDimens.cardGap),
+          SizedBox(height: height, child: right),
+        ],
+      );
+    }
+    return SizedBox(
+      height: height,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: AppDimens.cardGap),
+          Expanded(child: right),
+        ],
+      ),
     );
   }
 }

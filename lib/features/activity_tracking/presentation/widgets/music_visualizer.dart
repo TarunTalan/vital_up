@@ -36,6 +36,9 @@ class _MusicVisualizerState extends State<MusicVisualizer>
   @override
   void didUpdateWidget(MusicVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Parents rebuild every second during a workout; restarting the
+    // animation each time made the bars stutter.
+    if (widget.isPlaying == oldWidget.isPlaying) return;
     if (widget.isPlaying) {
       _controller.repeat();
     } else {

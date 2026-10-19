@@ -5,7 +5,7 @@ import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 /// Where today stands against the goal. One vocabulary for every tracker,
 /// shown as a [TrackerStatusChip] on home cards and detail heroes.
 enum TrackerStatus {
-  noGoal('Set a goal', Icons.flag_outlined),
+  noGoal('Set a goal', Icons.flag_rounded),
   notLogged('Not logged', Icons.radio_button_unchecked_rounded),
   onTrack('On track', Icons.trending_up_rounded),
   behind('Behind', Icons.schedule_rounded),
@@ -105,6 +105,7 @@ class TrackerStatusChip extends StatelessWidget {
           Text(
             label ?? status.label,
             maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: context.text.labelSmall?.copyWith(
               color: c,
               fontWeight: FontWeight.w600,

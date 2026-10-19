@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 
 class ChallengesState extends Equatable {
@@ -44,10 +45,16 @@ class ChallengesCubit extends Cubit<ChallengesState> {
 
   ChallengesCubit(this._repository) : super(const ChallengesState());
 
+  @override
+  void emit(ChallengesState state) {
+    // Requests can finish after the page closed (back during a save).
+    if (!isClosed) super.emit(state);
+  }
+
   Future<void> load() async {
     emit(state.copyWith(failed: false));
     try {
-      final challenges = await _repository.getChallenges();
+      final challenges = await _repository.getChallenges().withLoadTimeout();
       if (!isClosed) emit(state.copyWith(challenges: challenges));
     } catch (e) {
       // Includes rows that don't parse, not only server refusals.
@@ -61,12 +68,14 @@ class ChallengesCubit extends Cubit<ChallengesState> {
     required ChallengeMetric metric,
     required int days,
     required List<String> friendIds,
+    String? requestId,
   }) async {
     try {
       await _repository.create(
         metric: metric,
         days: days,
         friendIds: friendIds,
+        requestId: requestId,
       );
     } on ChallengeException catch (e) {
       return e.message;

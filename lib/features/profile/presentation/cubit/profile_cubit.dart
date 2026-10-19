@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dartz/dartz.dart';
@@ -10,11 +11,32 @@ import 'profile_state.dart';
 
 class ProfileCubit extends Cubit<ProfileState> {
   final ProfileRepository _profileRepository;
+  StreamSubscription<ProfileEntity>? _changes;
 
-  ProfileCubit({
-    required ProfileRepository profileRepository,
-  })  : _profileRepository = profileRepository,
-        super(ProfileInitial());
+  ProfileCubit({required ProfileRepository profileRepository})
+    : _profileRepository = profileRepository,
+      super(ProfileInitial()) {
+    // Every screen has its own cubit; an edit saved on one (or by
+    // onboarding, weight logging, a server refresh) shows on all of them.
+    _changes = _profileRepository.changes.listen(_onChanged);
+  }
+
+  void _onChanged(ProfileEntity profile) {
+    // A save or photo change in progress reports its own result.
+    if (isClosed ||
+        state is ProfileSaving ||
+        state is ProfilePhotoUpdating ||
+        profile == currentProfile) {
+      return;
+    }
+    emit(ProfileLoaded(profile));
+  }
+
+  @override
+  Future<void> close() async {
+    await _changes?.cancel();
+    return super.close();
+  }
 
   /// Cached copy while fresh; [forceRefresh] (retry / pull-to-refresh)
   /// goes to the server.
@@ -52,7 +74,10 @@ class ProfileCubit extends Cubit<ProfileState> {
     if (profile == null || state is ProfilePhotoUpdating) return;
 
     emit(ProfilePhotoUpdating(profile));
-    final result = await _profileRepository.uploadProfilePhoto(profile.id, imageFile);
+    final result = await _profileRepository.uploadProfilePhoto(
+      profile.id,
+      imageFile,
+    );
     if (isClosed) return;
     result.fold(
       (failure) => emit(ProfilePhotoFailed(profile, failure.message)),
@@ -69,10 +94,12 @@ class ProfileCubit extends Cubit<ProfileState> {
     if (isClosed) return;
     result.fold(
       (failure) => emit(ProfilePhotoFailed(profile, failure.message)),
-      (_) => emit(ProfilePhotoUpdated(
-        profile.copyWith(clearPhotoUrl: true),
-        removed: true,
-      )),
+      (_) => emit(
+        ProfilePhotoUpdated(
+          profile.copyWith(clearPhotoUrl: true),
+          removed: true,
+        ),
+      ),
     );
   }
 
@@ -89,14 +116,11 @@ class ProfileCubit extends Cubit<ProfileState> {
     }
     if (isClosed) return;
 
-    result.fold(
-      (failure) {
-        // Report the error, then keep showing the unsaved profile.
-        emit(ProfileError(failure.message));
-        emit(ProfileLoaded(previous));
-      },
-      (_) => emit(ProfileSaveSuccess(profile)),
-    );
+    result.fold((failure) {
+      // Report the error, then keep showing the unsaved profile.
+      emit(ProfileError(failure.message));
+      emit(ProfileLoaded(previous));
+    }, (_) => emit(ProfileSaveSuccess(profile)));
   }
 
   static const _saveFailed = "Couldn't save your profile. Try again.";

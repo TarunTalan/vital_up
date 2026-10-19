@@ -102,6 +102,30 @@ class PendingWrite {
          queuedAt: DateTime.now(),
        );
 
+  /// The row an `update` / `upsert` / `delete` touches; null for RPCs.
+  String? get rowId => switch (kind) {
+    'upsert' => '$target:${values[onConflict ?? 'id']}',
+    'update' || 'delete' => '$target:${jsonEncode(match)}',
+    _ => null,
+  };
+
+  /// Whether this queued write sets any field [other] also sets on the
+  /// same row (sending them out of order would leave an old value).
+  bool overlaps(PendingWrite other) =>
+      userId == other.userId &&
+      rowId != null &&
+      _rowKey == other._rowKey &&
+      values.keys.any(other.values.containsKey);
+
+  /// Row identity across kinds: an update matched by id and an upsert of
+  /// that id are the same row.
+  String? get _rowKey {
+    final id = kind == 'upsert'
+        ? values[onConflict ?? 'id']
+        : (match.length == 1 && match.containsKey('id') ? match['id'] : null);
+    return id == null ? rowId : '$target:id=$id';
+  }
+
   PendingWrite _copy({Map<String, dynamic>? values, int? attempts}) =>
       PendingWrite(
         kind: kind,
@@ -163,6 +187,15 @@ class PendingWrite {
   );
 }
 
+/// The server is down or rate limiting; queued writes wait for a retry.
+class ServerUnavailable implements Exception {
+  final Object cause;
+  const ServerUnavailable(this.cause);
+
+  @override
+  String toString() => 'ServerUnavailable: $cause';
+}
+
 /// Durable outbox for server writes made while offline. Flushed in order by
 /// [SyncService] whenever it runs (reconnect, resume, after local changes).
 class PendingWrites {
@@ -202,9 +235,7 @@ class PendingWrites {
     }
   }
 
-  List<PendingWrite> _all() => [
-    for (final raw in _raw()) ?_decode(raw),
-  ];
+  List<PendingWrite> _all() => [for (final raw in _raw()) ?_decode(raw)];
 
   Future<void> _save(List<PendingWrite> writes) {
     var list = writes;
@@ -214,14 +245,24 @@ class PendingWrites {
       );
       list = list.sublist(list.length - maxQueued);
     }
-    return _prefs.setStringList(
-      _storageKey,
-      [for (final w in list) jsonEncode(w.toJson())],
-    );
+    return _prefs.setStringList(_storageKey, [
+      for (final w in list) jsonEncode(w.toJson()),
+    ]);
   }
+
+  /// Drops every queued write (sign-out: the account's queued health and
+  /// profile edits must not stay on a shared phone, or be sent over newer
+  /// values if that account signs in here again).
+  Future<void> clear() => _prefs.remove(_storageKey);
 
   /// Writes queued for [userId].
   int countFor(String userId) => _all().where((w) => w.userId == userId).length;
+
+  /// Whether a write to one of [targets] (tables or RPCs) is still queued
+  /// for [userId]. Until it's sent, the server copy is older than the
+  /// local edit, so a refresh must not overwrite the local one with it.
+  bool hasQueuedFor(String userId, Set<String> targets) =>
+      _all().any((w) => w.userId == userId && targets.contains(w.target));
 
   /// Queues [write] (coalescing with a queued one of the same key) and asks
   /// for a sync.
@@ -235,11 +276,31 @@ class PendingWrites {
     } else {
       final old = all[i];
       final merges =
-          old.kind == write.kind && (write.kind == 'update' || write.kind == 'upsert');
+          old.kind == write.kind &&
+          (write.kind == 'update' || write.kind == 'upsert');
       // Keep the original position so writes stay in order.
       all[i] = merges
           ? old._copy(values: {...old.values, ...write.values}, attempts: 0)
           : write;
+      // Writes queued after that position for the same row still carry
+      // the older values of these fields: give them the new ones, or they
+      // would be sent last and win.
+      if (write.kind == 'update' || write.kind == 'upsert') {
+        for (var j = i + 1; j < all.length; j++) {
+          final later = all[j];
+          if ((later.kind != 'update' && later.kind != 'upsert') ||
+              !later.overlaps(write)) {
+            continue;
+          }
+          all[j] = later._copy(
+            values: {
+              ...later.values,
+              for (final e in write.values.entries)
+                if (later.values.containsKey(e.key)) e.key: e.value,
+            },
+          );
+        }
+      }
     }
     await _save(all);
     _hooks?.schedule();
@@ -250,9 +311,12 @@ class PendingWrites {
   ///
   /// Returns true if it reached the server.
   Future<bool> sendOrQueue(SupabaseClient client, PendingWrite write) async {
-    // An older queued write for the same key must go first, so queue behind it.
+    // An older queued write for the same key, or one setting the same
+    // fields of the same row, must go first: queue behind it.
     final queuedAhead = _all().any(
-      (w) => w.key == write.key && w.userId == write.userId,
+      (w) =>
+          (w.key == write.key && w.userId == write.userId) ||
+          w.overlaps(write),
     );
     if (!_connectivity.hasNetwork || queuedAhead) {
       await enqueue(write);
@@ -263,6 +327,12 @@ class PendingWrites {
       _connectivity.reportSuccess();
       return true;
     } catch (e) {
+      // An outage or an expired session is as temporary as being offline:
+      // keep the edit (the flush retries once the session is refreshed).
+      if (_isServerTrouble(e) || isSessionError(e)) {
+        await enqueue(write);
+        return false;
+      }
       if (!isOfflineError(e)) rethrow;
       _connectivity.reportFailure();
       await enqueue(write);
@@ -288,6 +358,7 @@ class PendingWrites {
     // Stored entry -> its replacement after this flush (null = remove it).
     final outcome = <String, String?>{};
     Object? offline;
+    Object? unavailable;
     var stop = false;
     for (final raw in snapshot) {
       final write = _decode(raw);
@@ -310,8 +381,15 @@ class PendingWrites {
           stop = true;
           continue;
         }
-        if (_isSessionError(e)) {
+        if (isSessionError(e)) {
           // Expired session: not the write's fault, try again later.
+          stop = true;
+          continue;
+        }
+        if (_isServerTrouble(e)) {
+          // Outage or rate limit: not the write's fault either. Keep it
+          // (no attempt used) and let the sync back off.
+          unavailable = e;
           stop = true;
           continue;
         }
@@ -324,7 +402,9 @@ class PendingWrites {
           outcome[raw] = null;
         } else {
           debugPrint('PendingWrites: ${write.key} failed, will retry: $e');
-          outcome[raw] = jsonEncode(write._copy(attempts: write.attempts + 1).toJson());
+          outcome[raw] = jsonEncode(
+            write._copy(attempts: write.attempts + 1).toJson(),
+          );
         }
       }
     }
@@ -344,9 +424,20 @@ class PendingWrites {
       await _prefs.setStringList(_storageKey, next);
     }
     if (offline != null) throw offline;
+    if (unavailable != null) throw ServerUnavailable(unavailable);
   }
 
-  static bool _isSessionError(Object e) {
+  /// 5xx, 429 and PostgREST's database-connection errors (PGRST000-003).
+  static bool _isServerTrouble(Object e) {
+    if (e is! PostgrestException) return false;
+    final code = e.code ?? '';
+    if (code == '429' || code.startsWith('PGRST00')) return true;
+    final status = int.tryParse(code);
+    return status != null && status >= 500 && status < 600;
+  }
+
+  /// The sign-in token expired or is invalid: not the request's fault.
+  static bool isSessionError(Object e) {
     if (e is AuthException) return true;
     if (e is PostgrestException) {
       return const {'PGRST301', 'PGRST302', 'PGRST303', '401'}.contains(e.code);

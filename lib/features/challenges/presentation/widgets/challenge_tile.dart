@@ -12,6 +12,9 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/name_with_you_tag.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 IconData challengeMetricIcon(ChallengeMetric m) => switch (m) {
   ChallengeMetric.activeMinutes => Icons.timer_rounded,
@@ -94,8 +97,6 @@ class ChallengeTile extends StatelessWidget {
                   children: [
                     Text(
                       challengeTitle(c),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: context.text.titleSmall?.copyWith(
                         color: context.colors.onSurface,
                       ),
@@ -103,8 +104,6 @@ class ChallengeTile extends StatelessWidget {
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       challengeSubtitle(c, now),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
                   ],
@@ -121,14 +120,29 @@ class ChallengeTile extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '#${c.myRank}',
-                      style: context.text.titleMedium?.copyWith(
-                        color: c.myRank == 1
-                            ? AppColors.rankGold
-                            : context.colors.onSurface,
+                    // Top three get the medal alone; the number would
+                    // repeat it.
+                    if (c.myRank! <= 3)
+                      Semantics(
+                        label: 'Rank ${c.myRank}',
+                        child: GameIcon(
+                          GamificationIcons.leaderboardRank(c.myRank!)!,
+                          fallback: Icons.military_tech_rounded,
+                          size: AppDimens.iconLg,
+                          color: c.myRank == 1
+                              ? AppColors.rankGold
+                              : c.myRank == 2
+                              ? AppColors.rankSilver
+                              : AppColors.rankBronze,
+                        ),
+                      )
+                    else
+                      Text(
+                        '#${c.myRank}',
+                        style: context.text.titleMedium?.copyWith(
+                          color: context.colors.onSurface,
+                        ),
                       ),
-                    ),
                     Text(
                       c.metric.format(c.myScore ?? 0),
                       style: context.text.bodySmall?.copyWith(color: grey),
@@ -245,91 +259,111 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
           future: _standings,
           builder: (context, snap) {
             final standings = snap.data;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  challengeTitle(challenge),
-                  style: context.text.headlineSmall,
-                ),
-                const SizedBox(height: AppDimens.space4),
-                Text(
-                  challengeSubtitle(challenge, DateTime.now()),
-                  style: context.text.bodySmall?.copyWith(color: grey),
-                ),
-                const SizedBox(height: AppDimens.space16),
-                if (snap.hasError)
-                  LoadErrorView(
-                    onRetry: () => setState(() {
-                      _standings = _fetch();
-                    }),
-                  )
-                else if (standings == null)
-                  const Padding(
-                    padding: EdgeInsets.all(AppDimens.space24),
-                    child: Center(child: VitalUpLoader()),
-                  )
-                else
-                  for (final s in standings)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppDimens.space8,
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: AppDimens.rankColumnWidth,
-                            child: Text(
-                              s.rank == null ? '–' : '#${s.rank}',
-                              style: context.text.titleSmall,
+            // Up to 10 participants plus the Leave button: scroll on short
+            // phones and with large text.
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    challengeTitle(challenge),
+                    style: context.text.headlineSmall,
+                  ),
+                  const SizedBox(height: AppDimens.space4),
+                  Text(
+                    challengeSubtitle(challenge, DateTime.now()),
+                    style: context.text.bodySmall?.copyWith(color: grey),
+                  ),
+                  const SizedBox(height: AppDimens.space16),
+                  if (snap.hasError)
+                    LoadErrorView(
+                      onRetry: () => setState(() {
+                        _standings = _fetch();
+                      }),
+                    )
+                  else if (standings == null)
+                    const Padding(
+                      padding: EdgeInsets.all(AppDimens.space24),
+                      child: Center(child: VitalUpLoader()),
+                    )
+                  else
+                    for (final s in standings)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppDimens.space8,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: AppDimens.rankColumnWidth,
+                              margin: const EdgeInsets.only(
+                                right: AppDimens.space8,
+                              ),
+                              alignment: AlignmentDirectional.centerStart,
+                              child: s.rank != null && s.rank! <= 3
+                                  ? GameIcon(
+                                      GamificationIcons.leaderboardRank(
+                                        s.rank!,
+                                      )!,
+                                      fallback: Icons.military_tech_rounded,
+                                      size: AppDimens.iconLg,
+                                      color: s.rank == 1
+                                          ? AppColors.rankGold
+                                          : s.rank == 2
+                                          ? AppColors.rankSilver
+                                          : AppColors.rankBronze,
+                                    )
+                                  : FitText(
+                                      s.rank == null ? '–' : '#${s.rank}',
+                                      textAlign: TextAlign.center,
+                                      style: context.text.titleSmall,
+                                    ),
                             ),
-                          ),
-                          UserAvatar(username: s.username, url: s.avatarUrl),
-                          const SizedBox(width: AppDimens.space12),
-                          Expanded(
-                            child: Text(
-                              s.isMe
-                                  ? '@${s.username} (you)'
-                                  : '@${s.username}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.text.bodyMedium?.copyWith(
-                                fontWeight: s.isMe ? FontWeight.w600 : null,
+                            UserAvatar(username: s.username, url: s.avatarUrl),
+                            const SizedBox(width: AppDimens.space12),
+                            Expanded(
+                              child: NameWithYouTag(
+                                name: '@${s.username}',
+                                isMe: s.isMe,
+                                style: context.text.bodyMedium?.copyWith(
+                                  fontWeight: s.isMe ? FontWeight.w600 : null,
+                                ),
                               ),
                             ),
-                          ),
-                          Text(
-                            s.status == ParticipantStatus.invited
-                                ? 'Invited'
-                                : challenge.metric.format(s.score ?? 0),
-                            style: context.text.titleSmall?.copyWith(
-                              color: s.status == ParticipantStatus.invited
-                                  ? grey
-                                  : null,
+                            const SizedBox(width: AppDimens.space8),
+                            Text(
+                              s.status == ParticipantStatus.invited
+                                  ? 'Invited'
+                                  : challenge.metric.format(s.score ?? 0),
+                              style: context.text.titleSmall?.copyWith(
+                                color: s.status == ParticipantStatus.invited
+                                    ? grey
+                                    : null,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                  if (canLeave) ...[
+                    const SizedBox(height: AppDimens.space16),
+                    BlocSelector<ChallengesCubit, ChallengesState, bool>(
+                      selector: (state) => state.busy.contains(challenge.id),
+                      builder: (context, busy) => AppSecondaryButton(
+                        label: 'Leave challenge',
+                        leadingIcon: Icon(
+                          Icons.logout_rounded,
+                          size: AppDimens.iconSm,
+                          color: context.colors.error,
+                        ),
+                        contentColor: context.colors.error,
+                        isLoading: busy,
+                        onTap: _leave,
                       ),
                     ),
-                if (canLeave) ...[
-                  const SizedBox(height: AppDimens.space16),
-                  BlocSelector<ChallengesCubit, ChallengesState, bool>(
-                    selector: (state) => state.busy.contains(challenge.id),
-                    builder: (context, busy) => AppSecondaryButton(
-                      label: 'Leave challenge',
-                      leadingIcon: Icon(
-                        Icons.logout_rounded,
-                        size: AppDimens.iconSm,
-                        color: context.colors.error,
-                      ),
-                      contentColor: context.colors.error,
-                      isLoading: busy,
-                      onTap: _leave,
-                    ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             );
           },
         ),

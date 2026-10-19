@@ -37,7 +37,12 @@ These tokens are implemented in:
 | success tint | `rgba(76,175,80,.2)` |
 | hairline (toast) | `#D8D8D8` |
 
-## Typography (SF Pro Rounded)
+## Typography (Nunito)
+
+The app font is Nunito (SIL OFL), which replaced SF Pro Rounded because
+Apple's licence only allows SF fonts on Apple platforms. Switch the Figma
+text styles to Nunito with the same sizes and weights. Captions stay
+JetBrains Mono Medium.
 | Figma style | Size / weight | TextTheme slot |
 |---|---|---|
 | Large Title | 36 / 600 | `displayLarge` |

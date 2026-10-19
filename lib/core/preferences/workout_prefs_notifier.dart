@@ -7,12 +7,24 @@ const _kCountdownKey = 'workout_countdown';
 const _kTargetTypeKey = 'workout_target_type'; // 'none' | 'distance' | 'calories'
 const _kTargetValueKey = 'workout_target_value';
 const _kSelectedMetricsKey = 'workout_selected_metrics';
-const _kDailyTargetEnabledKey = 'workout_daily_target_enabled';
-const _kDailyTargetTypeKey = 'workout_daily_target_type';
-const _kDailyTargetValueKey = 'workout_daily_target_value';
+// The workout timer's own target: [WorkoutTargetType.duration] (minutes) or
+// calories. Kept apart so GPS targets are untouched.
+const _kTimerTargetTypeKey = 'workout_timer_target_type';
+const _kTimerTargetValueKey = 'workout_timer_target_value';
 
-/// Type of workout goal the user has set.
-enum WorkoutTargetType { none, distance, calories }
+/// Settings that were replaced: the activity now follows the activity
+/// goals, and their daily distance / calories goal is the workout target.
+/// Removed from prefs on the next load.
+const _kRetiredKeys = [
+  'workout_daily_target_enabled',
+  'workout_daily_target_type',
+  'workout_daily_target_value',
+  'workout_default_activity_type',
+];
+
+/// Type of workout goal the user has set. GPS workouts use distance or
+/// calories; workouts without a route use duration (minutes) or calories.
+enum WorkoutTargetType { none, distance, calories, duration }
 
 extension WorkoutTargetTypeLabel on WorkoutTargetType {
   String get label {
@@ -20,6 +32,7 @@ extension WorkoutTargetTypeLabel on WorkoutTargetType {
       WorkoutTargetType.none => 'None',
       WorkoutTargetType.distance => 'Distance',
       WorkoutTargetType.calories => 'Calories',
+      WorkoutTargetType.duration => 'Time',
     };
   }
 }
@@ -53,6 +66,18 @@ enum StatMetric {
   }
 }
 
+/// The live stats a workout shows until the user picks their own layout:
+/// steps on foot, pace on a run, speed on a ride.
+List<StatMetric> defaultStatsFor(ActivityType type) => [
+  StatMetric.distance,
+  switch (type) {
+    ActivityType.run => StatMetric.avgPace,
+    ActivityType.cycle => StatMetric.currentSpeed,
+    _ => StatMetric.steps,
+  },
+  StatMetric.calories,
+];
+
 /// Holds all workout preference toggles, active workout target, custom metrics layout, and music settings.
 /// All values persist in [SharedPreferences].
 class WorkoutPrefs {
@@ -60,38 +85,28 @@ class WorkoutPrefs {
   final int countdownDurationSeconds;
   final WorkoutTargetType targetType;
   final double targetValue; // km or kcal depending on targetType
+  /// The user's own layout; empty until they save one, and the workout
+  /// shows [defaultStatsFor] its type instead.
   final List<StatMetric> selectedMetrics;
   final String backgroundAudioTrack; // 'None', 'Story: It\'s Possible', 'Lo-Fi Jogging Beats', 'Synthwave Cardio Energy'
   final String backgroundAudioQueueType; // 'curated', 'local', 'favorite'
-  final ActivityType defaultActivityType;
   final String preferredPlayerPackage; // 'builtIn' or package name
 
-  /// Whether a daily target is enabled (auto-applies to every new session).
-  final bool dailyTargetEnabled;
-
-  /// The daily target type (distance or calories).
-  final WorkoutTargetType dailyTargetType;
-
-  /// The daily target value in km or kcal.
-  final double dailyTargetValue;
+  /// The workout timer's target (duration in minutes, or kcal).
+  final WorkoutTargetType timerTargetType;
+  final double timerTargetValue;
 
   const WorkoutPrefs({
     this.voiceCoachEnabled = true,
     this.countdownDurationSeconds = 3,
     this.targetType = WorkoutTargetType.none,
     this.targetValue = 0.0,
-    this.selectedMetrics = const [
-      StatMetric.distance,
-      StatMetric.calories,
-      StatMetric.avgPace,
-    ],
+    this.selectedMetrics = const [],
     this.backgroundAudioTrack = 'None',
     this.backgroundAudioQueueType = 'stories',
-    this.defaultActivityType = ActivityType.walk,
     this.preferredPlayerPackage = 'builtIn',
-    this.dailyTargetEnabled = false,
-    this.dailyTargetType = WorkoutTargetType.none,
-    this.dailyTargetValue = 0.0,
+    this.timerTargetType = WorkoutTargetType.none,
+    this.timerTargetValue = 0.0,
   });
 
   WorkoutPrefs copyWith({
@@ -102,11 +117,9 @@ class WorkoutPrefs {
     List<StatMetric>? selectedMetrics,
     String? backgroundAudioTrack,
     String? backgroundAudioQueueType,
-    ActivityType? defaultActivityType,
     String? preferredPlayerPackage,
-    bool? dailyTargetEnabled,
-    WorkoutTargetType? dailyTargetType,
-    double? dailyTargetValue,
+    WorkoutTargetType? timerTargetType,
+    double? timerTargetValue,
   }) {
     return WorkoutPrefs(
       voiceCoachEnabled: voiceCoachEnabled ?? this.voiceCoachEnabled,
@@ -116,11 +129,9 @@ class WorkoutPrefs {
       selectedMetrics: selectedMetrics ?? this.selectedMetrics,
       backgroundAudioTrack: backgroundAudioTrack ?? this.backgroundAudioTrack,
       backgroundAudioQueueType: backgroundAudioQueueType ?? this.backgroundAudioQueueType,
-      defaultActivityType: defaultActivityType ?? this.defaultActivityType,
       preferredPlayerPackage: preferredPlayerPackage ?? this.preferredPlayerPackage,
-      dailyTargetEnabled: dailyTargetEnabled ?? this.dailyTargetEnabled,
-      dailyTargetType: dailyTargetType ?? this.dailyTargetType,
-      dailyTargetValue: dailyTargetValue ?? this.dailyTargetValue,
+      timerTargetType: timerTargetType ?? this.timerTargetType,
+      timerTargetValue: timerTargetValue ?? this.timerTargetValue,
     );
   }
 }
@@ -139,23 +150,16 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     );
 
     final savedMetrics = prefs.getStringList(_kSelectedMetricsKey);
-    List<StatMetric> metrics = const [
-      StatMetric.distance,
-      StatMetric.calories,
-      StatMetric.avgPace,
-    ];
+    List<StatMetric> metrics = const [];
     if (savedMetrics != null) {
       metrics = savedMetrics
           .map((m) => StatMetric.values.firstWhere((e) => e.name == m, orElse: () => StatMetric.distance))
           .toList();
     }
 
-    final defaultActivityTypeName =
-        prefs.getString('workout_default_activity_type') ?? ActivityType.walk.name;
-    final defaultActivityType = ActivityType.values.firstWhere(
-      (e) => e.name == defaultActivityTypeName,
-      orElse: () => ActivityType.walk,
-    );
+    for (final key in _kRetiredKeys) {
+      if (prefs.containsKey(key)) await prefs.remove(key);
+    }
 
     final int defaultCountdown;
     if (prefs.containsKey(_kCountdownKey)) {
@@ -164,16 +168,6 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
       defaultCountdown = 3;
     }
     final countdownDuration = prefs.getInt('workout_countdown_duration') ?? defaultCountdown;
-
-    // Daily target fields
-    final dailyTargetEnabled = prefs.getBool(_kDailyTargetEnabledKey) ?? false;
-    final dailyTargetTypeName =
-        prefs.getString(_kDailyTargetTypeKey) ?? WorkoutTargetType.none.name;
-    final dailyTargetType = WorkoutTargetType.values.firstWhere(
-      (e) => e.name == dailyTargetTypeName,
-      orElse: () => WorkoutTargetType.none,
-    );
-    final dailyTargetValue = prefs.getDouble(_kDailyTargetValueKey) ?? 0.0;
 
     value = WorkoutPrefs(
       voiceCoachEnabled: prefs.getBool(_kVoiceCoachKey) ?? true,
@@ -185,11 +179,14 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
       backgroundAudioQueueType: (prefs.getString('workout_audio_queue_type') == 'curated')
           ? 'stories'
           : (prefs.getString('workout_audio_queue_type') ?? 'stories'),
-      defaultActivityType: defaultActivityType,
       preferredPlayerPackage: prefs.getString('workout_preferred_player_package') ?? 'builtIn',
-      dailyTargetEnabled: dailyTargetEnabled,
-      dailyTargetType: dailyTargetType,
-      dailyTargetValue: dailyTargetValue,
+      timerTargetType: WorkoutTargetType.values.firstWhere(
+        (e) =>
+            e.name == prefs.getString(_kTimerTargetTypeKey) &&
+            (e == WorkoutTargetType.duration || e == WorkoutTargetType.calories),
+        orElse: () => WorkoutTargetType.none,
+      ),
+      timerTargetValue: prefs.getDouble(_kTimerTargetValueKey) ?? 0.0,
     );
   }
 
@@ -238,52 +235,31 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     await prefs.setString('workout_audio_queue_type', resolvedQueueType);
   }
 
-  Future<void> setDefaultActivityType(ActivityType type) async {
-    value = value.copyWith(defaultActivityType: type);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('workout_default_activity_type', type.name);
-  }
-
   Future<void> setPreferredPlayerPackage(String package) async {
     value = value.copyWith(preferredPlayerPackage: package);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('workout_preferred_player_package', package);
   }
 
-  /// Sets a persistent daily target that auto-applies to every new session.
-  Future<void> setDailyTarget(WorkoutTargetType type, double targetValue) async {
-    value = value.copyWith(
-      dailyTargetEnabled: true,
-      dailyTargetType: type,
-      dailyTargetValue: targetValue,
-    );
+  /// The workout timer's target: [WorkoutTargetType.duration] (minutes) or
+  /// calories.
+  Future<void> setTimerTarget(WorkoutTargetType type, double targetValue) async {
+    value = value.copyWith(timerTargetType: type, timerTargetValue: targetValue);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kDailyTargetEnabledKey, true);
-    await prefs.setString(_kDailyTargetTypeKey, type.name);
-    await prefs.setDouble(_kDailyTargetValueKey, targetValue);
+    await prefs.setString(_kTimerTargetTypeKey, type.name);
+    await prefs.setDouble(_kTimerTargetValueKey, targetValue);
   }
 
-  /// Disables the daily target.
-  Future<void> clearDailyTarget() async {
+  /// Clears the workout timer's target (after a workout is saved or
+  /// discarded, or from settings).
+  Future<void> clearTimerTarget() async {
     value = value.copyWith(
-      dailyTargetEnabled: false,
-      dailyTargetType: WorkoutTargetType.none,
-      dailyTargetValue: 0.0,
+      timerTargetType: WorkoutTargetType.none,
+      timerTargetValue: 0.0,
     );
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kDailyTargetEnabledKey, false);
-    await prefs.setString(_kDailyTargetTypeKey, WorkoutTargetType.none.name);
-    await prefs.setDouble(_kDailyTargetValueKey, 0.0);
-  }
-
-  /// If a daily target is enabled, copies it into the per-session target fields.
-  /// Call this at session start.
-  Future<void> applyDailyTargetIfEnabled() async {
-    if (value.dailyTargetEnabled &&
-        value.dailyTargetType != WorkoutTargetType.none &&
-        value.dailyTargetValue > 0) {
-      await setTarget(value.dailyTargetType, value.dailyTargetValue);
-    }
+    await prefs.remove(_kTimerTargetTypeKey);
+    await prefs.remove(_kTimerTargetValueKey);
   }
 
   /// Clears the per-session target. Call after a session is saved.

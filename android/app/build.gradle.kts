@@ -13,14 +13,16 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-// Firebase (push notifications). Applied only once android/app/google-services.json
+// Firebase (push, analytics, Crashlytics). Applied only once android/app/google-services.json
 // has been downloaded from the Firebase console, so the app still builds before then.
+// The Crashlytics plugin uploads the R8 mapping file so native stack traces are readable.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 android {
-    namespace = "com.tarun_siddhi.vital_up"
+    namespace = "com.vitalup.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -32,11 +34,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.tarun_siddhi.vital_up"
+        applicationId = "com.vitalup.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
-        targetSdk = 35
+        // Play requires API 36 for new apps and updates from 31 Aug 2026.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -52,6 +55,8 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (keystorePropertiesFile.exists() && keystoreProperties["storeFile"] != null) {
                 signingConfigs.getByName("release")
             } else {
@@ -61,6 +66,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Bundles native symbol tables in the AAB so Play Console can
+            // symbolicate native crashes and ANRs.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }
@@ -77,4 +87,17 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// ML Kit through Google Play Services instead of bundling the OCR and
+// barcode models (about 7 MB less per device). Same Java API; Play Services
+// downloads the models at install (see com.google.mlkit.vision.DEPENDENCIES
+// in the manifest).
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.mlkit:text-recognition"))
+            .using(module("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1"))
+        substitute(module("com.google.mlkit:barcode-scanning"))
+            .using(module("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1"))
+    }
 }

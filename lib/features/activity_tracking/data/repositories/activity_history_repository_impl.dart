@@ -18,8 +18,11 @@ class ActivityHistoryRepositoryImpl implements ActivityHistoryRepository {
   });
 
   @override
-  Future<List<ActivitySession>> getSessions() {
-    return activityRepository.getSessions();
+  Future<List<ActivitySession>> getSessions({
+    DateTime? since,
+    bool withRoutes = false,
+  }) {
+    return activityRepository.getSessions(since: since, withRoutes: withRoutes);
   }
 
   @override

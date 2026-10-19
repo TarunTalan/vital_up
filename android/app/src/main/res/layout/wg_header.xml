@@ -6,11 +6,11 @@
     android:gravity="center_vertical"
     android:orientation="horizontal">
     <TextView android:id="@+id/wg_title" android:layout_width="0dp" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="13dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="13dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="Today" android:layout_weight="1"/>
     <TextView android:id="@+id/wg_updated" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" />
     <ImageView android:id="@+id/wg_refresh" android:layout_width="24dp" android:layout_height="24dp"

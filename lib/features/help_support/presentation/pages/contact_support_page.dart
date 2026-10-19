@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/services/email_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -45,7 +48,7 @@ void openContactSupport(
 }
 
 /// Support ticket form — category, subject, description and optional
-/// diagnostics, sent through the user's email client.
+/// diagnostics, sent to support@vitalup.live with confirmation to the user.
 class ContactSupportPage extends StatefulWidget {
   final ContactSupportArgs args;
 
@@ -57,17 +60,29 @@ class ContactSupportPage extends StatefulWidget {
 
 class _ContactSupportPageState extends State<ContactSupportPage> {
   late SupportCategory _selectedCategory;
+  late final TextEditingController _emailController;
+  late final TextEditingController _nameController;
   late final TextEditingController _subjectController;
   late final TextEditingController _descriptionController;
   bool _includeDiagnostics = true;
   bool _isSubmitting = false;
   String? _appVersion;
+  String? _emailError;
   String? _descriptionError;
 
   @override
   void initState() {
     super.initState();
+    final user = Supabase.instance.client.auth.currentUser;
+    final initialEmail = user?.email ?? '';
+    final initialName = (user?.userMetadata?['full_name'] as String?) ??
+        (user?.userMetadata?['name'] as String?) ??
+        (user?.userMetadata?['username'] as String?) ??
+        '';
+
     _selectedCategory = widget.args.initialCategory;
+    _emailController = TextEditingController(text: initialEmail);
+    _nameController = TextEditingController(text: initialName);
     _subjectController = TextEditingController(
       text: widget.args.initialSubject,
     );
@@ -92,13 +107,31 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
 
   @override
   void dispose() {
+    _emailController.dispose();
+    _nameController.dispose();
     _subjectController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
+  bool _isValidEmail(String email) {
+    final trimmed = email.trim();
+    return trimmed.isNotEmpty &&
+        trimmed.contains('@') &&
+        trimmed.contains('.') &&
+        !trimmed.startsWith('@') &&
+        !trimmed.endsWith('@');
+  }
+
   Future<void> _submitTicket() async {
     if (_isSubmitting) return;
+
+    final email = _emailController.text.trim();
+    if (!_isValidEmail(email)) {
+      setState(() => _emailError = 'Please enter a valid email address.');
+      return;
+    }
+
     final cleanSubject = SupportTicketRules.cleanSubject(_subjectController.text);
     final subject =
         cleanSubject.isNotEmpty ? cleanSubject : _selectedCategory.label;
@@ -115,19 +148,55 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
 
+    final user = Supabase.instance.client.auth.currentUser;
+    final userName = _nameController.text.trim();
+    final appVer = _appVersion ?? '1.0.0 (1)';
+    final platform = Platform.operatingSystem;
+    final device = Platform.operatingSystemVersion;
+
+    try {
+      final emailService = sl<EmailService>();
+      final dispatched = await emailService.submitSupportTicket(
+        userEmail: email,
+        userName: userName.isNotEmpty ? userName : null,
+        userId: user?.id,
+        category: _selectedCategory.label,
+        subject: subject,
+        description: description,
+        includeDiagnostics: _includeDiagnostics,
+        appVersion: appVer,
+        osPlatform: platform,
+        deviceModel: device,
+      );
+
+      if (dispatched) {
+        if (mounted) {
+          showSuccessSnackBar(
+            context,
+            'Ticket sent. We emailed you a confirmation.',
+          );
+          context.pop();
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('Autonomous email submission error: $e');
+    }
+
+    // Fallback if Edge function or offline network failed
     final ticket = SupportTicket(
       category: _selectedCategory,
       subject: subject,
       description: description,
+      userEmail: email,
       includeDiagnostics: _includeDiagnostics,
-      appVersion: _appVersion ?? '1.0.0 (1)',
-      osPlatform: Platform.operatingSystem,
-      deviceModel: Platform.operatingSystemVersion,
+      appVersion: appVer,
+      osPlatform: platform,
+      deviceModel: device,
     );
 
     final emailSubject = '[VitalUp ${_selectedCategory.label}] $subject';
     final emailBody = ticket.toFormattedEmailBody();
-
     final emailUri = supportMailUri(subject: emailSubject, body: emailBody);
 
     try {
@@ -139,7 +208,10 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       if (!launched) {
         await _copyTicket(emailBody);
       } else if (mounted) {
-        showSuccessSnackBar(context, 'Your email app is open. Send it from there.');
+        showSuccessSnackBar(
+          context,
+          'Your email app is open. Tap send to complete submission.',
+        );
         context.pop();
       }
     } catch (e) {
@@ -150,17 +222,17 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     }
   }
 
-  /// No mail app: copy the ticket so it can be pasted into any email.
+  /// No mail app / offline: copy ticket so details are preserved.
   Future<void> _copyTicket(String body) async {
     try {
       await Clipboard.setData(ClipboardData(text: body));
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
+      if (mounted) showErrorSnackBar(context, 'Unable to send. Email $kSupportEmail');
       return;
     }
     if (mounted) {
-      showSuccessSnackBar(context, 'Details copied. Paste them into an email to us.');
+      showSuccessSnackBar(context, 'Ticket copied. Paste it into an email to support.');
       context.pop();
     }
   }
@@ -195,7 +267,7 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           AppPrimaryButton(
-            label: 'Send Support Email',
+            label: 'Submit Support Ticket',
             leadingIcon: const Icon(Icons.send_rounded),
             isLoading: _isSubmitting,
             onTap: _submitTicket,
@@ -234,6 +306,33 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // User Contact Info
+          AppTextField(
+            controller: _emailController,
+            label: 'Your Contact Email',
+            hint: 'e.g., name@example.com',
+            prefixIcon: Icons.email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            error: _emailError,
+            onChanged: (_) {
+              if (_emailError != null) {
+                setState(() => _emailError = null);
+              }
+            },
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: AppDimens.space16),
+
+          AppTextField(
+            controller: _nameController,
+            label: 'Your Name (optional)',
+            hint: 'e.g., Alex Johnson',
+            prefixIcon: Icons.person_outline_rounded,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: AppDimens.space16),
+
           // Category Dropdown
           AppDropdownField<SupportCategory>(
             label: 'Issue category',

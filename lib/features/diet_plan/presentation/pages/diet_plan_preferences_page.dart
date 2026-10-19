@@ -80,7 +80,7 @@ class _DietPlanPreferencesPageState extends State<DietPlanPreferencesPage> {
               children: [
                 IconButton(
                   onPressed: _mealsPerDay > 2 ? () => setState(() => _mealsPerDay--) : null,
-                  icon: const Icon(Icons.remove_circle_outline),
+                  icon: const Icon(Icons.remove_circle_outline_rounded),
                   iconSize: AppDimens.iconXl,
                   color: colors.primary,
                 ),
@@ -92,7 +92,7 @@ class _DietPlanPreferencesPageState extends State<DietPlanPreferencesPage> {
                 const SizedBox(width: AppDimens.space32),
                 IconButton(
                   onPressed: _mealsPerDay < 6 ? () => setState(() => _mealsPerDay++) : null,
-                  icon: const Icon(Icons.add_circle_outline),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
                   iconSize: AppDimens.iconXl,
                   color: colors.primary,
                 ),

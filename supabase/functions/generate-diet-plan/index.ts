@@ -11,7 +11,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
-import { consumeDailyQuota, dailyLimit, refundDailyQuota } from "../_shared/quota.ts";
+import { consumeDailyQuota, dailyLimit, quotaUpgradeInfo, refundDailyQuota } from "../_shared/quota.ts";
 import {
   bearerToken,
   clampNumber,
@@ -218,10 +218,19 @@ serve(async (req) => {
     const baseMeals = tweak ? parseBaseMeals(body.basePlan) : [];
 
     // Per-user daily fair-use cap: all users share one free-tier LLM quota.
-    const quota = await consumeDailyQuota(client, user.id, "diet_plan", dailyLimit("DIET_PLAN_DAILY_LIMIT", 15));
+    const quota = await consumeDailyQuota(
+      client,
+      user.id,
+      "diet_plan",
+      dailyLimit("DIET_PLAN_DAILY_LIMIT", 3),
+      dailyLimit("PRO_DIET_PLAN_DAILY_LIMIT", 20),
+    );
     if (!quota.allowed) {
       console.timeEnd("TotalExecution");
-      return json({ error: "Daily diet plan limit reached", code: "daily_limit", limit: quota.limit }, 429);
+      return json(
+        { error: "Daily diet plan limit reached", code: "daily_limit", limit: quota.limit, ...quotaUpgradeInfo(quota) },
+        429,
+      );
     }
     const refundQuota = () => refundDailyQuota(client, user.id, "diet_plan");
 

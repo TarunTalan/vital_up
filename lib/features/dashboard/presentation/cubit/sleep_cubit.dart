@@ -50,11 +50,8 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
   /// Health Connect, granted usage access, or woken up since.
   bool get _staleOnResume => switch (state) {
     SleepLoading() || SleepInitial() => false,
-    SleepLoadedAuto(:final session) ||
-    SleepLoadedManual(:final session) => !isSameDay(
-      session.wakeTime,
-      DateTime.now(),
-    ),
+    SleepLoadedAuto(:final session) || SleepLoadedManual(:final session) =>
+      !isSameDay(session.wakeTime, DateTime.now()),
     _ => true,
   };
 
@@ -67,6 +64,9 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
   }) async {
     if (!silent) emit(SleepLoading());
     try {
+      // Estimates left unreviewed are saved first, so the card and trends
+      // show them as logged nights.
+      await _service.saveUnreviewedEstimates();
       final session = await _service.getSleepDataForLastNight(
         requestPermission: requestPermission,
       );
@@ -102,7 +102,8 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
       if (Platform.isAndroid) {
         final status = await _service.getHealthConnectStatus();
         if (status == HealthConnectSdkStatus.sdkUnavailable ||
-            status == HealthConnectSdkStatus.sdkUnavailableProviderUpdateRequired) {
+            status ==
+                HealthConnectSdkStatus.sdkUnavailableProviderUpdateRequired) {
           emit(SleepNeedsHealthConnectInstall());
           return;
         }
@@ -110,7 +111,8 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
 
       emit(
         SleepNeedsManualEntry(
-          canDetect: !Platform.isAndroid || await _service.canEstimateFromPhone(),
+          canDetect:
+              !Platform.isAndroid || await _service.canEstimateFromPhone(),
         ),
       );
     } catch (e) {

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// A cached server response: the decoded value and when it was fetched.
 class Cached<T> {
@@ -16,6 +17,10 @@ class Cached<T> {
   const Cached(this.value, this.savedAt);
 
   Duration get age => DateTime.now().difference(savedAt);
+
+  /// Saved less than [maxAge] ago; a copy dated in the future (the clock was
+  /// ahead) counts as stale.
+  bool isFresh(Duration maxAge) => isWithinLast(maxAge, savedAt);
 }
 
 /// Persistent cache for server reads, so screens open instantly and keep
@@ -42,6 +47,15 @@ class CacheStore {
   Directory? _dir;
   final Map<String, Cached<Object?>> _memory = {};
   final Map<String, Future<Object?>> _inFlight = {};
+  final _changes = StreamController<String>.broadcast();
+
+  /// Keys whose value was written, updated or removed, as it happens. Lets
+  /// every screen showing a cached value refresh when any writer (a local
+  /// edit, a server refresh, another feature) changes it.
+  Stream<String> get changes => _changes.stream;
+
+  /// [changes] for one [key].
+  Stream<void> watch(String key) => changes.where((k) => k == key);
 
   /// Bumped by [clear]; a fetch that started before a clear (sign-out)
   /// must not write the old account's data back into the cache.
@@ -53,9 +67,13 @@ class CacheStore {
 
   Future<Directory> _directory() async {
     if (_dir != null) return _dir!;
-    final dir = _override ??
+    final dir =
+        _override ??
         Directory(
-          p.join((await getApplicationSupportDirectory()).path, 'vitalup_cache'),
+          p.join(
+            (await getApplicationSupportDirectory()).path,
+            'vitalup_cache',
+          ),
         );
     if (!await dir.exists()) await dir.create(recursive: true);
     return _dir = dir;
@@ -75,7 +93,7 @@ class CacheStore {
     bool forceRefresh = false,
   }) async {
     final cached = await read<T>(key, decode: decode);
-    if (cached != null && !forceRefresh && cached.age < maxAge) {
+    if (cached != null && !forceRefresh && cached.isFresh(maxAge)) {
       return cached.value;
     }
     // Known offline: don't wait for a request to time out.
@@ -84,18 +102,19 @@ class CacheStore {
     try {
       final generation = _generation;
       late final Future<Object?> request;
-      request = _inFlight[key] ??= () async {
-        final value = await remote().timeout(fetchTimeout);
-        _connectivity.reportSuccess();
-        final data = encode == null ? value : encode(value);
-        if (generation == _generation) await write(key, data);
-        return data;
-      }().whenComplete(() {
-        // Block body on purpose: returning the removed future would make
-        // whenComplete wait on itself. Only drop our own entry: a clear()
-        // may have let a newer request take the slot.
-        if (identical(_inFlight[key], request)) _inFlight.remove(key);
-      });
+      request = _inFlight[key] ??=
+          () async {
+            final value = await remote().timeout(fetchTimeout);
+            _connectivity.reportSuccess();
+            final data = encode == null ? value : encode(value);
+            if (generation == _generation) await write(key, data);
+            return data;
+          }().whenComplete(() {
+            // Block body on purpose: returning the removed future would make
+            // whenComplete wait on itself. Only drop our own entry: a clear()
+            // may have let a newer request take the slot.
+            if (identical(_inFlight[key], request)) _inFlight.remove(key);
+          });
       final json = await request;
       return decode == null ? json as T : decode(json);
     } catch (e) {
@@ -129,6 +148,7 @@ class CacheStore {
   Future<void> write(String key, Object? data) async {
     final entry = Cached<Object?>(data, DateTime.now());
     _memory[key] = entry;
+    _changes.add(key);
     try {
       final file = await _file(key);
       // Write then rename, so a crash mid-write never leaves half a file.
@@ -162,6 +182,7 @@ class CacheStore {
 
   Future<void> remove(String key) async {
     _memory.remove(key);
+    _changes.add(key);
     try {
       final file = await _file(key);
       if (await file.exists()) await file.delete();

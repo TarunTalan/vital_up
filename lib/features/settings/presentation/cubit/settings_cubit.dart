@@ -13,9 +13,13 @@ class SettingsCubit extends Cubit<SettingsState> {
   /// Called when the notifications switch changes (push on/off).
   final Future<void> Function(bool enabled)? _onNotificationsChanged;
 
+  /// Applies the analytics switch (after loading, saving or a restore).
+  final Future<void> Function(bool enabled)? _onAnalyticsChanged;
+
   SettingsCubit({
     required SettingsRepository settingsRepository,
     this._onNotificationsChanged,
+    this._onAnalyticsChanged,
   })  : _settingsRepository = settingsRepository,
         super(SettingsInitial());
 
@@ -36,8 +40,19 @@ class SettingsCubit extends Cubit<SettingsState> {
       (failure) {
         if (!loaded) emit(SettingsError(failure.message));
       },
-      (settings) => emit(SettingsLoaded(settings)),
+      (settings) {
+        emit(SettingsLoaded(settings));
+        _applyAnalytics(settings.analyticsEnabled);
+      },
     );
+  }
+
+  Future<void> _applyAnalytics(bool enabled) async {
+    try {
+      await _onAnalyticsChanged?.call(enabled);
+    } catch (e) {
+      debugPrint('Analytics preference not applied: $e');
+    }
   }
 
   Future<void> updateSettings(SettingsEntity settings) async {
@@ -45,6 +60,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         ? (state as SettingsLoaded).settings
         : null;
     final previous = current?.notificationsEnabled;
+    final previousAnalytics = current?.analyticsEnabled;
     final result = await _settingsRepository.saveSettings(settings);
     if (isClosed) return;
     result.fold(
@@ -55,6 +71,9 @@ class SettingsCubit extends Cubit<SettingsState> {
       },
       (_) => emit(SettingsLoaded(settings)),
     );
+    if (result.isRight() && previousAnalytics != settings.analyticsEnabled) {
+      await _applyAnalytics(settings.analyticsEnabled);
+    }
     if (result.isRight() && previous != settings.notificationsEnabled) {
       try {
         await _onNotificationsChanged?.call(settings.notificationsEnabled);

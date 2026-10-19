@@ -154,12 +154,12 @@ class WeightService {
 
   Future<void> delete(WeightLogCache log) async {
     await _isar.writeTxn(() => _isar.weightLogCaches.delete(log.id));
-    if (log.isSynced) {
-      await _sync?.recordDelete(
-        'weight_logs',
-        syncId('weight', log.userId, log.timestamp),
-      );
-    }
+    // Always recorded: an upload can reach the server before it's marked
+    // synced here, and a delete of an id the server lacks changes nothing.
+    await _sync?.recordDelete(
+      'weight_logs',
+      syncId('weight', log.userId, log.timestamp),
+    );
   }
 
   /// Entries in [from, to), newest first.
@@ -204,6 +204,15 @@ class WeightService {
         final kg = await _cache.fetch<double?>(
           targetCacheKey(userId),
           remote: () async {
+            // A goal set offline is still queued: keep it over the older
+            // server value.
+            if (_pendingWrites.hasQueuedFor(userId, {'user_health_data'})) {
+              final local = await _cache.read<double?>(
+                targetCacheKey(userId),
+                decode: (json) => (json as num?)?.toDouble(),
+              );
+              if (local != null) return local.value;
+            }
             final row = await _client
                 .from('user_health_data')
                 .select('target_weight, target_weight_unit')

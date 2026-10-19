@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -196,7 +197,10 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                 ),
               ),
           const SizedBox(height: AppDimens.sectionGap),
-          _StillNeedHelpCard(onEmail: _sendDirectEmail),
+          _StillNeedHelpCard(
+            onContact: _contactSupport,
+            onEmail: _sendDirectEmail,
+          ),
         ],
       ),
     );
@@ -214,7 +218,7 @@ class _SupportActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assistant = _ActionCard(
-      icon: Icons.smart_toy_rounded,
+      svgAsset: 'assets/icons/nav/vita.svg',
       title: 'Vital Assistant',
       subtitle: 'Chat for instant AI guidance & diagnostics',
       highlighted: true,
@@ -252,19 +256,21 @@ class _SupportActions extends StatelessWidget {
 }
 
 class _ActionCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String title;
   final String subtitle;
   final bool highlighted;
   final VoidCallback onTap;
 
   const _ActionCard({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.title,
     required this.subtitle,
     required this.onTap,
     this.highlighted = false,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +281,19 @@ class _ActionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppIconBadge(icon: Icon(icon)),
+          AppIconBadge(
+            icon: svgAsset != null
+                ? SvgPicture.asset(
+                    svgAsset!,
+                    width: AppDimens.iconSm,
+                    height: AppDimens.iconSm,
+                    colorFilter: ColorFilter.mode(
+                      highlighted ? VitaColors.accent : context.colors.primary,
+                      BlendMode.srcIn,
+                    ),
+                  )
+                : Icon(icon),
+          ),
           const SizedBox(height: AppDimens.space12),
           Text(title, style: context.text.titleSmall),
           const SizedBox(height: AppDimens.space4),
@@ -528,7 +546,15 @@ class _EmptySearchResults extends StatelessWidget {
           const SizedBox(height: AppDimens.space16),
           AppPrimaryButton(
             label: 'Ask Vital Assistant',
-            leadingIcon: const Icon(Icons.smart_toy_rounded),
+            leadingIcon: SvgPicture.asset(
+              'assets/icons/nav/vita.svg',
+              width: AppDimens.iconSm,
+              height: AppDimens.iconSm,
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
+            ),
             onTap: onAssistant,
           ),
         ],
@@ -538,9 +564,13 @@ class _EmptySearchResults extends StatelessWidget {
 }
 
 class _StillNeedHelpCard extends StatelessWidget {
+  final VoidCallback onContact;
   final VoidCallback onEmail;
 
-  const _StillNeedHelpCard({required this.onEmail});
+  const _StillNeedHelpCard({
+    required this.onContact,
+    required this.onEmail,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +595,7 @@ class _StillNeedHelpCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppDimens.space2),
                     Text(
-                      'Email our support team directly for fast assistance.',
+                      'Submit a ticket or email our support desk directly.',
                       style: context.text.bodySmall?.copyWith(
                         color: context.vColors.grayText,
                       ),
@@ -576,13 +606,43 @@ class _StillNeedHelpCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppDimens.space16),
-          AppSecondaryButton(
-            label: 'Contact Support via Email',
-            leadingIcon: const Icon(Icons.mail_outline_rounded),
+          AppPrimaryButton(
+            label: 'Open Contact Form',
+            leadingIcon: const Icon(Icons.edit_note_rounded),
+            onTap: onContact,
+          ),
+          const SizedBox(height: AppDimens.space10),
+          InkWell(
             onTap: onEmail,
+            borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space12,
+                vertical: AppDimens.space6,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.mail_outline_rounded,
+                    size: AppDimens.iconSm,
+                    color: context.colors.primary,
+                  ),
+                  const SizedBox(width: AppDimens.space6),
+                  Text(
+                    'Direct contact: $kSupportEmail',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
+

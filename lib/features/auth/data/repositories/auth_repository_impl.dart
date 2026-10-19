@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/features/auth/data/datasources/auth_local_data_source.dart';
@@ -17,11 +18,16 @@ import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart'
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final AuthLocalDataSource _localDataSource;
+  final ConnectivityService? _connectivity;
 
   AuthRepositoryImpl({
     required this._remoteDataSource,
     required this._localDataSource,
+    this._connectivity,
   });
+
+  /// The splash waits on [hasCompletedOnboarding]; past this it gives up.
+  static const onboardingCheckTimeout = Duration(seconds: 5);
 
   @override
   Future<Either<Failure, UserEntity>> signIn(String username, String password) async {
@@ -412,13 +418,20 @@ class AuthRepositoryImpl implements AuthRepository {
       return true;
     }
 
+    // No network: answer now instead of waiting for the request to fail.
+    if (_connectivity?.hasNetwork == false) {
+      return await _localDataSource.hasCompletedOnboarding(userId) ?? true;
+    }
+
     try {
+      // No automatic retries (1 + 2 + 4 s offline): the splash is waiting.
       final row = await Supabase.instance.client
           .from('user_health_data')
           .select('onboarding_completed')
           .eq('id', userId)
           .maybeSingle()
-          .timeout(const Duration(seconds: 8));
+          .retry(enabled: false)
+          .timeout(onboardingCheckTimeout);
       final completed = row?['onboarding_completed'] == true;
       await _localDataSource.setOnboardingCompleted(userId, completed);
       return completed;

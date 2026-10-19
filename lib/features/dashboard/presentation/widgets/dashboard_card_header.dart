@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Figma `card/big` header: success-tint icon badge + "body 16 med" title,
 /// with an optional trailing widget. Pass an SVG [iconAsset] or a Material
@@ -65,14 +66,10 @@ class DashboardMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerLeft,
-      child: Text(
-        value,
-        maxLines: 1,
-        style: AppTextStyles.metric.copyWith(color: context.colors.onSurface),
-      ),
+    return FitText(
+      value,
+      maxLines: 1,
+      style: AppTextStyles.metric.copyWith(color: context.colors.onSurface),
     );
   }
 }
@@ -118,6 +115,7 @@ class DashboardCardLoading extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           color: context.colors.primary,
+          strokeCap: StrokeCap.round,
         ),
       ),
     );

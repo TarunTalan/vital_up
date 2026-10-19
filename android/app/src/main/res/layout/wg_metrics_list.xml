@@ -22,17 +22,17 @@
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:layout_marginStart="8dp" android:orientation="vertical">
             <TextView android:id="@+id/wg_slot1_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="Steps" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
                 <TextView android:id="@+id/wg_slot1_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="—" />
                 <TextView android:id="@+id/wg_slot1_detail" android:layout_width="0dp" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
             </LinearLayout>
@@ -57,17 +57,17 @@
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:layout_marginStart="8dp" android:orientation="vertical">
             <TextView android:id="@+id/wg_slot2_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="Steps" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
                 <TextView android:id="@+id/wg_slot2_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="—" />
                 <TextView android:id="@+id/wg_slot2_detail" android:layout_width="0dp" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
             </LinearLayout>
@@ -92,17 +92,17 @@
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:layout_marginStart="8dp" android:orientation="vertical">
             <TextView android:id="@+id/wg_slot3_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="Steps" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
                 <TextView android:id="@+id/wg_slot3_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="—" />
                 <TextView android:id="@+id/wg_slot3_detail" android:layout_width="0dp" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
             </LinearLayout>
@@ -127,17 +127,17 @@
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:layout_marginStart="8dp" android:orientation="vertical">
             <TextView android:id="@+id/wg_slot4_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="11dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="Steps" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="1dp">
                 <TextView android:id="@+id/wg_slot4_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
+    android:fontFamily="@font/nunito_semibold" android:textSize="15dp" android:textColor="@color/wg_text"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="—" />
                 <TextView android:id="@+id/wg_slot4_detail" android:layout_width="0dp" android:layout_height="wrap_content"
-    android:fontFamily="@font/sf_pro_rounded_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
+    android:fontFamily="@font/nunito_regular" android:textSize="10dp" android:textColor="@color/wg_text_secondary"
     android:maxLines="1" android:ellipsize="end" android:includeFontPadding="false"
     android:text="" android:layout_weight="1" android:layout_marginStart="4dp"/>
             </LinearLayout>

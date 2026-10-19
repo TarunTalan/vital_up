@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -19,6 +21,7 @@ import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart'
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Swipe-to-delete for a detail page's history: removes [log] at once,
 /// deletes it, reloads, and says so if it couldn't be deleted.
@@ -48,6 +51,9 @@ class TrackerToday {
   /// Text in the ring; defaults to the percentage.
   final String? ringLabel;
 
+  /// Whether today is already logged; defaults to a met goal.
+  final bool? logged;
+
   const TrackerToday({
     required this.value,
     required this.status,
@@ -56,19 +62,26 @@ class TrackerToday {
     this.statusLabel,
     this.statusColor,
     this.ringLabel,
+    this.logged,
   });
+
+  bool get isLogged => logged ?? status == TrackerStatus.done;
 }
 
 /// The one detail-page layout every tracker uses (Figma track/detail):
 ///
 /// 1. Today — value, status and a ring against the goal, with the goal
 ///    and its Edit action underneath.
-/// 2. Trend — 7D / 30D chart with a dashed goal line and stats.
-/// 3. Insights — plain-language patterns.
+/// 2. Trend — Daily (7 days) or Weekly (4 weeks, daily average per bar)
+///    chart with a dashed goal line and stats.
+/// 3. Insights — up to two plain-language patterns.
 /// 4. Metric-specific [sections] (macros, tags, top apps…).
-/// 5. History — every entry in the range, swipe to delete.
+/// 5. Today's log — today's entries (swipe to delete) and "See all", which
+///    opens [TrackerLogsPage] with every entry ([allLogs]).
 ///
-/// The pinned bottom button is always the metric's log action.
+/// The pinned bottom button is the metric's log action. Once today is
+/// logged (or its goal met) it turns into the quieter secondary button, as
+/// on the Home cards, labelled [editLabel] for once-a-day trackers.
 /// Needs a [TrendCubit<L>] above it.
 class TrackerDetailScaffold<L> extends StatelessWidget {
   final TrackerMetric metric;
@@ -97,21 +110,41 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
 
   final String logsTitle;
   final String emptyLogs;
+
+  /// Builds one entry. Deletes should use the [TrendCubit<L>] read from
+  /// this context: on [TrackerLogsPage] it is that page's own list.
   final Widget Function(BuildContext context, L log) logBuilder;
-  final String? logsActionLabel;
+
+  /// Day an entry belongs to; the detail page lists today's entries.
+  final DateTime Function(L log) dateOf;
+
+  /// Every entry, newest first, for "See all". Ignored when
+  /// [onLogsAction] opens a page of its own.
+  final Future<List<L>> Function()? allLogs;
+
+  /// Opens a page of its own instead of [TrackerLogsPage].
   final VoidCallback? onLogsAction;
+  final String logsActionLabel;
 
   /// Primary bottom action; defaults to the metric's log label.
   final VoidCallback? onLog;
   final String? logLabel;
+
+  /// Bottom button label once today is logged ("Edit check-in"); null keeps
+  /// [logLabel] (trackers logged several times a day).
+  final String? editLabel;
   final Widget? headerAction;
   final Future<void> Function()? onRefresh;
+
+  /// Chart ranges offered by the Daily / Weekly (/ Monthly) switch.
+  final List<TrendRange> ranges;
 
   const TrackerDetailScaffold({
     super.key,
     required this.metric,
     required this.format,
     required this.logBuilder,
+    required this.dateOf,
     required this.noun,
     this.title,
     this.axisFormat,
@@ -122,14 +155,17 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     this.onEditGoal,
     this.insights,
     this.sections,
-    this.logsTitle = 'History',
-    this.emptyLogs = 'Nothing logged in this period yet.',
-    this.logsActionLabel,
+    this.logsTitle = "Today's log",
+    this.emptyLogs = 'Nothing logged today.',
+    this.allLogs,
     this.onLogsAction,
+    this.logsActionLabel = 'See all',
     this.onLog,
     this.logLabel,
+    this.editLabel,
     this.headerAction,
     this.onRefresh,
+    this.ranges = TrendRange.standard,
   });
 
   TrackerToday _defaultToday(TrendData<L> data) {
@@ -151,6 +187,24 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     );
   }
 
+  Future<void> _openAll(BuildContext context, TrendCubit<L> cubit) async {
+    final load = allLogs;
+    if (load == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TrackerLogsPage<L>(
+          metric: metric,
+          title: '${title ?? metric.label} history',
+          load: load,
+          dateOf: dateOf,
+          logBuilder: logBuilder,
+        ),
+      ),
+    );
+    // Entries deleted there change today's numbers here.
+    if (!cubit.isClosed) await cubit.load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<TrendCubit<L>>();
@@ -158,10 +212,26 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
       header: AppPageHeader(title: title ?? metric.label, action: headerAction),
       bottomBar: onLog == null
           ? null
-          : AppPrimaryButton(
-              label: logLabel ?? metric.logLabel,
-              leadingIcon: Icon(metric.logIcon),
-              onTap: onLog!,
+          : BlocBuilder<TrendCubit<L>, TrendState<L>>(
+              builder: (context, state) {
+                final data = state.data;
+                final logged =
+                    data != null && (today ?? _defaultToday)(data).isLogged;
+                if (!logged) {
+                  return AppPrimaryButton(
+                    label: logLabel ?? metric.logLabel,
+                    leadingIcon: Icon(metric.logIcon),
+                    onTap: onLog!,
+                  );
+                }
+                return AppSecondaryButton(
+                  label: editLabel ?? logLabel ?? metric.logLabel,
+                  leadingIcon: Icon(
+                    editLabel != null ? Icons.edit_rounded : metric.logIcon,
+                  ),
+                  onTap: onLog!,
+                );
+              },
             ),
       onRefresh:
           onRefresh ??
@@ -187,7 +257,15 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
           final allInsights = [
             ...extraInsights,
             ...seriesInsights(data.series, format: format, noun: noun),
-          ].take(4).toList();
+          ].take(2).toList();
+          final todayNow = DateTime.now();
+          final todays = [
+            for (final log in data.logs)
+              if (isSameDay(dateOf(log), todayNow)) log,
+          ];
+          final seeAll =
+              onLogsAction ??
+              (allLogs == null ? null : () => _openAll(context, cubit));
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -206,10 +284,13 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
                 format: format,
                 axisFormat: axisFormat,
                 colorOf: colorOf,
+                ranges: ranges,
                 onRange: cubit.load,
               ),
-              const SizedBox(height: AppDimens.cardGap),
-              TrackerInsightsCard(insights: allInsights),
+              if (allInsights.isNotEmpty) ...[
+                const SizedBox(height: AppDimens.cardGap),
+                TrackerInsightsCard(insights: allInsights),
+              ],
               for (final section in sections?.call(context, data) ?? []) ...[
                 const SizedBox(height: AppDimens.cardGap),
                 section,
@@ -217,14 +298,14 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
               const SizedBox(height: AppDimens.sectionGap),
               TrackerSectionTitle(
                 logsTitle,
-                actionLabel: logsActionLabel,
-                onAction: onLogsAction,
+                actionLabel: seeAll == null ? null : logsActionLabel,
+                onAction: seeAll,
               ),
               const SizedBox(height: AppDimens.cardGap),
-              if (data.logs.isEmpty)
+              if (todays.isEmpty)
                 AppInfoNote(message: emptyLogs)
               else
-                for (final log in data.logs) ...[
+                for (final log in todays) ...[
                   logBuilder(context, log),
                   const SizedBox(height: AppDimens.space8),
                 ],
@@ -259,7 +340,7 @@ class _HeroCard extends StatelessWidget {
     final fraction = raw != null && raw.isFinite ? raw : null;
     return AppCard(
       width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
+      padding: AppDimens.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -271,15 +352,11 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     AppCaption(label),
                     const SizedBox(height: AppDimens.space8),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        today.value,
-                        maxLines: 1,
-                        style: AppTextStyles.metricLarge.copyWith(
-                          color: context.colors.onSurface,
-                        ),
+                    FitText(
+                      today.value,
+                      maxLines: 1,
+                      style: AppTextStyles.metricLarge.copyWith(
+                        color: context.colors.onSurface,
                       ),
                     ),
                     if (today.caption != null) ...[
@@ -338,7 +415,7 @@ class _HeroCard extends StatelessWidget {
                   icon: goal == null
                       ? const Icon(Icons.add_rounded, size: AppDimens.iconSm)
                       : SvgPicture.asset(
-                          'assets/icons/edit.svg',
+                          'assets/icons/ui/edit.svg',
                           width: AppDimens.iconSm,
                           height: AppDimens.iconSm,
                           colorFilter: ColorFilter.mode(
@@ -364,6 +441,7 @@ class _TrendCard<L> extends StatelessWidget {
   final String Function(double value)? axisFormat;
   final Color Function(double value)? colorOf;
   final ValueChanged<TrendRange> onRange;
+  final List<TrendRange> ranges;
 
   const _TrendCard({
     required this.metric,
@@ -373,39 +451,139 @@ class _TrendCard<L> extends StatelessWidget {
     required this.axisFormat,
     required this.colorOf,
     required this.onRange,
+    required this.ranges,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: AppCaption(
-                  state.range == TrendRange.week
-                      ? '7-day trend'
-                      : '30-day trend',
-                ),
-              ),
-              TrendRangeToggle(value: state.range, onChanged: onRange),
-            ],
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TrendBarChart(
-            series: data.series,
-            color: metric.color,
-            valueFormatter: format,
-            axisFormatter: axisFormat,
-            colorOf: colorOf,
-          ),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          TrendStatsRow(series: data.series, format: format),
-        ],
+    return TrendChartCard(
+      caption: state.range.caption,
+      range: state.range,
+      onRange: onRange,
+      ranges: ranges,
+      chart: TrendBarChart(
+        series: switch (state.range) {
+          TrendRange.week => data.series,
+          TrendRange.month => data.series.weekly(),
+          TrendRange.halfYear => data.series.monthly(),
+        },
+        weekly: state.range == TrendRange.month,
+        monthly: state.range == TrendRange.halfYear,
+        color: metric.color,
+        valueFormatter: format,
+        axisFormatter: axisFormat,
+        colorOf: colorOf,
+      ),
+      stats: TrendStatsRow(series: data.series, format: format),
+    );
+  }
+}
+
+/// Every entry of one tracker, newest first, grouped by day. Opened from
+/// "See all" on a detail page; swipe to delete works as there.
+class TrackerLogsPage<L> extends StatefulWidget {
+  final TrackerMetric metric;
+  final String title;
+  final Future<List<L>> Function() load;
+  final DateTime Function(L log) dateOf;
+  final Widget Function(BuildContext context, L log) logBuilder;
+
+  const TrackerLogsPage({
+    super.key,
+    required this.metric,
+    required this.title,
+    required this.load,
+    required this.dateOf,
+    required this.logBuilder,
+  });
+
+  @override
+  State<TrackerLogsPage<L>> createState() => _TrackerLogsPageState<L>();
+}
+
+class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
+  /// Entries shown before "Show more", so years of logs build quickly.
+  static const _pageSize = 60;
+
+  late final TrendCubit<L> _cubit = TrendCubit<L>(
+    (_) async => TrendData<L>(const TrendSeries([]), await widget.load()),
+  )..load();
+  int _shown = _pageSize;
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  String _dayLabel(DateTime day, DateTime now) {
+    if (isSameDay(day, now)) return 'Today';
+    if (isSameDay(day, previousDay(now))) {
+      return 'Yesterday';
+    }
+    return DateFormat(
+      day.year == now.year ? 'EEEE d MMM' : 'EEEE d MMM y',
+    ).format(day);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider<TrendCubit<L>>.value(
+      value: _cubit,
+      child: AppScaffold(
+        header: AppPageHeader(title: widget.title),
+        onRefresh: _cubit.load,
+        body: BlocBuilder<TrendCubit<L>, TrendState<L>>(
+          builder: (context, state) {
+            final logs = state.data?.logs;
+            if (logs == null) {
+              return SizedBox(
+                height: AppDimens.trendChartHeight * 2,
+                child: state.error != null
+                    ? LoadErrorView(onRetry: _cubit.load)
+                    : TrackerLoading(color: widget.metric.color),
+              );
+            }
+            if (logs.isEmpty) {
+              return TrackerEmptyState(
+                metric: widget.metric,
+                message: 'What you log will show up here.',
+              );
+            }
+            final now = DateTime.now();
+            final visible = logs.take(_shown).toList();
+            final children = <Widget>[];
+            DateTime? day;
+            for (final log in visible) {
+              final d = startOfDay(widget.dateOf(log));
+              if (d != day) {
+                day = d;
+                if (children.isNotEmpty) {
+                  children.add(const SizedBox(height: AppDimens.space8));
+                }
+                children
+                  ..add(TrackerSectionTitle(_dayLabel(d, now)))
+                  ..add(const SizedBox(height: AppDimens.space8));
+              }
+              children
+                ..add(widget.logBuilder(context, log))
+                ..add(const SizedBox(height: AppDimens.space8));
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...children,
+                if (logs.length > visible.length) ...[
+                  const SizedBox(height: AppDimens.space8),
+                  AppSecondaryButton(
+                    label: 'Show more',
+                    onTap: () => setState(() => _shown += _pageSize),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/services/app_loading_controller.dart';
+import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Primary CTA — Figma `button/ pri`:
 /// 48h, radius 14, #19C3E0 fill, #0C0C0C "body 16 med" label, 16/12 padding.
@@ -44,7 +47,10 @@ class AppPrimaryButton extends StatelessWidget {
       isLoading: isLoading,
       expand: expand,
       child: ElevatedButton(
-        onPressed: onTap,
+        onPressed: () {
+          FocusManager.instance.primaryFocus?.unfocus();
+          onTap();
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: bgColor,
           foregroundColor: fgColor,
@@ -113,7 +119,10 @@ class AppSecondaryButton extends StatelessWidget {
       isLoading: isLoading,
       expand: expand,
       child: OutlinedButton(
-        onPressed: onTap,
+        onPressed: () {
+          FocusManager.instance.primaryFocus?.unfocus();
+          onTap();
+        },
         style: OutlinedButton.styleFrom(
           backgroundColor: bgColor,
           foregroundColor: fgColor,
@@ -140,7 +149,7 @@ class AppSecondaryButton extends StatelessWidget {
 }
 
 /// Shared sizing + disabled/loading behaviour for both button variants.
-class _ButtonShell extends StatelessWidget {
+class _ButtonShell extends StatefulWidget {
   final bool enabled;
   final bool isLoading;
   final bool expand;
@@ -154,17 +163,63 @@ class _ButtonShell extends StatelessWidget {
   });
 
   @override
+  State<_ButtonShell> createState() => _ButtonShellState();
+}
+
+class _ButtonShellState extends State<_ButtonShell> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.isLoading) {
+          AppLoadingController.instance.setTokenLoading(this, true);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ButtonShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isLoading != widget.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          AppLoadingController.instance.setTokenLoading(this, widget.isLoading);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.isLoading) {
+      AppLoadingController.instance.setTokenLoading(this, false);
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final canTap = enabled && !isLoading;
+    final canTap = widget.enabled && !widget.isLoading;
     return AnimatedOpacity(
       duration: AppDurations.fast,
-      opacity: canTap || isLoading ? 1.0 : 0.5,
+      opacity: canTap || widget.isLoading ? 1.0 : 0.5,
       child: AbsorbPointer(
         absorbing: !canTap,
-        child: SizedBox(
-          width: expand ? double.infinity : null,
-          height: AppDimens.buttonHeight,
-          child: child,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) {
+            if (canTap) {
+              FocusManager.instance.primaryFocus?.unfocus();
+            }
+          },
+          child: SizedBox(
+            width: widget.expand ? double.infinity : null,
+            // Grows with the text size so the label never clips.
+            height: context.textScaled(AppDimens.buttonHeight),
+            child: widget.child,
+          ),
         ),
       ),
     );
@@ -194,37 +249,36 @@ class _ButtonContent extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: AppDimens.borderThick,
           valueColor: AlwaysStoppedAnimation<Color>(color),
+          strokeCap: StrokeCap.round,
         ),
       );
     }
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (leadingIcon != null) ...[
-            IconTheme(
-              data: IconThemeData(color: color, size: AppDimens.iconMd),
-              child: leadingIcon!,
-            ),
-            const SizedBox(width: AppDimens.buttonGap),
-          ],
-          Text(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (leadingIcon != null) ...[
+          IconTheme(
+            data: IconThemeData(color: color, size: AppDimens.iconMd),
+            child: leadingIcon!,
+          ),
+          const SizedBox(width: AppDimens.buttonGap),
+        ],
+        Flexible(
+          child: FitText(
             label,
-            maxLines: 1,
             style: context.text.labelLarge?.copyWith(color: color),
           ),
-          if (showRightArrow) ...[
-            const SizedBox(width: AppDimens.buttonGap),
-            SvgPicture.asset(
-              'assets/icons/right_arrow.svg',
-              width: AppDimens.iconXs,
-              height: AppDimens.iconXs,
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            ),
-          ],
+        ),
+        if (showRightArrow) ...[
+          const SizedBox(width: AppDimens.buttonGap),
+          SvgPicture.asset(
+            'assets/icons/ui/right_arrow.svg',
+            width: AppDimens.iconXs,
+            height: AppDimens.iconXs,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          ),
         ],
-      ),
+      ],
     );
   }
 }

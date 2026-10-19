@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -7,15 +8,14 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/activity_calendar_cubit.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/month_calendar_grid.dart';
+
 /// Activity Calendar Page displaying daily wellness metrics, expandable calendar,
 /// and collapsible Move, Rest, Fuel, and Vitals categories.
 class ActivityCalendarPage extends StatefulWidget {
   final DateTime? initialDate;
 
-  const ActivityCalendarPage({
-    super.key,
-    this.initialDate,
-  });
+  const ActivityCalendarPage({super.key, this.initialDate});
 
   @override
   State<ActivityCalendarPage> createState() => _ActivityCalendarPageState();
@@ -48,20 +48,16 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
     });
   }
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  // Returns completion status for day bar indicator: 
+  // Returns completion status for day bar indicator:
   // -1 = Future/Today (No bar), 0 = No progress, 1 = Light (Red), 2 = Moderate (Orange), 3 = Good (Green)
   int _getDayStatus(DateTime date, ActivityCalendarState state) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     if (date.isAfter(today) || date.isAtSameMomentAs(today)) {
       return -1; // Future or Today
     }
-    
+
     final metrics = state.monthMetrics[date];
     if (metrics == null) return 0; // No data yet
 
@@ -69,7 +65,7 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
     if (metrics.activeMinutes > 20) score++;
     if (metrics.sleepHours > 6) score++;
     if (metrics.waterLogs > 0 || metrics.foodLogs > 0) score++;
-    
+
     if (score == 0 && metrics.steps > 1000) return 1;
     if (score == 0) return 0;
     if (score == 1) return 1;
@@ -86,7 +82,8 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
         final steps = metrics?.steps ?? 0;
         final sleep = metrics?.sleepHours ?? 0.0;
         final water = metrics?.waterLogs ?? 0;
-        final nutrition = metrics?.foodLogs ?? 0; // Using food logs count for now
+        final nutrition =
+            metrics?.foodLogs ?? 0; // Using food logs count for now
         final stress = metrics?.moodLevel ?? 0;
 
         return AppScaffold(
@@ -96,149 +93,154 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
             child: Padding(
               padding: EdgeInsets.fromLTRB(
                 context.gutter,
-            AppDimens.sectionGap,
-            context.gutter,
-            context.safePadding.bottom + AppDimens.space24,
+                AppDimens.sectionGap,
+                context.gutter,
+                context.safePadding.bottom + AppDimens.space24,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1. Expandable Month Calendar Grid
+                  AnimatedCrossFade(
+                    firstChild: _buildCalendarView(context, state),
+                    secondChild: const SizedBox.shrink(),
+                    crossFadeState: _isCalendarOpen
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    duration: AppDurations.medium,
+                  ),
+
+                  if (_isCalendarOpen)
+                    const SizedBox(height: AppDimens.sectionGap),
+
+                  // 2. Daily Wellness Summary Card
+                  _buildDailySummaryCard(context, state),
+                  const SizedBox(height: AppDimens.sectionGap),
+
+                  // 3. Move Section (Activity, Steps)
+                  _buildCategoryCard(
+                    context,
+                    title: 'MOVE',
+                    isExpanded: _moveExpanded,
+                    onToggle: () =>
+                        setState(() => _moveExpanded = !_moveExpanded),
+                    children: [
+                      _MetricRow(
+                        svgAsset: 'assets/icons/trackers/activity.svg',
+                        iconBgColor: AppColors.success.withValues(alpha: 0.15),
+                        iconColor: AppColors.success,
+                        label: 'Activity',
+                        value: '$activeMins min',
+                        progress: (activeMins / 30).clamp(0.0, 1.0),
+                        progressColor: AppColors.success,
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _MetricRow(
+                        svgAsset: 'assets/icons/trackers/step.svg',
+                        iconBgColor: AppColors.success.withValues(alpha: 0.15),
+                        iconColor: AppColors.success,
+                        label: 'Steps',
+                        value: '$steps',
+                        progress: (steps / 10000).clamp(0.0, 1.0),
+                        progressColor: AppColors.success,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.sectionGap),
+
+                  // 4. Rest Section (Sleep, Screen time)
+                  _buildCategoryCard(
+                    context,
+                    title: 'REST',
+                    isExpanded: _restExpanded,
+                    onToggle: () =>
+                        setState(() => _restExpanded = !_restExpanded),
+                    children: [
+                      _MetricRow(
+                        icon: Icons.bedtime_rounded,
+                        iconBgColor: AppColors.success.withValues(alpha: 0.15),
+                        iconColor: AppColors.success,
+                        label: 'Sleep',
+                        value: '${sleep.toStringAsFixed(1)}h',
+                        progress: (sleep / 8.0).clamp(0.0, 1.0),
+                        progressColor: AppColors.success,
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _MetricRow(
+                        icon: Icons.devices_rounded,
+                        iconBgColor: AppColors.warning.withValues(alpha: 0.15),
+                        iconColor: AppColors.warning,
+                        label: 'Screen time',
+                        value: '-',
+                        progress: 0.0,
+                        progressColor: AppColors.warning,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.sectionGap),
+
+                  // 5. Fuel Section (Nutrition, Water)
+                  _buildCategoryCard(
+                    context,
+                    title: 'FUEL',
+                    isExpanded: _fuelExpanded,
+                    onToggle: () =>
+                        setState(() => _fuelExpanded = !_fuelExpanded),
+                    children: [
+                      _MetricRow(
+                        icon: Icons.restaurant_rounded,
+                        iconBgColor: AppColors.error.withValues(alpha: 0.15),
+                        iconColor: AppColors.error,
+                        label: 'Nutrition',
+                        value: '$nutrition logs',
+                        progress: (nutrition / 3.0).clamp(0.0, 1.0),
+                        progressColor: AppColors.error,
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _MetricRow(
+                        icon: Icons.water_drop_rounded,
+                        iconBgColor: AppColors.error.withValues(alpha: 0.15),
+                        iconColor: AppColors.error,
+                        label: 'Water',
+                        value: '$water glasses',
+                        progress: (water / 8.0).clamp(0.0, 1.0),
+                        progressColor: AppColors.error,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.sectionGap),
+
+                  // 6. Vitals Section (Heart rate)
+                  _buildCategoryCard(
+                    context,
+                    title: 'VITALS',
+                    isExpanded: _vitalsExpanded,
+                    onToggle: () =>
+                        setState(() => _vitalsExpanded = !_vitalsExpanded),
+                    children: [
+                      _MetricRow(
+                        icon: Icons.favorite_rounded,
+                        iconBgColor: AppColors.success.withValues(alpha: 0.15),
+                        iconColor: AppColors.success,
+                        label: 'Stress check-in',
+                        value: stress > 0 ? 'Level $stress' : '-',
+                        progress: stress > 0 ? 1.0 : 0.0,
+                        progressColor: AppColors.success,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Expandable Month Calendar Grid
-              AnimatedCrossFade(
-                firstChild: _buildCalendarView(context, state),
-                secondChild: const SizedBox.shrink(),
-                crossFadeState: _isCalendarOpen
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                duration: AppDurations.medium,
-              ),
-
-              if (_isCalendarOpen) const SizedBox(height: AppDimens.sectionGap),
-
-              // 2. Daily Wellness Summary Card
-              _buildDailySummaryCard(context, state),
-              const SizedBox(height: AppDimens.sectionGap),
-
-              // 3. Move Section (Activity, Steps)
-              _buildCategoryCard(
-                context,
-                title: 'MOVE',
-                isExpanded: _moveExpanded,
-                onToggle: () => setState(() => _moveExpanded = !_moveExpanded),
-                children: [
-                  _MetricRow(
-                    icon: Icons.directions_run_rounded,
-                    iconBgColor: AppColors.success.withValues(alpha: 0.15),
-                    iconColor: AppColors.success,
-                    label: 'Activity',
-                    value: '$activeMins min',
-                    progress: (activeMins / 30).clamp(0.0, 1.0),
-                    progressColor: AppColors.success,
-                  ),
-                  const SizedBox(height: AppDimens.space12),
-                  _MetricRow(
-                    icon: Icons.directions_walk_rounded,
-                    iconBgColor: AppColors.success.withValues(alpha: 0.15),
-                    iconColor: AppColors.success,
-                    label: 'Steps',
-                    value: '$steps',
-                    progress: (steps / 10000).clamp(0.0, 1.0),
-                    progressColor: AppColors.success,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.sectionGap),
-
-              // 4. Rest Section (Sleep, Screen time)
-              _buildCategoryCard(
-                context,
-                title: 'REST',
-                isExpanded: _restExpanded,
-                onToggle: () => setState(() => _restExpanded = !_restExpanded),
-                children: [
-                  _MetricRow(
-                    icon: Icons.bedtime_rounded,
-                    iconBgColor: AppColors.success.withValues(alpha: 0.15),
-                    iconColor: AppColors.success,
-                    label: 'Sleep',
-                    value: '${sleep.toStringAsFixed(1)}h',
-                    progress: (sleep / 8.0).clamp(0.0, 1.0),
-                    progressColor: AppColors.success,
-                  ),
-                  const SizedBox(height: AppDimens.space12),
-                  _MetricRow(
-                    icon: Icons.devices_rounded,
-                    iconBgColor: AppColors.warning.withValues(alpha: 0.15),
-                    iconColor: AppColors.warning,
-                    label: 'Screen time',
-                    value: '-',
-                    progress: 0.0,
-                    progressColor: AppColors.warning,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.sectionGap),
-
-              // 5. Fuel Section (Nutrition, Water)
-              _buildCategoryCard(
-                context,
-                title: 'FUEL',
-                isExpanded: _fuelExpanded,
-                onToggle: () => setState(() => _fuelExpanded = !_fuelExpanded),
-                children: [
-                  _MetricRow(
-                    icon: Icons.restaurant_rounded,
-                    iconBgColor: AppColors.error.withValues(alpha: 0.15),
-                    iconColor: AppColors.error,
-                    label: 'Nutrition',
-                    value: '$nutrition logs',
-                    progress: (nutrition / 3.0).clamp(0.0, 1.0),
-                    progressColor: AppColors.error,
-                  ),
-                  const SizedBox(height: AppDimens.space12),
-                  _MetricRow(
-                    icon: Icons.water_drop_rounded,
-                    iconBgColor: AppColors.error.withValues(alpha: 0.15),
-                    iconColor: AppColors.error,
-                    label: 'Water',
-                    value: '$water glasses',
-                    progress: (water / 8.0).clamp(0.0, 1.0),
-                    progressColor: AppColors.error,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.sectionGap),
-
-              // 6. Vitals Section (Heart rate)
-              _buildCategoryCard(
-                context,
-                title: 'VITALS',
-                isExpanded: _vitalsExpanded,
-                onToggle: () => setState(() => _vitalsExpanded = !_vitalsExpanded),
-                children: [
-                  _MetricRow(
-                    icon: Icons.favorite_rounded,
-                    iconBgColor: AppColors.success.withValues(alpha: 0.15),
-                    iconColor: AppColors.success,
-                    label: 'Stress check-in',
-                    value: stress > 0 ? 'Level $stress' : '-',
-                    progress: stress > 0 ? 1.0 : 0.0,
-                    progressColor: AppColors.success,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    },
+        );
+      },
     );
   }
 
   /// Custom top app bar matching the user design with Month Year and [<] [📅] [>]
   Widget _buildHeader(BuildContext context, ActivityCalendarState state) {
-    final monthTitle = DateFormat('MMM yy').format(state.focusedMonth);
+    final monthTitle = DateFormat('MMM y').format(state.focusedMonth);
 
     return AppPageHeader(
       title: monthTitle,
@@ -270,175 +272,104 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
     );
   }
 
-  /// The month grid with weekdays, date buttons, status indicator bars, and selected highlight
+  /// Figma track/calender month grid ([MonthCalendarGrid]).
   Widget _buildCalendarView(BuildContext context, ActivityCalendarState state) {
-    final v = context.vColors;
-    final year = state.focusedMonth.year;
-    final month = state.focusedMonth.month;
-
-    // Number of days in current focused month
-    final daysInMonth = DateUtils.getDaysInMonth(year, month);
-
-    // Weekday of the first day (DateTime weekday: 1 = Mon ... 7 = Sun)
-    // Design has Sunday as the first column: 0 = Sun, 1 = Mon ... 6 = Sat
-    final firstDayWeekday = DateTime(year, month, 1).weekday % 7;
-
-    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    return Column(
-      children: [
-        // Weekday Labels Row
-        Padding(
-          padding: const EdgeInsets.only(
-            top: AppDimens.space8,
-            bottom: AppDimens.space16,
-          ),
-          child: Row(
-            children: [
-              for (final label in weekdayLabels)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      label,
-                      style: context.text.labelSmall?.copyWith(
-                        color: v.grayText,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
-        // Days Grid
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            mainAxisSpacing: AppDimens.space8,
-            crossAxisSpacing: AppDimens.space8,
-            childAspectRatio: 0.95,
-          ),
-          itemCount: firstDayWeekday + daysInMonth,
-          itemBuilder: (context, index) {
-            if (index < firstDayWeekday) {
-              return const SizedBox.shrink();
-            }
-
-            final dayNumber = index - firstDayWeekday + 1;
-            final cellDate = DateTime(year, month, dayNumber);
-            final isSelected = _isSameDay(cellDate, state.selectedDate);
-            final status = _getDayStatus(cellDate, state);
-
-            // Bar indicator color based on status
-            final barColor = switch (status) {
-              0 => context.colors.onSurface.withValues(alpha: 0.15),
-              1 => AppColors.error,
-              2 => AppColors.warning,
-              3 => AppColors.success,
-              _ => Colors.transparent,
-            };
-
-            return InkWell(
-              onTap: () {
-                if (cellDate.isAfter(DateTime.now())) return;
-                context.read<ActivityCalendarCubit>().selectDate(cellDate);
-              },
-              borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? context.colors.primary
-                      : v.glassFill ?? AppColors.surfaceDarkElevated.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppDimens.radiusToast),
-                  border: isSelected
-                      ? null
-                      : Border.all(
-                          color: v.glassBorder!.withValues(alpha: 0.5),
-                          width: AppDimens.borderThin,
-                        ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$dayNumber',
-                      style: context.text.bodyMedium?.copyWith(
-                        color: isSelected
-                            ? context.colors.surface
-                            : context.colors.onSurface,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (status >= 0) ...[
-                      const SizedBox(height: 3),
-                      Stack(
-                        children: [
-                          // Background track (empty progress)
-                          Container(
-                            width: 24,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: context.colors.onSurface.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                            ),
-                          ),
-                          // Filled progress based on status (0 to 3)
-                          if (status > 0)
-                            Container(
-                              width: 24 * (status / 3.0),
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: barColor,
-                                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+    return MonthCalendarGrid(
+      month: state.focusedMonth,
+      selected: state.selectedDate,
+      gradeOf: (day) => switch (_getDayStatus(day, state)) {
+        0 => CalendarDayGrade.empty,
+        1 => CalendarDayGrade.light,
+        2 => CalendarDayGrade.moderate,
+        3 => CalendarDayGrade.good,
+        _ => CalendarDayGrade.none,
+      },
+      onSelect: (day) => context.read<ActivityCalendarCubit>().selectDate(day),
     );
   }
 
   /// Daily summary card (e.g. "Light activity day with good rest...")
-  Widget _buildDailySummaryCard(BuildContext context, ActivityCalendarState state) {
+  Widget _buildDailySummaryCard(
+    BuildContext context,
+    ActivityCalendarState state,
+  ) {
+    if (state.failed) {
+      return AppCard(
+        width: double.infinity,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Couldn't load this day.",
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.read<ActivityCalendarCubit>().selectDate(
+                state.selectedDate,
+              ),
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
+
     String message = "No data recorded for this day.";
+    Color iconColor = AppColors.primary;
+    IconData icon = Icons.insights_rounded;
+
     if (state.loading) {
       message = "Loading...";
     } else if (state.selectedMetrics != null) {
       final score = _getDayStatus(state.selectedDate, state);
       if (score == 3) {
         message = "Excellent day. You met most of your wellness goals.";
+        iconColor = AppColors.gradeGood;
+        icon = Icons.check_circle_rounded;
       } else if (score == 2) {
-        message = "Good day. A few more healthy choices could boost your score.";
+        message =
+            "Good day. A few more healthy choices could boost your score.";
+        iconColor = AppColors.gradeModerate;
+        icon = Icons.trending_up_rounded;
       } else if (score == 1) {
         message = "Light activity day. Take it easy and try to get some rest.";
+        iconColor = AppColors.gradeBad;
+        icon = Icons.nature_people_rounded;
       } else {
         message = "No goals met on this day. Every little bit counts.";
+        iconColor = context.vColors.grayText ?? AppColors.greyText;
+        icon = Icons.info_outline_rounded;
       }
     }
 
     return AppCard(
       width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
-      child: Text(
-        message,
-        style: context.text.bodyMedium?.copyWith(
-          color: context.colors.onSurface,
-          height: 1.35,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconBadge(color: iconColor, icon: Icon(icon)),
+          const SizedBox(width: AppDimens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppCaption('DAILY SUMMARY'),
+                const SizedBox(height: AppDimens.space4),
+                Text(
+                  message,
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.colors.onSurface,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -455,38 +386,33 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
 
     return AppCard(
       width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header Row with Category Title and Arrow
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(AppDimens.radiusXs),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: context.text.labelMedium?.copyWith(
+            borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  AppCaption(title),
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: AppDimens.iconMd,
                     color: v.grayText,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
                   ),
-                ),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: AppDimens.iconMd,
-                  color: v.grayText,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
           if (isExpanded) ...[
-            const SizedBox(height: AppDimens.space12),
+            const SizedBox(height: AppDimens.space16),
             ...children,
           ],
         ],
@@ -496,7 +422,8 @@ class _ActivityCalendarPageState extends State<ActivityCalendarPage> {
 }
 
 class _MetricRow extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final Color iconBgColor;
   final Color iconColor;
   final String label;
@@ -505,52 +432,56 @@ class _MetricRow extends StatelessWidget {
   final Color progressColor;
 
   const _MetricRow({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.iconBgColor,
     required this.iconColor,
     required this.label,
     required this.value,
     required this.progress,
     required this.progressColor,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
+    final onSurface = context.colors.onSurface;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space12,
-        vertical: AppDimens.space10,
-      ),
+      padding: const EdgeInsets.all(AppDimens.space12),
       decoration: BoxDecoration(
-        color: v.glassFill ?? AppColors.surfaceDark.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(
-          color: v.glassBorder!.withValues(alpha: 0.5),
-          width: AppDimens.borderThin,
-        ),
+        color: v.glassFill,
+        borderRadius: BorderRadius.circular(AppDimens.radiusToast),
+        border: Border.all(color: v.glassBorder!, width: AppDimens.borderThin),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Top Row: Icon, Label, Value
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: iconBgColor,
-                ),
-                child: Icon(icon, size: AppDimens.iconSm, color: iconColor),
+              AppIconBadge(
+                size: AppDimens.iconBadgeSmall,
+                color: iconColor,
+                icon: svgAsset != null
+                    ? SvgPicture.asset(
+                        svgAsset!,
+                        width: AppDimens.iconSm,
+                        height: AppDimens.iconSm,
+                        colorFilter: ColorFilter.mode(
+                          iconColor,
+                          BlendMode.srcIn,
+                        ),
+                      )
+                    : Icon(icon, size: AppDimens.iconSm, color: iconColor),
               ),
-              const SizedBox(width: AppDimens.space10),
+              const SizedBox(width: AppDimens.space12),
               Expanded(
                 child: Text(
                   label,
                   style: context.text.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: onSurface,
                   ),
                 ),
               ),
@@ -558,35 +489,18 @@ class _MetricRow extends StatelessWidget {
                 value,
                 style: context.text.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: onSurface,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppDimens.space10),
+          const SizedBox(height: AppDimens.space12),
 
           // Horizontal Progress Bar
-          Container(
-            height: 6,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: v.track ?? AppColors.surfaceDark,
-              borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: progress.clamp(0.02, 1.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: progressColor,
-                      borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          AppProgressBar(
+            value: progress,
+            color: progressColor,
+            trackColor: v.track,
           ),
         ],
       ),

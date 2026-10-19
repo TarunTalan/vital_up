@@ -28,7 +28,10 @@ class FakeRemote implements ProfileRemoteDataSource {
   }
 
   @override
-  Future<bool> updateProfile(ProfileEntity profile, {ProfileEntity? previous}) async {
+  Future<bool> updateProfile(
+    ProfileEntity profile, {
+    ProfileEntity? previous,
+  }) async {
     lastPrevious = previous;
     if (updateError != null) throw updateError!;
     return sent;
@@ -57,6 +60,7 @@ void main() {
   late Directory dir;
   late FakeRemote remote;
   late ProfileRepositoryImpl repo;
+  var queued = false;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('profile_cache_test');
@@ -68,7 +72,9 @@ void main() {
       cacheStore: CacheStore(ConnectivityService(), directory: dir),
       currentUserId: () => 'user123',
       logger: Logger(level: Level.off),
+      hasQueuedEdits: (_) => queued,
     );
+    queued = false;
   });
 
   tearDown(() => dir.deleteSync(recursive: true));
@@ -97,10 +103,7 @@ void main() {
     remote.getError = const SocketException('Failed host lookup');
     final result = await repo.getProfile();
     expect(result.isLeft(), isTrue);
-    result.fold(
-      (f) => expect(f.message, contains("You're offline")),
-      (_) {},
-    );
+    result.fold((f) => expect(f.message, contains("You're offline")), (_) {});
   });
 
   test('edits show immediately even when the write is queued', () async {
@@ -116,9 +119,13 @@ void main() {
 
   test('a rejected edit is rolled back in the cache', () async {
     await repo.getProfile();
-    remote.updateError = const ServerException(message: 'That username is taken');
+    remote.updateError = const ServerException(
+      message: 'That username is taken',
+    );
 
-    final result = await repo.updateProfile(tProfile.copyWith(username: 'taken'));
+    final result = await repo.updateProfile(
+      tProfile.copyWith(username: 'taken'),
+    );
     expect(result.isLeft(), isTrue);
     expect((await repo.getProfile()).getOrElse(() => throw 'x'), tProfile);
   });
@@ -129,5 +136,26 @@ void main() {
       (f) => expect(f.message, contains("You're offline")),
       (_) => fail('expected failure'),
     );
+  });
+
+  test('every edit is announced on changes', () async {
+    await repo.getProfile();
+    final edited = tProfile.copyWith(fullName: 'New Name');
+    final next = repo.changes.first;
+    await repo.updateProfile(edited);
+    expect(await next, edited);
+  });
+
+  test('a refresh keeps an edit still queued offline', () async {
+    await repo.getProfile();
+    remote.sent = false;
+    queued = true;
+    final edited = tProfile.copyWith(fullName: 'New Name');
+    await repo.updateProfile(edited);
+
+    // The server still has the old name until the queue flushes.
+    final result = await repo.getProfile(forceRefresh: true);
+    expect(result.getOrElse(() => throw 'x'), edited);
+    expect(remote.getCalls, 1);
   });
 }

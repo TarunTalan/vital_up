@@ -5,8 +5,11 @@ import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/community/data/datasources/community_remote_datasource.dart';
+import 'package:vital_up/features/community/domain/entities/common_community_rank.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
+import 'package:vital_up/features/community/domain/entities/community_standing.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/domain/entities/player_profile.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -25,14 +28,26 @@ class CommunityRepositoryImpl implements CommunityRepository {
   static const _friendsMaxAge = Duration(minutes: 5);
   static const _boardMaxAge = Duration(minutes: 3);
 
+  /// Awards change at most once a week.
+  static const _awardsMaxAge = Duration(minutes: 30);
+
   /// Gives up on a hung request early enough to fall back to the cache
   /// before the screen's own load timeout.
   static const _requestTimeout = Duration(seconds: 10);
 
   String _key(String name) => 'community:$name:${_remote.requireUser()}';
   String get _communitiesKey => _key('communities');
-  String get _settingsKey => _key('settings');
+  String get _settingsKey => settingsKey(_remote.requireUser());
+
+  /// Cached Arena settings (username, city...); a username change patches
+  /// it so Arena shows the new name at once.
+  static String settingsKey(String userId) => 'community:settings:$userId';
   String get _friendsKey => _key('friends');
+
+  /// Ranks that depend on who the caller's friends are or which
+  /// communities they're in.
+  String get _friendRanksPrefix => '${_key('friendranks')}:';
+  String get _standingsPrefix => '${_key('standings')}:';
 
   /// Every leaderboard key of [communityId] starts with this.
   String _boardPrefix(String communityId) => '${_key('board')}:$communityId:';
@@ -65,6 +80,8 @@ class CommunityRepositoryImpl implements CommunityRepository {
   Future<void> _invalidateFriends() async {
     await _cache.remove(_friendsKey);
     await _cache.removeWhere(_boardPrefix('friends'));
+    await _cache.removeWhere(_friendRanksPrefix);
+    await _cache.removeWhere(_standingsPrefix);
   }
 
   @override
@@ -93,9 +110,9 @@ class CommunityRepositoryImpl implements CommunityRepository {
   }) async {
     try {
       if (joined) {
-        await _remote.join(community.id);
+        await _remote.join(community.id).timeout(_requestTimeout);
       } else {
-        await _remote.leave(community.id);
+        await _remote.leave(community.id).timeout(_requestTimeout);
       }
     } on PostgrestException catch (e) {
       // Joined already (e.g. on another device): the goal is met.
@@ -112,6 +129,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       return rows;
     });
     await _cache.removeWhere(_boardPrefix(community.id));
+    await _cache.removeWhere(_standingsPrefix);
   }
 
   @override
@@ -142,6 +160,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       'city': c.isEmpty ? null : c,
       'country_code': cc.isEmpty ? null : cc.toUpperCase(),
     });
+    await _cache.removeWhere(_standingsPrefix);
     if (sent) {
       // Moved to another local community: refetch the list.
       await _cache.remove(_communitiesKey);
@@ -222,6 +241,70 @@ class CommunityRepositoryImpl implements CommunityRepository {
     return row == null ? null : LeaderboardEntry.fromJson(row);
   }
 
+  @override
+  Future<List<LeaderboardEntry>> getFriendRanks(
+    Community community, {
+    required LeaderboardPeriod period,
+    ScoreCategory? category,
+  }) async {
+    if (community.type == CommunityType.friends) {
+      return _friendsBoard(period, category);
+    }
+    return [
+      for (final r in await _rows(
+        '$_friendRanksPrefix${community.id}:${period.name}:${category?.name}',
+        () => _remote.fetchCommunityFriendRanks(
+          communityId: community.id,
+          period: period.name,
+          category: category?.name,
+        ),
+        _boardMaxAge,
+      ))
+        LeaderboardEntry.fromJson(r),
+    ];
+  }
+
+  @override
+  Future<Map<String, CommunityStanding>> getMyStandings({
+    LeaderboardPeriod period = LeaderboardPeriod.week,
+  }) async => {
+    for (final r in await _rows(
+      '$_standingsPrefix${period.name}',
+      () => _remote.fetchMyStandings(period: period.name),
+      _boardMaxAge,
+    ))
+      r['community_id'] as String: CommunityStanding.fromJson(r),
+  };
+
+  @override
+  Future<List<AwardWinner>> getCommunityWinners(
+    Community community,
+    AwardPeriod period,
+  ) async {
+    if (community.type == CommunityType.friends) return const [];
+    return [
+      for (final r in await _rows(
+        '${_key('winners')}:${community.id}:${period.name}',
+        () => _remote.fetchCommunityAwards(
+          communityId: community.id,
+          period: period.name,
+        ),
+        _awardsMaxAge,
+      ))
+        AwardWinner.fromJson(r),
+    ];
+  }
+
+  @override
+  Future<List<CommunityAward>> getPlayerAwards([String? userId]) async => [
+    for (final r in await _rows(
+      '${_key('awards')}:${userId ?? 'me'}',
+      () => _remote.fetchPlayerAwards(userId),
+      _awardsMaxAge,
+    ))
+      CommunityAward.fromJson(r),
+  ];
+
   Future<List<LeaderboardEntry>> _friendsBoard(
     LeaderboardPeriod period,
     ScoreCategory? category,
@@ -301,8 +384,17 @@ class CommunityRepositoryImpl implements CommunityRepository {
       getPlayerProfile(_remote.requireUser());
 
   @override
-  Future<void> sendCheer(String userId) =>
-      _profileCall(() => _remote.sendCheer(userId).timeout(_requestTimeout));
+  Future<void> sendCheer(String userId) async {
+    try {
+      await _profileCall(
+        () => _remote.sendCheer(userId).timeout(_requestTimeout),
+      );
+    } on PlayerProfileException catch (e) {
+      // A retry after a lost reply, or a cheer sent from another device:
+      // the cheer is there, which is what the user wanted.
+      if (e.message != PlayerProfileException.alreadyCheered) rethrow;
+    }
+  }
 
   /// Maps server and network failures to [PlayerProfileException].
   Future<T> _profileCall<T>(Future<T> Function() run) async {
@@ -334,6 +426,65 @@ class CommunityRepositoryImpl implements CommunityRepository {
             if (r['user_id'] != friend.userId) r,
         ],
       );
+    }
+  }
+
+  /// Friends board, Global, the caller's city and joined communities where
+  /// the friend is ranked too, with both all-time ranks. Uses the real
+  /// ranks from [getFriendRanks]; falls back to the first 100 of each board
+  /// when that isn't available.
+  @override
+  Future<List<CommonCommunityRank>> getCommonCommunityRanks(
+    String friendUserId,
+  ) async {
+    try {
+      final communities = await getCommunities();
+      final targets = [
+        Community.friendsOf(0),
+        for (final c in communities)
+          if (c.type == CommunityType.global) c,
+        for (final c in communities)
+          if (c.type != CommunityType.global && c.isMember) c,
+      ];
+      final results = await Future.wait(
+        targets.map((c) async {
+          try {
+            List<LeaderboardEntry> entries;
+            try {
+              entries = await getFriendRanks(c, period: LeaderboardPeriod.all);
+            } catch (_) {
+              entries = await getLeaderboard(
+                c,
+                period: LeaderboardPeriod.all,
+                limit: 100,
+              );
+            }
+            final friend = entries
+                .where((e) => e.userId == friendUserId)
+                .firstOrNull;
+            final me = entries.where((e) => e.isMe).firstOrNull;
+            // Global and the friends board are always shared; elsewhere
+            // only boards the friend is ranked on.
+            final shared =
+                c.type == CommunityType.global ||
+                c.type == CommunityType.friends ||
+                friend != null;
+            if (!shared) return null;
+            return CommonCommunityRank(
+              community: c,
+              friendRank: friend?.rank,
+              friendPoints: friend?.points ?? 0,
+              myRank: me?.rank,
+              myPoints: me?.points ?? 0,
+            );
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      return results.whereType<CommonCommunityRank>().toList();
+    } catch (_) {
+      return const [];
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -25,6 +26,10 @@ class DriftActivitySessions extends Table {
   /// Uploaded to `activity_sessions` (SyncService). Reset on every save.
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
 
+  /// `WorkoutIntensity.name` for workouts without a route; null for GPS.
+  /// Declared last: upgrades add it after every older column.
+  TextColumn get intensity => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -48,10 +53,20 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
+
+  /// Track points are always read by session (route, sync, cascade delete);
+  /// without this every lookup scans every point ever recorded.
+  static const _trackPointIndex =
+      'CREATE INDEX IF NOT EXISTS idx_track_points_session '
+      'ON drift_track_points (session_id)';
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) async {
+          await m.createAll();
+          await customStatement(_trackPointIndex);
+        },
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.addColumn(
@@ -82,8 +97,19 @@ class AppDatabase extends _$AppDatabase {
               driftActivitySessions.synced,
             );
           }
+          if (from < 6) {
+            await customStatement(_trackPointIndex);
+          }
+          if (from < 7) {
+            await m.addColumn(
+              driftActivitySessions,
+              driftActivitySessions.intensity,
+            );
+          }
         },
         beforeOpen: (details) async {
+          // Prevent SQLITE_BUSY / database locked errors during concurrent startup.
+          await customStatement('PRAGMA busy_timeout = 5000');
           // SQLite ships with foreign keys off; without this the cascade on
           // track points never fires and deleted sessions leave them behind.
           await customStatement('PRAGMA foreign_keys = ON');
@@ -171,18 +197,25 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Every track point of every session, grouped by session id and in
-  /// time order. One query instead of one per session.
-  Future<Map<String, List<DriftTrackPoint>>> getAllTrackPointsBySession() async {
-    final rows = await (select(driftTrackPoints)
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.sessionId),
-            (t) => OrderingTerm(expression: t.timestamp),
-          ]))
-        .get();
+  /// Track points of [sessionIds], grouped by session id and in time
+  /// order. One query per 500 sessions (SQLite caps bound variables)
+  /// instead of one per session.
+  Future<Map<String, List<DriftTrackPoint>>> getTrackPointsBySession(
+    List<String> sessionIds,
+  ) async {
     final grouped = <String, List<DriftTrackPoint>>{};
-    for (final row in rows) {
-      (grouped[row.sessionId] ??= []).add(row);
+    for (var i = 0; i < sessionIds.length; i += 500) {
+      final chunk = sessionIds.sublist(i, min(i + 500, sessionIds.length));
+      final rows = await (select(driftTrackPoints)
+            ..where((t) => t.sessionId.isIn(chunk))
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.sessionId),
+              (t) => OrderingTerm(expression: t.timestamp),
+            ]))
+          .get();
+      for (final row in rows) {
+        (grouped[row.sessionId] ??= []).add(row);
+      }
     }
     return grouped;
   }
@@ -218,8 +251,16 @@ class AppDatabase extends _$AppDatabase {
       .get();
 
   // Retrieve all sessions in reverse chronological order
-  Future<List<DriftActivitySession>> getAllSessions() =>
-      (select(driftActivitySessions)..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.desc)])).get();
+  Future<List<DriftActivitySession>> getAllSessions({DateTime? since}) {
+    final query = select(driftActivitySessions)
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.desc),
+      ]);
+    if (since != null) {
+      query.where((t) => t.startTime.isBiggerOrEqualValue(since));
+    }
+    return query.get();
+  }
 
   // Delete a session and cascaded points
   Future<void> deleteSession(String id) => transaction(() async {
@@ -232,6 +273,12 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'vital_up_activity.db'));
-    return NativeDatabase.createInBackground(file);
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (rawDb) {
+        rawDb.execute('PRAGMA journal_mode = WAL;');
+        rawDb.execute('PRAGMA busy_timeout = 5000;');
+      },
+    );
   });
 }

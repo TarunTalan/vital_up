@@ -33,7 +33,7 @@ void main() {
     expect(insights.single.text, contains('Log water'));
   });
 
-  test('reports goal hit rate and the current streak', () {
+  test('reports the current goal streak', () {
     final insights = seriesInsights(
       _series([1, 1, 3, 3, 3], goal: 3),
       format: _f,
@@ -41,7 +41,6 @@ void main() {
     );
     final goal = insights.firstWhere((i) => i.icon == Icons.flag_rounded);
     expect(goal.text, contains('3-day goal streak'));
-    expect(goal.text, contains('3 of the last 5 days'));
   });
 
   test('a rising "less is better" metric is flagged, not praised', () {

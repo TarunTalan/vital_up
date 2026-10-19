@@ -72,7 +72,6 @@ class WaterIntakeCard extends StatelessWidget {
           }
           final current = state.currentIntakeMl;
           final goal = state.dailyGoalMl;
-          final left = goal - current;
           return TrackerCard(
             metric: _metric,
             status: TrackerStatus.of(
@@ -100,10 +99,6 @@ class WaterIntakeCard extends StatelessWidget {
                     goal: WaterTrendsPage.formatMl(goal.toDouble()),
                     fraction: safeFraction(current, goal),
                     color: _metric.color,
-                    caption: left > 0
-                        ? '${WaterTrendsPage.formatMl(left.toDouble())} to go · '
-                              'about ${(left / 250).ceil()} glasses'
-                        : 'Goal met — nicely hydrated today.',
                   ),
                 ],
               ),

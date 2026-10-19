@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
@@ -19,6 +20,7 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     required this.deleteActivitySession,
   }) : super(const ActivityHistoryLoading()) {
     on<LoadActivityHistory>(_onLoad);
+    on<FilterByActivityGroup>(_onFilterByActivityGroup);
     on<FilterByActivityType>(_onFilterByActivityType);
     on<SearchHistory>(_onSearch);
     on<UpdateSessionAnnotation>(_onUpdateAnnotation);
@@ -42,6 +44,21 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     }
   }
 
+  void _onFilterByActivityGroup(
+      FilterByActivityGroup event,
+      Emitter<ActivityHistoryState> emit,
+      ) {
+    final s = state;
+    if (s is! ActivityHistoryLoaded) return;
+
+    final updated = s.copyWith(
+      groupFilter: event.group,
+      clearGroupFilter: event.group == null,
+      clearActivityTypeFilter: true,
+    );
+    emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
+  }
+
   void _onFilterByActivityType(
       FilterByActivityType event,
       Emitter<ActivityHistoryState> emit,
@@ -52,6 +69,7 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     final updated = s.copyWith(
       activityTypeFilter: event.activityType,
       clearActivityTypeFilter: event.activityType == null,
+      clearGroupFilter: true,
     );
     emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
   }
@@ -68,15 +86,19 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     final query = s.searchQuery.trim().toLowerCase();
 
     return s.allEntries.where((entry) {
-      final matchesType = s.activityTypeFilter == null ||
-          entry.session.activityType == s.activityTypeFilter;
+      final type = entry.session.activityType;
+      final matchesType =
+          (s.activityTypeFilter == null || type == s.activityTypeFilter) &&
+          (s.groupFilter?.contains(type) ?? true);
 
       if (!matchesType) return false;
       if (query.isEmpty) return true;
 
       final tag = entry.annotation?.tag?.toLowerCase() ?? '';
       final note = entry.annotation?.note?.toLowerCase() ?? '';
-      return tag.contains(query) || note.contains(query);
+      return type.label.toLowerCase().contains(query) ||
+          tag.contains(query) ||
+          note.contains(query);
     }).toList();
   }
 

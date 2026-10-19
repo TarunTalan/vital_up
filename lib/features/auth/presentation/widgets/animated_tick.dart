@@ -130,7 +130,7 @@ class _AnimatedTickState extends State<AnimatedTick>
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(flipAngle),
                 child: SvgPicture.asset(
-                  'assets/icons/outercircle.svg',
+                  'assets/icons/auth/outercircle.svg',
                   width: outerSize,
                   height: outerSize,
                 ),
@@ -142,7 +142,7 @@ class _AnimatedTickState extends State<AnimatedTick>
                     ..setEntry(3, 2, 0.001)
                     ..rotateY(flipAngle),
                   child: SvgPicture.asset(
-                    'assets/icons/innercircle.svg',
+                    'assets/icons/auth/innercircle.svg',
                     width: innerSize,
                     height: innerSize,
                   ),
@@ -151,7 +151,7 @@ class _AnimatedTickState extends State<AnimatedTick>
                 width: tickWidth,
                 height: tickHeight,
                 child: SvgPicture.asset(
-                  'assets/icons/tick.svg',
+                  'assets/icons/ui/tick.svg',
                   fit: BoxFit.contain,
                 ),
               ),

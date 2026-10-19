@@ -60,8 +60,13 @@ class SleepTrendsPage extends StatelessWidget {
                           '${time.format(night.wakeTime)}',
                 fraction: safeFraction(hours, goal),
                 // The night is over, so judge it against the whole goal.
-                status: TrackerStatus.of(value: hours, goal: goal, paceFraction: 1),
+                status: TrackerStatus.of(
+                  value: hours,
+                  goal: goal,
+                  paceFraction: 1,
+                ),
                 ringLabel: night == null ? null : '${night.sleepScore}',
+                logged: night != null,
                 statusColor: night == null
                     ? null
                     : sleepScoreColor(night.sleepScore),
@@ -93,9 +98,19 @@ class SleepTrendsPage extends StatelessWidget {
                 ),
               const _RecoveryCard(),
             ],
-            logsTitle: 'Nights',
+            emptyLogs: 'No sleep logged for last night.',
+            dateOf: (night) => night.wakeTime,
+            allLogs: () async {
+              final nights = await sl<SleepService>().getSleepBetween(
+                DateTime(2000),
+                nextDay(startOfDay(DateTime.now())),
+              );
+              return nights..sort((a, b) => b.wakeTime.compareTo(a.wakeTime));
+            },
+            editLabel: 'Edit sleep',
             onLog: () async {
-              if (await showSleepLogSheet(context)) {
+              final logs = cubit.state.data?.logs ?? const [];
+              if (await showSleepLogSheet(context, initial: _lastNight(logs))) {
                 await cubit.load();
                 try {
                   await sl<HomeWidgetService>().refresh();
@@ -154,7 +169,7 @@ class SleepTrendsPage extends StatelessWidget {
     ).add(Duration(minutes: avg.round()));
     return [
       TrackerInsight(
-        Icons.nightlight_round,
+        Icons.bedtime_rounded,
         'You usually go to bed around ${DateFormat.jm().format(typical)}'
         '${spread > 45 ? ', but it varies by about ${spread.round()} min. '
                   'A steadier bedtime improves deep sleep.' : ' — nice and consistent.'}',

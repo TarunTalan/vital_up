@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
@@ -69,10 +70,13 @@ class DietProgressPage extends StatelessWidget {
               if (await editNutritionGoal(context)) reload();
             },
             insights: (data) => _mealInsights(data.logs),
-            sections: (context, data) => [const _MacrosCard()],
-            logsTitle: 'Meals',
-            emptyLogs: 'No meals logged in this period yet.',
-            logsActionLabel: 'All meals',
+            sections: (context, data) => [
+              const _MacrosCard(),
+              _DietPlanActionCard(onReload: reload),
+            ],
+            logsTitle: "Today's meals",
+            emptyLogs: 'No meals logged today.',
+            dateOf: (meal) => meal.capturedAt,
             onLogsAction: () => context.pushNamed('meal-log-history'),
             onRefresh: reload,
             onLog: () async {
@@ -177,7 +181,7 @@ class _MacrosCard extends StatelessWidget {
                       TrackerFigure(
                         label: 'Sugar',
                         value: '${sugar.toStringAsFixed(1)}g',
-                        icon: Icons.icecream_rounded,
+                        iconAsset: 'assets/icons/ui/sugar.svg',
                       ),
                       TrackerFigure(
                         label: 'Sat. fat',
@@ -190,6 +194,42 @@ class _MacrosCard extends StatelessWidget {
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// The active diet plan, or a way to create one, as a single row.
+class _DietPlanActionCard extends StatelessWidget {
+  final Future<void> Function() onReload;
+
+  const _DietPlanActionCard({required this.onReload});
+
+  @override
+  Widget build(BuildContext context) {
+    const metric = TrackerMetric.nutrition;
+    return BlocBuilder<DietPlanCubit, DietPlanState>(
+      builder: (context, state) {
+        final plan = state is DietPlanLoaded ? state.mealPlan : null;
+        return AppListGroup(
+          children: [
+            AppListTile(
+              svgAsset: 'assets/icons/nav/vita.svg',
+              iconColor: metric.color,
+              title: plan != null ? 'Your diet plan' : 'Create a diet plan',
+              subtitle: plan != null
+                  ? '${plan.meals.length} meals · '
+                        '${NumberFormat.decimalPattern().format(plan.totalCalories.round())} kcal a day'
+                  : 'Vita builds one around your goals',
+              onTap: () async {
+                await context.pushNamed(
+                  plan != null ? 'vita-diet-plan' : 'diet-plan-prefs',
+                );
+                onReload();
+              },
+            ),
+          ],
         );
       },
     );

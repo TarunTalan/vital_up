@@ -1,183 +1,172 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
 
-/// A single row in the activity history list: date/time, activity icon,
-/// key stats, and an optional tag chip. Tapping the card opens details/edit
-/// via [onTap]; long-pressing offers delete via [onDelete].
+/// One activity in the history: its icon, type and when, then three
+/// figures in equal columns (distance, time and calories; time, calories
+/// and effort for workouts without a route). One accent only, on the icon.
+/// Tapping opens the details (target, notes); the bin deletes.
 class ActivityHistoryCard extends StatelessWidget {
   final HistoryEntry entry;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+
+  /// Null on read-only lists: no delete button.
+  final VoidCallback? onDelete;
 
   const ActivityHistoryCard({
     super.key,
     required this.entry,
     required this.onTap,
-    required this.onDelete,
+    this.onDelete,
   });
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final delete = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this activity?'),
+        content: const Text('It will be removed from your history and totals.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: dialogContext.colors.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (delete == true) onDelete?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final v = context.vColors;
     final session = entry.session;
     final tag = entry.annotation?.tag;
-    final targetValue = session.targetValue;
-    final hasTarget =
-        session.targetType != null && targetValue != null && targetValue > 0;
+    final time = formatDuration(
+      Duration(seconds: session.totalDurationSeconds),
+    );
+    final calories = _Figure(value: '${session.calories}', label: 'Calories');
+    final figures = session.hasDistance
+        ? [
+            _Figure(
+              value: formatDistanceKm(session.totalDistanceMeters),
+              label: 'km',
+            ),
+            _Figure(value: time, label: 'Time'),
+            calories,
+          ]
+        : [
+            _Figure(value: time, label: 'Time'),
+            calories,
+            _Figure(value: session.intensity?.label ?? '–', label: 'Effort'),
+          ];
 
-    return Dismissible(
-      key: ValueKey(session.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        margin: EdgeInsets.symmetric(
-          horizontal: context.gutter,
-          vertical: AppDimens.space6,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimens.space20),
-        decoration: BoxDecoration(
-          color: colors.error,
-          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        ),
-        child: Icon(Icons.delete_rounded, color: colors.onError),
-      ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Delete activity?'),
-                content: const Text('This cannot be undone.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: TextButton.styleFrom(foregroundColor: colors.error),
-                    child: const Text('Delete'),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-      },
-      onDismissed: (_) => onDelete(),
-      child: AppCard(
-        onTap: onTap,
-        margin: EdgeInsets.symmetric(
-          horizontal: context.gutter,
-          vertical: AppDimens.space6,
-        ),
-        padding: AppDimens.cardPaddingCompact,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppIconBadge(icon: Icon(activityTypeIcon(session.activityType))),
-            const SizedBox(width: AppDimens.space12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: AppDimens.space8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        session.activityType.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.titleSmall?.copyWith(
-                          color: colors.onSurface,
-                        ),
+    return AppCard(
+      onTap: onTap,
+      padding: AppDimens.cardPaddingCompact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconBadge(icon: Icon(activityTypeIcon(session.activityType))),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.activityType.label,
+                      style: context.text.titleSmall?.copyWith(
+                        color: context.colors.onSurface,
                       ),
-                      Text(
-                        '${formatShortDate(session.startTime)} · ${formatTimeOfDay(session.startTime)}',
-                        style: context.text.bodySmall?.copyWith(
-                          color: v.grayText,
-                        ),
+                    ),
+                    const SizedBox(height: AppDimens.space2),
+                    Text(
+                      formatLogDateTime(session.startTime),
+                      style: context.text.bodySmall?.copyWith(
+                        color: v.grayText,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: AppDimens.space8),
-                  Wrap(
-                    spacing: AppDimens.space12,
-                    runSpacing: AppDimens.space4,
-                    children: [
-                      _MiniStat(
-                        icon: Icons.straighten_rounded,
-                        value:
-                            '${formatDistanceKm(session.totalDistanceMeters)} km',
-                      ),
-                      _MiniStat(
-                        icon: Icons.access_time_rounded,
-                        value: formatDuration(
-                          Duration(seconds: session.totalDurationSeconds),
-                        ),
-                      ),
-                      _MiniStat(
-                        icon: Icons.local_fire_department_rounded,
-                        value: '${session.calories} cal',
-                      ),
-                    ],
-                  ),
-                  if ((tag != null && tag.isNotEmpty) || hasTarget) ...[
-                    const SizedBox(height: AppDimens.space8),
-                    Wrap(
-                      spacing: AppDimens.space6,
-                      runSpacing: AppDimens.space6,
-                      children: [
-                        if (tag != null && tag.isNotEmpty)
-                          ActivityTagChip(label: tag),
-                        if (hasTarget)
-                          ActivityTargetChip(
-                            label: formatActivityTarget(
-                              session.targetType,
-                              targetValue,
-                            ),
-                            achieved: session.targetAchieved,
-                          ),
-                      ],
                     ),
                   ],
-                ],
+                ),
+              ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'Delete',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _confirmDelete(context),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: AppDimens.iconMd,
+                    color: v.grayText,
+                  ),
+                ),
+            ],
+          ),
+          if (tag != null && tag.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.space8),
+            Text(
+              tag,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.bodyMedium?.copyWith(
+                color: context.colors.onSurface,
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: v.grayText),
           ],
-        ),
+          const SizedBox(height: AppDimens.space12),
+          Divider(height: 1, color: v.glassBorder),
+          const SizedBox(height: AppDimens.space12),
+          AdaptiveRow(children: figures),
+        ],
       ),
     );
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
+/// A figure over its label, both left-aligned so the columns line up.
+class _Figure extends StatelessWidget {
   final String value;
+  final String label;
 
-  const _MiniStat({required this.icon, required this.value});
+  const _Figure({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: AppDimens.iconXs, color: context.vColors.grayText),
-        const SizedBox(width: AppDimens.space4),
-        Text(
+        FitText(
           value,
           maxLines: 1,
-          style: context.text.bodySmall?.copyWith(
+          style: context.text.titleSmall?.copyWith(
             color: context.colors.onSurface,
-            fontWeight: FontWeight.w500,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(height: AppDimens.space2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.labelSmall?.copyWith(
+            color: context.vColors.grayText,
           ),
         ),
       ],

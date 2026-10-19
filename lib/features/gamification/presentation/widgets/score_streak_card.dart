@@ -4,19 +4,18 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
-import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 final _points = NumberFormat.decimalPattern();
 
-/// Arena card: level and title, points with progress to the next level,
-/// and streak, best streak and today's points. Tap for points history;
-/// "Badges" opens the badge collection.
+/// Arena hero: level ring, level title and points to the next level, then
+/// streak, today's points and banked rest days. Tap for points history.
+/// Shortcuts to badges, points and the activity calendar sit below it.
 class ScoreStreakCard extends StatelessWidget {
   const ScoreStreakCard({super.key});
 
@@ -44,122 +43,240 @@ class ScoreStreakCard extends StatelessWidget {
           );
         }
         final next = stats.nextLevel;
-        final grey = context.vColors.grayText;
+        final v = context.vColors;
         String days(int n) => '$n ${n == 1 ? 'day' : 'days'}';
-        return AppCard(
-          width: double.infinity,
-          onTap: () => _push(context, 'points-history'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DashboardCardHeader(
-                title: 'Level ${stats.level.level} · ${stats.level.title}',
-                icon: Icons.emoji_events_rounded,
-                badgeColor: AppColors.scoreBonus,
-                trailing: CardLink(
-                  label: 'Badges',
-                  onTap: () => _push(context, 'badges'),
-                ),
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppCard(
+              width: double.infinity,
+              onTap: () => _push(context, 'points-history'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    '${_points.format(stats.totalPoints)} pts',
-                    style: context.text.titleMedium?.copyWith(
-                      color: context.colors.onSurface,
-                      fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      LevelRing(stats: stats),
+                      const SizedBox(width: AppDimens.space16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Level ${stats.level.level}',
+                              style: context.text.labelLarge?.copyWith(
+                                color: v.accentText,
+                              ),
+                            ),
+                            Text(
+                              stats.level.title,
+                              style: context.text.titleLarge?.copyWith(
+                                color: context.colors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: AppDimens.space4),
+                            Text(
+                              next == null
+                                  ? '${_points.format(stats.totalPoints)} pts'
+                                        ' · top level'
+                                  : '${_points.format(stats.totalPoints)} pts'
+                                        ' · ${_points.format(stats.pointsToNextLevel)}'
+                                        ' to Level ${next.level}',
+                              style: context.text.bodySmall?.copyWith(
+                                color: v.grayText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.space16),
+                  Divider(height: AppDimens.borderThin, color: v.divider),
+                  const SizedBox(height: AppDimens.space12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _Stat(
+                            icon: Icons.local_fire_department_rounded,
+                            iconAsset: GamificationIcons.streakFlame,
+                            color: stats.streak > 0
+                                ? AppColors.streak
+                                : v.grayText!,
+                            value: days(stats.streak),
+                            label: 'Streak',
+                          ),
+                        ),
+                        VerticalDivider(
+                          width: AppDimens.space16,
+                          color: v.divider,
+                        ),
+                        Expanded(
+                          child: _Stat(
+                            icon: Icons.star_rounded,
+                            iconAsset: GamificationIcons.points,
+                            color: context.colors.primary,
+                            value: '+${_points.format(state.todayTotal)}',
+                            label: 'Today',
+                          ),
+                        ),
+                        VerticalDivider(
+                          width: AppDimens.space16,
+                          color: v.divider,
+                        ),
+                        Expanded(
+                          child: _Stat(
+                            icon: Icons.ac_unit_rounded,
+                            color: stats.streakFreezes > 0
+                                ? AppColors.info
+                                : v.grayText!,
+                            value: '${stats.streakFreezes}',
+                            label: stats.streakFreezes == 1
+                                ? 'Rest day'
+                                : 'Rest days',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: AppDimens.space8),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimens.cardGap),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Expanded(
-                    child: Text(
-                      next == null
-                          ? 'Top level reached'
-                          : '${_points.format(stats.pointsToNextLevel)} to '
-                                'Level ${next.level}',
-                      textAlign: TextAlign.end,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.bodySmall?.copyWith(color: grey),
+                    child: _Shortcut(
+                      icon: Icons.military_tech_rounded,
+                      label: 'Badges',
+                      onTap: () => _push(context, 'badges'),
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.cardGap),
+                  Expanded(
+                    child: _Shortcut(
+                      icon: Icons.insights_rounded,
+                      label: 'Points',
+                      onTap: () => _push(context, 'points-history'),
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.cardGap),
+                  Expanded(
+                    child: _Shortcut(
+                      icon: Icons.calendar_month_rounded,
+                      label: 'Calendar',
+                      onTap: () => _push(context, 'activity-calendar'),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppDimens.space8),
-              AppProgressBar(
-                value: stats.levelProgress,
-                color: context.colors.primary,
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              Divider(
-                height: AppDimens.borderThin,
-                color: context.vColors.divider,
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              TrackerFigureRow(
-                figures: [
-                  TrackerFigure(
-                    label: 'Streak',
-                    value: days(stats.streak),
-                    icon: Icons.local_fire_department_rounded,
-                    color: stats.streak > 0 ? AppColors.streak : grey,
-                  ),
-                  TrackerFigure(
-                    label: 'Best',
-                    value: days(stats.longestStreak),
-                    icon: Icons.emoji_events_outlined,
-                    color: grey,
-                  ),
-                  TrackerFigure(
-                    label: 'Today',
-                    value: '+${_points.format(state.todayTotal)}',
-                    icon: Icons.add_circle_outline_rounded,
-                    color: context.colors.primary,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              _RestDays(stats: stats),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
   }
 }
 
-/// Rest days banked, or how close the next one is.
-class _RestDays extends StatelessWidget {
-  final PlayerStats stats;
+/// One figure under the level: icon, value and a short label, centred.
+class _Stat extends StatelessWidget {
+  final IconData icon;
+  final String? iconAsset;
+  final Color color;
+  final String value;
+  final String label;
 
-  const _RestDays({required this.stats});
+  const _Stat({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+    this.iconAsset,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final banked = stats.streakFreezes;
-    final toGo = stats.daysToNextFreeze;
-    final text = banked == 0
-        ? 'Stay active $toGo more ${toGo == 1 ? 'day' : 'days'} in a row to '
-              'earn a rest day'
-        : '$banked rest ${banked == 1 ? 'day' : 'days'} saved: a missed day '
-              "won't break your streak";
-    final color = banked > 0 ? AppColors.info : context.vColors.grayText;
-    return Row(
-      children: [
-        Icon(Icons.ac_unit_rounded, size: AppDimens.iconXs, color: color),
-        const SizedBox(width: AppDimens.space8),
-        Expanded(
-          child: Text(
-            text,
-            style: context.text.bodySmall?.copyWith(
+    return Semantics(
+      label: '$label: $value',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          iconAsset != null
+              ? GameIcon(
+                  iconAsset!,
+                  fallback: icon,
+                  size: AppDimens.iconMd,
+                  color: color,
+                )
+              : Icon(icon, size: AppDimens.iconMd, color: color),
+          const SizedBox(height: AppDimens.space4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: context.text.labelSmall?.copyWith(
               color: context.vColors.grayText,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Square-ish shortcut card: icon over a one-word label.
+class _Shortcut extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _Shortcut({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space8,
+          vertical: AppDimens.space12,
         ),
-      ],
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: AppDimens.iconLg,
+              color: context.vColors.accentText,
+            ),
+            const SizedBox(height: AppDimens.space6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: context.text.labelLarge?.copyWith(
+                color: context.colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -192,20 +309,11 @@ class LevelRing extends StatelessWidget {
               strokeCap: StrokeCap.round,
             ),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LV',
-                style: context.text.labelSmall?.copyWith(
-                  color: context.vColors.grayText,
-                ),
-              ),
-              Text(
-                '${stats.level.level}',
-                style: context.text.headlineSmall?.copyWith(color: color),
-              ),
-            ],
+          GameIcon(
+            GamificationIcons.levelHexagon(stats.level.level),
+            fallback: Icons.shield_rounded,
+            size: size * 0.48,
+            color: color,
           ),
         ],
       ),
@@ -266,7 +374,7 @@ class _Pill extends StatelessWidget {
             child: Text(
               text,
               style: context.text.labelSmall?.copyWith(
-                color: color,
+                color: context.colors.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -311,15 +419,18 @@ class CategoryPointsTile extends StatelessWidget {
                 )
               : Icon(category.icon, size: AppDimens.iconSm, color: color),
           const SizedBox(height: AppDimens.space6),
-          Text(
+          // Narrow tiles (4 across on small phones): the total shrinks to
+          // fit instead of breaking mid-number, and the label wraps.
+          FitText(
             '${signed ? '+' : ''}${_points.format(points)}',
+            maxLines: 1,
             style: context.text.titleSmall?.copyWith(
               color: context.colors.onSurface,
             ),
           ),
           Text(
             category.label,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: context.text.labelSmall?.copyWith(
               color: context.vColors.grayText,

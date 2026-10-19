@@ -29,7 +29,7 @@ class AppPageHeader extends StatelessWidget {
     this.onBack,
     this.action,
     this.showBack = true,
-    this.blur = true,
+    this.blur = false,
   }) : assert(
          title != null || titleWidget != null,
          'Either title or titleWidget must be provided',
@@ -229,7 +229,7 @@ class AppHeaderAction extends StatelessWidget {
           onTap: onTap,
           child: IconTheme(
             data: IconThemeData(
-              color: context.colors.primary,
+              color: v.accentText,
               size: AppDimens.iconLg,
             ),
             child: Center(child: icon),

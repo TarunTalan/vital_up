@@ -5,11 +5,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/food_scanner/data/models/food_scanner_models.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/food_item.dart';
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
@@ -24,6 +28,7 @@ import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_ut
 import 'package:vital_up/features/auth/presentation/widgets/back_icon.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/accuracy_info_dialog.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -34,11 +39,20 @@ class FoodDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<FoodScanBloc, FoodScanState>(
       listenWhen: (previous, current) =>
-          current is MealLogSaved || current is RecognitionFailed || current is ScanActionFailed,
+          current is MealLogSaved ||
+          current is RecognitionFailed ||
+          current is ScanActionFailed,
       listener: (context, state) {
         if (state is MealLogSaved) {
           showSuccessSnackBar(context, 'Meal saved to your log.');
           Navigator.of(context).maybePop();
+        } else if (state is RecognitionFailed &&
+            state.failure is ScanQuotaExceededFailure) {
+          offerProForLimit(
+            context,
+            reason: ProReason.photoScans,
+            message: state.failure.message,
+          );
         } else if (state is RecognitionFailed) {
           showErrorSnackBar(context, state.failure.message);
         } else if (state is ScanActionFailed) {
@@ -54,9 +68,7 @@ class FoodDetailPage extends StatelessWidget {
               Positioned.fill(
                 child: ColoredBox(
                   color: AppColors.black.withValues(alpha: 0.54),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: AppColors.white),
-                  ),
+                  child: const Center(child: VitalUpLoader()),
                 ),
               ),
             ],
@@ -81,12 +93,10 @@ class FoodDetailPage extends StatelessWidget {
         macros: [for (final m in data.macros) (m.name, m.grams)],
       );
       final path = data.imagePath;
-      final hasPhoto = path != null && path.isNotEmpty && await File(path).exists();
+      final hasPhoto =
+          path != null && path.isNotEmpty && await File(path).exists();
       await SharePlus.instance.share(
-        ShareParams(
-          text: text,
-          files: hasPhoto ? [XFile(path)] : null,
-        ),
+        ShareParams(text: text, files: hasPhoto ? [XFile(path)] : null),
       );
     } catch (e) {
       debugPrint('Meal share failed: $e');
@@ -177,9 +187,7 @@ class FoodDetailPage extends StatelessWidget {
             dishes: data.dishes,
             foodItems: data.foodItems,
             onRemove: (id) {
-              context.read<FoodScanBloc>().add(
-                RemoveDetectedItemRequested(id),
-              );
+              context.read<FoodScanBloc>().add(RemoveDetectedItemRequested(id));
             },
             onEdit: (itemId, name, quantity, unit) {
               context.read<FoodScanBloc>().add(
@@ -314,29 +322,76 @@ class _FoodDetailData {
         ),
     ];
 
-    final totalSaturatedFat = nutrition.fold<double>(0, (sum, nut) => sum + nut.saturatedFatG);
-    final totalTransFat = nutrition.fold<double>(0, (sum, nut) => sum + nut.transFatG);
-    final totalCholesterol = nutrition.fold<double>(0, (sum, nut) => sum + nut.cholesterolMg);
-    final totalPotassium = nutrition.fold<double>(0, (sum, nut) => sum + nut.potassiumMg);
-    final totalCalcium = nutrition.fold<double>(0, (sum, nut) => sum + nut.calciumMg);
+    final totalSaturatedFat = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.saturatedFatG,
+    );
+    final totalTransFat = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.transFatG,
+    );
+    final totalCholesterol = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.cholesterolMg,
+    );
+    final totalPotassium = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.potassiumMg,
+    );
+    final totalCalcium = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.calciumMg,
+    );
     final totalIron = nutrition.fold<double>(0, (sum, nut) => sum + nut.ironMg);
-    final totalVitaminC = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminCMg);
-    final totalVitaminD = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminDIu);
-    final totalVitaminB12 = nutrition.fold<double>(0, (sum, nut) => sum + nut.vitaminB12Mcg);
-    final totalMagnesium = nutrition.fold<double>(0, (sum, nut) => sum + nut.magnesiumMg);
+    final totalVitaminC = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.vitaminCMg,
+    );
+    final totalVitaminD = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.vitaminDIu,
+    );
+    final totalVitaminB12 = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.vitaminB12Mcg,
+    );
+    final totalMagnesium = nutrition.fold<double>(
+      0,
+      (sum, nut) => sum + nut.magnesiumMg,
+    );
     final totalZinc = nutrition.fold<double>(0, (sum, nut) => sum + nut.zincMg);
 
     final candidates = [
-      _NutrientCandidate(name: 'Carbs', value: totalCarbs, unit: 'g', color: AppColors.scanCarbs),
-      _NutrientCandidate(name: 'Protein', value: totalProtein, unit: 'g', color: AppColors.scanProtein),
-      _NutrientCandidate(name: 'Fat', value: totalFat, unit: 'g', color: AppColors.scanFat),
+      _NutrientCandidate(
+        name: 'Carbs',
+        value: totalCarbs,
+        unit: 'g',
+        color: AppColors.scanCarbs,
+      ),
+      _NutrientCandidate(
+        name: 'Protein',
+        value: totalProtein,
+        unit: 'g',
+        color: AppColors.scanProtein,
+      ),
+      _NutrientCandidate(
+        name: 'Fat',
+        value: totalFat,
+        unit: 'g',
+        color: AppColors.scanFat,
+      ),
     ];
 
     final top3 = candidates;
-    final totalTop3Weight = top3.fold<double>(0, (sum, item) => sum + item.value);
+    final totalTop3Weight = top3.fold<double>(
+      0,
+      (sum, item) => sum + item.value,
+    );
 
     final macros = top3.map((item) {
-      final pct = totalTop3Weight > 0 ? (item.value / totalTop3Weight * 100).round() : 0;
+      final pct = totalTop3Weight > 0
+          ? (item.value / totalTop3Weight * 100).round()
+          : 0;
       return MacroMain(
         name: item.name,
         grams: item.value.round(),
@@ -349,30 +404,44 @@ class _FoodDetailData {
 
     // --- 1. Common Healthy Macros/Nutrients ---
     if (totalFiber > 0) {
-      macroDetails.add(MacroDetail(name: 'Dietary Fiber', grams: totalFiber, unit: 'g'));
+      macroDetails.add(
+        MacroDetail(name: 'Dietary Fiber', grams: totalFiber, unit: 'g'),
+      );
     }
     if (totalPotassium > 0) {
-      macroDetails.add(MacroDetail(name: 'Potassium', grams: totalPotassium, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Potassium', grams: totalPotassium, unit: 'mg'),
+      );
     }
     if (totalCalcium > 0) {
-      macroDetails.add(MacroDetail(name: 'Calcium', grams: totalCalcium, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Calcium', grams: totalCalcium, unit: 'mg'),
+      );
     }
     if (totalIron > 0) {
       macroDetails.add(MacroDetail(name: 'Iron', grams: totalIron, unit: 'mg'));
     }
     if (totalVitaminC > 0) {
-      macroDetails.add(MacroDetail(name: 'Vitamin C', grams: totalVitaminC, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Vitamin C', grams: totalVitaminC, unit: 'mg'),
+      );
     }
 
     // --- 2. Rare but Important Healthy Nutrients ---
     if (totalVitaminD > 0) {
-      macroDetails.add(MacroDetail(name: 'Vitamin D', grams: totalVitaminD, unit: 'IU'));
+      macroDetails.add(
+        MacroDetail(name: 'Vitamin D', grams: totalVitaminD, unit: 'IU'),
+      );
     }
     if (totalVitaminB12 > 0) {
-      macroDetails.add(MacroDetail(name: 'Vitamin B12', grams: totalVitaminB12, unit: 'mcg'));
+      macroDetails.add(
+        MacroDetail(name: 'Vitamin B12', grams: totalVitaminB12, unit: 'mcg'),
+      );
     }
     if (totalMagnesium > 0) {
-      macroDetails.add(MacroDetail(name: 'Magnesium', grams: totalMagnesium, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Magnesium', grams: totalMagnesium, unit: 'mg'),
+      );
     }
     if (totalZinc > 0) {
       macroDetails.add(MacroDetail(name: 'Zinc', grams: totalZinc, unit: 'mg'));
@@ -380,19 +449,29 @@ class _FoodDetailData {
 
     // --- 3. Unhealthy/Harmful Macros/Nutrients ---
     if (totalSugar > 0) {
-      macroDetails.add(MacroDetail(name: 'Total Sugars', grams: totalSugar, unit: 'g'));
+      macroDetails.add(
+        MacroDetail(name: 'Total Sugars', grams: totalSugar, unit: 'g'),
+      );
     }
     if (totalSaturatedFat > 0) {
-      macroDetails.add(MacroDetail(name: 'Saturated Fat', grams: totalSaturatedFat, unit: 'g'));
+      macroDetails.add(
+        MacroDetail(name: 'Saturated Fat', grams: totalSaturatedFat, unit: 'g'),
+      );
     }
     if (totalTransFat > 0) {
-      macroDetails.add(MacroDetail(name: 'Trans Fat', grams: totalTransFat, unit: 'g'));
+      macroDetails.add(
+        MacroDetail(name: 'Trans Fat', grams: totalTransFat, unit: 'g'),
+      );
     }
     if (totalCholesterol > 0) {
-      macroDetails.add(MacroDetail(name: 'Cholesterol', grams: totalCholesterol, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Cholesterol', grams: totalCholesterol, unit: 'mg'),
+      );
     }
     if (totalSodium > 0) {
-      macroDetails.add(MacroDetail(name: 'Sodium', grams: totalSodium, unit: 'mg'));
+      macroDetails.add(
+        MacroDetail(name: 'Sodium', grams: totalSodium, unit: 'mg'),
+      );
     }
 
     // Sort all details in descending order of their weight contribution (converting all to grams)
@@ -405,19 +484,27 @@ class _FoodDetailData {
         case 'mcg':
           return detail.grams / 1000000.0;
         case 'iu':
-          return detail.grams * 0.000000025; // 1 IU Vitamin D = 0.025 mcg = 0.000000025 g
+          return detail.grams *
+              0.000000025; // 1 IU Vitamin D = 0.025 mcg = 0.000000025 g
         default:
           return detail.grams;
       }
     }
-    macroDetails.sort((a, b) => getWeightInGrams(b).compareTo(getWeightInGrams(a)));
+
+    macroDetails.sort(
+      (a, b) => getWeightInGrams(b).compareTo(getWeightInGrams(a)),
+    );
 
     String capitalize(String s) {
       if (s.isEmpty) return s;
-      return s.split(' ').map((word) {
-        if (word.isEmpty) return '';
-        return word[0].toUpperCase() + word.substring(1).toLowerCase();
-      }).join(' ');
+      return s
+          .split(' ')
+          .map((word) {
+            // Only all-lowercase words: keep "KFC" and "McDonald's" as written.
+            if (word.isEmpty || word != word.toLowerCase()) return word;
+            return word[0].toUpperCase() + word.substring(1);
+          })
+          .join(' ');
     }
 
     final rawDishName = items.length == 1 ? items.first.name : 'Scanned Meal';
@@ -443,7 +530,10 @@ class _FoodDetailData {
     );
 
     final totalMacronutrientsWeight = totalProtein + totalCarbs + totalFat;
-    final totalMacroWeight = candidates.fold<double>(0, (sum, item) => sum + item.value);
+    final totalMacroWeight = candidates.fold<double>(
+      0,
+      (sum, item) => sum + item.value,
+    );
 
     return _FoodDetailData(
       imagePath: image?.path,
@@ -451,9 +541,15 @@ class _FoodDetailData {
       totalCalories: totalCalories.round(),
       healthScore: _computeHealthScore(
         totalCalories: totalCalories,
-        proteinRatio: totalProtein / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
-        carbRatio: totalCarbs / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
-        fatRatio: totalFat / (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        proteinRatio:
+            totalProtein /
+            (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        carbRatio:
+            totalCarbs /
+            (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
+        fatRatio:
+            totalFat /
+            (totalMacronutrientsWeight > 0 ? totalMacronutrientsWeight : 1),
         fiberG: totalFiber,
         sugarG: totalSugar,
         sodiumMg: totalSodium,
@@ -521,8 +617,7 @@ List<String> _tagsToSuggestions(List<String> tags) {
         'Great post-workout timing for recovery and muscle repair.',
     'high_sodium':
         'High in salt; go easy on pickle, papad and added salt today.',
-    'high_sugar':
-        'High in sugar; keep your next snack or drink unsweetened.',
+    'high_sugar': 'High in sugar; keep your next snack or drink unsweetened.',
     'high_saturated_fat':
         'Much of the fat is saturated (ghee, butter, cream, frying); try a lighter tadka next time.',
     'low_protein':
@@ -531,8 +626,7 @@ List<String> _tagsToSuggestions(List<String> tags) {
         'Add a salad, sabzi or fruit, or choose whole-wheat roti, for more fibre.',
     'high_fiber':
         'Good fibre content helps digestion and keeps you full longer.',
-    'large_meal':
-        'This is a large meal; keep the next one light.',
+    'large_meal': 'This is a large meal; keep the next one light.',
   };
   return [
     for (final tag in tags)
@@ -585,7 +679,10 @@ int _computeHealthScore({
   double adjustedSugar = sugarG;
   if (fiberG > 0 && sugarG > 0) {
     final fiberToSugarRatio = fiberG / (sugarG * 0.2); // 1:5 target ratio
-    final discount = fiberToSugarRatio.clamp(0.0, 0.8); // Up to 80% discount for high fiber
+    final discount = fiberToSugarRatio.clamp(
+      0.0,
+      0.8,
+    ); // Up to 80% discount for high fiber
     adjustedSugar = sugarG * (1.0 - discount);
   }
   final sugarPoints = (adjustedSugar * 1.0).clamp(0.0, 30.0);
@@ -621,11 +718,34 @@ int _computeHealthScore({
       return false;
     }
     final keywords = [
-      'fried', 'samosa', 'fries', 'gulab jamun', 'ice cream',
-      'burger', 'pizza', 'donut', 'crisps', 'chips', 'soda', 'coke',
-      'candy', 'sweet', 'cake', 'waffle', 'chocolate', 'nugget',
-      'hot dog', 'hotdog', 'milkshake', 'cookie', 'brownie', 'pastry',
-      'syrup', 'jalebi', 'ladoo', 'barfi'
+      'fried',
+      'samosa',
+      'fries',
+      'gulab jamun',
+      'ice cream',
+      'burger',
+      'pizza',
+      'donut',
+      'crisps',
+      'chips',
+      'soda',
+      'coke',
+      'candy',
+      'sweet',
+      'cake',
+      'waffle',
+      'chocolate',
+      'nugget',
+      'hot dog',
+      'hotdog',
+      'milkshake',
+      'cookie',
+      'brownie',
+      'pastry',
+      'syrup',
+      'jalebi',
+      'ladoo',
+      'barfi',
     ];
     return keywords.any((k) => lower.contains(k));
   }
@@ -643,6 +763,7 @@ Color _accentText(BuildContext context) =>
 /// Top row — back button plus circular share / info actions.
 class _DetailTopBar extends StatelessWidget {
   final VoidCallback onBack;
+
   /// Null hides the share button (nothing to share yet).
   final VoidCallback? onShare;
   final VoidCallback onInfo;
@@ -661,14 +782,14 @@ class _DetailTopBar extends StatelessWidget {
         const Spacer(),
         if (onShare case final share?) ...[
           _CircleIconButton(
-            asset: 'assets/icons/share.svg',
+            asset: 'assets/icons/ui/share.svg',
             tooltip: 'Share',
             onTap: share,
           ),
           const SizedBox(width: AppDimens.space12),
         ],
         _CircleIconButton(
-          asset: 'assets/icons/info_icon.svg',
+          asset: 'assets/icons/ui/info_icon.svg',
           tooltip: 'How accurate is this?',
           onTap: onInfo,
         ),
@@ -745,7 +866,14 @@ class _ScannedDish extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (hasImage)
-                  Image.file(File(imagePath!), fit: BoxFit.cover)
+                  Image.file(
+                    File(imagePath!),
+                    cacheWidth:
+                        (context.w(200) *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round(),
+                    fit: BoxFit.cover,
+                  )
                 else
                   ColoredBox(
                     color: context.vColors.glassFill!,
@@ -783,7 +911,7 @@ class _KeyMatrices extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel('Key Metrics'),
+          const AppCaption('Key Metrics', uppercase: false),
           const SizedBox(height: AppDimens.space12),
           Text(
             data.dishName,
@@ -807,26 +935,23 @@ class _KeyMatrices extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppDimens.space8),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '${data.totalCalories}',
-                              style: AppTextStyles.metric.copyWith(
-                                color: context.colors.onSurface,
-                                fontWeight: FontWeight.w500,
-                              ),
+                    FitText.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${data.totalCalories}',
+                            style: AppTextStyles.metric.copyWith(
+                              color: context.colors.onSurface,
+                              fontWeight: FontWeight.w500,
                             ),
-                            TextSpan(
-                              text: ' Kcal',
-                              style: context.text.bodyLarge?.copyWith(
-                                color: calorieAccent,
-                              ),
+                          ),
+                          TextSpan(
+                            text: ' Kcal',
+                            style: context.text.bodyLarge?.copyWith(
+                              color: calorieAccent,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -901,7 +1026,8 @@ class _DishInfoCard extends StatelessWidget {
   final List<DishItem> dishes;
   final List<FoodItem> foodItems;
   final ValueChanged<String> onRemove;
-  final Function(String itemId, String name, double quantity, String unit)? onEdit;
+  final Function(String itemId, String name, double quantity, String unit)?
+  onEdit;
   final Function(String name, double quantity, String unit)? onAdd;
 
   const _DishInfoCard({
@@ -923,7 +1049,9 @@ class _DishInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: _SectionLabel('Dish Info')),
+              const Expanded(
+                child: AppCaption('Dish Info', uppercase: false),
+              ),
               _TextAction(
                 label: 'Add',
                 icon: Icons.add_rounded,
@@ -969,8 +1097,12 @@ class _DishInfoCard extends StatelessWidget {
                 }
               }
 
-              final totalWeight = getWeightInGrams(foodItem.quantity, foodItem.unit);
-              final qtyStr = foodItem.quantity == foodItem.quantity.roundToDouble()
+              final totalWeight = getWeightInGrams(
+                foodItem.quantity,
+                foodItem.unit,
+              );
+              final qtyStr =
+                  foodItem.quantity == foodItem.quantity.roundToDouble()
                   ? foodItem.quantity.round().toString()
                   : foodItem.quantity.toStringAsFixed(1);
               final weightStr = totalWeight == totalWeight.roundToDouble()
@@ -993,20 +1125,22 @@ class _DishInfoCard extends StatelessWidget {
                           const SizedBox(height: AppDimens.space2),
                           Text(
                             '${dish.calories} kcal · $subtitleText',
-                            style: context.text.bodySmall?.copyWith(color: grey),
+                            style: context.text.bodySmall?.copyWith(
+                              color: grey,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: AppDimens.space8),
                     _RowIconButton(
-                      asset: 'assets/icons/edit.svg',
+                      asset: 'assets/icons/ui/edit.svg',
                       tooltip: 'Edit',
                       onTap: () => _showEditDialog(context, dish),
                     ),
                     const SizedBox(width: AppDimens.space8),
                     _RowIconButton(
-                      asset: 'assets/icons/delete.svg',
+                      asset: 'assets/icons/ui/delete.svg',
                       tooltip: 'Remove',
                       onTap: () => onRemove(dish.id),
                     ),
@@ -1082,9 +1216,12 @@ class _MacroCardState extends State<_MacroCard> {
   @override
   Widget build(BuildContext context) {
     final hasMore = widget.details.length > 5;
-    final visibleDetails = _isExpanded ? widget.details : widget.details.take(5).toList();
+    final visibleDetails = _isExpanded
+        ? widget.details
+        : widget.details.take(5).toList();
 
-    final totalGrams = widget.macros.fold<double>(0, (sum, m) => sum + m.grams) +
+    final totalGrams =
+        widget.macros.fold<double>(0, (sum, m) => sum + m.grams) +
         widget.details
             .where((d) => d.unit.toLowerCase() == 'g')
             .fold<double>(0, (sum, d) => sum + d.grams);
@@ -1095,7 +1232,7 @@ class _MacroCardState extends State<_MacroCard> {
         children: [
           Row(
             children: [
-              const Expanded(child: _SectionLabel('Macros')),
+              const Expanded(child: AppCaption('Macros', uppercase: false)),
               if (hasMore)
                 _TextAction(
                   label: _isExpanded ? 'Less Details' : 'More Details',
@@ -1195,9 +1332,22 @@ class _MacroDetailRow extends StatelessWidget {
     final gramsStr = detail.grams == detail.grams.roundToDouble()
         ? detail.grams.round().toString()
         : detail.grams.toStringAsFixed(1);
+    final isSugar = detail.name.toLowerCase().contains('sugar');
 
     return Row(
       children: [
+        if (isSugar) ...[
+          SvgPicture.asset(
+            'assets/icons/ui/sugar.svg',
+            width: AppDimens.iconXs,
+            height: AppDimens.iconXs,
+            colorFilter: ColorFilter.mode(
+              context.vColors.grayText ?? Colors.grey,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: AppDimens.space6),
+        ],
         Expanded(child: Text(detail.name, style: context.text.bodyMedium)),
         const SizedBox(width: AppDimens.space8),
         Text('$gramsStr ${detail.unit}', style: context.text.bodyMedium),
@@ -1329,12 +1479,9 @@ class _NumberIcon extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: accent),
       ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          '$number',
-          style: context.text.bodySmall?.copyWith(color: accent),
-        ),
+      child: FitText(
+        '$number',
+        style: context.text.bodySmall?.copyWith(color: accent),
       ),
     );
   }
@@ -1371,21 +1518,6 @@ class _BulletText extends StatelessWidget {
   }
 }
 
-/// Card eyebrow — Figma "caption 12" (JetBrains Mono), sentence case.
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTextStyles.caption.copyWith(color: context.vColors.grayText),
-    );
-  }
-}
-
 /// "Add +" / "More Details ⌄" link in a card header.
 class _TextAction extends StatelessWidget {
   final String label;
@@ -1410,10 +1542,7 @@ class _TextAction extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: context.text.titleSmall?.copyWith(color: color),
-            ),
+            Text(label, style: context.text.titleSmall?.copyWith(color: color)),
             const SizedBox(width: AppDimens.space8),
             Icon(icon, size: AppDimens.iconSm, color: color),
           ],

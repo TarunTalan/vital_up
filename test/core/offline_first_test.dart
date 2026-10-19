@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
@@ -181,6 +183,91 @@ void main() {
 
       expect(writes.countFor('u1'), 1);
       expect(writes.countFor('u2'), 1);
+    });
+
+    test('a newer weight is not undone by a profile save queued later', () async {
+      // Weight 78 logged offline, then the profile saved (weight 78), then
+      // weight 76 logged: the queue must end on 76 whatever order it sends.
+      await writes.enqueue(PendingWrite.update(
+        'user_health_data',
+        values: {'weight': '78.0'},
+        match: {'id': 'u1'},
+        userId: 'u1',
+        key: 'health:weight:u1',
+      ));
+      await writes.enqueue(PendingWrite.upsert(
+        'user_health_data',
+        values: {'id': 'u1', 'weight': '78.0', 'height': '180'},
+        userId: 'u1',
+        key: 'health:u1',
+      ));
+      await writes.enqueue(PendingWrite.update(
+        'user_health_data',
+        values: {'weight': '76.0'},
+        match: {'id': 'u1'},
+        userId: 'u1',
+        key: 'health:weight:u1',
+      ));
+
+      final prefs = await SharedPreferences.getInstance();
+      final queued = [
+        for (final raw in prefs.getStringList('pending_server_writes_v1')!)
+          PendingWrite.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+      ];
+      expect(queued.map((w) => w.key), ['health:weight:u1', 'health:u1']);
+      // Sent in order, the last write of `weight` carries the newest value.
+      expect(queued.last.values['weight'], '76.0');
+      expect(queued.last.values['height'], '180');
+    });
+
+    test('writes to other rows or fields are left alone', () async {
+      final weight = PendingWrite.update(
+        'user_health_data',
+        values: {'weight': '70'},
+        match: {'id': 'u1'},
+        userId: 'u1',
+      );
+      expect(
+        weight.overlaps(PendingWrite.upsert(
+          'user_health_data',
+          values: {'id': 'u1', 'weight': '71'},
+          userId: 'u1',
+        )),
+        isTrue,
+      );
+      expect(
+        weight.overlaps(PendingWrite.upsert(
+          'user_health_data',
+          values: {'id': 'u1', 'height': '180'},
+          userId: 'u1',
+        )),
+        isFalse,
+      );
+      expect(
+        weight.overlaps(PendingWrite.update(
+          'user_health_data',
+          values: {'weight': '70'},
+          match: {'id': 'u2'},
+          userId: 'u2',
+        )),
+        isFalse,
+      );
+    });
+
+    test('an expired session is not the fault of the write', () {
+      expect(
+        PendingWrites.isSessionError(
+          const PostgrestException(message: 'JWT expired', code: 'PGRST303'),
+        ),
+        isTrue,
+      );
+      expect(PendingWrites.isSessionError(const AuthException('expired')), isTrue);
+      expect(
+        PendingWrites.isSessionError(
+          const PostgrestException(message: 'bad', code: '23514'),
+        ),
+        isFalse,
+      );
     });
 
     test('queued writes survive a restart', () async {

@@ -1,28 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
 
-/// 7D / 30D switch on trend detail pages.
+/// Daily / Weekly (/ Monthly) switch on trend detail pages.
 class TrendRangeToggle extends StatelessWidget {
   final TrendRange value;
   final ValueChanged<TrendRange> onChanged;
+  final List<TrendRange> ranges;
 
   const TrendRangeToggle({
     super.key,
     required this.value,
     required this.onChanged,
+    this.ranges = TrendRange.standard,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<TrendRange>(
-      showSelectedIcon: false,
-      segments: [
-        for (final r in TrendRange.values)
-          ButtonSegment(value: r, label: Text(r.label)),
-      ],
-      selected: {value},
-      onSelectionChanged: (s) => onChanged(s.first),
+    // The app's compact segmented control: the same small text as the
+    // card's caption, instead of Material's larger button text.
+    return AppSegmentedControl<TrendRange>(
+      values: ranges,
+      selected: value,
+      label: (r) => r.label,
+      onChanged: onChanged,
+      compact: true,
+    );
+  }
+}
+
+/// Trend card on detail pages: caption with the range toggle, the bar
+/// chart, then the average / best / goal readout, with the same spacing
+/// everywhere.
+class TrendChartCard extends StatelessWidget {
+  final String caption;
+  final TrendRange range;
+  final List<TrendRange> ranges;
+  final ValueChanged<TrendRange> onRange;
+  final Widget chart;
+  final Widget stats;
+
+  const TrendChartCard({
+    super.key,
+    required this.caption,
+    required this.range,
+    required this.onRange,
+    required this.chart,
+    required this.stats,
+    this.ranges = TrendRange.standard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: AppCaption(caption)),
+              const SizedBox(width: AppDimens.space8),
+              TrendRangeToggle(
+                value: range,
+                onChanged: onRange,
+                ranges: ranges,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space24),
+          chart,
+          const SizedBox(height: AppDimens.space16),
+          Divider(height: AppDimens.borderThin, color: context.vColors.divider),
+          const SizedBox(height: AppDimens.space16),
+          stats,
+        ],
+      ),
     );
   }
 }
@@ -38,17 +95,36 @@ class TrendStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final avg = series.average;
     final best = series.best;
+    if (series.direction == GoalDirection.near) {
+      final values = [
+        for (final p in series.points)
+          if (p.value != null && p.value!.isFinite) p.value!,
+      ];
+      String of(double Function(double, double) pick) =>
+          values.isEmpty ? '—' : format(values.reduce(pick));
+      return Row(
+        children: [
+          Expanded(child: _Stat('Average', avg == null ? '—' : format(avg))),
+          Expanded(child: _Stat('Lowest', of((a, b) => a < b ? a : b))),
+          Expanded(child: _Stat('Highest', of((a, b) => a > b ? a : b))),
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(child: _Stat('Average', avg == null ? '—' : format(avg))),
         Expanded(child: _Stat('Best', best == null ? '—' : format(best))),
+        // Without a goal (mood), how often it was logged instead.
         Expanded(
-          child: _Stat(
-            'Goal met',
-            series.goal == null
-                ? '—'
-                : '${series.daysMetGoal}/${series.points.length} days',
-          ),
+          child: series.goal == null
+              ? _Stat(
+                  'Days logged',
+                  '${series.loggedDays}/${series.points.length} days',
+                )
+              : _Stat(
+                  'Goal met',
+                  '${series.daysMetGoal}/${series.points.length} days',
+                ),
         ),
       ],
     );
@@ -73,15 +149,11 @@ class _Stat extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppDimens.space4),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: context.text.titleMedium?.copyWith(
-              color: context.colors.onSurface,
-            ),
+        FitText(
+          value,
+          maxLines: 1,
+          style: context.text.titleSmall?.copyWith(
+            color: context.colors.onSurface,
           ),
         ),
       ],

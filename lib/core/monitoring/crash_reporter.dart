@@ -29,7 +29,12 @@ abstract final class CrashReporter {
     // 1. Flutter framework UI build & render errors
     FlutterError.onError = (FlutterErrorDetails details) {
       if (_enabled) {
-        crashlytics.recordFlutterFatalError(details);
+        // Layout overflows and image errors aren't crashes; the app keeps
+        // running (release builds show AppErrorFallback).
+        // A Postgrest error thrown during a build carries row data.
+        crashlytics.recordFlutterError(
+          details.copyWith(exception: safeError(details.exception)),
+        );
       } else {
         FlutterError.presentError(details);
       }
@@ -38,7 +43,7 @@ abstract final class CrashReporter {
     // 2. Asynchronous platform dispatcher errors (outside Flutter widget tree)
     PlatformDispatcher.instance.onError = (error, stack) {
       if (_enabled) {
-        crashlytics.recordError(error, stack, fatal: true);
+        crashlytics.recordError(safeError(error), stack, fatal: true);
       } else {
         debugPrint('PlatformDispatcher uncaught error: $error\n$stack');
       }
@@ -65,16 +70,22 @@ abstract final class CrashReporter {
       _isolateErrorPort?.close();
       _isolateErrorPort = RawReceivePort((pair) async {
         final List<dynamic> errorAndStacktrace = pair as List<dynamic>;
-        final error = errorAndStacktrace.isNotEmpty ? errorAndStacktrace[0] : 'Unknown isolate error';
-        final rawStack = errorAndStacktrace.length > 1 ? errorAndStacktrace[1] : null;
+        final error = errorAndStacktrace.isNotEmpty
+            ? errorAndStacktrace[0]
+            : 'Unknown isolate error';
+        final rawStack = errorAndStacktrace.length > 1
+            ? errorAndStacktrace[1]
+            : null;
         final stackTrace = rawStack != null
-            ? (rawStack is StackTrace ? rawStack : StackTrace.fromString(rawStack.toString()))
+            ? (rawStack is StackTrace
+                  ? rawStack
+                  : StackTrace.fromString(rawStack.toString()))
             : StackTrace.current;
 
         debugPrint('Unhandled Isolate Error: $error\n$stackTrace');
         if (_enabled) {
           await FirebaseCrashlytics.instance.recordError(
-            error,
+            safeError(error),
             stackTrace,
             reason: 'Unhandled isolate error',
             fatal: true,
@@ -93,16 +104,22 @@ abstract final class CrashReporter {
     try {
       final port = RawReceivePort((pair) async {
         final List<dynamic> errorAndStacktrace = pair as List<dynamic>;
-        final error = errorAndStacktrace.isNotEmpty ? errorAndStacktrace[0] : 'Unknown background isolate error';
-        final rawStack = errorAndStacktrace.length > 1 ? errorAndStacktrace[1] : null;
+        final error = errorAndStacktrace.isNotEmpty
+            ? errorAndStacktrace[0]
+            : 'Unknown background isolate error';
+        final rawStack = errorAndStacktrace.length > 1
+            ? errorAndStacktrace[1]
+            : null;
         final stackTrace = rawStack != null
-            ? (rawStack is StackTrace ? rawStack : StackTrace.fromString(rawStack.toString()))
+            ? (rawStack is StackTrace
+                  ? rawStack
+                  : StackTrace.fromString(rawStack.toString()))
             : StackTrace.current;
 
         debugPrint('Unhandled Background Isolate Error: $error\n$stackTrace');
         if (_enabled) {
           await FirebaseCrashlytics.instance.recordError(
-            error,
+            safeError(error),
             stackTrace,
             reason: 'Background isolate error',
             fatal: true,
@@ -123,7 +140,7 @@ abstract final class CrashReporter {
 
   /// Adds a breadcrumb log entry to Crashlytics reports.
   static void log(String message) {
-    debugPrint('[CrashReporter] $message');
+    if (kDebugMode) debugPrint('[CrashReporter] $message');
     if (!_enabled) return;
     FirebaseCrashlytics.instance.log(message);
   }
@@ -131,11 +148,15 @@ abstract final class CrashReporter {
   /// Tags reports with the signed-in user's id (never email or name).
   static void watchUser(SupabaseClient client) {
     if (!_enabled) return;
-    client.auth.onAuthStateChange.listen((auth) {
-      FirebaseCrashlytics.instance.setUserIdentifier(
-        auth.session?.user.id ?? '',
-      );
-    });
+    client.auth.onAuthStateChange.listen(
+      (auth) {
+        FirebaseCrashlytics.instance.setUserIdentifier(
+          auth.session?.user.id ?? '',
+        );
+      },
+      // A failed token refresh offline arrives here; it isn't a crash.
+      onError: (Object e) => log('Auth state error: ${e.runtimeType}'),
+    );
   }
 
   /// Reports a handled error worth knowing about.
@@ -145,13 +166,39 @@ abstract final class CrashReporter {
     String? reason,
     bool fatal = false,
   }) {
-    debugPrint('${reason ?? 'Error'}: $error');
+    // debugPrint stays in release builds and server errors can carry row
+    // data, so the raw error is only printed while debugging.
+    if (kDebugMode) debugPrint('${reason ?? 'Error'}: $error');
     if (!_enabled) return;
     FirebaseCrashlytics.instance.recordError(
-      error,
+      safeError(error),
       stack,
       reason: reason,
       fatal: fatal,
     );
   }
+
+  /// What may leave the device. Server errors carry the refused row in
+  /// `details`/`hint` ("Failing row contains (..., weight_kg, ...)"), which
+  /// is health data, so only their code and status are kept.
+  @visibleForTesting
+  static Object safeError(Object error) => switch (error) {
+    PostgrestException(:final code) => _SafeError('PostgrestException($code)'),
+    FunctionException(:final status) => _SafeError(
+      'FunctionException($status)',
+    ),
+    AuthException(:final statusCode, :final code) => _SafeError(
+      'AuthException($statusCode, $code)',
+    ),
+    _ => error,
+  };
+}
+
+/// A server error reduced to its code; grouped by this text in reports.
+class _SafeError implements Exception {
+  final String description;
+  const _SafeError(this.description);
+
+  @override
+  String toString() => description;
 }

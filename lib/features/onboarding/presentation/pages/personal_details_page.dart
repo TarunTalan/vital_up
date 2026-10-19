@@ -368,11 +368,11 @@ class _GenderButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SvgPicture.asset(
-                  gender == "male" ? 'assets/icons/gender_male.svg' : 'assets/icons/gender_female.svg',
+                  gender == "male" ? 'assets/icons/onboarding/gender_male.svg' : 'assets/icons/onboarding/gender_female.svg',
                   width: iconSize,
                   height: iconSize,
                   placeholderBuilder: (BuildContext context) => Icon(
-                    gender == "male" ? Icons.male : Icons.female,
+                    gender == "male" ? Icons.male_rounded : Icons.female_rounded,
                     size: iconSize,
                     color: accent,
                   ),

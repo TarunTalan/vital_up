@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -27,22 +28,65 @@ class LocationTaskHandler extends TaskHandler {
 
   @override
   void onReceiveData(Object data) {
-    if (data is String) {
+    if (data is Map) {
+      final text = data['text'];
+      if (text is! String) return;
       FlutterForegroundTask.updateService(
-        notificationTitle: 'VitalUp Active Workout',
-        notificationText: data,
+        notificationTitle: ForegroundServiceManager._title,
+        notificationText: text,
+        notificationButtons: ForegroundServiceManager._buttons(
+          paused: data['paused'] == true,
+        ),
       );
     }
+  }
+
+  /// Pause / Resume in the tray: the workout runs in the app's isolate, so
+  /// hand the press over ([ForegroundServiceManager.buttonPresses]).
+  @override
+  void onNotificationButtonPressed(String id) {
+    FlutterForegroundTask.sendDataToMain(id);
   }
 }
 
 class ForegroundServiceManager {
-  /// The workout and the audio downloader share one Android foreground
-  /// service. Track who needs it so one finishing never stops it under the
-  /// other — a finished download must not kill an active workout's service.
+  /// The service is for workouts only. It's declared as a location service
+  /// (Android 14+ checks the type), so it can't also carry audio downloads:
+  /// starting it for one without location permission crashes the app.
   static bool _trackingActive = false;
-  static bool _downloadActive = false;
   static String? _lastStatsText;
+  static bool? _lastPaused;
+
+  static const _title = 'VitalUp Active Workout';
+  static const pauseButton = 'gps_workout_pause';
+  static const resumeButton = 'gps_workout_resume';
+
+  static List<NotificationButton> _buttons({required bool paused}) => [
+    paused
+        ? const NotificationButton(id: resumeButton, text: 'Resume')
+        : const NotificationButton(id: pauseButton, text: 'Pause'),
+  ];
+
+  static final _buttonPresses = StreamController<String>.broadcast();
+  static bool _listening = false;
+
+  /// Pause / Resume tapped on the workout notification ([pauseButton] or
+  /// [resumeButton]).
+  static Stream<String> get buttonPresses {
+    if (!_listening && Platform.isAndroid) {
+      _listening = true;
+      FlutterForegroundTask.addTaskDataCallback(handleTaskData);
+    }
+    return _buttonPresses.stream;
+  }
+
+  /// Data the service sent to the app; only button presses are expected.
+  @visibleForTesting
+  static void handleTaskData(Object data) {
+    if (data == pauseButton || data == resumeButton) {
+      _buttonPresses.add(data as String);
+    }
+  }
 
   static void init() {
     if (Platform.isAndroid) {
@@ -77,10 +121,19 @@ class ForegroundServiceManager {
 
   static Future<void> start({
     required String activityName,
+    bool paused = false,
   }) async {
     if (!Platform.isAndroid) return;
     _trackingActive = true;
+    // The port is found by name, and any other engine that runs main()
+    // takes the name over: claim it again for the isolate running the
+    // workout, or Pause / Resume presses go there instead.
+    FlutterForegroundTask.initCommunicationPort();
     _lastStatsText = null;
+    _lastPaused = paused;
+    final text = paused
+        ? 'Paused'
+        : 'Tracking your $activityName...';
 
     // Request notification permission for Android 13+
     final reqResult = await FlutterForegroundTask.checkNotificationPermission();
@@ -92,10 +145,11 @@ class ForegroundServiceManager {
     // keeps GPS running under Doze, and Play restricts that permission.
 
     if (await FlutterForegroundTask.isRunningService) {
-      // Already up for a download — take over its notification.
+      // Still up from an earlier workout: take over its notification.
       await FlutterForegroundTask.updateService(
-        notificationTitle: 'VitalUp Active Workout',
-        notificationText: 'Tracking your $activityName...',
+        notificationTitle: _title,
+        notificationText: text,
+        notificationButtons: _buttons(paused: paused),
       );
       return;
     }
@@ -107,8 +161,9 @@ class ForegroundServiceManager {
     );
 
     await FlutterForegroundTask.startService(
-      notificationTitle: 'VitalUp Active Workout',
-      notificationText: 'Tracking your $activityName...',
+      notificationTitle: _title,
+      notificationText: text,
+      notificationButtons: _buttons(paused: paused),
       notificationIcon: const NotificationIcon(
         metaDataName: 'com.pravera.flutter_foreground_task.NOTIFICATION_ICON',
       ),
@@ -116,65 +171,22 @@ class ForegroundServiceManager {
     );
   }
 
-  static Future<void> startDownloadService({required String trackTitle}) async {
-    if (!Platform.isAndroid) return;
-    _downloadActive = true;
-    if (await FlutterForegroundTask.isRunningService) return;
-
-    final reqResult = await FlutterForegroundTask.checkNotificationPermission();
-    if (reqResult != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
-    }
-
-    _configure(
-      channelId: 'audio_download_channel',
-      channelName: 'Audio Download Service',
-      channelDescription: 'Keeps audio download alive in background',
-    );
-
-    await FlutterForegroundTask.startService(
-      notificationTitle: 'VitalUp Download',
-      notificationText: 'Downloading $trackTitle...',
-      notificationIcon: const NotificationIcon(
-        metaDataName: 'com.pravera.flutter_foreground_task.NOTIFICATION_ICON',
-      ),
-      callback: startCallback,
-    );
-  }
-
-  static Future<void> updateDownloadProgress({required String trackTitle, required double progress}) async {
-    if (!Platform.isAndroid) return;
-    // The workout's live stats own the notification while it is running.
-    if (_trackingActive) return;
-    if (await FlutterForegroundTask.isRunningService) {
-      final pct = (progress * 100).toStringAsFixed(0);
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Downloading $trackTitle',
-        notificationText: '$pct% completed',
-      );
-    }
-  }
-
-  static Future<void> stopDownloadService() async {
-    if (!Platform.isAndroid) return;
-    _downloadActive = false;
-    if (_trackingActive) return;
-    if (await FlutterForegroundTask.isRunningService) {
-      await FlutterForegroundTask.stopService();
-    }
-  }
-
-  static Future<void> update(String statsText) async {
+  /// [paused] picks the notification's button (Resume, or Pause).
+  static Future<void> update(String statsText, {bool paused = false}) async {
     if (!Platform.isAndroid || !_trackingActive) return;
     // Called on every tick and GPS fix; skip the platform round-trip when
-    // the text hasn't changed.
-    if (statsText == _lastStatsText) return;
+    // nothing shown has changed.
+    if (statsText == _lastStatsText && paused == _lastPaused) return;
     _lastStatsText = statsText;
+    _lastPaused = paused;
     // Callers don't await this; a failed notification update must never
     // surface as an uncaught error mid-workout.
     try {
       if (await FlutterForegroundTask.isRunningService) {
-        FlutterForegroundTask.sendDataToTask(statsText);
+        FlutterForegroundTask.sendDataToTask({
+          'text': statsText,
+          'paused': paused,
+        });
       }
     } catch (e) {
       debugPrint('Workout notification update failed: $e');
@@ -185,7 +197,7 @@ class ForegroundServiceManager {
     if (!Platform.isAndroid) return;
     _trackingActive = false;
     _lastStatsText = null;
-    if (_downloadActive) return;
+    _lastPaused = null;
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.stopService();
     }

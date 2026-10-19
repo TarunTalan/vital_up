@@ -12,6 +12,7 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
   static const String _keyHealthSyncEnabled = 'settings_health_sync_enabled';
   static const String _keyWeightUnit = 'settings_weight_unit';
   static const String _keyHeightUnit = 'settings_height_unit';
+  static const String keyAnalyticsEnabled = 'settings_analytics_enabled';
 
   @override
   Future<SettingsEntity> getSettings() async {
@@ -21,6 +22,7 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
     final healthSyncEnabled = sharedPreferences.getBool(_keyHealthSyncEnabled) ?? false;
     final weightUnit = _oneOf(_keyWeightUnit, const ['kg', 'lbs'], 'kg');
     final heightUnit = _oneOf(_keyHeightUnit, const ['cm', 'in'], 'cm');
+    final analyticsEnabled = sharedPreferences.getBool(keyAnalyticsEnabled) ?? true;
 
     return SettingsEntity(
       themeMode: themeMode,
@@ -28,6 +30,7 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
       healthSyncEnabled: healthSyncEnabled,
       weightUnit: weightUnit,
       heightUnit: heightUnit,
+      analyticsEnabled: analyticsEnabled,
     );
   }
 
@@ -43,5 +46,6 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
     await sharedPreferences.setBool(_keyHealthSyncEnabled, settings.healthSyncEnabled);
     await sharedPreferences.setString(_keyWeightUnit, settings.weightUnit);
     await sharedPreferences.setString(_keyHeightUnit, settings.heightUnit);
+    await sharedPreferences.setBool(keyAnalyticsEnabled, settings.analyticsEnabled);
   }
 }

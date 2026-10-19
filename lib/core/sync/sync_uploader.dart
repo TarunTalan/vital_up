@@ -75,6 +75,10 @@ class SyncUploader {
 
   Future<void> push(SyncAdapter adapter, String userId) async {
     final pending = await adapter.pending(userId);
+    final int batchSize = switch (adapter) {
+      SyncSizing(:final batchSize) => batchSize,
+      _ => this.batchSize,
+    };
     for (var i = 0; i < pending.length; i += batchSize) {
       final batch = pending.skip(i).take(batchSize).toList();
       try {
@@ -90,7 +94,10 @@ class SyncUploader {
     }
   }
 
-  Future<void> _pushOneByOne(SyncAdapter adapter, List<PendingRow> batch) async {
+  Future<void> _pushOneByOne(
+    SyncAdapter adapter,
+    List<PendingRow> batch,
+  ) async {
     for (final p in batch) {
       try {
         await _send(adapter.table, p.row);

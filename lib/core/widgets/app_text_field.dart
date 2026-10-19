@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,35 +70,31 @@ class AppInputBox extends StatelessWidget {
         borderRadius: radius,
         boxShadow: focused && !hasError ? AppShadows.inputFocus : null,
       ),
+      // Glass look from the fill and border alone: a backdrop blur per field
+      // was costly on long forms, over a background that barely shows.
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: AppDimens.glassBlur,
-            sigmaY: AppDimens.glassBlur,
+        child: AnimatedContainer(
+          duration: AppDurations.medium,
+          width: double.infinity,
+          constraints: BoxConstraints(
+            minHeight: AppTheme.responsiveInputHeight(context),
           ),
-          child: AnimatedContainer(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: radius,
+            border: Border.all(color: border, width: borderWidth),
+          ),
+          padding: EdgeInsetsDirectional.only(
+            start: AppDimens.space16,
+            end: AppDimens.space4,
+            top: multiline ? AppDimens.space16 : 0,
+            bottom: multiline ? AppDimens.space16 : 0,
+          ),
+          child: AnimatedOpacity(
             duration: AppDurations.medium,
-            width: double.infinity,
-            constraints: BoxConstraints(
-              minHeight: AppTheme.responsiveInputHeight(context),
-            ),
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: radius,
-              border: Border.all(color: border, width: borderWidth),
-            ),
-            padding: EdgeInsetsDirectional.only(
-              start: AppDimens.space16,
-              end: AppDimens.space4,
-              top: multiline ? AppDimens.space16 : 0,
-              bottom: multiline ? AppDimens.space16 : 0,
-            ),
-            child: AnimatedOpacity(
-              duration: AppDurations.medium,
-              opacity: enabled ? 1 : AppDimens.disabledOpacity,
-              child: child,
-            ),
+            opacity: enabled ? 1 : AppDimens.disabledOpacity,
+            child: child,
           ),
         ),
       ),
@@ -326,14 +321,17 @@ class _AppTextFieldState extends State<AppTextField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.label != null || (widget.showCounter && widget.maxLength != null)) ...[
+        if (widget.label != null ||
+            (widget.showCounter && widget.maxLength != null)) ...[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (widget.label != null)
                 Text(
                   widget.label!,
-                  style: context.text.titleSmall?.copyWith(color: colors.onSurface),
+                  style: context.text.titleSmall?.copyWith(
+                    color: colors.onSurface,
+                  ),
                 )
               else
                 const SizedBox.shrink(),
@@ -370,7 +368,13 @@ class _AppTextFieldState extends State<AppTextField> {
                   readOnly: widget.readOnly,
                   autofocus: widget.autofocus,
                   maxLength: widget.maxLength,
-                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                  buildCounter:
+                      (
+                        context, {
+                        required currentLength,
+                        required isFocused,
+                        maxLength,
+                      }) => null,
                   keyboardType: widget.multiline
                       ? TextInputType.multiline
                       : widget.keyboardType,
@@ -382,7 +386,8 @@ class _AppTextFieldState extends State<AppTextField> {
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                   onTap: widget.onTap,
-                  onTapOutside: (_) {},
+                  onTapOutside: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
                   cursorColor: hasError ? colors.error : colors.primary,
                   style: context.text.bodyMedium?.copyWith(color: textColor),
                   decoration: InputDecoration(
@@ -529,8 +534,9 @@ class AppDropdownField<T> extends StatelessWidget {
                       ? null
                       : Text(
                           hint!,
-                          style: context.text.bodyMedium
-                              ?.copyWith(color: v.grayText),
+                          style: context.text.bodyMedium?.copyWith(
+                            color: v.grayText,
+                          ),
                         ),
                   style: context.text.bodyMedium?.copyWith(
                     color: enabled ? context.colors.onSurface : v.grayText,

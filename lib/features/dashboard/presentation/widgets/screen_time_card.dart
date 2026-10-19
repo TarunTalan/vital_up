@@ -52,7 +52,6 @@ class ScreenTimeCard extends StatelessWidget {
                 children: const [
                   TrackerPrompt(
                     title: 'Track screen time',
-                    message: 'Grant Usage Access to total your screen time.',
                     color: AppColors.trackScreenTime,
                   ),
                 ],
@@ -84,7 +83,7 @@ class ScreenTimeCard extends StatelessWidget {
       actions: [
         TrackerQuickAction(
           label: 'Edit Goal',
-          svgAsset: 'assets/icons/edit.svg',
+          svgAsset: 'assets/icons/ui/edit.svg',
           color: _metric.color,
           filled: true,
           onTap: () async {
@@ -135,7 +134,7 @@ class ScreenTimeSummaryRow extends StatelessWidget {
         final grey = context.vColors.grayText;
         String? value;
         Color? valueColor;
-        final String caption;
+        String? caption;
         VoidCallback onTap = () => _open(context);
         switch (state) {
           case ScreenTimeLoaded():
@@ -143,10 +142,6 @@ class ScreenTimeSummaryRow extends StatelessWidget {
             final left = limit - state.totalDuration.inMinutes;
             value = formatDashboardDuration(state.totalDuration);
             valueColor = left >= 0 ? null : context.colors.error;
-            caption = left >= 0
-                ? '${formatDashboardDuration(Duration(minutes: left))} left of '
-                      '${formatDashboardDuration(Duration(minutes: limit))} limit'
-                : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}';
           case ScreenTimePermissionDenied():
             caption = 'Allow usage access to track it';
             onTap = cubit.openSettings;
@@ -176,13 +171,15 @@ class ScreenTimeSummaryRow extends StatelessWidget {
                         color: context.colors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: AppDimens.space2),
-                    Text(
-                      caption,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.bodySmall?.copyWith(color: grey),
-                    ),
+                    if (caption != null) ...[
+                      const SizedBox(height: AppDimens.space2),
+                      Text(
+                        caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.bodySmall?.copyWith(color: grey),
+                      ),
+                    ],
                   ],
                 ),
               ),

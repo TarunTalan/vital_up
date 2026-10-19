@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
@@ -76,6 +77,12 @@ class WaterTrendsPage extends StatelessWidget {
               );
               if (added != null) cubit.load();
             },
+            dateOf: (log) => log.timestamp,
+            allLogs: () async => (await water.getLogsBetween(
+              userId,
+              DateTime(2000),
+              nextDay(startOfDay(DateTime.now())),
+            )).reversed.toList(),
             logBuilder: (context, log) => TrackerLogTile(
               id: log.id,
               icon: _presetFor(log.amountMl)?.icon ?? metric.icon,
@@ -85,7 +92,7 @@ class WaterTrendsPage extends StatelessWidget {
               trailing: '${log.amountMl} ml',
               onDelete: () => deleteTrackerLog(
                 context,
-                cubit,
+                context.read<TrendCubit<WaterLogCache>>(),
                 log,
                 () => water.deleteWaterLog(log.id),
               ),

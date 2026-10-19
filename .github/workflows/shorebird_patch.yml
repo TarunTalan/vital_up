@@ -1,0 +1,116 @@
+name: Shorebird Patch (Instant Code Push)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Target release version to patch (e.g. 1.0.0+1). Must match a Shorebird release on the Play Store.'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (verify patch without publishing to users)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: shorebird-patch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    name: Build & Deploy Shorebird Patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SYMBOLS_DIR: build/app/outputs/symbols
+      HAVE_FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Used for pub get / codegen only; Shorebird builds the patch with the
+      # release's own Flutter version.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Set up Shorebird
+        uses: shorebirdtech/shorebird-action@v0
+        with:
+          shorebird-token: ${{ secrets.SHOREBIRD_TOKEN }}
+
+      - name: Write release secrets
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PROPERTIES_CONTENT: ${{ secrets.KEY_PROPERTIES }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          missing=""
+          [ -z "$ENV_CONTENT" ] && missing="$missing ENV_FILE"
+          [ -z "$KEYSTORE_BASE64" ] && missing="$missing KEYSTORE_BASE64"
+          [ -z "$KEY_PROPERTIES_CONTENT" ] && missing="$missing KEY_PROPERTIES"
+          [ -z "$GOOGLE_SERVICES_JSON" ] && missing="$missing GOOGLE_SERVICES_JSON_BASE64"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            exit 1
+          fi
+          echo "$ENV_CONTENT" > .env
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/vitalup-release-key.jks
+          echo "$KEY_PROPERTIES_CONTENT" > android/key.properties
+          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Verify Shorebird Setup
+        run: shorebird doctor
+
+      # Same obfuscation flags as the release build (play_store_release.yml).
+      - name: Deploy Shorebird Patch
+        env:
+          IS_DRY_RUN: ${{ inputs.dry_run }}
+          TARGET_VERSION: ${{ inputs.release_version }}
+        run: |
+          if [ "$IS_DRY_RUN" = "true" ]; then
+            echo "Performing dry-run patch verification..."
+            shorebird patch android --dry-run --release-version="$TARGET_VERSION" \
+              -- --obfuscate --split-debug-info=$SYMBOLS_DIR
+          else
+            echo "Deploying live patch for release version $TARGET_VERSION..."
+            shorebird patch android --release-version="$TARGET_VERSION" --no-confirm \
+              -- --obfuscate --split-debug-info=$SYMBOLS_DIR
+          fi
+
+      - name: Archive Patch Debug Symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch-debug-symbols-${{ inputs.release_version }}-${{ github.run_number }}
+          path: ${{ env.SYMBOLS_DIR }}/
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Upload Dart symbols to Crashlytics
+        if: env.HAVE_FIREBASE_SA == 'true' && inputs.dry_run != true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+          APP_ID=$(jq -r '.client[] | select(.client_info.android_client_info.package_name=="com.vitalup.app") | .client_info.mobilesdk_app_id' android/app/google-services.json)
+          npx --yes firebase-tools crashlytics:symbols:upload --app="$APP_ID" "$SYMBOLS_DIR"

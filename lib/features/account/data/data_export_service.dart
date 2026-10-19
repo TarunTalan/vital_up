@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/sync/backup_sync.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
@@ -36,6 +37,15 @@ class ExportData {
   final List<PointEvent> points;
   final List<Reminder> reminders;
 
+  /// App data kept on the phone (settings, goals, Vita, workout notes, diet
+  /// plan), by kind; preference values as stored.
+  final Map<String, Object?> app;
+
+  /// Arena and account rows from the server (stats, badges, daily reports,
+  /// friends, communities, awards, challenges, notifications, weekly
+  /// summaries), by kind. Missing kinds couldn't be fetched.
+  final Map<String, Object?> server;
+
   const ExportData({
     required this.exportedAt,
     this.profile,
@@ -47,6 +57,8 @@ class ExportData {
     this.moods = const [],
     this.points = const [],
     this.reminders = const [],
+    this.app = const {},
+    this.server = const {},
   });
 }
 
@@ -64,6 +76,10 @@ class DataExportService {
   final GamificationRepository _game;
   final RemindersService _reminders;
 
+  /// The same per-user sources backed up to `user_backups`, plus Vita's
+  /// chat and insights (not backed up, but the user's data all the same).
+  final List<BackupSource> _appSources;
+
   DataExportService(
     this._client,
     this._water,
@@ -74,17 +90,19 @@ class DataExportService {
     this._vita,
     this._game,
     this._reminders,
+    this._appSources,
   );
 
   /// Builds the zip and opens the share sheet. Returns null, or a message.
   Future<String?> exportAndShare() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return 'Sign in to export your data.';
+    File? file;
     try {
       final data = await _gather(userId);
       final bytes = zipExport(buildExportFiles(data));
       final day = data.exportedAt.toIso8601String().substring(0, 10);
-      final file = File(
+      file = File(
         '${(await getTemporaryDirectory()).path}/vitalup-export-$day.zip',
       );
       await file.writeAsBytes(bytes, flush: true);
@@ -98,6 +116,13 @@ class DataExportService {
     } catch (e) {
       debugPrint('Export failed: $e');
       return "Couldn't create the export. Try again.";
+    } finally {
+      // The whole health history; don't leave a copy in the cache folder.
+      try {
+        if (file != null && await file.exists()) await file.delete();
+      } catch (e) {
+        debugPrint('Export file not deleted: $e');
+      }
     }
   }
 
@@ -112,9 +137,14 @@ class DataExportService {
     try {
       // Bounded so a bad connection can't hang the export.
       const timeout = Duration(seconds: 15);
+      // Named columns: email isn't readable from profiles (it comes from
+      // the session below), so select('*') would be refused.
       final account = await _client
           .from('profiles')
-          .select()
+          .select(
+            'username, display_name, avatar_url, city, country_code, '
+            'leaderboard_visible, timezone',
+          )
           .eq('id', userId)
           .maybeSingle()
           .timeout(timeout);
@@ -134,6 +164,20 @@ class DataExportService {
       debugPrint('Export without server data: $e');
     }
 
+    final app = <String, Object?>{};
+    for (final source in _appSources) {
+      try {
+        app[source.kind] = await source.export(userId);
+      } catch (e) {
+        debugPrint('Export without ${source.kind}: $e');
+      }
+    }
+    try {
+      app['goal_weight_kg'] = await _weight.targetKg();
+    } catch (e) {
+      debugPrint('Export without goal weight: $e');
+    }
+
     return ExportData(
       exportedAt: now,
       profile: profile,
@@ -141,11 +185,76 @@ class DataExportService {
       sleep: await _sleep.getSleepBetween(from, to),
       meals: (await _meals.callAll()).getOrElse(() => const []),
       weight: await _weight.between(from, to),
-      workouts: await _activity.getSessions(),
+      workouts: await _activity.getSessions(withRoutes: true),
       moods: _vita.getStressCheckIns(),
       points: points,
       reminders: _reminders.load(),
+      app: app,
+      server: await _gatherServer(userId),
     );
+  }
+
+  /// Each part on its own: one that fails (offline, timeout) is left out
+  /// and the rest still exported.
+  Future<Map<String, Object?>> _gatherServer(String userId) async {
+    const timeout = Duration(seconds: 15);
+    final parts = <String, Future<Object?> Function()>{
+      'player_stats': () => _client
+          .from('player_stats')
+          .select(
+            'total_points, nutrition_points, lifestyle_points, '
+            'fitness_points, bonus_points, level, current_streak, '
+            'longest_streak, last_active_day, streak_freezes, streak_start, '
+            'frozen_days, updated_at',
+          )
+          .eq('user_id', userId)
+          .maybeSingle(),
+      'badges': () => _client
+          .from('user_badges')
+          .select('badge_code, earned_at')
+          .eq('user_id', userId)
+          .order('earned_at'),
+      'daily_reports': () => _client
+          .from('daily_reports')
+          .select('day, metrics, updated_at')
+          .eq('user_id', userId)
+          .order('day'),
+      // Friends as this user sees them: username, status and since when.
+      'friends': () async => [
+        for (final r in await _client.rpc('get_friends') as List)
+          {
+            'username': r['username'],
+            'status': r['status'],
+            'since': r['since'],
+          },
+      ],
+      'communities': () => _client
+          .from('community_members')
+          .select('joined_at, communities(name, type)')
+          .eq('user_id', userId),
+      'community_awards': () =>
+          _client.rpc('get_player_awards', params: {'p_user': userId}),
+      'challenges': () => _client.rpc('get_challenges'),
+      'notifications': () => _client
+          .from('notifications')
+          .select('type, title, body, data, created_at, read_at')
+          .eq('user_id', userId)
+          .order('created_at'),
+      'weekly_summaries': () => _client
+          .from('weekly_summaries')
+          .select('week_start, stats, sent_at')
+          .eq('user_id', userId)
+          .order('week_start'),
+    };
+    final server = <String, Object?>{};
+    for (final MapEntry(key: kind, value: fetch) in parts.entries) {
+      try {
+        server[kind] = await fetch().timeout(timeout);
+      } catch (e) {
+        debugPrint('Export without $kind: $e');
+      }
+    }
+    return server;
   }
 }
 
@@ -158,7 +267,11 @@ Map<String, String> buildExportFiles(ExportData d) {
         'CSV files open in any spreadsheet app. JSON files have full detail\n'
         '(meal items and nutrition, workout GPS routes). Weights are in kg,\n'
         'distances in metres, durations in minutes or seconds as labelled.\n'
-        'Meal photos stay on your phone and are not included.\n',
+        'Meal photos stay on your phone and are not included.\n'
+        'app_data.json has settings, goals, Vita chats and insights, mood\n'
+        'scores, workout notes and your diet plan. arena.json has points,\n'
+        'level, badges, daily reports, friends, communities, awards,\n'
+        'challenges, notifications and weekly summaries.\n',
     'water.csv': csv(
       ['logged_at', 'amount_ml'],
       [
@@ -281,8 +394,29 @@ Map<String, String> buildExportFiles(ExportData d) {
         },
     ]),
     'reminders.json': _json([for (final r in d.reminders) r.toJson()]),
+    'app_data.json': _json(decodeStoredJson(d.app)),
+    if (d.server.isNotEmpty) 'arena.json': _json(d.server),
     if (d.profile != null) 'profile.json': _json(d.profile),
   };
+}
+
+/// Preferences keep lists and maps as JSON strings; decode them so the
+/// export reads as one JSON document instead of escaped strings.
+Object? decodeStoredJson(Object? value) {
+  if (value is Map) {
+    return {
+      for (final e in value.entries) '${e.key}': decodeStoredJson(e.value),
+    };
+  }
+  if (value is List) return [for (final v in value) decodeStoredJson(v)];
+  if (value is String && (value.startsWith('{') || value.startsWith('['))) {
+    try {
+      return decodeStoredJson(jsonDecode(value));
+    } on FormatException {
+      return value;
+    }
+  }
+  return value;
 }
 
 String _json(Object? value) =>

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -58,10 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     if (!connected) {
       if (mounted) {
-        showErrorSnackBar(
-          context,
-          'Allow health data access to turn this on.',
-        );
+        showErrorSnackBar(context, 'Allow health data access to turn this on.');
       }
       return;
     }
@@ -76,10 +74,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (success) {
       showSuccessSnackBar(context, on ? 'App lock on' : 'App lock off');
     } else if (on) {
-      showErrorSnackBar(
-        context,
-        'Set up a screen lock on this device first.',
-      );
+      showErrorSnackBar(context, 'Set up a screen lock on this device first.');
     }
   }
 
@@ -102,7 +97,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     setState(() => _openingLeaderboards = false);
     if (failed) {
-      showErrorSnackBar(context, "Couldn't load leaderboard settings. Try again.");
+      showErrorSnackBar(
+        context,
+        "Couldn't load leaderboard settings. Try again.",
+      );
     } else {
       await CommunitySettingsSheet.show(context, cubit: cubit);
     }
@@ -120,6 +118,7 @@ class _SettingsPageState extends State<SettingsPage> {
     child: CircularProgressIndicator(
       strokeWidth: AppDimens.borderThick,
       color: context.colors.primary,
+      strokeCap: StrokeCap.round,
     ),
   );
 
@@ -135,14 +134,11 @@ class _SettingsPageState extends State<SettingsPage> {
         if (state is! SettingsLoaded) {
           return AppScaffold(
             header: header,
-            body: Padding(
-              padding: const EdgeInsets.only(top: AppDimens.space48),
-              child: state is SettingsError
-                  ? LoadErrorView(
-                      onRetry: context.read<SettingsCubit>().loadSettings,
-                    )
-                  : const Center(child: VitalUpLoader()),
-            ),
+            body: state is SettingsError
+                ? LoadErrorView(
+                    onRetry: context.read<SettingsCubit>().loadSettings,
+                  )
+                : const Center(child: VitalUpLoader()),
           );
         }
         final s = state.settings;
@@ -156,7 +152,9 @@ class _SettingsPageState extends State<SettingsPage> {
               const AppSectionHeader('Appearance'),
               AppSegmentedControl<String>(
                 values: _themes,
-                selected: _themes.contains(s.themeMode) ? s.themeMode : 'system',
+                selected: _themes.contains(s.themeMode)
+                    ? s.themeMode
+                    : 'system',
                 label: _themeLabel,
                 onChanged: (mode) => _update(s.copyWith(themeMode: mode)),
               ),
@@ -178,7 +176,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   AppListTile(
-                    icon: Icons.monitor_weight_rounded,
+                    svgAsset: 'assets/icons/trackers/weight_icon.svg',
                     title: 'Weight',
                     trailing: AppSegmentedControl<String>(
                       compact: true,
@@ -189,6 +187,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           _update(s.copyWith(weightUnit: unit)),
                     ),
                   ),
+                  const _DistanceUnitTile(),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -260,6 +259,22 @@ class _SettingsPageState extends State<SettingsPage> {
                     trailing: _openingLeaderboards ? _chevronSpinner() : null,
                     onTap: _openLeaderboards,
                   ),
+                  AppListTile(
+                    icon: Icons.auto_awesome_outlined,
+                    title: 'AI coach data',
+                    subtitle: 'What Vita and AI plans may use',
+                    onTap: () => context.pushNamed('ai-coach-data'),
+                  ),
+                  AppListTile(
+                    icon: Icons.insights_rounded,
+                    title: 'Share usage analytics',
+                    subtitle: 'App opens and screens only. No health data.',
+                    trailing: Switch(
+                      value: s.analyticsEnabled,
+                      onChanged: (on) =>
+                          _update(s.copyWith(analyticsEnabled: on)),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -284,6 +299,49 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Distance in workouts (distance, pace, speed, targets). Kept in its own
+/// preference, which the workout screens read when they open.
+class _DistanceUnitTile extends StatefulWidget {
+  const _DistanceUnitTile();
+
+  @override
+  State<_DistanceUnitTile> createState() => _DistanceUnitTileState();
+}
+
+class _DistanceUnitTileState extends State<_DistanceUnitTile> {
+  final _unit = DistanceUnitNotifier();
+
+  @override
+  void initState() {
+    super.initState();
+    _unit.load();
+  }
+
+  @override
+  void dispose() {
+    _unit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<DistanceUnit>(
+      valueListenable: _unit,
+      builder: (context, unit, _) => AppListTile(
+        icon: Icons.route_rounded,
+        title: 'Distance',
+        trailing: AppSegmentedControl<DistanceUnit>(
+          compact: true,
+          values: DistanceUnit.values,
+          selected: unit,
+          label: (u) => u.label,
+          onChanged: _unit.setUnit,
+        ),
+      ),
     );
   }
 }

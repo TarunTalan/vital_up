@@ -12,6 +12,7 @@ import 'package:vital_up/features/notifications/domain/repositories/notification
 import 'package:vital_up/features/reminders/data/reminder_actions.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Pushes are shown by the system while the app is in the background; this
 /// only needs to exist so FCM can wake the app.
@@ -124,14 +125,17 @@ class PushService {
     if (initial != null) _handleOpen(initial.data);
 
     messaging.onTokenRefresh.listen((_) => register());
-    _client.auth.onAuthStateChange.listen((auth) {
-      final signedIn = auth.session != null;
-      if (signedIn &&
-          (auth.event == AuthChangeEvent.initialSession ||
-              auth.event == AuthChangeEvent.signedIn)) {
-        register();
-      }
-    });
+    _client.auth.onAuthStateChange
+        // A token refresh that fails offline arrives as an error; not a crash.
+        .handleError((Object _) {})
+        .listen((auth) {
+          final signedIn = auth.session != null;
+          if (signedIn &&
+              (auth.event == AuthChangeEvent.initialSession ||
+                  auth.event == AuthChangeEvent.signedIn)) {
+            register();
+          }
+        });
   }
 
   Future<void> _initLocal() async {
@@ -214,14 +218,18 @@ class PushService {
       if (token == _prefs.getString(_keyToken) &&
           user == _prefs.getString(_keyUser) &&
           at != null &&
-          DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(at)) <
-              _reregisterAfter) {
+          isWithinLast(
+            _reregisterAfter,
+            DateTime.fromMillisecondsSinceEpoch(at),
+          )) {
         return;
       }
-      await _client.rpc(
-        'register_push_token',
-        params: {'p_token': token, 'p_platform': _platform},
-      );
+      await _client
+          .rpc(
+            'register_push_token',
+            params: {'p_token': token, 'p_platform': _platform},
+          )
+          .timeout(const Duration(seconds: 15));
       await _prefs.setString(_keyToken, token);
       await _prefs.setString(_keyUser, user);
       await _prefs.setInt(_keyAt, DateTime.now().millisecondsSinceEpoch);

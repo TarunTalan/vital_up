@@ -242,7 +242,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       final hasStepPermission = await getLiveStepsStream.ensurePermission();
 
       try {
-        await ForegroundServiceManager.start(activityName: activityType.label);
+        await ForegroundServiceManager.start(
+          activityName: activityType.label,
+          paused: checkpoint.paused,
+        );
       } catch (e) {
         debugPrint('Foreground service failed to start: $e');
       }
@@ -361,6 +364,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
 
     ForegroundServiceManager.update(
       'Paused\nDistance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km | Duration: ${_formatDuration(elapsed)}',
+      paused: true,
     );
     _checkpoint(paused);
   }
@@ -389,6 +393,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       routePoints: s.routePoints,
       elevationGainMeters: s.elevationGainMeters,
     ));
+    // Swap the notification's Resume for Pause now, not on the next tick.
+    ForegroundServiceManager.update(
+      'Distance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(s.elapsed)}',
+    );
 
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));

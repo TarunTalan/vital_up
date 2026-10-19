@@ -190,7 +190,7 @@ class SupportBotService {
         text:
             '**Account & Customization:**\n\n'
             '• **Theme Toggle**: Switch between System, Light, and Dark mode in Settings.\n'
-            '• **Offline Privacy**: Your metrics are stored locally in encrypted Isar databases and safely synced to your private Supabase profile.\n'
+            '• **Offline Privacy**: Your metrics are stored privately on your device and safely synced to your private Supabase profile.\n'
             '• **Account Deletion**: Navigate to Settings → Account → Delete Account.',
         actionLabel: 'Open Settings',
         actionRoute: 'settings',

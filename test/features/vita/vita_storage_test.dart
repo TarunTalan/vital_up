@@ -62,4 +62,32 @@ void main() {
       InputLimits.chatMessage,
     );
   });
+
+  group('historyCutoff', () {
+    final now = DateTime(2026, 10, 18, 9);
+
+    test('counts 90 days back from the newest entry', () {
+      expect(
+        historyCutoff([DateTime(2026, 10, 1), DateTime(2026, 10, 17)], now),
+        DateTime(2026, 7, 19),
+      );
+    });
+
+    test('a clock set months ahead keeps the real history', () {
+      final ahead = DateTime(2027, 6, 1);
+      final cutoff = historyCutoff([DateTime(2026, 10, 17)], ahead);
+      expect(DateTime(2026, 9, 1).isAfter(cutoff), isTrue);
+    });
+
+    test('future-dated entries fall back to now', () {
+      expect(
+        historyCutoff([DateTime(2027, 6, 1)], now),
+        DateTime(2026, 7, 20),
+      );
+    });
+
+    test('empty history uses now', () {
+      expect(historyCutoff(const [], now), DateTime(2026, 7, 20));
+    });
+  });
 }

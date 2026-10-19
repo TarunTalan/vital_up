@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 
-/// Formats a stored session target (distance in km or calories).
+/// Formats a stored session target (distance in km, minutes or calories).
 String formatActivityTarget(String? targetType, double value) {
-  return targetType == 'distance'
-      ? '${value.toStringAsFixed(1)} km'
-      : '${value.toStringAsFixed(0)} kcal';
+  return switch (targetType) {
+    'distance' => '${value.toStringAsFixed(1)} km',
+    'duration' => '${value.toStringAsFixed(0)} min',
+    _ => '${value.toStringAsFixed(0)} kcal',
+  };
 }
 
 /// Accent for a target outcome: primary when achieved, warning otherwise.
@@ -61,7 +63,7 @@ class ActivityTargetResultCard extends StatelessWidget {
           ),
           const SizedBox(width: AppDimens.space8),
           Icon(
-            achieved ? Icons.check_circle_rounded : Icons.cancel_outlined,
+            achieved ? Icons.check_circle_rounded : Icons.cancel_rounded,
             size: AppDimens.iconLg,
             color: accent,
           ),

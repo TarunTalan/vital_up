@@ -28,6 +28,7 @@ class OnboardingLayout extends StatelessWidget {
   final double? titleBottomSpace;
   final bool showBack;
   final Widget child;
+  final bool isLoading;
 
   const OnboardingLayout({
     super.key,
@@ -46,6 +47,7 @@ class OnboardingLayout extends StatelessWidget {
     this.titleTopSpace,
     this.titleBottomSpace,
     required this.child,
+    this.isLoading = false,
   });
 
   @override
@@ -172,19 +174,29 @@ class OnboardingLayout extends StatelessWidget {
       ),
     );
 
-    if (!handleSystemBack || !showBack) return scaffold;
+    final effectiveScaffold = AbsorbPointer(
+      absorbing: isLoading,
+      child: scaffold,
+    );
+
+    if (!handleSystemBack || !showBack) {
+      return PopScope(
+        canPop: !isLoading,
+        child: effectiveScaffold,
+      );
+    }
 
     return PopScope(
-      canPop: false,
+      canPop: !isLoading,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop || isLoading) return;
         if (MediaQuery.viewInsetsOf(context).bottom > 0.0) {
           FocusScope.of(context).unfocus();
         } else {
           onBack();
         }
       },
-      child: scaffold,
+      child: effectiveScaffold,
     );
   }
 }
@@ -591,7 +603,7 @@ class _OnboardingNumberFieldState<T extends num>
                   ),
                 ],
                 textAlign: TextAlign.center,
-                onTapOutside: (event) {},
+                onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
                 autofocus: widget.autofocus,
                 cursorColor: colors.primary,
                 style: context.text.headlineLarge?.copyWith(color: valueColor),

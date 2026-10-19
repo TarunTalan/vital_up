@@ -9,6 +9,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Brings weight entries and workouts from Health Connect / Apple Health
 /// into VitalUp, so people with a smart scale or watch don't log twice.
@@ -87,20 +88,29 @@ class HealthImportService {
 
   /// Imports what's new since the last run. Returns the number of entries
   /// added. Never throws.
+  /// Epoch ms; older installs saved a local ISO string (no offset).
+  DateTime? _lastImport() {
+    final raw = _prefs.get(_keyLastImport);
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
+
   Future<int> import({bool force = false}) =>
       _running ??= _import(force).whenComplete(() => _running = null);
 
   Future<int> _import(bool force) async {
     if (!_supported) return 0;
     final now = DateTime.now();
-    final last = DateTime.tryParse(_prefs.getString(_keyLastImport) ?? '');
-    if (!force && last != null && now.difference(last) < _minInterval) {
+    final last = _lastImport();
+    if (!force && last != null && isWithinLast(_minInterval, last, now: now)) {
       return 0;
     }
-    // Overlap a day so late-syncing devices (watches) aren't missed.
+    // Overlap a day so late-syncing devices (watches) aren't missed. A last
+    // import dated in the future (clock was ahead) must not skip the gap.
     final from = last == null
         ? now.subtract(_firstImport)
-        : last.subtract(const Duration(days: 1));
+        : (last.isAfter(now) ? now : last).subtract(const Duration(days: 1));
     var added = 0;
     try {
       final points = _health.removeDuplicates(
@@ -118,7 +128,7 @@ class HealthImportService {
           debugPrint('Health import skipped ${p.type.name}: $e');
         }
       }
-      await _prefs.setString(_keyLastImport, now.toIso8601String());
+      await _prefs.setInt(_keyLastImport, now.millisecondsSinceEpoch);
     } catch (e) {
       debugPrint('Health import failed: $e');
     }
@@ -148,8 +158,63 @@ class HealthImportService {
   static bool isPlausibleWeightKg(double kg) =>
       kg.isFinite && kg >= InputLimits.weightKgMin && kg <= InputLimits.weightKgMax;
 
-  /// A health-store workout as a VitalUp session, or null for workout types
-  /// VitalUp doesn't track and for empty or implausibly long workouts.
+  /// The VitalUp workout type for a health-store workout without a route,
+  /// or null for sessions that aren't exercise (breathing, cool-down).
+  static ActivityType? workoutTypeFor(HealthWorkoutActivityType t) {
+    return switch (t) {
+      HealthWorkoutActivityType.STRENGTH_TRAINING ||
+      HealthWorkoutActivityType.TRADITIONAL_STRENGTH_TRAINING ||
+      HealthWorkoutActivityType.FUNCTIONAL_STRENGTH_TRAINING ||
+      HealthWorkoutActivityType.WEIGHTLIFTING ||
+      HealthWorkoutActivityType.CALISTHENICS ||
+      HealthWorkoutActivityType.CORE_TRAINING => ActivityType.strength,
+      HealthWorkoutActivityType.YOGA ||
+      HealthWorkoutActivityType.PILATES ||
+      HealthWorkoutActivityType.BARRE ||
+      HealthWorkoutActivityType.TAI_CHI ||
+      HealthWorkoutActivityType.FLEXIBILITY ||
+      HealthWorkoutActivityType.MIND_AND_BODY => ActivityType.yoga,
+      HealthWorkoutActivityType.HIGH_INTENSITY_INTERVAL_TRAINING ||
+      HealthWorkoutActivityType.CROSS_TRAINING ||
+      HealthWorkoutActivityType.MIXED_CARDIO ||
+      HealthWorkoutActivityType.JUMP_ROPE ||
+      HealthWorkoutActivityType.STEP_TRAINING => ActivityType.hiit,
+      HealthWorkoutActivityType.SWIMMING ||
+      HealthWorkoutActivityType.SWIMMING_POOL ||
+      HealthWorkoutActivityType.SWIMMING_OPEN_WATER => ActivityType.swimming,
+      HealthWorkoutActivityType.DANCING ||
+      HealthWorkoutActivityType.CARDIO_DANCE ||
+      HealthWorkoutActivityType.SOCIAL_DANCE => ActivityType.dance,
+      HealthWorkoutActivityType.AMERICAN_FOOTBALL ||
+      HealthWorkoutActivityType.AUSTRALIAN_FOOTBALL ||
+      HealthWorkoutActivityType.BADMINTON ||
+      HealthWorkoutActivityType.BASEBALL ||
+      HealthWorkoutActivityType.BASKETBALL ||
+      HealthWorkoutActivityType.CRICKET ||
+      HealthWorkoutActivityType.HANDBALL ||
+      HealthWorkoutActivityType.HOCKEY ||
+      HealthWorkoutActivityType.LACROSSE ||
+      HealthWorkoutActivityType.PICKLEBALL ||
+      HealthWorkoutActivityType.RACQUETBALL ||
+      HealthWorkoutActivityType.RUGBY ||
+      HealthWorkoutActivityType.SOCCER ||
+      HealthWorkoutActivityType.SOFTBALL ||
+      HealthWorkoutActivityType.SQUASH ||
+      HealthWorkoutActivityType.TABLE_TENNIS ||
+      HealthWorkoutActivityType.TENNIS ||
+      HealthWorkoutActivityType.VOLLEYBALL ||
+      HealthWorkoutActivityType.WATER_POLO ||
+      HealthWorkoutActivityType.FRISBEE_DISC ||
+      HealthWorkoutActivityType.DISC_SPORTS => ActivityType.sports,
+      HealthWorkoutActivityType.GUIDED_BREATHING ||
+      HealthWorkoutActivityType.PREPARATION_AND_RECOVERY ||
+      HealthWorkoutActivityType.COOLDOWN => null,
+      _ => ActivityType.other,
+    };
+  }
+
+  /// A health-store workout as a VitalUp session, or null for sessions that
+  /// aren't exercise and for empty or implausibly long workouts.
   static ActivitySession? workoutToSession(
     String uuid,
     DateTime start,
@@ -166,7 +231,7 @@ class HealthImportService {
       HealthWorkoutActivityType.HIKING => ActivityType.trekking,
       HealthWorkoutActivityType.CLIMBING ||
       HealthWorkoutActivityType.ROCK_CLIMBING => ActivityType.climbing,
-      _ => null,
+      _ => workoutTypeFor(w.workoutActivityType),
     };
     if (type == null) return null;
     final seconds = end.difference(start).inSeconds;

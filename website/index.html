@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VitalUp — Holistic Health, Biometrics & AI Fitness Platform</title>
+  <meta name="description" content="VitalUp is a production-grade health & fitness ecosystem with offline-first synchronization, Google Health Connect integration, and AI coaching.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgdmlld0JveD0iMCAwIDUwMCA1MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI3NC4xODggMjEwLjIzNEMyOTIuNTQyIDE5MS44OCAzMjIuMzAxIDE5MS44OCAzNDAuNjU1IDIxMC4yMzRMMzcxLjA2MSAyNDAuNjM5QzQwMi4zMDMgMjcxLjg4MSA0MDIuMzAzIDMyMi41MzUgMzcxLjA2MSAzNTMuNzdMMzE0LjQ5MiA0MTAuMzQ1QzI5OC44NzEgNDI1Ljk2NiAyNzMuNTQ1IDQyNS45NjYgMjU3LjkyNCA0MTAuMzQ1TDI0OS45MjEgNDAyLjM0M0wyMzYuMTg1IDQxNi4wNzlDMjIwLjU2NCA0MzEuNyAxOTUuMjM3IDQzMS43IDE3OS42MTYgNDE2LjA3OUwxMjMuMDQ4IDM1OS41MTFDOTEuODA2MSAzMjguMjY5IDkxLjgwNiAyNzcuNjE2IDEyMy4wNDggMjQ2LjM3NEwxNTEuMzMyIDIxOC4wOUMxNzAuODU4IDE5OC41NjMgMjAyLjUxNyAxOTguNTYzIDIyMi4wNDMgMjE4LjA5TDI0NC4xODggMjQwLjIzNEwyNzQuMTg4IDIxMC4yMzRaIiBmaWxsPSIjMTlDM0UwIi8+PHBhdGggZD0iTTE2OC4xODkgMjcwLjc0QzE4MS4yMzQgMjU3Ljc3MyAyMDEuODEzIDI1Ny4wMTYgMjE1LjczOSAyNjguNDI1TDIxNS44NzIgMjY4LjI5M0wyNTAuNDIyIDMwMi44NDNMMjgwLjE3OCAyNzMuMDg0QzI4MC43MTMgMjcyLjQ3NCAyODEuMjcxIDI3MS44NzYgMjgxLjg1NSAyNzEuMjk1QzI4Mi4zODcgMjcwLjc2NiAyODIuOTM0IDI3MC4yNTkgMjgzLjQ5MSAyNjkuNzcxTDI4My45ODcgMjY5LjI3NmwyODQuMDI0IDI2OS4zMTNDMjk3Ljc5MSAyNTcuNzMxIDMxOC4zNzIgMjU4LjQ1NCAzMzEuMjg0IDI3MS40NDJDMzQ0LjE0NiAyODQuMzgxIDM0NC43OSAzMDQuODU2IDMzMy4yNjQgMzE4LjU1NEwzMzMuMzYgMzE4LjY0OUwyNDkuNDM4IDQwMi41N0wxNjUuNTE3IDMxOC42NDlMMTY1LjcyNSAzMTguNDRDMTU0LjI1OCAzMDQuNDQ0IDE1NS4wOTMgMjgzLjc1OCAxNjguMTg5IDI3MC43NFoiIGZpbGw9IiNGRUZFRkUiLz48cGF0aCBkPSJNMjUwLjIxMSAxNzNDMjg2LjM0MyAxNzMgMzE4LjkyMiAxODguMjExIDM0MS44OTcgMjEyLjU3NmwyNTAuNjMyIDMwMy44NDNMMTU5IDIxMi4yMTFMMTY1LjMzMiAyMDUuODc4QzE4Ny43MjYgMTg1LjQ1NCAyMTcuNTE0IDE3MyAyNTAuMjExIDE3M1oiIGZpbGw9IiMxNDlDQjMiLz48Y2lyY2xlIGN4PSIyNTAiIGN5PSIxNDUiIHI9Ijc1IiBmaWxsPSIjMTlDM0UwIi8+PC9zdmc+">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-card: #162032;
+      --border: #1F293D;
+      --primary: #38BDF8;
+      --badge-bg: rgba(56, 189, 248, 0.1);
+      --badge-border: rgba(56, 189, 248, 0.25);
+      --accent: #10B981;
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --radius: 16px;
+      --max-width: 1040px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1.6;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+      overflow-x: hidden;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0.85rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.2s ease;
+      background: #FFFFFF;
+    }
+    .logo-container:hover .brand-logo {
+      transform: scale(1.05);
+    }
+    .brand-title { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 101;
+    }
+    .nav-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+    }
+    .hamburger-bar {
+      width: 20px;
+      height: 2px;
+      background-color: var(--text);
+      border-radius: 2px;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(2) {
+      opacity: 0;
+    }
+    .nav-toggle.is-open .hamburger-bar:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .hero {
+      max-width: var(--max-width);
+      margin: clamp(2.5rem, 6vw, 4.5rem) auto clamp(2rem, 4vw, 3rem);
+      text-align: center;
+      position: relative;
+      padding: 0 0.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: var(--primary);
+      margin-bottom: 1.5rem;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(180deg, #FFFFFF 0%, #94A3B8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-wrap: balance;
+    }
+    .hero p {
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto clamp(1.5rem, 3.5vw, 2.5rem);
+      line-height: 1.6;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 0.85rem 1.8rem;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: transform 0.15s, opacity 0.15s;
+      min-height: 48px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #38BDF8, #2563EB);
+      color: #FFFFFF;
+      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.35);
+    }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      opacity: 0.95;
+    }
+
+    .features-grid {
+      max-width: var(--max-width);
+      margin: clamp(2.5rem, 5vw, 4rem) auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: clamp(1rem, 2.5vw, 1.5rem);
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3vw, 2rem);
+      transition: border-color 0.2s, transform 0.2s;
+      overflow-wrap: break-word;
+    }
+    .card:hover {
+      border-color: var(--primary);
+      transform: translateY(-3px);
+    }
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+    }
+    .card h3 {
+      font-size: clamp(1.15rem, 2.5vw, 1.25rem);
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      color: #FFF;
+      line-height: 1.35;
+    }
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .legal-bar {
+      max-width: var(--max-width);
+      margin: 2rem auto clamp(3rem, 6vw, 5rem);
+      background: linear-gradient(180deg, var(--surface) 0%, var(--surface-card) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(1.25rem, 3vw, 2rem);
+      text-align: center;
+    }
+    .legal-bar h2 {
+      font-size: clamp(1.2rem, 3vw, 1.4rem);
+      font-weight: 700;
+      color: #FFF;
+      margin-bottom: 0.75rem;
+    }
+    .legal-bar p {
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .legal-links-row {
+      display: flex;
+      justify-content: center;
+      gap: 1rem 1.5rem;
+      flex-wrap: wrap;
+    }
+    .legal-links-row a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.05);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      font-size: 0.92rem;
+    }
+    .legal-links-row a:hover {
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .nav-toggle {
+        display: flex;
+      }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        background: rgba(17, 24, 39, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+        gap: 0.35rem;
+        z-index: 1000;
+      }
+      .nav-links.is-open {
+        display: flex;
+        animation: navSlideDown 0.2s ease-out forwards;
+      }
+      .nav-links a {
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+      }
+      @keyframes navSlideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .hero-actions .btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body { font-size: 15px; }
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <a href="https://vitalup.live" class="logo-container">
+        <img src="assets/vitalup_light_logo.png" 
+             srcset="assets/vitalup_light_logo.png 1x, /assets/vitalup_light_logo.png 1x"
+             onerror="this.onerror=null; this.src='/assets/vitalup_light_logo.png'; if(!this.complete || this.naturalWidth===0){this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgdmlld0JveD0iMCAwIDUwMCA1MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI3NC4xODggMjEwLjIzNEMyOTIuNTQyIDE5MS44OCAzMjIuMzAxIDE5MS44OCAzNDAuNjU1IDIxMC4yMzRMMzcxLjA2MSAyNDAuNjM5QzQwMi4zMDMgMjcxLjg4MSA0MDIuMzAzIDMyMi41MzUgMzcxLjA2MSAzNTMuNzdMMzE0LjQ5MiA0MTAuMzQ1QzI5OC44NzEgNDI1Ljk2NiAyNzMuNTQ1IDQyNS45NjYgMjU3LjkyNCA0MTAuMzQ1TDI0OS45MjEgNDAyLjM0M0wyMzYuMTg1IDQxNi4wNzlDMjIwLjU2NCA0MzEuNyAxOTUuMjM3IDQzMS43IDE3OS42MTYgNDE2LjA3OUwxMjMuMDQ4IDM1OS41MTFDOTEuODA2MSAzMjguMjY5IDkxLjgwNiAyNzcuNjE2IDEyMy4wNDggMjQ2LjM3NEwxNTEuMzMyIDIxOC4wOUMxNzAuODU4IDE5OC41NjMgMjAyLjUxNyAxOTguNTYzIDIyMi4wNDMgMjE4LjA5TDI0NC4xODggMjQwLjIzNEwyNzQuMTg4IDIxMC4yMzRaIiBmaWxsPSIjMTlDM0UwIi8+PHBhdGggZD0iTTE2OC4xODkgMjcwLjc0QzE4MS4yMzQgMjU3Ljc3MyAyMDEuODEzIDI1Ny4wMTYgMjE1LjczOSAyNjguNDI1TDIxNS44NzIgMjY4LjI5M0wyNTAuNDIyIDMwMi44NDNMMjgwLjE3OCAyNzMuMDg0QzI4MC43MTMgMjcyLjQ3NCAyODEuMjcxIDI3MS44NzYgMjgxLjg1NSAyNzEuMjk1QzI4Mi4zODcgMjcwLjc2NiAyODIuOTM0IDI3MC4yNTkgMjgzLjQ5MSAyNjkuNzcxTDI4My45ODcgMjY5LjI3NmwyODQuMDI0IDI2OS4zMTNDMjk3Ljc5MSAyNTcuNzMxIDMxOC4zNzIgMjU4LjQ1NCAzMzEuMjg0IDI3MS40NDJDMzQ0LjE0NiAyODQuMzgxIDM0NC43OSAzMDQuODU2IDMzMy4yNjQgMzE4LjU1NEwzMzMuMzYgMzE4LjY0OUwyNDkuNDM4IDQwMi41N0wxNjUuNTE3IDMxOC42NDlMMTY1LjcyNSAzMTguNDRDMTU0LjI1OCAzMDQuNDQ0IDE1NS4wOTMgMjgzLjc1OCAxNjguMTg5IDI3MC43NFoiIGZpbGw9IiNGRUZFRkUiLz48cGF0aCBkPSJNMjUwLjIxMSAxNzNDMjg2LjM0MyAxNzMgMzE4LjkyMiAxODguMjExIDM0MS44OTcgMjEyLjU3NmwyNTAuNjMyIDMwMy44NDNMMTU5IDIxMi4yMTFMMTY1LjMzMiAyMDUuODc4QzE4Ny43MjYgMTg1LjQ1NCAyMTcuNTE0IDE3MyAyNTAuMjExIDE3M1oiIGZpbGw9IiMxNDlDQjMiLz48Y2lyY2xlIGN4PSIyNTAiIGN5PSIxNDUiIHI9Ijc1IiBmaWxsPSIjMTlDM0UwIi8+PC9zdmc+';}"
+             alt="VitalUp Logo" class="brand-logo" width="40" height="40">
+        <span class="brand-title">VitalUp</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <nav class="nav-links" id="navMenu">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+        <a href="delete-account.html">Account Deletion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="badge">&bull; Production Health &amp; Biometrics Platform</div>
+      <h1>Elevate Your Health.<br>Master Your Vitals.</h1>
+      <p>
+        VitalUp connects daily biometrics, offline-first activity tracking, Google Health Connect, and multi-model AI vision into an intuitive wellness powerhouse.
+      </p>
+      <div class="hero-actions">
+        <a href="privacy.html" class="btn btn-primary">View Privacy Policy &rarr;</a>
+        <a href="terms.html" class="btn btn-secondary">Terms of Service</a>
+      </div>
+    </section>
+
+    <section class="features-grid">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Offline-First Architecture</h3>
+        <p>Instant local reads and writes with Isar DB. Syncs seamlessly with Supabase PostgreSQL and Row-Level Security when back online.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">❤️</div>
+        <h3>Google Health Connect</h3>
+        <p>Unified sync for steps, sleep stages, resting heart rate, HRV, blood pressure, SpO2, and workouts with strictly enforced privacy guarantees.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">📸</div>
+        <h3>AI Food Vision Scanner</h3>
+        <p>Capture meal pictures to instantly recognize ingredients, calculate macros, and log calories powered by Gemini Vision and USDA databases.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🤖</div>
+        <h3>Vita AI Health Coach</h3>
+        <p>Conversational, context-aware coaching that correlates stress, recovery, hydration, and activity trends to support your lifestyle goals.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🏃</div>
+        <h3>Live GPS Workout Tracker</h3>
+        <p>Track outdoor runs and cycling with offline maps, milestones TTS voice cues, background audio, and Bluetooth LE heart rate straps.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🔒</div>
+        <h3>Biometric Security &amp; Control</h3>
+        <p>Hardware-level app lock (fingerprint/face recognition) and complete user data sovereignty with one-tap account deletion.</p>
+      </div>
+    </section>
+
+    <section class="legal-bar">
+      <h2>Google Play Store &amp; Developer Legal Information</h2>
+      <p>
+        VitalUp adheres to the highest data protection standards and Google Play Store policies. Review our legal documentation below:
+      </p>
+      <div class="legal-links-row">
+        <a href="privacy.html">📋 Privacy Policy</a>
+        <a href="terms.html">⚖️ Terms of Service</a>
+        <a href="delete-account.html">🗑️ Account &amp; Data Deletion Portal</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div style="max-width: var(--max-width); margin: 0 auto;">
+      <p>&copy; 2026 VitalUp. Developed by Tarun Talan. All rights reserved.</p>
+      <p style="margin-top: 0.5rem;">
+        <a href="privacy.html">Privacy Policy</a> &bull;
+        <a href="terms.html">Terms of Service</a> &bull;
+        <a href="delete-account.html">Account &amp; Data Deletion</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = navMenu.classList.toggle('is-open');
+        navToggle.classList.toggle('is-open', isOpen);
+        navToggle.setAttribute('aria-expanded', isOpen);
+      });
+      document.addEventListener('click', (e) => {
+        if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navMenu.classList.contains('is-open')) {
+          navMenu.classList.remove('is-open');
+          navToggle.classList.remove('is-open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

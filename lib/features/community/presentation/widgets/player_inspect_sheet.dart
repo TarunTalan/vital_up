@@ -17,10 +17,13 @@ import 'package:vital_up/features/community/domain/entities/player_profile.dart'
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/pages/head_to_head_comparison_page.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
+import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/badge_widgets.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
-import 'package:vital_up/features/gamification/presentation/widgets/level_badge_widget.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
+import 'package:vital_up/core/widgets/adaptive_row.dart';
 
 final _number = NumberFormat.decimalPattern();
 
@@ -72,10 +75,6 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
       showSuccessSnackBar(context, 'Cheer sent to @${widget.friend.username}');
     } on PlayerProfileException catch (e) {
       if (!mounted) return;
-      // Sent earlier (maybe from another device): show it as sent.
-      if (e.message == PlayerProfileException.alreadyCheered) {
-        setState(() => _cheered = true);
-      }
       showErrorSnackBar(context, e.message);
     } catch (e) {
       debugPrint('Cheer failed: $e');
@@ -103,7 +102,6 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
     final friend = widget.friend;
     final name = friend.fullName?.trim();
     final hasName = name != null && name.isNotEmpty;
-    final tier = LevelTierConfig.forLevel(friend.level);
     final grey = context.vColors.grayText;
 
     return SafeArea(
@@ -120,10 +118,23 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
-              child: UserAvatar(
-                username: friend.username,
-                url: friend.avatarUrl,
-                size: AppDimens.avatarLarge,
+              child: Container(
+                width: AppDimens.avatarLarge,
+                height: AppDimens.avatarLarge,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.colors.primary,
+                    width: AppDimens.borderThick + 0.5,
+                  ),
+                ),
+                child: ClipOval(
+                  child: UserAvatar(
+                    username: friend.username,
+                    url: friend.avatarUrl,
+                    size: AppDimens.avatarLarge,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: AppDimens.space16),
@@ -137,14 +148,47 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
               ),
             ),
             const SizedBox(height: AppDimens.space4),
-            Text(
-              [
-                if (hasName) '@${friend.username}',
-                'Level ${friend.level}',
-                tier.tierName,
-              ].join(' · '),
-              textAlign: TextAlign.center,
-              style: context.text.bodyMedium?.copyWith(color: grey),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GameIcon(
+                  GamificationIcons.levelHexagon(friend.level),
+                  fallback: Icons.shield_rounded,
+                  size: AppDimens.iconSm,
+                  color: context.colors.primary,
+                ),
+                const SizedBox(width: AppDimens.space6),
+                Text(
+                  [
+                    if (hasName) '@${friend.username}',
+                    'Level ${friend.level}',
+                    levelTitle(friend.level),
+                  ].join(' · '),
+                  textAlign: TextAlign.center,
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.colors.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  size: AppDimens.iconXs,
+                  color: grey,
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  'Active community member',
+                  textAlign: TextAlign.center,
+                  style: context.text.bodySmall?.copyWith(color: grey),
+                ),
+              ],
             ),
             const SizedBox(height: AppDimens.sectionGap),
             FutureBuilder<PlayerProfile>(
@@ -178,9 +222,10 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                     icon: Icons.lock_outline_rounded,
                   );
                 }
-                return _ProfileStats(profile: profile);
+                return PlayerProfileStats(profile: profile);
               },
             ),
+            PlayerAwardsSummary(userId: friend.userId),
             const SizedBox(height: AppDimens.sectionGap),
             AppPrimaryButton(
               label: 'Challenge',
@@ -201,7 +246,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                     leadingIcon: Icon(
                       _cheered
                           ? Icons.check_rounded
-                          : Icons.thumb_up_alt_outlined,
+                          : Icons.thumb_up_alt_rounded,
                       size: AppDimens.iconSm,
                     ),
                     enabled: !_cheered,
@@ -236,7 +281,7 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
                   foregroundColor: context.colors.error,
                 ),
                 icon: const Icon(
-                  Icons.person_remove_outlined,
+                  Icons.person_remove_rounded,
                   size: AppDimens.iconSm,
                 ),
                 label: const Text('Remove friend'),
@@ -251,10 +296,10 @@ class _PlayerInspectSheetState extends State<PlayerInspectSheet> {
 }
 
 /// Points, streaks, points per category and recent badges.
-class _ProfileStats extends StatelessWidget {
+class PlayerProfileStats extends StatelessWidget {
   final PlayerProfile profile;
 
-  const _ProfileStats({required this.profile});
+  const PlayerProfileStats({super.key, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -272,12 +317,14 @@ class _ProfileStats extends StatelessWidget {
                   TrackerFigure(
                     label: 'Total points',
                     value: _number.format(p.totalPoints),
+                    iconAsset: GamificationIcons.points,
                     icon: Icons.star_rounded,
                     color: AppColors.scoreBonus,
                   ),
                   TrackerFigure(
                     label: 'Badges',
                     value: _number.format(p.badgeCount),
+                    iconAsset: GamificationIcons.badgeIcon,
                     icon: Icons.military_tech_rounded,
                     color: AppColors.rankGold,
                   ),
@@ -289,13 +336,15 @@ class _ProfileStats extends StatelessWidget {
                   TrackerFigure(
                     label: 'Current streak',
                     value: _days(p.currentStreak),
+                    iconAsset: GamificationIcons.streakFlame,
                     icon: Icons.local_fire_department_rounded,
                     color: AppColors.streak,
                   ),
                   TrackerFigure(
                     label: 'Best streak',
                     value: _days(p.longestStreak),
-                    icon: Icons.emoji_events_outlined,
+                    iconAsset: GamificationIcons.trophy,
+                    icon: Icons.emoji_events_rounded,
                     color: AppColors.streak,
                   ),
                 ],
@@ -304,19 +353,14 @@ class _ProfileStats extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppDimens.cardGap),
-        Row(
+        AdaptiveRow(
           children: [
-            for (final c in ScoreCategory.scored) ...[
-              if (c != ScoreCategory.scored.first)
-                const SizedBox(width: AppDimens.space8),
-              Expanded(
-                child: CategoryPointsTile(
-                  category: c,
-                  points: p.pointsIn(c),
-                  signed: false,
-                ),
+            for (final c in ScoreCategory.scored)
+              CategoryPointsTile(
+                category: c,
+                points: p.pointsIn(c),
+                signed: false,
               ),
-            ],
           ],
         ),
         if (p.recentBadges.isNotEmpty) ...[
@@ -327,15 +371,18 @@ class _ProfileStats extends StatelessWidget {
             runSpacing: AppDimens.space8,
             children: [
               for (final b in p.recentBadges)
-                Tooltip(
-                  message: b.name,
-                  child: AppIconBadge(
-                    color: AppColors.rankGold,
-                    size: AppDimens.iconBadgeLarge,
-                    icon: GameIcon(
-                      GamificationIcons.badge(b.iconKey),
-                      fallback: Icons.military_tech_rounded,
-                      size: AppDimens.iconLg,
+                GestureDetector(
+                  onTap: () => showBadgeDetailSheet(context, b),
+                  child: Tooltip(
+                    message: b.name,
+                    child: AppIconBadge(
+                      color: AppColors.rankGold,
+                      size: AppDimens.iconBadgeLarge,
+                      icon: GameIcon(
+                        GamificationIcons.badge(b.iconKey),
+                        fallback: Icons.military_tech_rounded,
+                        size: AppDimens.iconLg,
+                      ),
                     ),
                   ),
                 ),

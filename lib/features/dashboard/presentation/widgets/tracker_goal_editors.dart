@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_sheet.dart';
 import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
@@ -37,8 +39,8 @@ Future<bool> editWaterGoal(BuildContext context) async {
     title: 'Daily water goal',
     description: 'How much to drink each day',
     initial: service.getDailyGoal().toDouble(),
-    min: 500,
-    max: 6000,
+    min: InputLimits.waterGoalMlMin.toDouble(),
+    max: InputLimits.waterGoalMlMax.toDouble(),
     step: 250,
     format: formatWaterGoal,
     recommended: recommended,
@@ -57,8 +59,8 @@ Future<bool> editSleepGoal(BuildContext context) async {
     title: 'Nightly sleep goal',
     description: 'Hours of sleep to aim for each night',
     initial: service.getGoalMinutes().toDouble(),
-    min: 240,
-    max: 720,
+    min: InputLimits.sleepGoalMinMin.toDouble(),
+    max: InputLimits.sleepGoalMinMax.toDouble(),
     step: 30,
     format: formatMinutesGoal,
     recommended: SleepService.defaultGoalMinutes.toDouble(),
@@ -77,9 +79,9 @@ Future<bool> editScreenTimeGoal(BuildContext context) async {
     title: 'Daily screen time limit',
     description: 'Stay under this to meet your goal',
     initial: service.getDailyLimitMinutes().toDouble(),
-    min: 30,
-    max: 600,
-    step: 30,
+    min: screenLimitMinMinutes.toDouble(),
+    max: screenLimitMaxMinutes.toDouble(),
+    step: 15,
     format: formatMinutesGoal,
     recommended: 120,
     recommendedReason: 'A common target for leisure screen time',
@@ -102,8 +104,8 @@ Future<bool> editWeightGoal(BuildContext context) async {
     title: 'Goal weight',
     description: 'The weight you are working towards',
     initial: (unit.fromKg(start) * 2).round() / 2,
-    min: unit.fromKg(30).roundToDouble(),
-    max: unit.fromKg(250).roundToDouble(),
+    min: unit.minValue.toDouble(),
+    max: unit.maxValue.toDouble(),
     step: 0.5,
     format: (v) => '${v.toStringAsFixed(1)} ${unit.label}',
   );

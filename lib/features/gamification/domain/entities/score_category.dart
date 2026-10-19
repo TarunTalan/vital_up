@@ -4,14 +4,30 @@ import 'package:vital_up/core/theme/app_colors.dart';
 /// Score buckets points are earned in (`score_categories` on the server).
 /// Bonus points (streaks, badges) count toward the total only.
 enum ScoreCategory {
-  nutrition('Nutrition', AppColors.scoreNutrition, Icons.restaurant_rounded),
+  nutrition(
+    'Nutrition',
+    AppColors.scoreNutrition,
+    Icons.restaurant_rounded,
+    'assets/icons/trackers/fork_knife.svg',
+  ),
   lifestyle(
     'Lifestyle',
     AppColors.scoreLifestyle,
     Icons.self_improvement_rounded,
+    'assets/icons/gamification/shield.svg',
   ),
-  fitness('Fitness', AppColors.scoreFitness, Icons.directions_run_rounded),
-  bonus('Bonus', AppColors.scoreBonus, Icons.auto_awesome_rounded, 'assets/icons/bonus.svg');
+  fitness(
+    'Fitness',
+    AppColors.scoreFitness,
+    Icons.directions_run_rounded,
+    'assets/icons/trackers/activity.svg',
+  ),
+  bonus(
+    'Bonus',
+    AppColors.scoreBonus,
+    Icons.auto_awesome_rounded,
+    'assets/icons/gamification/bonus.svg',
+  );
 
   final String label;
   final Color color;

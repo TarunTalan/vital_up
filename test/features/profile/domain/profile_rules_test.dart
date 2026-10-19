@@ -60,7 +60,10 @@ void main() {
       expect(ProfileRules.firstDob(now), DateTime(1906, 10, 9));
       expect(ProfileRules.clampDob(DateTime(2020), now), DateTime(2013, 10, 9));
       // 29 Feb today: the boundary falls back to 28 Feb.
-      expect(ProfileRules.lastDob(DateTime(2024, 2, 29)), DateTime(2011, 2, 28));
+      expect(
+        ProfileRules.lastDob(DateTime(2024, 2, 29)),
+        DateTime(2011, 2, 28),
+      );
     });
 
     test('calorie goal age ignores impossible and future dates', () {

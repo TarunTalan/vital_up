@@ -89,23 +89,26 @@ dependencies:
   flutter_blue_plus: ^1.35.3
   just_audio: ^0.9.42
   audio_session: ^0.1.21
-  just_audio_background: ^0.0.1-beta.15
   on_audio_query_forked: ^2.9.1
   on_audio_query_android: ^1.1.0
   permission_handler: ^11.3.1
   url_launcher: ^6.3.0
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
+  firebase_analytics: ^12.1.0
+  firebase_crashlytics: ^5.4.0
+  envied: ^1.1.1
   flutter_local_notifications: ^22.3.1
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   package_info_plus: ^10.2.2
-  firebase_crashlytics: ^5.4.0
   home_widget: ^0.10.0
   local_auth: ^3.0.2
   share_plus: ^13.3.1
   archive: ^4.3.0
   connectivity_plus: ^7.3.1
+  background_downloader: ^9.5.9
+  purchases_flutter: ^10.16.0
 
 
 dev_dependencies:
@@ -116,6 +119,7 @@ dev_dependencies:
 
   # Code generation
   build_runner: ^2.4.9
+  envied_generator: ^1.1.1
   isar_community_generator: ^3.3.2
   drift_dev: ^2.16.0
   injectable_generator: ^2.6.1
@@ -135,37 +139,49 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/badges/
     - assets/icons/
+    - assets/icons/app/
+    - assets/icons/auth/
+    - assets/icons/awards/
+    - assets/icons/gamification/
+    - assets/icons/leaderboard_ranks/
+    - assets/icons/levels/
+    - assets/icons/nav/
+    - assets/icons/onboarding/
+    - assets/icons/trackers/
+    - assets/icons/ui/
+    - assets/icons/vita/
     - assets/audio/
     - assets/data/
+    # JetBrains Mono for captions: google_fonts uses this instead of fetching.
+    - assets/google_fonts/
+    - assets/fonts/licenses/
+    - shorebird.yaml
 
 
   fonts:
-    - family: SFProRounded
+    # Nunito (SIL OFL 1.1, assets/fonts/licenses), subset to Latin,
+    # punctuation, currency (incl. the rupee sign) and common symbols.
+    - family: Nunito
       fonts:
-        - asset: assets/fonts/sf_pro_rounded_thin.otf
-          weight: 100
-        - asset: assets/fonts/sf_pro_rounded_ultralight.otf
-          weight: 200
-        - asset: assets/fonts/sf_pro_rounded_light.otf
+        - asset: assets/fonts/Nunito-Light.ttf
           weight: 300
-        - asset: assets/fonts/sf_pro_rounded_regular.otf
+        - asset: assets/fonts/Nunito-Regular.ttf
           weight: 400
-        - asset: assets/fonts/sf_pro_rounded_medium.otf
+        - asset: assets/fonts/Nunito-Medium.ttf
           weight: 500
-        - asset: assets/fonts/sf_pro_rounded_semibold.otf
+        - asset: assets/fonts/Nunito-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/sf_pro_rounded_bold.otf
+        - asset: assets/fonts/Nunito-Bold.ttf
           weight: 700
-        - asset: assets/fonts/sf_pro_rounded_heavy.otf
-          weight: 800
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icons/app_icon_launcher.png"
+  image_path: "assets/icons/app/app_icon_launcher.png"
   remove_alpha_ios: true
   min_sdk_android: 21
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icons/app_icon_launcher_foreground.png"
+  adaptive_icon_foreground: "assets/icons/app/app_icon_launcher_foreground.png"
   adaptive_icon_foreground_inset: 0

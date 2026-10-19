@@ -102,7 +102,7 @@ class WeeklySummaryService {
     final thisFrom = days[7];
     final to = nextDay(days.last);
 
-    final sessions = await _activity.getSessions();
+    final sessions = await _activity.getSessions(since: lastFrom);
     final userId = _client.auth.currentUser?.id;
     final water = userId == null
         ? const <WaterLogCache>[]

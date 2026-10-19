@@ -39,6 +39,7 @@ class QuickChallengeSheet extends StatefulWidget {
 class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
   var _selected = _options.first;
   bool _submitting = false;
+  final _requestIds = ChallengeRequestIds();
 
   Future<void> _send() async {
     if (_submitting) return;
@@ -50,6 +51,11 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
         metric: _selected.metric,
         days: _selected.days,
         friendIds: [widget.friend.userId],
+        requestId: _requestIds.forChallenge(
+          _selected.metric,
+          _selected.days,
+          [widget.friend.userId],
+        ),
       );
       if (mounted) navigator.pop(true);
       if (rootContext.mounted) {

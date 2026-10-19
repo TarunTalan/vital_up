@@ -4,8 +4,10 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
+import 'package:vital_up/features/community/domain/entities/community_award.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/notifications/domain/entities/app_notification.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 
 /// Routes an announcement's `data.route` may open.
 const notificationLinkableRoutes = {
@@ -27,6 +29,8 @@ const notificationLinkableRoutes = {
   'weight-trends',
   'weekly-summary',
   'challenges',
+  // Ongoing workout timer notification.
+  'workout-timer',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.
@@ -35,7 +39,7 @@ String? notificationRoute(NotificationType type, String? route) =>
       NotificationType.friendRequest ||
       NotificationType.friendAccepted ||
       NotificationType.cheer => 'friends',
-      NotificationType.badge => 'badges',
+      NotificationType.badge || NotificationType.award => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
       NotificationType.challenge => 'challenges',
       NotificationType.announcement =>
@@ -266,6 +270,7 @@ class NotificationTile extends StatelessWidget {
                   dimension: AppDimens.iconLg,
                   child: CircularProgressIndicator(
                     strokeWidth: AppDimens.borderThick,
+                    strokeCap: StrokeCap.round,
                   ),
                 ),
               )
@@ -318,13 +323,21 @@ class _NotificationLeading extends StatelessWidget {
       ),
       NotificationType.levelUp => (
         AppColors.scoreBonus,
-        GamificationIcons.trophy,
+        GamificationIcons.levelUp,
         Icons.emoji_events_rounded,
       ),
       NotificationType.streak => (
         AppColors.streak,
         GamificationIcons.streak,
         Icons.local_fire_department_rounded,
+      ),
+      NotificationType.award => (
+        AppColors.rankGold,
+        AwardIcons.forPlace(
+          AwardPeriod.fromName(n.awardPeriod),
+          n.awardPlace ?? 1,
+        ),
+        Icons.emoji_events_rounded,
       ),
       _ => (context.colors.primary, '', Icons.campaign_rounded),
     };
@@ -346,9 +359,7 @@ String notificationTimeLabel(DateTime at, DateTime now) {
   final diff = now.difference(at);
   if (diff.inMinutes < 1) return 'Just now';
   if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(at.year, at.month, at.day);
-  final days = today.difference(day).inDays;
+  final days = calendarDaysBetween(at, now);
   if (days == 0) return '${diff.inHours}h ago';
   if (days == 1) return 'Yesterday';
   if (days < 7) return DateFormat('EEEE').format(at);

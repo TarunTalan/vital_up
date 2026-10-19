@@ -8,7 +8,7 @@ import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 enum TrackerMetric {
   nutrition(
     label: 'Nutrition',
-    iconAsset: 'assets/icons/fork_knife.svg',
+    iconAsset: 'assets/icons/trackers/fork_knife.svg',
     icon: Icons.restaurant_rounded,
     color: AppColors.trackNutrition,
     route: 'diet-progress',
@@ -17,16 +17,16 @@ enum TrackerMetric {
   ),
   activity(
     label: 'Activity',
-    iconAsset: 'assets/icons/barbell.svg',
+    iconAsset: 'assets/icons/trackers/activity.svg',
     icon: Icons.directions_run_rounded,
     color: AppColors.trackActivity,
     route: 'activity-goals',
-    logLabel: 'Start workout',
+    logLabel: 'Start activity',
     logIcon: Icons.play_arrow_rounded,
   ),
   mood(
     label: 'Mood & Stress',
-    iconAsset: 'assets/icons/mood.svg',
+    iconAsset: 'assets/icons/trackers/mood.svg',
     icon: Icons.self_improvement_rounded,
     color: AppColors.trackMood,
     route: 'stress-trends',
@@ -35,7 +35,7 @@ enum TrackerMetric {
   ),
   water(
     label: 'Water',
-    iconAsset: 'assets/icons/drop.svg',
+    iconAsset: 'assets/icons/trackers/drop.svg',
     icon: Icons.water_drop_rounded,
     color: AppColors.trackWater,
     route: 'water-trends',
@@ -44,7 +44,7 @@ enum TrackerMetric {
   ),
   sleep(
     label: 'Sleep',
-    iconAsset: 'assets/icons/moon_stars.svg',
+    iconAsset: 'assets/icons/trackers/moon_stars.svg',
     icon: Icons.bedtime_rounded,
     color: AppColors.trackSleep,
     route: 'sleep-trends',
@@ -53,7 +53,7 @@ enum TrackerMetric {
   ),
   weight(
     label: 'Weight',
-    iconAsset: 'assets/icons/weight_icon.svg',
+    iconAsset: 'assets/icons/trackers/weight_icon.svg',
     icon: Icons.monitor_weight_rounded,
     color: AppColors.trackWeight,
     route: 'weight-trends',
@@ -62,7 +62,7 @@ enum TrackerMetric {
   ),
   screenTime(
     label: 'Screen Time',
-    iconAsset: 'assets/icons/devices.svg',
+    iconAsset: 'assets/icons/trackers/devices.svg',
     icon: Icons.smartphone_rounded,
     color: AppColors.trackScreenTime,
     route: 'screen-time-trends',

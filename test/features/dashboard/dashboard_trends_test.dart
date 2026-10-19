@@ -53,6 +53,63 @@ void main() {
     });
   });
 
+  group('TrendSeries.weekly', () {
+    test('averages logged days per week, newest week ends today', () {
+      final days = lastNDays(30);
+      final source = TrendSeries(
+        [
+          for (var i = 0; i < 30; i++)
+            // Oldest two days fall outside the 4 weeks; one gap in week 1.
+            DailyPoint(days[i], i == 2 ? null : (i ~/ 7 + 1) * 10.0),
+        ],
+        goal: 25,
+      );
+      final weekly = source.weekly();
+      expect(weekly.points.length, 4);
+      expect(weekly.points.first.day, days[2]);
+      expect(weekly.points.last.day, days[23]);
+      expect(weekly.goal, 25);
+      expect(weekly.points.last.value, closeTo((40.0 * 5 + 50 * 2) / 7, 1e-9));
+    });
+
+    test('a week with nothing logged is a gap', () {
+      final days = lastNDays(7);
+      final weekly = TrendSeries([for (final d in days) DailyPoint(d, null)])
+          .weekly();
+      expect(weekly.points.single.value, isNull);
+    });
+  });
+
+  group('TrendSeries.monthly', () {
+    test('averages per calendar month and drops a partial oldest month', () {
+      // 14 Apr .. 16 Oct 2026: April is partial, May..Oct are kept.
+      final days = lastNDays(TrendRange.halfYear.days,
+          now: DateTime(2026, 10, 16, 9));
+      expect(days.first, DateTime(2026, 4, 14));
+      final source = TrendSeries(
+        [
+          for (final d in days)
+            DailyPoint(
+              d,
+              d.month == 6 || (d.month == 10 && d.day > 2)
+                  ? null
+                  : 70.0 + d.day % 2,
+            ),
+        ],
+        goal: 68,
+        direction: GoalDirection.near,
+      );
+      final monthly = source.monthly();
+      expect([for (final p in monthly.points) p.day], [
+        for (var m = 5; m <= 10; m++) DateTime(2026, m),
+      ]);
+      expect(monthly.points[1].value, isNull); // June: nothing logged
+      expect(monthly.points.last.value, 70.5); // 1 Oct = 71, 2 Oct = 70
+      expect(monthly.goal, 68);
+      expect(monthly.direction, GoalDirection.near);
+    });
+  });
+
   group('TrendSeries', () {
     final days = lastNDays(4);
     TrendSeries series(List<double?> values,

@@ -95,7 +95,7 @@ class ChatBubble extends StatelessWidget {
                   ),
                   child: Text(
                     message.text,
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.start,
                     style: _bubbleText(context, VitaColors.userText),
                   ),
                 ),

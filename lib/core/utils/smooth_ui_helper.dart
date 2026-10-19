@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
+/// Global key for the root ScaffoldMessenger to allow clearing/displaying snackbars
+/// from anywhere in the app (e.g. during navigation).
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 /// Guards against a double tap opening the same sheet or dialog twice: while
 /// a modal opened from a [BuildContext] is still showing, another open from
 /// that same context within [_reopenGuard] is ignored (returns null).
@@ -79,10 +84,15 @@ void showSmoothSnackBar(
   SnackBarAction? action,
 }) {
   if (!context.mounted) return;
-  final messenger = ScaffoldMessenger.maybeOf(context);
+  final messenger =
+      ScaffoldMessenger.maybeOf(context) ??
+      rootScaffoldMessengerKey.currentState;
   if (messenger == null) return;
   // Never show an empty bubble.
   if (message.trim().isEmpty) message = 'Something went wrong. Try again.';
+
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final bgColor = isDark ? const Color(0xFF162032) : const Color(0xFF0F172A);
 
   messenger.clearSnackBars();
   final controller = messenger.showSnackBar(
@@ -90,20 +100,39 @@ void showSmoothSnackBar(
       behavior: SnackBarBehavior.floating,
       dismissDirection: DismissDirection.horizontal,
       duration: duration,
+      backgroundColor: bgColor,
+      elevation: 6.0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+        side: BorderSide(color: iconColor.withValues(alpha: 0.35), width: 1.0),
+      ),
       margin: const EdgeInsets.symmetric(
         horizontal: AppDimens.gutter,
         vertical: AppDimens.space16,
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimens.space16,
-        vertical: AppDimens.space12,
+        vertical: 14.0,
       ),
       action: action,
       content: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: AppDimens.iconMd),
+          Padding(
+            padding: const EdgeInsets.only(top: 2.0),
+            child: Icon(icon, color: iconColor, size: AppDimens.iconMd),
+          ),
           const SizedBox(width: AppDimens.space12),
-          Expanded(child: Text(message)),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.small14.copyWith(
+                color: const Color(0xFFF8FAFC),
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     ),
@@ -141,6 +170,14 @@ void showErrorSnackBar(BuildContext context, String message) {
     iconColor: AppColors.error,
     icon: Icons.error_outline_rounded,
   );
+}
+
+/// Clears any active snackbars currently displayed across the app.
+void clearActiveSnackBars([BuildContext? context]) {
+  if (context != null && context.mounted) {
+    ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+  }
+  rootScaffoldMessengerKey.currentState?.clearSnackBars();
 }
 
 /// Shows a modal bottom sheet with the app-standard look: elevated surface,

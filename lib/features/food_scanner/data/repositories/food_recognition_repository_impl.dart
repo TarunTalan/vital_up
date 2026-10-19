@@ -18,6 +18,7 @@ import 'package:vital_up/features/food_scanner/data/utils/food_image_encoder.dar
 import 'package:vital_up/features/food_scanner/domain/entities/recognized_food.dart';
 import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
+import 'package:vital_up/core/utils/quota_reset.dart';
 
 /// Top-level so the isolate closure captures only [bytes].
 Future<String> _hashInBackground(Uint8List bytes) => Isolate.run(() => hashBytes(bytes));
@@ -116,7 +117,11 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         case 402:
         case 403:
         case 429:
-          return const Left(ScanQuotaExceededFailure());
+          return Left(
+            ScanQuotaExceededFailure(
+              'No photo scans left today. They reset at ${quotaResetTime()}.',
+            ),
+          );
         case 503:
           return const Left(RecognitionUnavailableFailure());
         default:

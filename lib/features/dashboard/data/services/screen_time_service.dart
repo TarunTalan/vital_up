@@ -121,17 +121,29 @@ class ScreenTimeService {
     }
   }
 
+  /// Finished days don't change: kept so a reload only queries today
+  /// instead of 7 native usage queries each time.
+  final Map<DateTime, DailyScreenTime> _finishedDays = {};
+
   /// Fetches weekly history and aggregates statistics (average, lowest, highest, change vs yesterday)
   Future<ScreenTimeWeeklySummary> getWeeklySummary() async {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final List<DailyScreenTime> history = [];
+    _finishedDays.removeWhere(
+      (day, _) => day.isBefore(DateTime(now.year, now.month, now.day - 7)),
+    );
 
     // Query past 7 days from oldest (6 days ago) to today
     for (int i = 6; i >= 0; i--) {
       // Calendar days, not 24h steps, so DST changes don't shift them.
       final day = DateTime(todayStart.year, todayStart.month, todayStart.day - i);
       final dayEnd = i == 0 ? now : nextDay(day);
+      final cached = _finishedDays[day];
+      if (cached != null) {
+        history.add(cached);
+        continue;
+      }
 
       try {
         final usage = await _fetchAppUsage(day, dayEnd);
@@ -146,13 +158,17 @@ class ScreenTimeService {
         }
         validApps.sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
 
-        history.add(
-          DailyScreenTime(
-            date: day,
-            duration: Duration(milliseconds: totalMs),
-            topApps: validApps,
-          ),
+        final daily = DailyScreenTime(
+          date: day,
+          duration: Duration(milliseconds: totalMs),
+          topApps: validApps,
         );
+        history.add(daily);
+        // The system can report the last events late: only trust a day
+        // that ended a while ago.
+        if (now.difference(dayEnd) > const Duration(hours: 1)) {
+          _finishedDays[day] = daily;
+        }
       } catch (_) {
         // Fallback for empty day
         history.add(DailyScreenTime(date: day, duration: Duration.zero));

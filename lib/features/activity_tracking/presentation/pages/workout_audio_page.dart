@@ -1,8 +1,11 @@
 import 'dart:async';
+
+import 'package:background_downloader/background_downloader.dart' show TaskStatus;
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -11,6 +14,7 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/music_visualizer.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/database/isar_service.dart';
@@ -20,6 +24,7 @@ import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
 import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 class WorkoutAudioPage extends StatefulWidget {
   final WorkoutPrefs current;
@@ -46,17 +51,43 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
 
   bool _isLoadingLocal = false;
   final Map<String, double> _downloadProgress = {};
+  StreamSubscription<({String trackId, double? progress})>? _downloadChanges;
 
   @override
   void initState() {
     super.initState();
     _loadLocalSongs();
     _loadFavoritesAndDownloads();
+    _followBackgroundDownloads();
   }
 
   @override
   void dispose() {
+    _downloadChanges?.cancel();
     super.dispose();
+  }
+
+  /// Downloads keep running with this screen closed: show the ones still
+  /// going (started before it opened) and pick up any that finished.
+  Future<void> _followBackgroundDownloads() async {
+    await _downloader.start();
+    final active = await _downloader.activeDownloads();
+    if (!mounted) return;
+    setState(() => _downloadProgress.addAll(active));
+    _downloadChanges = _downloader.changes.listen(
+      (change) {
+        if (!mounted) return;
+        final progress = change.progress;
+        if (progress == null) {
+          setState(() => _downloadProgress.remove(change.trackId));
+          _loadFavoritesAndDownloads();
+        } else if (_downloadProgress.containsKey(change.trackId)) {
+          setState(() => _downloadProgress[change.trackId] = progress);
+        }
+      },
+      onError: (Object e) => debugPrint('Download updates failed: $e'),
+    );
+    _loadFavoritesAndDownloads();
   }
 
   Future<void> _loadLocalSongs() async {
@@ -147,6 +178,9 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     // One download per track: a second tap would write the same file.
     if (_downloadProgress.containsKey(trackId)) return;
     setState(() => _downloadProgress[trackId] = 0.01);
+    // Progress shows in the tray, so the download can be left running.
+    await sl<ReminderScheduler>().requestPermission();
+    if (!mounted) return;
     try {
       await _downloader.downloadTrack(
         trackId: trackId,
@@ -168,8 +202,12 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
       }
     } catch (e) {
       debugPrint('Audio download failed: $e');
+      // Cancelled from the notification: nothing to report.
+      final cancelled =
+          e is AudioDownloadFailed && e.status == TaskStatus.canceled;
       if (mounted) {
         setState(() => _downloadProgress.remove(trackId));
+        if (cancelled) return;
         showErrorSnackBar(
           context,
           userMessage(e, fallback: "Couldn't download this track. Try again."),
@@ -368,6 +406,7 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
                       child: CircularProgressIndicator(
                         value: downloadingProgress,
                         strokeWidth: AppDimens.borderThick,
+                        strokeCap: StrokeCap.round,
                       ),
                     )
                   else if (isDownloadedOffline)
@@ -416,7 +455,7 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     final v = context.vColors;
 
     if (_isLoadingLocal) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: VitalUpLoader());
     }
 
     if (_localSongs.isEmpty) {
@@ -614,7 +653,7 @@ class _SegmentTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tab(
       height: AppDimens.segmentHeight,
-      child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
+      child: FitText(label, maxLines: 1),
     );
   }
 }
@@ -738,6 +777,7 @@ class AudioTrackLeadingIcon extends StatelessWidget {
                       child: CircularProgressIndicator(
                         strokeWidth: AppDimens.borderThick,
                         valueColor: AlwaysStoppedAnimation(defaultColor),
+                        strokeCap: StrokeCap.round,
                       ),
                     )
                   : MusicVisualizer(color: defaultColor, isPlaying: isPlaying),

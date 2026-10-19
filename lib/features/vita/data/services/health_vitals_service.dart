@@ -31,9 +31,9 @@ class HealthVitalsService {
         HealthDataType.STEPS,
       ];
 
-  static const _sleepTypes = [
+  static final _sleepTypes = [
     HealthDataType.SLEEP_ASLEEP,
-    HealthDataType.SLEEP_IN_BED,
+    if (Platform.isIOS) HealthDataType.SLEEP_IN_BED,
   ];
 
   bool get _supported => Platform.isAndroid || Platform.isIOS;

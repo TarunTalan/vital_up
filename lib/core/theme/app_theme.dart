@@ -67,6 +67,10 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
   final Color? warning;
   final Color? warningTint;
   final Color? info;
+
+  /// Primary as readable text (numbers, ranks, links) in either mode; keep
+  /// `colors.primary` for fills, bars and rings.
+  final Color? accentText;
   /// Hairline outline (toast/info) — Figma #D8D8D8.
   final Color? hairline;
 
@@ -113,6 +117,7 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
     required this.warning,
     required this.warningTint,
     required this.info,
+    required this.accentText,
     required this.hairline,
   });
 
@@ -160,6 +165,7 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
     Color? warning,
     Color? warningTint,
     Color? info,
+    Color? accentText,
     Color? hairline,
   }) {
     return VitalUpColors(
@@ -206,6 +212,7 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
       warning: warning ?? this.warning,
       warningTint: warningTint ?? this.warningTint,
       info: info ?? this.info,
+      accentText: accentText ?? this.accentText,
       hairline: hairline ?? this.hairline,
     );
   }
@@ -258,6 +265,7 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
       warning: l(warning, other.warning),
       warningTint: l(warningTint, other.warningTint),
       info: l(info, other.info),
+      accentText: l(accentText, other.accentText),
       hairline: l(hairline, other.hairline),
     );
   }
@@ -355,6 +363,7 @@ class AppTheme {
     warning: AppColors.warning,
     warningTint: AppColors.warningTint,
     info: AppColors.info,
+    accentText: AppColors.primaryTextLight,
     hairline: AppColors.outline,
   );
 
@@ -364,7 +373,7 @@ class AppTheme {
     textFieldText: AppColors.lightText,
     outlineFocused: AppColors.primary,
     errorTextField: AppColors.errorFill,
-    grayText: AppColors.greyText,
+    grayText: AppColors.greyTextDark,
     tab: AppColors.surfaceDark,
     preText: AppColors.primary,
     surfaceFocused: AppColors.primaryFill,
@@ -401,6 +410,7 @@ class AppTheme {
     warning: AppColors.warning,
     warningTint: AppColors.warningTint,
     info: AppColors.info,
+    accentText: AppColors.primary,
     hairline: AppColors.outlineDark,
   );
 
@@ -680,11 +690,12 @@ class AppTheme {
         backgroundColor: scheme.inverseSurface,
         elevation: 6.0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(100), // Pill shape for modern toast look
+          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
         ),
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
           fontWeight: FontWeight.w500,
+          height: 1.35,
         ),
       ),
     );

@@ -18,13 +18,14 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     required GenerateMealPlan generateMealPlan,
     required GetActiveMealPlan getActiveMealPlan,
     required SetActiveMealPlan setActiveMealPlan,
-  })  : _generateMealPlan = generateMealPlan,
-        _getActiveMealPlan = getActiveMealPlan,
-        _setActiveMealPlan = setActiveMealPlan,
-        super(DietPlanInitial());
+  }) : _generateMealPlan = generateMealPlan,
+       _getActiveMealPlan = getActiveMealPlan,
+       _setActiveMealPlan = setActiveMealPlan,
+       super(DietPlanInitial());
 
   Future<void> loadActiveMealPlan() async {
-    emit(DietPlanLoading());
+    // A reload keeps the plan on screen instead of flashing "Get a plan".
+    if (state is! DietPlanLoaded) emit(DietPlanLoading());
     // A failed or slow local read falls back to "no plan" (generate CTA).
     final cached = await _getActiveMealPlan().orFallback(null, kLoadTimeout);
     if (isClosed) return;
@@ -54,7 +55,12 @@ class DietPlanCubit extends Cubit<DietPlanState> {
       );
     } catch (e) {
       addError(e);
-      if (!isClosed) emit(DietPlanError(userMessage(e, fallback: "Couldn't create your plan. Try again.")));
+      if (!isClosed)
+        emit(
+          DietPlanError(
+            userMessage(e, fallback: "Couldn't create your plan. Try again."),
+          ),
+        );
       return;
     }
     // The page may have been closed while the plan was generating.
@@ -63,7 +69,7 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     if (result is ApiSuccess<MealPlan>) {
       emit(DietPlanLoaded(result.data));
     } else if (result is ApiError<MealPlan>) {
-      emit(DietPlanError(result.message));
+      emit(DietPlanError(result.message, limitReached: result.code == 429));
     }
   }
 

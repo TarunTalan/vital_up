@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/workout_intensity.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/core/sync/sync_hooks.dart';
@@ -30,17 +31,22 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetType: Value(session.targetType),
       targetValue: Value(session.targetValue),
       targetAchieved: Value(session.targetAchieved),
+      intensity: Value(session.intensity?.name),
     );
 
-    final dbPoints = session.points.map((p) => DriftTrackPointsCompanion.insert(
-      sessionId: session.id,
-      latitude: p.latitude,
-      longitude: p.longitude,
-      timestamp: p.timestamp,
-      accuracy: p.accuracy,
-      speed: p.speed,
-      altitude: Value(p.altitude),
-    )).toList();
+    final dbPoints = session.points
+        .map(
+          (p) => DriftTrackPointsCompanion.insert(
+            sessionId: session.id,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            timestamp: p.timestamp,
+            accuracy: p.accuracy,
+            speed: p.speed,
+            altitude: Value(p.altitude),
+          ),
+        )
+        .toList();
 
     await database.saveSessionWithPoints(dbSession, dbPoints);
     // Checkpoints of a workout still recording aren't uploaded.
@@ -49,16 +55,25 @@ class ActivityRepositoryImpl implements ActivityRepository {
       sync?.schedule();
       final now = DateTime.now();
       // Imported older workouts don't count as today's.
-      if (end.year == now.year && end.month == now.month && end.day == now.day) {
+      if (end.year == now.year &&
+          end.month == now.month &&
+          end.day == now.day) {
         events?.logged(const HabitLogged(Habit.activity));
       }
     }
   }
 
   @override
-  Future<List<ActivitySession>> getSessions() async {
-    final dbSessions = await database.getAllSessions();
-    final pointsBySession = await database.getAllTrackPointsBySession();
+  Future<List<ActivitySession>> getSessions({
+    DateTime? since,
+    bool withRoutes = false,
+  }) async {
+    final dbSessions = await database.getAllSessions(since: since);
+    final pointsBySession = withRoutes
+        ? await database.getTrackPointsBySession([
+            for (final s in dbSessions) s.id,
+          ])
+        : const <String, List<DriftTrackPoint>>{};
 
     return dbSessions
         .map((s) => _toEntity(s, pointsBySession[s.id] ?? const []))
@@ -76,9 +91,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
 
   @override
   Future<void> deleteSession(String id) async {
-    final wasSynced = (await database.getSession(id))?.synced ?? false;
     await database.deleteSession(id);
-    if (wasSynced) await sync?.recordDelete('activity_sessions', id);
+    // Always recorded: an upload can reach the server before it's marked
+    // synced here, and a delete of an id the server lacks changes nothing.
+    await sync?.recordDelete('activity_sessions', id);
   }
 
   @override
@@ -90,18 +106,22 @@ class ActivityRepositoryImpl implements ActivityRepository {
     DriftActivitySession s,
     List<DriftTrackPoint> dbPoints,
   ) {
-    final points = dbPoints.map((p) => TrackPoint(
-      latitude: p.latitude,
-      longitude: p.longitude,
-      timestamp: p.timestamp,
-      accuracy: p.accuracy,
-      speed: p.speed,
-      altitude: p.altitude,
-    )).toList();
+    final points = dbPoints
+        .map(
+          (p) => TrackPoint(
+            latitude: p.latitude,
+            longitude: p.longitude,
+            timestamp: p.timestamp,
+            accuracy: p.accuracy,
+            speed: p.speed,
+            altitude: p.altitude,
+          ),
+        )
+        .toList();
 
     return ActivitySession(
       id: s.id,
-      activityType: ActivityType.values.firstWhere((e) => e.name == s.activityType, orElse: () => ActivityType.walk),
+      activityType: ActivityType.fromName(s.activityType),
       startTime: s.startTime,
       endTime: s.endTime,
       totalDistanceMeters: s.totalDistanceMeters,
@@ -114,6 +134,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
       targetType: s.targetType,
       targetValue: s.targetValue,
       targetAchieved: s.targetAchieved ?? false,
+      intensity: WorkoutIntensity.fromName(s.intensity),
     );
   }
 }

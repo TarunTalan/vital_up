@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- Network & Internet (required for Supabase sync, Firebase, Mapbox, ML API) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -7,6 +12,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Merged in by libraries but never used (the camera records no audio,
+         files stay in app storage, no ads attribution). A health app asking
+         for them raises Play / Health Connect review questions. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
     <!-- Reminders: reschedule after a reboot (flutter_local_notifications). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -45,7 +56,14 @@
     <application
         android:label="VitalUp"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- ML Kit OCR and barcode models come from Google Play Services
+             (see build.gradle.kts); download them at install time. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr,barcode" />
         <meta-data
             android:name="com.pravera.flutter_foreground_task.NOTIFICATION_ICON"
             android:resource="@mipmap/ic_launcher" />
@@ -100,6 +118,13 @@
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="location"
             android:exported="false" />
+
+        <!-- background_downloader's user-initiated job service (dataSync type).
+             Unused: audio downloads run as WorkManager jobs without a
+             foreground service, so no extra Play Console declaration. -->
+        <service
+            android:name="com.bbflight.background_downloader.UIDTJobService"
+            tools:node="remove" />
 
         <activity
             android:name=".MainActivity"
@@ -267,9 +292,11 @@
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/quick_shortcuts_widget_info" />
         </receiver>
-        <!-- Widget buttons (add water, mood, refresh) run Dart in the background. -->
+        <!-- Widget buttons (add water, mood, refresh) run Dart in the background.
+             Only reached by explicit in-app intents (Wg.runInDart), so other
+             apps can't log data through it. -->
         <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
             </intent-filter>
@@ -291,5 +318,15 @@
             <data android:mimeType="text/plain"/>
         </intent>
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- Music apps for the workout audio picker (Android 11+ package
+             visibility; MainActivity getInstalledAudioApps / launchAudioApp). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="audio/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_MUSIC" />
+        </intent>
     </queries>
 </manifest>

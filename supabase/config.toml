@@ -19,3 +19,21 @@ verify_jwt = false
 enabled = true
 # Called by the signed-in user; the JWT identifies whose account to delete.
 verify_jwt = true
+
+[functions.send-email]
+enabled = true
+# Auth Send-Email hook (signature-checked), signed-in support tickets
+# (JWT checked in the function) and the signed-out website deletion form.
+verify_jwt = false
+
+[functions.revenuecat-webhook]
+enabled = true
+# Called by RevenueCat with its own shared secret (checked in constant time,
+# fails closed), not a Supabase JWT; the gateway would reject it otherwise.
+verify_jwt = false
+
+[functions.sync-subscription]
+enabled = true
+# Called by the signed-in user after a purchase or restore; the JWT names
+# whose status is refreshed from RevenueCat.
+verify_jwt = true

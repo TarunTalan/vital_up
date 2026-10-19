@@ -42,9 +42,11 @@ abstract final class InputLimits {
 
 /// Zero-width and other invisible format characters, bidi overrides and
 /// C0/C1 control characters (except tab / newline, handled separately).
+/// ZWNJ / ZWJ (U+200C/D) and LRM / RLM (U+200E/F) are kept: emoji sequences
+/// (families, flags) and Indic / Persian scripts need them.
 final _invisible = RegExp(
   '[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F'
-  '\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]',
+  '\u200B\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]',
 );
 final _spaces = RegExp('[ \t\u00A0]+');
 final _blankLines = RegExp(r'\n{3,}');
@@ -119,9 +121,11 @@ String userMessage(Object error, {String fallback = 'Something went wrong. Try a
   }
   if (error is PostgrestException) {
     if (error.code == '23505') return 'That already exists.';
-    if (error.code == '42501' || error.code == 'PGRST301') {
-      return "You don't have access to that.";
+    // PGRST301 / PGRST303: the sign-in token expired or is invalid.
+    if (const {'PGRST301', 'PGRST302', 'PGRST303'}.contains(error.code)) {
+      return 'Please sign in again.';
     }
+    if (error.code == '42501') return "You don't have access to that.";
     return fallback;
   }
   if (error is FunctionException) {

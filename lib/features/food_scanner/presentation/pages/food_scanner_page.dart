@@ -17,6 +17,8 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
@@ -32,6 +34,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/features/food_scanner/domain/ml_kit_errors.dart';
 
 final GetIt _sl = GetIt.instance;
 
@@ -92,6 +95,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
   final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   bool _isStreaming = false;
   bool _isProcessingFrame = false;
+  DateTime? _lastFrameProcessedAt;
+  static const _frameInterval = Duration(milliseconds: 250);
   bool _isScanningBarcode = false;
   bool _isScanningNutritionLabel = false;
   String? _currentFailedBarcode;
@@ -143,12 +148,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         orElse: () => cameras.first,
       );
 
+      // High stays: the same controller takes the meal photo.
       final controller = CameraController(
         backCamera,
         ResolutionPreset.high,
         enableAudio: false,
+        // NV21 arrives as one plane ML Kit reads directly, no copy.
         imageFormatGroup: Platform.isAndroid
-            ? ImageFormatGroup.yuv420
+            ? ImageFormatGroup.nv21
             : ImageFormatGroup.bgra8888,
       );
 
@@ -207,6 +214,14 @@ class _FoodScannerViewState extends State<FoodScannerView> {
     // While framing a nutrition label the package barcode is usually in
     // view too; don't start another lookup for it.
     if (_isProcessingFrame || _isScanningBarcode || _isScanningNutritionLabel) return;
+    // A few looks a second find a barcode just as fast as every frame,
+    // without the CPU and battery cost.
+    final now = DateTime.now();
+    final last = _lastFrameProcessedAt;
+    if (last != null && now.difference(last) < _frameInterval && !now.isBefore(last)) {
+      return;
+    }
+    _lastFrameProcessedAt = now;
     _isProcessingFrame = true;
 
     try {
@@ -268,11 +283,9 @@ class _FoodScannerViewState extends State<FoodScannerView> {
 
   InputImage? _convertCameraImage(CameraImage image, CameraDescription cameraDesc) {
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
-      }
-      final bytes = allBytes.done().buffer.asUint8List();
+      // NV21 (Android) and BGRA (iOS) both come as a single plane.
+      if (image.planes.length != 1) return null;
+      final bytes = image.planes.first.bytes;
 
       final rotation = InputImageRotationValue.fromRawValue(cameraDesc.sensorOrientation) ??
           InputImageRotation.rotation90deg;
@@ -440,8 +453,8 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Center(
-          child: CircularProgressIndicator(color: context.colors.primary),
+        return const Center(
+          child: VitalUpLoader(),
         );
       },
     );
@@ -461,7 +474,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
       debugPrint('OCR processing error: $e');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Close loader
-        showErrorSnackBar(context, "Couldn't read the label. Enter the details.");
+        showErrorSnackBar(
+          context,
+          mlKitErrorMessage(
+            e,
+            fallback: "Couldn't read the label. Enter the details.",
+          ),
+        );
         // Fallback to manual entry with empty values
         _openNutritionManualEntry(null);
       }
@@ -562,7 +581,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
               const SizedBox(height: AppDimens.space24),
               AppPrimaryButton(
                 label: 'Scan Nutrition Label',
-                leadingIcon: const Icon(Icons.document_scanner_outlined),
+                leadingIcon: const Icon(Icons.document_scanner_rounded),
                 onTap: () {
                   Navigator.of(context).pop();
                   setState(() {
@@ -581,7 +600,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
               AppSecondaryButton(
                 label: 'Enter Details Manually',
                 leadingIcon: SvgPicture.asset(
-                  'assets/icons/edit.svg',
+                  'assets/icons/ui/edit.svg',
                   width: AppDimens.iconMd,
                   height: AppDimens.iconMd,
                   colorFilter: ColorFilter.mode(
@@ -730,6 +749,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         } else if (state is RecognitionFailed) {
           if (state.failure is BarcodeNotFoundFailure) {
             _showLookupFailureOptions();
+          } else if (state.failure is ScanQuotaExceededFailure) {
+            _restartScanning();
+            offerProForLimit(
+              context,
+              reason: ProReason.photoScans,
+              message: state.failure.message,
+            );
           } else {
             showErrorSnackBar(context, state.failure.message);
             _restartScanning();
@@ -744,7 +770,10 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop) return;
+            // As a dashboard tab, the dashboard's own PopScope handles back;
+            // every PopScope on a route is told, so handling it here too
+            // would step back through two tabs at once.
+            if (didPop || widget.onBack != null) return;
             _handleBack();
           },
           child: Scaffold(
@@ -804,7 +833,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                           ),
                           const Spacer(),
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/info_icon.svg',
+                            iconAsset: 'assets/icons/ui/info_icon.svg',
                             onTap: () {
                               showSmoothDialog(
                                 context: context,
@@ -831,7 +860,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/gallery_add.svg',
+                            iconAsset: 'assets/icons/ui/gallery_add.svg',
                             onTap: isRecognizing ? () {} : _pickFromGallery,
                           ),
                           const Flexible(
@@ -845,7 +874,7 @@ class _FoodScannerViewState extends State<FoodScannerView> {
                             child: SizedBox(width: AppDimens.scanBarGap),
                           ),
                           _ScannerIconButton(
-                            iconAsset: 'assets/icons/flash.svg',
+                            iconAsset: 'assets/icons/ui/flash.svg',
                             active: _torchEnabled,
                             onTap: _toggleFlash,
                           ),
@@ -932,6 +961,10 @@ class _RecognizingOverlay extends StatelessWidget {
         Positioned.fill(
           child: Image.file(
             image,
+            // Gallery picks can be 2048 px or more; decode at screen size.
+            cacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .round(),
             fit: BoxFit.cover,
           ),
         ),
@@ -1081,7 +1114,7 @@ class _NutritionLabelHint extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                Icons.document_scanner_outlined,
+                Icons.document_scanner_rounded,
                 color: primary,
                 size: AppDimens.iconLg,
               ),
@@ -1189,7 +1222,7 @@ class _CaptureButton extends StatelessWidget {
                     ),
                   )
                 : SvgPicture.asset(
-                    'assets/icons/camera.svg',
+                    'assets/icons/ui/camera.svg',
                     width: AppDimens.iconLg,
                     height: AppDimens.iconLg,
                     colorFilter: const ColorFilter.mode(
@@ -1228,6 +1261,9 @@ class _ScannedPreviewCard extends StatelessWidget {
             File(imagePath),
             width: double.infinity,
             height: cardHeight,
+            cacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .round(),
             fit: BoxFit.cover,
           ),
           Padding(
@@ -1274,8 +1310,8 @@ class FoodImageActionPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          action('assets/icons/edit.svg', onEdit),
-          if (onAdd != null) action('assets/icons/plus.svg', onAdd!),
+          action('assets/icons/ui/edit.svg', onEdit),
+          if (onAdd != null) action('assets/icons/ui/plus.svg', onAdd!),
         ],
       ),
     );

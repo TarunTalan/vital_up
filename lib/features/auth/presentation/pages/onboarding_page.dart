@@ -109,7 +109,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               color: colors.secondary.withValues(alpha: 0.2),
                               child: Center(
                                 child: Icon(
-                                  Icons.image_outlined,
+                                  Icons.image_rounded,
                                   size: AppDimens.iconXxl,
                                   color: colors.onSurface.withValues(alpha: 0.5),
                                 ),
@@ -191,11 +191,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           borderColor: v.hairline,
                           contentColor: v.preText,
                           leadingIcon: SvgPicture.asset(
-                            'assets/icons/google.svg',
+                            'assets/icons/auth/google.svg',
                             width: AppDimens.iconXs,
                             height: AppDimens.iconXs,
                             placeholderBuilder: (context) => Icon(
-                              Icons.g_mobiledata,
+                              Icons.g_mobiledata_rounded,
                               size: AppDimens.iconXs,
                               color: v.preText,
                             ),
@@ -209,7 +209,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                         const SizedBox(height: AppDimens.buttonGap),
                         Text(
-                          'Your health data is encrypted and never sold.',
+                          'Your health data is private and never sold.',
                           style: context.text.bodySmall?.copyWith(
                             color: v.grayText,
                           ),

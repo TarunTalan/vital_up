@@ -12,9 +12,6 @@ class VitaLocalDataSource {
   final SharedPreferences _prefs;
 
   static const maxMessages = 50;
-  /// Check-ins and scores kept for streaks and the 30-day stress trend.
-  static const _historyDays = 90;
-
   VitaLocalDataSource(this._prefs);
 
   Future<void> reload() => _prefs.reload();
@@ -45,13 +42,18 @@ class VitaLocalDataSource {
         StressCheckIn.fromJson,
       );
 
-  Future<void> addCheckIn(String userId, StressCheckIn checkIn) {
-    final cutoff = DateTime.now().subtract(const Duration(days: _historyDays));
-    final list = readCheckIns(userId)
+  Future<void> addCheckIn(String userId, StressCheckIn checkIn) async {
+    // The mood widget writes check-ins from another isolate; start from
+    // what's on disk so this write can't drop one made there.
+    await _prefs.reload();
+    final stored = readCheckIns(userId);
+    // Check-ins and scores are kept for streaks and the 30-day stress trend.
+    final cutoff = historyCutoff(stored.map((c) => c.date), DateTime.now());
+    final list = stored
         .where((c) => c.date.isAfter(cutoff) && !_sameDay(c.date, checkIn.date))
         .toList()
       ..add(checkIn);
-    return _prefs.setString(
+    await _prefs.setString(
       _key('checkins', userId),
       jsonEncode(list.map((c) => c.toJson()).toList()),
     );
@@ -75,8 +77,11 @@ class VitaLocalDataSource {
   }
 
   Future<void> writeScore(String userId, DateTime day, int score) {
-    final cutoff = dayKey(DateTime.now().subtract(const Duration(days: _historyDays)));
-    final scores = readScores(userId)
+    final scores = readScores(userId);
+    final cutoff = dayKey(
+      historyCutoff(scores.keys.map(DateTime.tryParse).nonNulls, DateTime.now()),
+    );
+    scores
       ..removeWhere((k, _) => k.compareTo(cutoff) < 0)
       ..[dayKey(day)] = score;
     return _prefs.setString(_key('scores', userId), jsonEncode(scores));
