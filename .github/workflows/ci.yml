@@ -48,8 +48,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate Envied Code
-        run: dart run build_runner build --build-filter="lib/core/config/**"
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyze Dart Code
         run: dart analyze lib test
