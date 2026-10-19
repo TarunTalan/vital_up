@@ -9,7 +9,7 @@ import {
   type VisionItem,
 } from './nutrition.ts';
 import { geminiGenerate } from '../_shared/llm.ts';
-import { consumeDailyQuota, dailyLimit, refundDailyQuota } from '../_shared/quota.ts';
+import { consumeDailyQuota, dailyLimit, isProUser, quotaUpgradeInfo, refundDailyQuota } from '../_shared/quota.ts';
 import {
   bearerToken,
   clampNumber,
@@ -419,12 +419,25 @@ async function handleImage(env: Env, userId: string, image: string, mimeType: st
 
   // Reserve one photo scan up front so concurrent requests can't overshoot
   // the cap; refunded below if recognition fails or finds no food.
-  const quota = await consumeDailyQuota(env.supabase, userId, 'photo_scan', dailyLimit('FREE_DAILY_SCANS', 25));
+  // Free: keep FREE_DAILY_SCANS in sync with get_remaining_scans().
+  const quota = await consumeDailyQuota(
+    env.supabase,
+    userId,
+    'photo_scan',
+    dailyLimit('FREE_DAILY_SCANS', 5),
+    dailyLimit('PRO_DAILY_SCANS', 100),
+  );
   if (!quota.allowed) {
     console.log(`Daily scan limit (${quota.limit}) reached`);
-    return jsonResponse({ error: 'Daily scan limit reached', code: 'daily_limit', limit: quota.limit }, 429);
+    return jsonResponse(
+      { error: 'Daily scan limit reached', code: 'daily_limit', limit: quota.limit, ...quotaUpgradeInfo(quota) },
+      429,
+    );
   }
 
+  // Pro's cap is fair use, not a counter to show: report -1 (unlimited) to
+  // Pro users, as get_remaining_scans does. Looked up during recognition.
+  const proLookup = isProUser(env.supabase, userId);
   const startTime = Date.now();
   let recognition: Awaited<ReturnType<typeof recognizeHedged>>;
   try {
@@ -449,7 +462,8 @@ async function handleImage(env: Env, userId: string, image: string, mimeType: st
   );
 
   const items = await Promise.all(visionItems.map((v) => enrichVisionItem(env, v)));
-  return jsonResponse({ items: items.filter(Boolean), served_by: servedBy, scans_remaining: quota.remaining }, 200);
+  const scansRemaining = (await proLookup) === true ? -1 : quota.remaining;
+  return jsonResponse({ items: items.filter(Boolean), served_by: servedBy, scans_remaining: scansRemaining }, 200);
 }
 
 /**
@@ -631,6 +645,7 @@ async function handleGetNutrition(env: Env, userId: string, request: NutritionRe
     userId,
     'nutrition_lookup',
     dailyLimit('NUTRITION_LOOKUP_DAILY_LIMIT', 60),
+    dailyLimit('PRO_NUTRITION_LOOKUP_DAILY_LIMIT', 200),
   );
   if (!quota.allowed) return jsonResponse(ZERO_NUTRITION, 200);
   const estimate = await estimateNutritionPer100g(foodName, { gemini: env.geminiKey, groq: env.groqKey });

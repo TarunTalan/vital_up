@@ -12,12 +12,15 @@
 //
 // Deploy with JWT verification on (the default).
 //
+// 4. Deletes the RevenueCat customer (purchase history), best effort.
+//
 // An active App Store / Play subscription is NOT cancelled by this; the app
 // tells the user to cancel it in their store account.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bearerToken, errorResponse, jsonResponse, UUID_RE } from "../_shared/validate.ts";
+import { deleteRevenueCatCustomer } from "../_shared/revenuecat.ts";
 
 /** The request carries no meaningful body; anything bigger than this is refused. */
 const MAX_BODY_BYTES = 4 * 1024;
@@ -424,6 +427,13 @@ serve(async (req) => {
 
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) throw error;
+
+    // The account is gone either way; a RevenueCat failure is only logged.
+    try {
+      await deleteRevenueCatCustomer(userId);
+    } catch (rcErr) {
+      console.error("delete-account: RevenueCat customer not deleted:", rcErr);
+    }
 
     // Send confirmation email to the user & notify privacy and support teams
     if (userEmail) {

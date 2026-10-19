@@ -9,6 +9,8 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/presentation/cubit/vita_chat_cubit.dart';
 import 'package:vital_up/features/vita/presentation/widgets/chat_bubble.dart';
@@ -101,6 +103,20 @@ class _VitaChatViewState extends State<_VitaChatView> {
     });
   }
 
+  /// Today's chat limit: free users can start Pro, then the unanswered
+  /// message is sent again.
+  Future<void> _offerPro(String message) async {
+    final started = await offerProForLimit(
+      context,
+      reason: ProReason.vitaChats,
+      message: message,
+    );
+    if (!started || !mounted) return;
+    final cubit = context.read<VitaChatCubit>();
+    final failed = cubit.state.messages.where((m) => m.failed).lastOrNull;
+    if (failed != null) await cubit.retry(failed);
+  }
+
   void _onAction(VitaMessage message, VitaAction action) {
     switch (action) {
       case VitaAction.viewDietPlan:
@@ -139,7 +155,12 @@ class _VitaChatViewState extends State<_VitaChatView> {
               listener: (context, state) {
                 _scrollToEnd();
                 final error = state.error;
-                if (error != null) showErrorSnackBar(context, error);
+                if (error == null) return;
+                if (state.limitReached) {
+                  _offerPro(error);
+                } else {
+                  showErrorSnackBar(context, error);
+                }
               },
               listenWhen: (prev, next) =>
                   prev.messages.length != next.messages.length ||

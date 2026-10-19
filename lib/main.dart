@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
+import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
@@ -154,6 +155,8 @@ class MyApp extends StatelessWidget {
         // for Health Connect access before sign-in.)
         BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
         BlocProvider(create: (context) => sl<SettingsCubit>()..loadSettings()),
+        // VitalUp Pro, read by gates and the paywall anywhere in the app.
+        BlocProvider.value(value: sl<SubscriptionCubit>()..start()),
       ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, settingsState) {

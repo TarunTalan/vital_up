@@ -31,3 +31,9 @@ enabled = true
 # Called by RevenueCat with its own shared secret (checked in constant time,
 # fails closed), not a Supabase JWT; the gateway would reject it otherwise.
 verify_jwt = false
+
+[functions.sync-subscription]
+enabled = true
+# Called by the signed-in user after a purchase or restore; the JWT names
+# whose status is refreshed from RevenueCat.
+verify_jwt = true

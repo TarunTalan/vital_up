@@ -21,6 +21,9 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
+import 'package:vital_up/features/subscription/presentation/widgets/pro_paywall.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 
 class DietPlanResultPage extends StatefulWidget {
@@ -209,6 +212,16 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     }
   }
 
+  /// Today's plans are used up: free users can start Pro, then the plan
+  /// is made.
+  Future<void> _offerPro() async {
+    final started = await showProPaywall(
+      context,
+      reason: ProReason.dietPlans,
+    );
+    if (started && mounted && _target != null) _retry();
+  }
+
   Future<void> _tweakWithVita(MealPlan plan) async {
     final instructions = await context.pushNamed<String>(
       'vita-chat',
@@ -298,7 +311,16 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
                               style: context.text.bodyMedium,
                             ),
                             const SizedBox(height: AppDimens.sectionGap),
-                            if (_target != null)
+                            if (state.limitReached &&
+                                context.select(
+                                  (SubscriptionCubit c) => c.state.canUpgrade,
+                                ))
+                              AppPrimaryButton(
+                                label: 'Get more with Pro',
+                                onTap: _offerPro,
+                                expand: false,
+                              )
+                            else if (_target != null)
                               AppPrimaryButton(
                                 label: 'Try Again',
                                 onTap: _retry,

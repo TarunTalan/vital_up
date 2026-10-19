@@ -25,6 +25,7 @@ import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart'
 import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
 import 'package:vital_up/features/profile/presentation/widgets/health_snapshot_card.dart';
 import 'package:vital_up/features/profile/presentation/widgets/profile_photo_sheet.dart';
+import 'package:vital_up/features/subscription/presentation/widgets/pro_plan_section.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
 final _points = NumberFormat.decimalPattern();
@@ -230,6 +231,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: AppDimens.sectionGap),
 
+              const ProPlanSection(),
               AppListGroup(
                 title: 'Account',
                 children: [

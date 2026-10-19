@@ -14,7 +14,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
-import { type AiFeature, consumeDailyQuota, dailyLimit, refundDailyQuota } from "../_shared/quota.ts";
+import { type AiFeature, consumeDailyQuota, dailyLimit, quotaUpgradeInfo, refundDailyQuota } from "../_shared/quota.ts";
 import {
   bearerToken,
   boundedJson,
@@ -201,10 +201,18 @@ serve(async (req) => {
     // Per-user daily fair-use cap: all users share one free-tier LLM quota.
     const feature: AiFeature = mode === "chat" ? "vita_chat" : "vita_insights";
     const limit = mode === "chat"
-      ? dailyLimit("VITA_CHAT_DAILY_LIMIT", 40)
-      : dailyLimit("VITA_INSIGHTS_DAILY_LIMIT", 6);
-    const quota = await consumeDailyQuota(client, user.id, feature, limit);
-    if (!quota.allowed) return json({ error: "Daily Vita limit reached", code: "daily_limit", limit }, 429);
+      ? dailyLimit("VITA_CHAT_DAILY_LIMIT", 15)
+      : dailyLimit("VITA_INSIGHTS_DAILY_LIMIT", 3);
+    const proLimit = mode === "chat"
+      ? dailyLimit("PRO_VITA_CHAT_DAILY_LIMIT", 150)
+      : dailyLimit("PRO_VITA_INSIGHTS_DAILY_LIMIT", 20);
+    const quota = await consumeDailyQuota(client, user.id, feature, limit, proLimit);
+    if (!quota.allowed) {
+      return json(
+        { error: "Daily Vita limit reached", code: "daily_limit", limit: quota.limit, ...quotaUpgradeInfo(quota) },
+        429,
+      );
+    }
     const refund = () => refundDailyQuota(client, user.id, feature);
 
     const prompt = mode === "chat" ? chatPrompt(history, snapshotText) : insightsPrompt(snapshotText);

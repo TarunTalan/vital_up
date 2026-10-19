@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vital_up/features/subscription/presentation/pages/pro_page.dart';
 import 'package:vital_up/core/router/app_page_transitions.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
 import 'package:vital_up/features/auth/presentation/utils/post_sign_in_navigation.dart';
@@ -353,6 +354,12 @@ class AppRouter {
           key: state.pageKey,
           child: _withProfileCubit(state, const AccountDetailsPage()),
         ),
+      ),
+      GoRoute(
+        path: '/profile/pro',
+        name: 'vitalup-pro',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const ProPage()),
       ),
       GoRoute(
         path: '/friends',

@@ -15,11 +15,15 @@ class VitaChatState extends Equatable {
   /// Last error to surface (offline, daily limit…); cleared on next send.
   final String? error;
 
+  /// [error] is today's chat limit (free users can get more with Pro).
+  final bool limitReached;
+
   const VitaChatState({
     this.messages = const [],
     this.isLoading = true,
     this.isTyping = false,
     this.error,
+    this.limitReached = false,
   });
 
   VitaChatState copyWith({
@@ -27,16 +31,19 @@ class VitaChatState extends Equatable {
     bool? isLoading,
     bool? isTyping,
     String? Function()? error,
+    bool? limitReached,
   }) =>
       VitaChatState(
         messages: messages ?? this.messages,
         isLoading: isLoading ?? this.isLoading,
         isTyping: isTyping ?? this.isTyping,
         error: error == null ? this.error : error(),
+        limitReached: limitReached ?? this.limitReached,
       );
 
   @override
-  List<Object?> get props => [messages, isLoading, isTyping, error];
+  List<Object?> get props =>
+      [messages, isLoading, isTyping, error, limitReached];
 }
 
 /// Vita conversation; history is stored on device so it's readable offline.
@@ -94,7 +101,12 @@ class VitaChatCubit extends Cubit<VitaChatState> {
   static const replyTimeout = Duration(seconds: 75);
 
   Future<void> _ask(List<VitaMessage> history) async {
-    emit(state.copyWith(messages: history, isTyping: true, error: () => null));
+    emit(state.copyWith(
+      messages: history,
+      isTyping: true,
+      error: () => null,
+      limitReached: false,
+    ));
     await _save(history);
 
     try {
@@ -121,6 +133,7 @@ class VitaChatCubit extends Cubit<VitaChatState> {
         messages: updated,
         isTyping: false,
         error: () => message,
+        limitReached: e is VitaException && e.dailyLimit,
       ));
       await _save(updated);
     }

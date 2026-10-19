@@ -5,6 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:vital_up/core/error/failures.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -43,6 +46,13 @@ class FoodDetailPage extends StatelessWidget {
         if (state is MealLogSaved) {
           showSuccessSnackBar(context, 'Meal saved to your log.');
           Navigator.of(context).maybePop();
+        } else if (state is RecognitionFailed &&
+            state.failure is ScanQuotaExceededFailure) {
+          offerProForLimit(
+            context,
+            reason: ProReason.photoScans,
+            message: state.failure.message,
+          );
         } else if (state is RecognitionFailed) {
           showErrorSnackBar(context, state.failure.message);
         } else if (state is ScanActionFailed) {

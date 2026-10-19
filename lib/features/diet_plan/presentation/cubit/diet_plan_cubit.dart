@@ -69,7 +69,7 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     if (result is ApiSuccess<MealPlan>) {
       emit(DietPlanLoaded(result.data));
     } else if (result is ApiError<MealPlan>) {
-      emit(DietPlanError(result.message));
+      emit(DietPlanError(result.message, limitReached: result.code == 429));
     }
   }
 

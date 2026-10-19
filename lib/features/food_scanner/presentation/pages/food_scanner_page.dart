@@ -17,6 +17,8 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vital_up/features/subscription/domain/pro_limits.dart';
+import 'package:vital_up/features/subscription/presentation/utils/pro_gate.dart';
 import 'package:vital_up/features/food_scanner/domain/nutrition_sanity.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/food_scan_event.dart';
@@ -747,6 +749,13 @@ class _FoodScannerViewState extends State<FoodScannerView> {
         } else if (state is RecognitionFailed) {
           if (state.failure is BarcodeNotFoundFailure) {
             _showLookupFailureOptions();
+          } else if (state.failure is ScanQuotaExceededFailure) {
+            _restartScanning();
+            offerProForLimit(
+              context,
+              reason: ProReason.photoScans,
+              message: state.failure.message,
+            );
           } else {
             showErrorSnackBar(context, state.failure.message);
             _restartScanning();

@@ -81,12 +81,15 @@ import 'package:vital_up/features/food_scanner/data/repositories/food_recognitio
 import 'package:vital_up/features/food_scanner/data/repositories/meal_log_repository_impl.dart';
 import 'package:vital_up/features/food_scanner/data/repositories/meal_recommendation_repository_impl.dart';
 import 'package:vital_up/features/food_scanner/data/repositories/nutrition_repository_impl.dart';
-import 'package:vital_up/features/food_scanner/data/repositories/subscription_repository_impl.dart';
+import 'package:vital_up/core/config/env.dart';
+import 'package:vital_up/features/subscription/data/repositories/subscription_repository_impl.dart';
+import 'package:vital_up/features/subscription/data/services/store_billing.dart';
+import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/meal_log_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/meal_recommendation_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/nutrition_repository.dart';
-import 'package:vital_up/features/food_scanner/domain/repositories/subscription_repository.dart';
+import 'package:vital_up/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/delete_meal_log.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_recommendation.dart';
@@ -335,11 +338,24 @@ Future<void> initDependencies() async {
     ),
   );
 
+  // VitalUp Pro: one app-wide cubit (provided in main.dart) that follows
+  // the signed-in user.
+  sl.registerLazySingleton<StoreBilling>(
+    () => RevenueCatBilling(apiKey: Env.revenueCatGoogleApiKey),
+  );
   sl.registerLazySingleton<SubscriptionRepository>(
     () => SubscriptionRepositoryImpl(
       supabaseClient: sl<SupabaseClient>(),
-      logger: sl<Logger>(),
       cacheStore: sl<CacheStore>(),
+      billing: sl<StoreBilling>(),
+    ),
+  );
+  sl.registerLazySingleton<SubscriptionCubit>(
+    () => SubscriptionCubit(
+      sl<SubscriptionRepository>(),
+      userIds: sl<SupabaseClient>().auth.onAuthStateChange.map(
+        (auth) => auth.session?.user.id,
+      ),
     ),
   );
 

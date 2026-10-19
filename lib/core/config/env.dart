@@ -15,4 +15,9 @@ abstract class Env {
 
   @EnviedField(varName: 'GOOGLE_WEB_CLIENT_ID')
   static final String googleWebClientId = _Env.googleWebClientId;
+
+  /// RevenueCat public SDK key for Google Play (`goog_...`). Optional: Pro
+  /// can't be bought without it, everything else works.
+  @EnviedField(varName: 'REVENUECAT_GOOGLE_API_KEY', optional: true)
+  static final String? revenueCatGoogleApiKey = _Env.revenueCatGoogleApiKey;
 }

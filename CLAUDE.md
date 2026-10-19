@@ -474,20 +474,19 @@ Route names are GoRouter `name`s.
   `MealLogBloc`. Isar `MealLogCache`, `OfflineFood` (synced from
   `proprietary_products`), `BarcodeCache`. `scan-food` responses cached
   (`FoodCacheKeys`); barcode falls back to OpenFoodFacts (read only: user
-  products are never uploaded there). 25 free photo scans a day
-  (`is_premium_user`, `get_remaining_scans`); no purchase flow in the app
-  yet.
+  products are never uploaded there). Photo scans: 5 a day free, 100 with
+  Pro (`get_remaining_scans`); a 429 opens the Pro sheet (`offerProForLimit`).
 - **diet_plan:** `diet-plan-prefs`, `diet-plan-mode`, `diet-plan-goal`,
   `diet-plan-manual`, `diet-plan-edit`, `diet-plan-result`. `DietPlanCubit`,
   Isar `MealPlanModel` by `dateKey`, prefs `active_plan`,
-  `active_plan_preferences`. `generate-diet-plan` (75 s timeout, 15/day;
+  `active_plan_preferences`. `generate-diet-plan` (75 s timeout, 3/day free, 20 Pro;
   `instructions` + `basePlan` tweak a plan). The result page asks before
   leaving mid-generation (it would waste a generation).
 - **vita:** `vita-chat` (extra `VitaChatArgs` or initial prompt String),
   `vita-analysis`, `vita-diet-plan`, `vita-stress`. Prefs
   `vita_{chat|checkins|scores|insights}_<userId>` (chat keeps 50 messages,
-  history 90 days). `vita-chat` 45 s timeout, last 12 turns sent, 40 chats
-  and 6 insights a day. `HealthSnapshotBuilder` computes numbers on device
+  history 90 days). `vita-chat` 45 s timeout, last 12 turns sent, chats
+  15 / Pro 150 and insights 3 / Pro 20 a day. `HealthSnapshotBuilder` computes numbers on device
   (profile from `ProfileRepository` first, onboarding answers as fallback);
   `StressEstimator` is pure. Stress check-ins: levels 1 very calm to 5 very
   stressed. `HealthVitalsService` only prompts from `connect()`.
@@ -567,6 +566,27 @@ Route names are GoRouter `name`s.
     `LeaderboardAwardsCard`, profile `PlayerAwardsSummary`, Badges page
     section, `showAwardRulesSheet`) and `award_celebration.dart` (one-time
     dialog for a new trophy, pref `community_award_seen_<uid>`).
+- **subscription (VitalUp Pro):** `vitalup-pro` (`ProPage`: plan, Manage
+  subscription, Restore for Pro users; the paywall otherwise), Profile
+  `ProPlanSection` (hidden where Pro can't be bought and the user isn't
+  Pro). Pro raises the daily AI caps only (`domain/pro_limits.dart`, keep in
+  step with the edge function defaults); tracking, trends, reports, sync
+  and Arena stay free. RevenueCat (`purchases_flutter`) over Google Play
+  Billing: `RevenueCatBilling` (`data/services/store_billing.dart`) is off
+  without `REVENUECAT_GOOGLE_API_KEY` in `.env` (optional envied field) and
+  on iOS; the RevenueCat app user id is the Supabase user id; entitlement
+  `pro`; offering `current` with `$rc_annual` / `$rc_monthly` packages
+  (prices, trials and offers live in Play Console, never in code).
+  `SubscriptionRepositoryImpl`: Pro if the store or `is_premium_user` says
+  so (CacheStore, offline last copy); after a purchase / restore it calls
+  `sync-subscription` so the AI functions see Pro before the webhook.
+  `SubscriptionCubit` is a lazy singleton provided in `main.dart`, follows
+  auth (`logIn` / `logOut`), loads plans on demand. Gates: scan 429
+  (`ScanQuotaExceededFailure`), Vita `limitReached`, `DietPlanError
+  .limitReached` -> `offerProForLimit` / `showProPaywall(reason:)` (free
+  users who can buy) else the plain message; a purchase from a gate retries
+  the action. The paywall shows price, period, trial and "Renews
+  automatically until you cancel in Google Play" (Play policy).
 - **help_support:** `help-support`, `support-chat` (local scripted bot),
   `contact-support` (`EmailService.submitSupportTicket` -> `send-email`,
   signed-in only; mailto fallback); static FAQ.
@@ -636,6 +656,11 @@ Route names are GoRouter `name`s.
   (app: "Sign in with your email instead"); `register_push_token` may take
   another account's token at most 3 times a day
   (`push_token_takeovers`, service only).
+  `20261026_vitalup_pro.sql`: `subscriptions.source` / `will_renew` /
+  `last_event_at`; `consume_ai_quota(..., p_pro_limit DEFAULT NULL)` (NULL
+  = Pro unlimited for old functions; functions now pass Pro fair-use caps);
+  `get_remaining_scans` free limit 5, -1 for Pro. Deploy it before the
+  functions that pass `p_pro_limit`.
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -649,7 +674,15 @@ Route names are GoRouter `name`s.
   `delete-account` (purges auth.users, avatar files, cascades DB rows,
   audits to privacy@vitalup.live & support@vitalup.live),
   `revenuecat-webhook` (table `subscriptions`; fails closed without its
-  secret); `fatsecret-proxy` is an unused stub that returns 501.
+  secret; with `REVENUECAT_SECRET_API_KEY` it re-reads the customer from
+  RevenueCat's REST API on every event, so order doesn't matter; without
+  it, the event is applied and older events are ignored; CANCELLATION keeps
+  Pro until expiry), `sync-subscription` (signed-in; same re-read for the
+  caller, 15 s throttle), `_shared/revenuecat.ts`; `delete-account` also
+  deletes the RevenueCat customer. Free / Pro caps are env-overridable
+  (`FREE_DAILY_SCANS` / `PRO_DAILY_SCANS`, `VITA_CHAT_DAILY_LIMIT` /
+  `PRO_VITA_CHAT_DAILY_LIMIT`, ...); 429 bodies carry `pro` and
+  `upgradable`. `fatsecret-proxy` is an unused stub that returns 501.
   `_shared/quota.ts` fails closed. AI nutrition estimates are never written
   to the shared `proprietary_products` catalogue. All
   validate input with `_shared/validate.ts` and return short JSON errors.
@@ -736,7 +769,8 @@ Route names are GoRouter `name`s.
   Services, `device_preview` only in debug; arm64 download ~29 MB est.).
 - Decide: 10 iOS gaps (no Crashlytics, push or widgets).
 - Known leftovers: AI keys are one per function for every user (no
-  premium routing; free-tier Gemini may use prompts); backup conflicts
+  Pro routing; free-tier Gemini may use prompts); the scanner doesn't show
+  scans left yet (`remainingFreeScans` is ready); backup conflicts
   use device clocks; widgets redraw after midnight only on their 30 min
   update or a tap; reminders don't see
   widget logs; other offline GETs take ~7 s to fail where no connectivity
@@ -750,7 +784,17 @@ food scan has no long-wait hint or cancel; label-scan loader
 ### Remaining:
 1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).
 2. **Play Console Declarations:** Submit Health apps form & Health Connect read permissions, Usage Access permission video, Location foreground service video, and Data safety form.
-3. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
+3. **VitalUp Pro setup:** Play Console subscription `vitalup_pro` with
+   base plans monthly + yearly (7-day free trial offer on yearly); a
+   RevenueCat project (Google Play app + service account, entitlement
+   `pro`, default offering with both packages, webhook to
+   `revenuecat-webhook` with the `REVENUECAT_WEBHOOK_SECRET` header);
+   secrets `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_SECRET`;
+   `REVENUECAT_GOOGLE_API_KEY` in `.env` and in the workflows' `ENV_CONTENT` secret;
+   then `supabase db push` (`20261026`) and deploy scan-food, vita-chat,
+   generate-diet-plan, revenuecat-webhook, sync-subscription,
+   delete-account. Data safety form: add "Purchase history".
+4. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
 ## Native Android
@@ -805,7 +849,7 @@ claims.
 
 Edge functions: `npx -p typescript@5.6.3 tsc --noEmit --strict
 --noImplicitAny false --module es2022 --moduleResolution bundler
---allowImportingTsExtensions --lib es2022,dom,dom.iterable --skipLibCheck
+--allowImportingTsExtensions --target es2022 --lib es2022,dom,dom.iterable --skipLibCheck
 shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
 `https://` imports as `any`.
 

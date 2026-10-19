@@ -24,8 +24,11 @@ class DietPlanLoaded extends DietPlanState {
 class DietPlanError extends DietPlanState {
   final String message;
 
-  const DietPlanError(this.message);
+  /// Today's plan limit (free users can get more with Pro).
+  final bool limitReached;
+
+  const DietPlanError(this.message, {this.limitReached = false});
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, limitReached];
 }
