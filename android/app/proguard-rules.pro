@@ -53,3 +53,8 @@
 -keep class com.tekartik.sqflite.** { *; }
 -dontwarn com.tekartik.sqflite.**
 
+# 11. RevenueCat In-App Purchases
+-keep class com.revenuecat.purchases.** { *; }
+-dontwarn com.revenuecat.purchases.**
+
+
