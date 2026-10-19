@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -186,6 +187,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           _update(s.copyWith(weightUnit: unit)),
                     ),
                   ),
+                  const _DistanceUnitTile(),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -297,6 +299,49 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Distance in workouts (distance, pace, speed, targets). Kept in its own
+/// preference, which the workout screens read when they open.
+class _DistanceUnitTile extends StatefulWidget {
+  const _DistanceUnitTile();
+
+  @override
+  State<_DistanceUnitTile> createState() => _DistanceUnitTileState();
+}
+
+class _DistanceUnitTileState extends State<_DistanceUnitTile> {
+  final _unit = DistanceUnitNotifier();
+
+  @override
+  void initState() {
+    super.initState();
+    _unit.load();
+  }
+
+  @override
+  void dispose() {
+    _unit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<DistanceUnit>(
+      valueListenable: _unit,
+      builder: (context, unit, _) => AppListTile(
+        icon: Icons.route_rounded,
+        title: 'Distance',
+        trailing: AppSegmentedControl<DistanceUnit>(
+          compact: true,
+          values: DistanceUnit.values,
+          selected: unit,
+          label: (u) => u.label,
+          onChanged: _unit.setUnit,
+        ),
+      ),
     );
   }
 }
