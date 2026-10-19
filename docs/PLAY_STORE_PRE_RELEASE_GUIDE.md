@@ -92,7 +92,7 @@ Shorebird allows you to push instant Dart code updates directly to user devices 
 - **Instant Hotfix (OTA without app store review)**: Dart-only changes. Native code, Gradle, manifest, assets
   declared in pubspec and plugin version changes need a new store release.
   ```bash
-  shorebird patch android --release-version=1.0.0+2 -- --obfuscate --split-debug-info=build/app/outputs/symbols
+  shorebird patch android --release-version=1.0.0+3 -- --obfuscate --split-debug-info=build/app/outputs/symbols
   ```
 - Bump `version:` in `pubspec.yaml` (name and `+build`) before every store release; the release workflow fails if the
   tag (`v1.0.1` or `v1.0.1+2`) doesn't match it.
