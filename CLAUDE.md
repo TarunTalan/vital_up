@@ -458,7 +458,11 @@ Route names are GoRouter `name`s.
   heart-rate straps (`flutter_blue_plus`), TTS voice coach, music/local
   audio. Gotcha: geolocator has one position stream; cancel the map preview
   stream before a workout subscribes.
-- **activity_goals:** `activity-goals`; `ActivityGoalsCubit`, pref
+- **activity_goals:** `activity-goals` (the Home Activity card's page:
+  goals, the selected goal's chart, "Today" as `ActivityHistoryCard`s
+  without delete that open `showActivitySummarySheet`). Every goal uses
+  the activity accent (`GoalMetricStyle.color`, also on the Today card and
+  widgets); the icon tells metrics apart. `ActivityGoalsCubit`, pref
   `activity_goals_v1`, one goal per metric and period; daily resets at
   midnight, weekly Monday-Sunday; steps from `HealthVitalsService` + sessions.
 - **health_sync:** `HealthImportService` imports weight and workouts (every
