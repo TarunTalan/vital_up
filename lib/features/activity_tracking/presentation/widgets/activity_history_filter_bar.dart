@@ -1,79 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
-import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
-import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 
-/// Horizontal row of filter chips (All, Outdoor, Workouts, then one per
-/// recorded type) plus a search box for filtering by tag/note text.
-class ActivityHistoryFilterBar extends StatelessWidget {
+/// All / Outdoor / Workouts, and a search button that opens a field for
+/// the activity name, tag or note. Closing the search clears it.
+class ActivityHistoryFilterBar extends StatefulWidget {
   final ActivityGroup? selectedGroup;
-  final ActivityType? selectedType;
-
-  /// Types the user has sessions of; only these get a chip.
-  final List<ActivityType> types;
   final ValueChanged<ActivityGroup?> onGroupSelected;
-  final ValueChanged<ActivityType?> onTypeSelected;
   final ValueChanged<String> onSearchChanged;
 
   const ActivityHistoryFilterBar({
     super.key,
     required this.selectedGroup,
-    required this.selectedType,
-    required this.types,
     required this.onGroupSelected,
-    required this.onTypeSelected,
     required this.onSearchChanged,
   });
 
   @override
+  State<ActivityHistoryFilterBar> createState() =>
+      _ActivityHistoryFilterBarState();
+}
+
+class _ActivityHistoryFilterBarState extends State<ActivityHistoryFilterBar> {
+  final _search = TextEditingController();
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() => _searching = !_searching);
+    if (!_searching && _search.text.isNotEmpty) {
+      _search.clear();
+      widget.onSearchChanged('');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final v = context.vColors;
-    final chipHeight = context
-        .textScaled(AppDimens.headerActionSize - AppDimens.space4)
-        .clamp(AppDimens.headerActionSize - AppDimens.space4, double.infinity);
 
     return Column(
       children: [
-        SizedBox(
-          height: chipHeight,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: context.pagePadding,
-            children: [
-              _FilterChip(
-                label: 'All',
-                selected: selectedType == null && selectedGroup == null,
-                onTap: () => onGroupSelected(null),
+        Row(
+          children: [
+            Expanded(
+              child: AppSegmentedControl<ActivityGroup?>(
+                values: const [null, ...ActivityGroup.values],
+                selected: widget.selectedGroup,
+                label: (group) => group?.label ?? 'All',
+                onChanged: widget.onGroupSelected,
               ),
-              const SizedBox(width: AppDimens.space8),
-              for (final group in ActivityGroup.values) ...[
-                _FilterChip(
-                  label: group.label,
-                  selected: selectedGroup == group,
-                  onTap: () => onGroupSelected(group),
-                ),
-                const SizedBox(width: AppDimens.space8),
-              ],
-              for (final type in types) ...[
-                _FilterChip(
-                  label: type.label,
-                  icon: activityTypeIcon(type),
-                  selected: selectedType == type,
-                  onTap: () => onTypeSelected(type),
-                ),
-                const SizedBox(width: AppDimens.space8),
-              ],
-            ],
-          ),
+            ),
+            const SizedBox(width: AppDimens.space8),
+            AppHeaderAction(
+              tooltip: _searching ? 'Close search' : 'Search',
+              onTap: _toggleSearch,
+              icon: Icon(
+                _searching ? Icons.close_rounded : Icons.search_rounded,
+                size: AppDimens.iconMd,
+                color: context.colors.onSurface,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: AppDimens.space12),
-        Padding(
-          padding: context.pagePadding,
-          child: TextField(
-            onChanged: onSearchChanged,
+        if (_searching) ...[
+          const SizedBox(height: AppDimens.space12),
+          TextField(
+            controller: _search,
+            autofocus: true,
+            onChanged: widget.onSearchChanged,
             maxLength: InputLimits.search,
             inputFormatters: InputFormatters.text(InputLimits.search),
             textInputAction: TextInputAction.search,
@@ -82,7 +84,7 @@ class ActivityHistoryFilterBar extends StatelessWidget {
             ),
             decoration: InputDecoration(
               counterText: '',
-              hintText: 'Search by tag or note…',
+              hintText: 'Activity, tag or note',
               prefixIcon: Icon(
                 Icons.search_rounded,
                 size: AppDimens.iconMd,
@@ -94,62 +96,8 @@ class ActivityHistoryFilterBar extends StatelessWidget {
               ),
             ),
           ),
-        ),
+        ],
       ],
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
-    required this.label,
-    this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    final fg = selected ? v.buttonText! : context.colors.onSurface;
-    final radius = BorderRadius.circular(AppDimens.radiusPill);
-
-    return Material(
-      color: selected ? context.colors.primary : v.glassFill,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(
-          color: selected ? context.colors.primary : v.glassBorder!,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppDimens.space12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: AppDimens.iconXs, color: fg),
-                const SizedBox(width: AppDimens.space6),
-              ],
-              Text(
-                label,
-                style: context.text.labelMedium?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

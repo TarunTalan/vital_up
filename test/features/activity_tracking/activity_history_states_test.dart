@@ -100,8 +100,7 @@ void main() {
     pending.complete(_sessions);
     await settle(tester);
     expect(find.byType(VitalUpLoader), findsNothing);
-    expect(find.text('Sessions'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget);
+    expect(find.byType(ActivityHistoryCard), findsNWidgets(3));
   });
 
   testWidgets('a failed load shows the error, and retry loads', (tester) async {
@@ -117,7 +116,7 @@ void main() {
 
     expect(repo.calls, 2);
     expect(find.text(_loadError), findsNothing);
-    expect(find.text('Sessions'), findsOneWidget);
+    expect(find.byType(ActivityHistoryCard), findsWidgets);
   });
 
   testWidgets(
@@ -137,6 +136,8 @@ void main() {
     await pumpPage(tester, const ActivityHistoryPage());
     await settle(tester);
 
+    await tester.tap(find.byTooltip('Search'));
+    await settle(tester);
     await tester.enterText(find.byType(TextField), 'zzz');
     await settle(tester);
     expect(find.text('No activities match'), findsOneWidget);
@@ -203,6 +204,6 @@ void main() {
       ),
       isEmpty,
     );
-    expect(find.text('Sessions'), findsOneWidget);
+    expect(find.byType(ActivityHistoryCard), findsWidgets);
   });
 }

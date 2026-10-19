@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/session_annotation.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
@@ -95,7 +96,9 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
 
       final tag = entry.annotation?.tag?.toLowerCase() ?? '';
       final note = entry.annotation?.note?.toLowerCase() ?? '';
-      return tag.contains(query) || note.contains(query);
+      return type.label.toLowerCase().contains(query) ||
+          tag.contains(query) ||
+          note.contains(query);
     }).toList();
   }
 

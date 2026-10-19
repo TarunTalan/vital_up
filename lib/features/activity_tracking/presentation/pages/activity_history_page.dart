@@ -1,29 +1,27 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
-import 'package:vital_up/core/widgets/app_buttons.dart';
-import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
-import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_filter_bar.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/session_detail_sheet.dart';
-import 'package:vital_up/core/widgets/fit_text.dart';
-import 'package:vital_up/core/widgets/adaptive_row.dart';
 
-/// Shows every saved activity session with date/time, key stats, and any
-/// tag/note the user added, with filtering by activity type and search.
+/// Every saved activity, newest first, laid out like the other log
+/// histories (meals): one card per entry with its kind, when, a delete
+/// button and its figures. An All / Outdoor / Workouts filter and search
+/// sit above the list.
 class ActivityHistoryPage extends StatelessWidget {
   const ActivityHistoryPage({super.key});
 
@@ -39,13 +37,14 @@ class ActivityHistoryPage extends StatelessWidget {
 class _ActivityHistoryView extends StatelessWidget {
   const _ActivityHistoryView();
 
+  void _reload(BuildContext context) =>
+      context.read<ActivityHistoryBloc>().add(LoadActivityHistory());
+
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
     return AppScaffold(
       header: AppPageHeader(
-        title: 'Activity History',
+        title: 'Activity history',
         action: AppHeaderAction(
           icon: const Icon(Icons.add_rounded),
           tooltip: 'Log a workout',
@@ -53,7 +52,7 @@ class _ActivityHistoryView extends StatelessWidget {
             final saved = await showLogWorkoutSheet(context);
             if (!saved || !context.mounted) return;
             showSuccessSnackBar(context, 'Workout saved');
-            context.read<ActivityHistoryBloc>().add(LoadActivityHistory());
+            _reload(context);
           },
         ),
       ),
@@ -64,126 +63,43 @@ class _ActivityHistoryView extends StatelessWidget {
         behavior: HitTestBehavior.translucent,
         child: SafeArea(
           top: false,
-          child: BlocConsumer<ActivityHistoryBloc, ActivityHistoryState>(
-            listenWhen: (previous, current) =>
-                current is ActivityHistoryLoaded &&
-                current.actionError != null &&
-                (previous is! ActivityHistoryLoaded ||
-                    previous.actionErrorId != current.actionErrorId),
-            listener: (context, state) {
-              final message = (state as ActivityHistoryLoaded).actionError;
-              if (message != null) showErrorSnackBar(context, message);
-            },
-            builder: (context, state) {
-              if (state is ActivityHistoryLoading) {
-                return const Center(child: VitalUpLoader());
-              }
-
-              if (state is ActivityHistoryError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppDimens.space24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          state.message,
-                          textAlign: TextAlign.center,
-                          style: context.text.bodyLarge?.copyWith(
-                            color: colors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: AppDimens.space16),
-                        AppSecondaryButton(
-                          label: 'Retry',
-                          expand: false,
-                          onTap: () => context.read<ActivityHistoryBloc>().add(
-                            LoadActivityHistory(),
-                          ),
-                        ),
-                      ],
+          child: RefreshIndicator(
+            onRefresh: () async => _reload(context),
+            child: BlocConsumer<ActivityHistoryBloc, ActivityHistoryState>(
+              listenWhen: (previous, current) =>
+                  current is ActivityHistoryLoaded &&
+                  current.actionError != null &&
+                  (previous is! ActivityHistoryLoaded ||
+                      previous.actionErrorId != current.actionErrorId),
+              listener: (context, state) {
+                final message = (state as ActivityHistoryLoaded).actionError;
+                if (message != null) showErrorSnackBar(context, message);
+              },
+              builder: (context, state) {
+                if (state is ActivityHistoryLoading) {
+                  return const Center(child: VitalUpLoader());
+                }
+                if (state is ActivityHistoryError) {
+                  return _FullHeight(
+                    child: LoadErrorView(
+                      message: state.message,
+                      onRetry: () => _reload(context),
                     ),
-                  ),
-                );
-              }
-
-              final loaded = state as ActivityHistoryLoaded;
-
-              final entries = loaded.visibleEntries;
-
-              return RefreshIndicator(
-                onRefresh: () async {
-                  context.read<ActivityHistoryBloc>().add(
-                    LoadActivityHistory(),
                   );
-                },
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  slivers: [
-                    // Stats scroll away so the list gets the screen.
-                    SliverPadding(
-                      padding: const EdgeInsets.only(top: AppDimens.space16),
-                      sliver: SliverToBoxAdapter(
-                        child: _HistorySummary(state: loaded),
-                      ),
+                }
+                final loaded = state as ActivityHistoryLoaded;
+                if (loaded.allEntries.isEmpty) {
+                  return const _FullHeight(
+                    child: TrackerEmptyState(
+                      metric: TrackerMetric.activity,
+                      title: 'No activities yet',
+                      message: 'Your finished workouts will show up here.',
                     ),
-                    // Filters stay reachable once the stats are gone.
-                    SliverLayoutBuilder(
-                      builder: (context, constraints) => PinnedHeaderSliver(
-                        child: _PinnedFilterBar(
-                          pinned: constraints.scrollOffset > 0,
-                          state: loaded,
-                        ),
-                      ),
-                    ),
-                    if (entries.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyHistory(
-                          noActivities: loaded.allEntries.isEmpty,
-                        ),
-                      )
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppDimens.sectionGap,
-                        ),
-                        sliver: SliverList.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (context, index) {
-                            final entry = entries[index];
-                            return ActivityHistoryCard(
-                              entry: entry,
-                              onTap: () async {
-                                final result = await showSessionDetailSheet(
-                                  context,
-                                  entry: entry,
-                                );
-                                if (result != null && context.mounted) {
-                                  final (tag, note) = result;
-                                  context.read<ActivityHistoryBloc>().add(
-                                    UpdateSessionAnnotation(
-                                      sessionId: entry.session.id,
-                                      tag: tag,
-                                      note: note,
-                                    ),
-                                  );
-                                }
-                              },
-                              onDelete: () =>
-                                  context.read<ActivityHistoryBloc>().add(
-                                    DeleteSessionFromHistory(entry.session.id),
-                                  ),
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                  );
+                }
+                return _HistoryList(state: loaded);
+              },
+            ),
           ),
         ),
       ),
@@ -191,169 +107,78 @@ class _ActivityHistoryView extends StatelessWidget {
   }
 }
 
-/// Chips + search, pinned under the page header. Gains a glass backdrop
-/// only while pinned so cards scrolling beneath don't show through.
-class _PinnedFilterBar extends StatelessWidget {
-  final bool pinned;
-  final ActivityHistoryLoaded state;
+/// Centres [child] in a scrollable, so pull-to-refresh still works.
+class _FullHeight extends StatelessWidget {
+  final Widget child;
 
-  const _PinnedFilterBar({required this.pinned, required this.state});
+  const _FullHeight({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        alignment: Alignment.center,
+        padding: context.pagePadding,
+        child: child,
+      ),
+    );
+  }
+}
 
-    // Tree shape stays fixed across pin changes so the search field isn't
-    // remounted (and cleared) mid-scroll.
-    return ClipRect(
-      child: BackdropFilter(
-        enabled: pinned,
-        filter: ImageFilter.blur(
-          sigmaX: AppDimens.headerBlur / 2,
-          sigmaY: AppDimens.headerBlur / 2,
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: pinned ? v.glassFill : Colors.transparent,
-            border: Border(
-              bottom: BorderSide(
-                color: pinned ? v.glassBorder! : Colors.transparent,
-              ),
-            ),
-          ),
-          padding: const EdgeInsets.only(
-            top: AppDimens.space12,
-            bottom: AppDimens.space8,
-          ),
-          child: ActivityHistoryFilterBar(
+class _HistoryList extends StatelessWidget {
+  final ActivityHistoryLoaded state;
+
+  const _HistoryList({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<ActivityHistoryBloc>();
+    final entries = state.visibleEntries;
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.symmetric(
+        horizontal: context.gutter,
+        vertical: AppDimens.sectionGap,
+      ),
+      // The filter first, then the entries (or why there are none).
+      itemCount: 1 + (entries.isEmpty ? 1 : entries.length),
+      separatorBuilder: (_, _) => const SizedBox(height: AppDimens.cardGap),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return ActivityHistoryFilterBar(
             selectedGroup: state.groupFilter,
-            selectedType: state.activityTypeFilter,
-            types: state.recordedTypes,
-            onGroupSelected: (group) => context
-                .read<ActivityHistoryBloc>()
-                .add(FilterByActivityGroup(group)),
-            onTypeSelected: (type) => context.read<ActivityHistoryBloc>().add(
-              FilterByActivityType(type),
-            ),
-            onSearchChanged: (query) =>
-                context.read<ActivityHistoryBloc>().add(SearchHistory(query)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HistorySummary extends StatelessWidget {
-  final ActivityHistoryLoaded state;
-
-  const _HistorySummary({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      margin: context.pagePadding,
-      padding: AppDimens.cardPaddingCompact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppCaption('All time'),
-          const SizedBox(height: AppDimens.space12),
-          AdaptiveRow(
-            children: [
-              _SummaryStat(value: '${state.totalSessions}', label: 'Sessions'),
-              _SummaryStat(
-                value: formatDistanceKm(state.totalDistanceMeters),
-                label: 'km',
+            onGroupSelected: (group) => bloc.add(FilterByActivityGroup(group)),
+            onSearchChanged: (query) => bloc.add(SearchHistory(query)),
+          );
+        }
+        if (entries.isEmpty) {
+          return const TrackerEmptyState(
+            metric: TrackerMetric.activity,
+            title: 'No activities match',
+            message: 'Try a different filter or search term.',
+          );
+        }
+        final entry = entries[index - 1];
+        return ActivityHistoryCard(
+          entry: entry,
+          onTap: () async {
+            final result = await showSessionDetailSheet(context, entry: entry);
+            if (result == null || !context.mounted) return;
+            final (tag, note) = result;
+            bloc.add(
+              UpdateSessionAnnotation(
+                sessionId: entry.session.id,
+                tag: tag,
+                note: note,
               ),
-              _SummaryStat(
-                value: formatDuration(
-                  Duration(seconds: state.totalDurationSeconds),
-                ),
-                label: 'Time',
-              ),
-              _SummaryStat(value: '${state.totalCalories}', label: 'Calories'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryStat extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _SummaryStat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: AppDimens.space4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FitText(
-            value,
-            maxLines: 1,
-            style: context.text.headlineSmall?.copyWith(
-              color: context.colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.labelSmall?.copyWith(
-              color: context.vColors.grayText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyHistory extends StatelessWidget {
-  const _EmptyHistory({required this.noActivities});
-
-  /// True when nothing was ever recorded (vs. a filter hiding everything).
-  final bool noActivities;
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimens.space24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIconBadge(
-              icon: const Icon(Icons.history_rounded),
-              size: AppDimens.iconBadgeLarge,
-            ),
-            const SizedBox(height: AppDimens.space12),
-            Text(
-              noActivities ? 'No activities yet' : 'No activities match',
-              style: context.text.titleSmall?.copyWith(
-                color: context.colors.onSurface,
-              ),
-            ),
-            const SizedBox(height: AppDimens.space4),
-            Text(
-              noActivities
-                  ? 'Your finished workouts will show up here.'
-                  : 'Try a different filter or search term.',
-              style: context.text.bodyMedium?.copyWith(color: v.grayText),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+          onDelete: () => bloc.add(DeleteSessionFromHistory(entry.session.id)),
+        );
+      },
     );
   }
 }
