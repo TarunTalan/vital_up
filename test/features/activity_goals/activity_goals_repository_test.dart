@@ -48,13 +48,28 @@ ActivitySession _walk(DateTime start, {double meters = 2500, int steps = 3000}) 
       points: const [],
     );
 
-Future<ActivityGoalsRepositoryImpl> _repo(List<ActivitySession> sessions) async {
+/// Health Connect connected, reporting the same total for every day.
+class _FakeHealth extends HealthVitalsService {
+  final int stepsPerDay;
+  _FakeHealth(super.prefs, this.stepsPerDay);
+
+  @override
+  Future<Map<DateTime, int>?> readDailySteps(List<DateTime> days) async =>
+      {for (final d in days) d: stepsPerDay};
+}
+
+Future<ActivityGoalsRepositoryImpl> _repo(
+  List<ActivitySession> sessions, {
+  int? healthStepsPerDay,
+}) async {
   final prefs = await SharedPreferences.getInstance();
   return ActivityGoalsRepositoryImpl(
     local: ActivityGoalsLocalDataSource(prefs),
     history: GetActivityHistory(_FakeHistory(sessions)),
     // Not Android/iOS in tests → no health store, steps come from sessions.
-    health: HealthVitalsService(prefs),
+    health: healthStepsPerDay == null
+        ? HealthVitalsService(prefs)
+        : _FakeHealth(prefs, healthStepsPerDay),
   );
 }
 
@@ -73,6 +88,29 @@ void main() {
     expect(steps.series.points, hasLength(7));
     expect(snapshot.goals.last.current, 1);
     expect(snapshot.stepsFromHealth, isFalse);
+  });
+
+  test('steps are the larger of Health Connect and tracked workouts',
+      () async {
+    final walk = _walk(DateTime.now().subtract(const Duration(minutes: 40)));
+
+    // Connected, but no app on the phone writes steps: the tracked walk
+    // still counts.
+    var snapshot = await (await _repo([walk], healthStepsPerDay: 0))
+        .getProgress(TrendRange.week);
+    expect(snapshot.stepsFromHealth, isTrue);
+    expect(snapshot.goals.first.current, 3000);
+
+    // Health Connect already includes the walk: not counted twice.
+    snapshot = await (await _repo([walk], healthStepsPerDay: 9000))
+        .getProgress(TrendRange.week);
+    expect(snapshot.goals.first.current, 9000);
+  });
+
+  test('dailySteps never adds the two sources', () {
+    expect(dailySteps(health: null, tracked: 1200), 1200);
+    expect(dailySteps(health: 0, tracked: 1200), 1200);
+    expect(dailySteps(health: 8000, tracked: 1200), 8000);
   });
 
   test('save, replace and delete goals', () async {
