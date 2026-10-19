@@ -69,6 +69,9 @@ ActivitySession buildWorkoutSession({
   required Duration length,
   required WorkoutIntensity intensity,
   required double weightKg,
+  String? targetType,
+  double? targetValue,
+  bool targetAchieved = false,
 }) {
   return ActivitySession(
     id: id,
@@ -88,5 +91,8 @@ ActivitySession buildWorkoutSession({
     stepCountReliable: true,
     points: const [],
     intensity: intensity,
+    targetType: targetType,
+    targetValue: targetValue,
+    targetAchieved: targetAchieved,
   );
 }

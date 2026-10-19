@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_controls.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -11,6 +12,8 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/log_workout.
 import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
+import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
 
 import '../../helpers/pump_app.dart';
 
@@ -25,18 +28,50 @@ class _FakeRepo implements ActivityRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// No music in tests: nothing plays, everything else is a no-op.
+class _SilentAudio implements WorkoutAudioService {
+  @override
+  bool get isPlaying => false;
+
+  @override
+  Stream<bool> get playingStream => Stream.value(false);
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> resume() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _SilentCoach implements VoiceCoachService {
+  @override
+  Future<void> stop() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   late _FakeRepo repo;
   late WorkoutTimerStore store;
   late DateTime clock;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    // No 3-2-1 before Start: the countdown has its own timers.
+    SharedPreferences.setMockInitialValues({'workout_countdown_duration': 0});
     store = WorkoutTimerStore(await SharedPreferences.getInstance());
     repo = _FakeRepo();
     clock = DateTime(2026, 10, 18, 18);
     final log = LogWorkout(repository: repo, weightKg: () async => 70);
     sl.registerSingleton<LogWorkout>(log);
+    sl.registerSingleton<WorkoutAudioService>(_SilentAudio());
+    sl.registerSingleton<VoiceCoachService>(_SilentCoach());
     sl.registerFactoryParam<WorkoutTimerCubit, ActivityType, void>(
       (type, _) => WorkoutTimerCubit(
         store: store,
@@ -50,6 +85,8 @@ void main() {
   tearDown(() async {
     await sl.unregister<WorkoutTimerCubit>();
     await sl.unregister<LogWorkout>();
+    await sl.unregister<WorkoutAudioService>();
+    await sl.unregister<VoiceCoachService>();
   });
 
   testWidgets('ready, timing and paused at the largest text size', (
@@ -62,23 +99,40 @@ void main() {
     );
     await settle(tester);
 
-    expect(find.text('Ready'), findsOneWidget);
-    expect(find.text('Log a past workout instead'), findsOneWidget);
+    expect(find.text('READY'), findsOneWidget);
+    // The same tiles as the GPS screen, above Start.
+    expect(find.byType(ActivitySelector), findsOneWidget);
     expect(takeAllExceptions(tester), isEmpty);
     expect(truncatedTexts(tester), isEmpty);
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Start Yoga'));
     await settle(tester);
     clock = clock.add(const Duration(minutes: 3, seconds: 5));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Timing'), findsOneWidget);
+    expect(find.text('TIMING'), findsOneWidget);
     expect(find.text('00:03:05'), findsOneWidget);
     expect(store.read()!.type, ActivityType.yoga);
 
-    await tester.tap(find.text('Pause'));
+    // Locked like a GPS workout: no Pause until the slider is pulled, and
+    // the page can't be left mid-workout.
+    expect(find.text('PAUSE'), findsNothing);
+    expect(find.text('SLIDE TO UNLOCK'), findsOneWidget);
+    await tester.drag(
+      find
+          .descendant(
+            of: find.byType(SlidingButton),
+            matching: find.byType(GestureDetector),
+          )
+          .first,
+      const Offset(2000, 0),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
     await settle(tester);
-    expect(find.text('Paused'), findsOneWidget);
-    expect(find.text('Resume'), findsOneWidget);
+
+    await tester.tap(find.text('PAUSE'));
+    await settle(tester);
+    expect(find.text('PAUSED'), findsOneWidget);
+    expect(find.text('RESUME'), findsOneWidget);
     expect(find.text('Discard workout'), findsOneWidget);
     expect(takeAllExceptions(tester), isEmpty);
     expect(truncatedTexts(tester), isEmpty);

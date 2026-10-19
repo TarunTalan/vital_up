@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
-import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 
@@ -98,7 +97,10 @@ class _ControlLabel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.space8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: iconTrailing
+        // Large text: the word alone, so it isn't cut short.
+        children: context.isLargeText
+            ? [text]
+            : iconTrailing
             ? [text, const SizedBox(width: AppDimens.space4), iconWidget]
             : [iconWidget, const SizedBox(width: AppDimens.space4), text],
       ),
@@ -107,46 +109,44 @@ class _ControlLabel extends StatelessWidget {
 }
 
 /// Row of activity type buttons (walk/run/cycle/more) shown while idle.
+/// Walk / run / cycle tiles plus More (every activity), shown above Start
+/// while idle on the activity screen, in GPS and timer mode alike.
 class ActivitySelector extends StatelessWidget {
   final ActivityType selected;
   final bool enabled;
   final ValueChanged<ActivityType> onSelected;
+  final List<ActivityType> quick;
 
   const ActivitySelector({
     super.key,
     required this.selected,
     required this.enabled,
     required this.onSelected,
+    this.quick = const [
+      ActivityType.walk,
+      ActivityType.run,
+      ActivityType.cycle,
+    ],
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ActivityButton(
-          icon: Icons.directions_walk_rounded,
-          selected: selected == ActivityType.walk,
-          enabled: enabled,
-          onTap: () => onSelected(ActivityType.walk),
-        ),
-        const SizedBox(width: AppDimens.space8),
-        ActivityButton(
-          icon: Icons.directions_run_rounded,
-          selected: selected == ActivityType.run,
-          enabled: enabled,
-          onTap: () => onSelected(ActivityType.run),
-        ),
-        const SizedBox(width: AppDimens.space8),
-        ActivityButton(
-          icon: Icons.directions_bike_rounded,
-          selected: selected == ActivityType.cycle,
-          enabled: enabled,
-          onTap: () => onSelected(ActivityType.cycle),
-        ),
-        const SizedBox(width: AppDimens.space8),
+        for (final type in quick) ...[
+          ActivityButton(
+            icon: activityTypeIcon(type),
+            tooltip: type.label,
+            selected: selected == type,
+            enabled: enabled,
+            onTap: () => onSelected(type),
+          ),
+          const SizedBox(width: AppDimens.space8),
+        ],
         MoreActivitiesButton(
           enabled: enabled,
           selected: selected,
+          quick: quick,
           onSelected: onSelected,
         ),
       ],
@@ -156,6 +156,7 @@ class ActivitySelector extends StatelessWidget {
 
 class ActivityButton extends StatelessWidget {
   final IconData icon;
+  final String? tooltip;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
@@ -163,6 +164,7 @@ class ActivityButton extends StatelessWidget {
   const ActivityButton({
     super.key,
     required this.icon,
+    this.tooltip,
     required this.selected,
     required this.enabled,
     required this.onTap,
@@ -177,6 +179,7 @@ class ActivityButton extends StatelessWidget {
         accent: selected ? primary : null,
         child: Icon(
           icon,
+          semanticLabel: tooltip,
           size: AppDimens.iconLg,
           color: selected ? primary : context.colors.onSurface,
         ),
@@ -190,11 +193,19 @@ class MoreActivitiesButton extends StatelessWidget {
   final ActivityType selected;
   final ValueChanged<ActivityType> onSelected;
 
+  /// The tiles beside this button; picking another type shows its icon here.
+  final List<ActivityType> quick;
+
   const MoreActivitiesButton({
     super.key,
     required this.enabled,
     required this.selected,
     required this.onSelected,
+    this.quick = const [
+      ActivityType.walk,
+      ActivityType.run,
+      ActivityType.cycle,
+    ],
   });
 
   void _showOptions(BuildContext context) {
@@ -253,13 +264,16 @@ class MoreActivitiesButton extends StatelessWidget {
                     color: colors.onSurface,
                   ),
                   title: Text(type.label),
-                  trailing: Icon(
-                    Icons.timer_outlined,
-                    color: context.vColors.grayText,
-                  ),
+                  trailing: selected == type
+                      ? Icon(Icons.check_rounded, color: colors.primary)
+                      : Icon(
+                          Icons.timer_outlined,
+                          color: context.vColors.grayText,
+                        ),
+                  // The activity screen switches to its timer for these.
                   onTap: () {
                     Navigator.of(context).pop();
-                    outer.pushNamed('workout-timer', extra: type);
+                    onSelected(type);
                   },
                 ),
               ListTile(
@@ -289,31 +303,56 @@ class MoreActivitiesButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isCustomSelected =
-        selected != ActivityType.walk &&
-        selected != ActivityType.run &&
-        selected != ActivityType.cycle;
+    final isCustomSelected = !quick.contains(selected);
 
     return Expanded(
       child: _ControlTile(
         onTap: enabled ? () => _showOptions(context) : null,
         accent: isCustomSelected ? colors.primary : null,
-        child: Icon(
-          isCustomSelected
-              ? activityTypeIcon(selected)
-              : Icons.more_horiz_rounded,
-          size: AppDimens.iconLg,
-          color: isCustomSelected ? colors.primary : colors.onSurface,
-        ),
+        // A type picked from More shows here, with the more mark beside it
+        // so the tile still reads as More.
+        child: isCustomSelected
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    activityTypeIcon(selected),
+                    semanticLabel: '${selected.label}, more activities',
+                    size: AppDimens.iconLg,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: AppDimens.space2),
+                  Icon(
+                    Icons.more_horiz_rounded,
+                    size: AppDimens.iconSm,
+                    color: colors.primary,
+                  ),
+                ],
+              )
+            : Icon(
+                Icons.more_horiz_rounded,
+                semanticLabel: 'More activities',
+                size: AppDimens.iconLg,
+                color: colors.onSurface,
+              ),
       ),
     );
   }
 }
 
-/// Bottom control cluster: start button while idle, slide-to-unlock while
-/// locked, and pause/resume/finish controls once unlocked.
+/// Bottom control cluster, shared by GPS and timed workouts: music, start
+/// and settings before a workout; slide-to-unlock while locked; finish,
+/// lock and pause/resume once unlocked.
 class StartPauseControl extends StatelessWidget {
-  final ActivityTrackingState state;
+  /// No workout yet: music, [startLabel] and settings.
+  final bool isIdle;
+
+  /// The workout is running (Pause shown) rather than paused (Resume).
+  final bool isRunning;
+  final String startLabel;
+
+  /// Resume can't be offered (the timer stopped at its limit).
+  final bool canResume;
   final bool isLocked;
   final ValueChanged<bool> onLockToggle;
   final VoidCallback onStart;
@@ -325,7 +364,10 @@ class StartPauseControl extends StatelessWidget {
 
   const StartPauseControl({
     super.key,
-    required this.state,
+    required this.isIdle,
+    required this.isRunning,
+    required this.startLabel,
+    this.canResume = true,
     required this.isLocked,
     required this.onLockToggle,
     required this.onStart,
@@ -340,8 +382,6 @@ class StartPauseControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final buttonText = context.vColors.buttonText!;
-    final isIdle = state is TrackingIdle || state is TrackingCompleted;
-    final isInProgress = state is TrackingInProgress;
 
     if (isIdle) {
       return Row(
@@ -375,7 +415,7 @@ class StartPauseControl extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Start ${state.activityType.label}',
+                        startLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.text.labelLarge?.copyWith(
@@ -439,7 +479,7 @@ class StartPauseControl extends StatelessWidget {
         ),
         const SizedBox(width: AppDimens.space8),
         Expanded(
-          child: isInProgress
+          child: isRunning
               ? _ControlTile(
                   onTap: onPause,
                   accent: colors.primary,
@@ -450,8 +490,8 @@ class StartPauseControl extends StatelessWidget {
                   ),
                 )
               : _ControlTile(
-                  filled: true,
-                  onTap: onResume,
+                  filled: canResume,
+                  onTap: canResume ? onResume : null,
                   child: _ControlLabel(
                     icon: Icons.arrow_forward_rounded,
                     label: 'RESUME',

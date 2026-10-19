@@ -10,9 +10,6 @@ import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/customize_layout_page.dart';
-import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
-import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
-import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/target_picker_sheet.dart';
 
@@ -27,12 +24,17 @@ class ActivitySettingsPage extends StatelessWidget {
   final HeartRateManager hrManager;
   final int? liveHeartRate;
 
+  /// The activity the settings are for: a workout without a route gets a
+  /// time or calories target and no map or GPS layout rows.
+  final ActivityType activityType;
+
   const ActivitySettingsPage({
     super.key,
     required this.unitNotifier,
     required this.prefsNotifier,
     required this.hrManager,
     this.liveHeartRate,
+    this.activityType = ActivityType.walk,
   });
 
   @override
@@ -44,7 +46,7 @@ class ActivitySettingsPage extends StatelessWidget {
     );
 
     return AppScaffold(
-      header: const AppPageHeader(title: 'Activity Settings'),
+      header: AppPageHeader(title: 'Activity Settings'),
       scrollable: false,
       padBody: false,
       body: SafeArea(
@@ -57,8 +59,17 @@ class ActivitySettingsPage extends StatelessWidget {
               builder: (_, unit, _) {
                 final connectedDevice = hrManager.connectedDevice;
 
-                String targetSubtitle = 'No target set';
-                if (prefs.targetType == WorkoutTargetType.distance) {
+                final timed = !activityType.isGpsBased;
+                String targetSubtitle = "Not set: what's left of today's goal";
+                if (timed) {
+                  targetSubtitle = switch (prefs.timerTargetType) {
+                    WorkoutTargetType.duration =>
+                      '${prefs.timerTargetValue.toStringAsFixed(0)} min',
+                    WorkoutTargetType.calories =>
+                      '${prefs.timerTargetValue.toStringAsFixed(0)} kcal',
+                    _ => targetSubtitle,
+                  };
+                } else if (prefs.targetType == WorkoutTargetType.distance) {
                   final val = unit == DistanceUnit.miles
                       ? prefs.targetValue / 1.60934
                       : prefs.targetValue;
@@ -82,7 +93,9 @@ class ActivitySettingsPage extends StatelessWidget {
                     _SettingsTile(
                       icon: Icons.mic_rounded,
                       title: 'Voice coach',
-                      subtitle: 'Audio cues at each km/mi milestone',
+                      subtitle: timed
+                          ? 'Spoken countdown before you start'
+                          : 'Audio cues at each km/mi milestone',
                       trailing: Switch(
                         value: prefs.voiceCoachEnabled,
                         onChanged: (v) => prefsNotifier.setVoiceCoach(v),
@@ -148,15 +161,14 @@ class ActivitySettingsPage extends StatelessWidget {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (prefs.targetType != WorkoutTargetType.none)
-                            ActivityTagChip(
-                              label: prefs.dailyTargetEnabled
-                                  ? 'Daily'
-                                  : 'Session',
-                            ),
-                          if (prefs.targetType != WorkoutTargetType.none)
+                          if ((timed
+                                  ? prefs.timerTargetType
+                                  : prefs.targetType) !=
+                              WorkoutTargetType.none)
                             _ClearButton(
-                              onTap: () => prefsNotifier.clearTarget(),
+                              onTap: () => timed
+                                  ? prefsNotifier.clearTimerTarget()
+                                  : prefsNotifier.clearTarget(),
                             ),
                           chevron,
                         ],
@@ -167,124 +179,7 @@ class ActivitySettingsPage extends StatelessWidget {
                           current: prefs,
                           distanceUnit: unit,
                           notifier: prefsNotifier,
-                        );
-                      },
-                    ),
-
-                    _SettingsTile(
-                      icon: Icons.calendar_month_rounded,
-                      title: 'Daily target',
-                      subtitle: prefs.dailyTargetEnabled
-                          ? (() {
-                              if (prefs.dailyTargetType ==
-                                  WorkoutTargetType.distance) {
-                                final val = unit == DistanceUnit.miles
-                                    ? prefs.dailyTargetValue / 1.60934
-                                    : prefs.dailyTargetValue;
-                                return '${val.toStringAsFixed(1)} ${unit.label} every session';
-                              } else if (prefs.dailyTargetType ==
-                                  WorkoutTargetType.calories) {
-                                return '${prefs.dailyTargetValue.toStringAsFixed(0)} kcal every session';
-                              }
-                              return 'Enabled';
-                            })()
-                          : 'Disabled — targets are per-session only',
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (prefs.dailyTargetEnabled)
-                            _ClearButton(
-                              onTap: () => prefsNotifier.clearDailyTarget(),
-                            ),
-                          chevron,
-                        ],
-                      ),
-                      onTap: () async {
-                        final result =
-                            await showAppBottomSheet<
-                              (WorkoutTargetType, double)?
-                            >(
-                              context: context,
-                              builder: (_) => TargetPickerSheet(
-                                current: prefs.dailyTargetEnabled
-                                    ? prefs.copyWith(
-                                        targetType: prefs.dailyTargetType,
-                                        targetValue: prefs.dailyTargetValue,
-                                      )
-                                    : prefs.copyWith(
-                                        targetType: WorkoutTargetType.none,
-                                        targetValue: 0.0,
-                                      ),
-                                distanceUnit: unit,
-                              ),
-                            );
-                        if (result != null) {
-                          final (WorkoutTargetType type, double val) = result;
-                          if (type == WorkoutTargetType.none) {
-                            await prefsNotifier.clearDailyTarget();
-                          } else {
-                            await prefsNotifier.setDailyTarget(type, val);
-                          }
-                        }
-                      },
-                    ),
-
-                    _SettingsTile(
-                      icon: Icons.run_circle_rounded,
-                      title: 'Default activity type',
-                      subtitle: prefs.defaultActivityType.label,
-                      trailing: chevron,
-                      onTap: () {
-                        showSmoothDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Default activity type'),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: ActivityType.outdoor.map((type) {
-                                  final isSel =
-                                      prefs.defaultActivityType == type;
-                                  return ListTile(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppDimens.radiusSm,
-                                      ),
-                                    ),
-                                    leading: Icon(
-                                      activityTypeIcon(type),
-                                      color: isSel
-                                          ? colors.primary
-                                          : context.vColors.grayText,
-                                    ),
-                                    title: Text(
-                                      type.label,
-                                      style: context.text.bodyLarge?.copyWith(
-                                        fontWeight: isSel
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                        color: isSel
-                                            ? colors.primary
-                                            : colors.onSurface,
-                                      ),
-                                    ),
-                                    trailing: isSel
-                                        ? Icon(
-                                            Icons.check_rounded,
-                                            color: colors.primary,
-                                          )
-                                        : null,
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      prefsNotifier.setDefaultActivityType(
-                                        type,
-                                      );
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
+                          timed: timed,
                         );
                       },
                     ),
@@ -316,62 +211,35 @@ class ActivitySettingsPage extends StatelessWidget {
                           : () => HrDeviceSheet.show(context, hrManager),
                     ),
 
-                    // ── Music & Stories ──────────────────────────────────────
-                    const _SectionHeader('Music & stories'),
+                    // The live stats layout and the map are GPS only.
+                    if (!timed) ...[
+                      // ── Display ──────────────────────────────────────────────
+                      const _SectionHeader('Display'),
 
-                    _SettingsTile(
-                      icon: Icons.music_note_rounded,
-                      title: 'Background soundtrack',
-                      subtitle: prefs.backgroundAudioTrack == 'None'
-                          ? 'No background soundtrack'
-                          : prefs.backgroundAudioTrack,
-                      trailing: chevron,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => WorkoutAudioPage(
-                            current: prefs,
-                            notifier: prefsNotifier,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // ── Display ──────────────────────────────────────────────
-                    const _SectionHeader('Display'),
-
-                    _SettingsTile(
-                      icon: Icons.straighten_rounded,
-                      title: 'Distance unit',
-                      subtitle: 'Affects distance, pace and speed display',
-                      trailing: _UnitPill(
-                        selected: unit,
-                        onTap: (u) => unitNotifier.setUnit(u),
-                      ),
-                    ),
-
-                    _SettingsTile(
-                      icon: Icons.dashboard_customize_rounded,
-                      title: 'Customize metrics layout',
-                      subtitle: 'Choose and reorder stats on tracking page',
-                      trailing: chevron,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => CustomizeLayoutPage(
-                              prefsNotifier: prefsNotifier,
+                      _SettingsTile(
+                        icon: Icons.dashboard_customize_rounded,
+                        title: 'Customize metrics layout',
+                        subtitle: 'Choose and reorder stats on tracking page',
+                        trailing: chevron,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CustomizeLayoutPage(
+                                prefsNotifier: prefsNotifier,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          );
+                        },
+                      ),
 
-                    // ── Map ─────────────────────────────────────────────────
-                    const _SectionHeader('Map'),
+                      // ── Map ─────────────────────────────────────────────────
+                      const _SectionHeader('Map'),
 
-                    _OfflineMapTile(
-                      unitNotifier: unitNotifier,
-                      prefsNotifier: prefsNotifier,
-                    ),
+                      _OfflineMapTile(
+                        unitNotifier: unitNotifier,
+                        prefsNotifier: prefsNotifier,
+                      ),
+                    ],
                   ],
                 );
               },
@@ -457,55 +325,6 @@ class _SettingsTile extends StatelessWidget {
         subtitle: Text(subtitle),
         trailing: trailing,
         onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _UnitPill extends StatelessWidget {
-  final DistanceUnit selected;
-  final ValueChanged<DistanceUnit> onTap;
-
-  const _UnitPill({required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final v = context.vColors;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: v.glassFill,
-        borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-        border: Border.all(color: v.glassBorder!),
-      ),
-      padding: const EdgeInsets.all(AppDimens.space2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: DistanceUnit.values.map((u) {
-          final isSel = u == selected;
-          return GestureDetector(
-            onTap: () => onTap(u),
-            child: AnimatedContainer(
-              duration: AppDurations.fast,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.space12,
-                vertical: AppDimens.space4,
-              ),
-              decoration: BoxDecoration(
-                color: isSel ? colors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-              ),
-              child: Text(
-                u.label.toUpperCase(),
-                style: context.text.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isSel ? v.buttonText : v.grayText,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }

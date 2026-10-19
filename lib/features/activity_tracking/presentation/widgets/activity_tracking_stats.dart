@@ -4,6 +4,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 
@@ -21,7 +22,7 @@ class TopStats extends StatelessWidget {
   final double currentSpeed;
   final double elevationGain;
 
-  final String activityTypeName;
+  final ActivityType activityType;
 
   const TopStats({
     super.key,
@@ -35,7 +36,7 @@ class TopStats extends StatelessWidget {
     this.steps = 0,
     this.currentSpeed = 0.0,
     this.elevationGain = 0.0,
-    this.activityTypeName = 'Walk',
+    this.activityType = ActivityType.walk,
   });
 
   double get _targetProgress {
@@ -89,7 +90,7 @@ class TopStats extends StatelessWidget {
         final elevLabel = distanceUnit == DistanceUnit.miles ? 'FT' : 'M';
         return (elevVal.toStringAsFixed(0), 'ELEV. GAIN ($elevLabel)');
       case StatMetric.activityType:
-        return (activityTypeName, 'ACTIVITY');
+        return (activityType.label, 'ACTIVITY');
     }
   }
 
@@ -101,7 +102,7 @@ class TopStats extends StatelessWidget {
     final hasBpm = heartRateBpm != null;
 
     final metrics = workoutPrefs.selectedMetrics.isEmpty
-        ? const [StatMetric.distance, StatMetric.calories, StatMetric.avgPace]
+        ? defaultStatsFor(activityType)
         : workoutPrefs.selectedMetrics;
 
     // Chunk metrics into rows of up to 3 columns.

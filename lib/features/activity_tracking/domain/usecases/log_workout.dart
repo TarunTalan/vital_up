@@ -29,6 +29,9 @@ class LogWorkout {
     required DateTime start,
     required Duration length,
     required WorkoutIntensity intensity,
+    String? targetType,
+    double? targetValue,
+    bool targetAchieved = false,
   }) async {
     final error = workoutEntryError(start, length, now: _now());
     if (error != null) throw ArgumentError(error);
@@ -47,6 +50,9 @@ class LogWorkout {
       length: Duration(seconds: length.inSeconds),
       intensity: intensity,
       weightKg: weight ?? WorkoutLogRules.fallbackWeightKg,
+      targetType: targetType,
+      targetValue: targetValue,
+      targetAchieved: targetAchieved,
     );
     await repository.saveSession(session);
     return session;

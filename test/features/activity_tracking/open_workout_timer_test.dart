@@ -29,6 +29,11 @@ void main() {
           builder: (_, _) => page('Tracking'),
         ),
         GoRoute(
+          path: '/activity-history',
+          name: 'activity-history',
+          builder: (_, _) => page('History'),
+        ),
+        GoRoute(
           path: '/workout-timer',
           name: 'workout-timer',
           builder: (_, _) => page('Timer'),
@@ -45,16 +50,27 @@ void main() {
 
   testWidgets('opens the timer above the current page', (tester) async {
     await pumpRouter(tester);
+    router.pushNamed('activity-history');
+    await tester.pumpAndSettle();
+
+    openWorkoutTimer(home);
+    await tester.pumpAndSettle();
+    expect(stack(), ['dashboard', 'activity-history', 'workout-timer']);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('History'), findsOneWidget);
+  });
+
+  testWidgets('an open activity screen is the timer: brought back, not stacked',
+      (tester) async {
+    await pumpRouter(tester);
     router.pushNamed('activity-tracking');
     await tester.pumpAndSettle();
 
     openWorkoutTimer(home);
     await tester.pumpAndSettle();
-    expect(stack(), ['dashboard', 'activity-tracking', 'workout-timer']);
-
-    router.pop();
-    await tester.pumpAndSettle();
-    expect(find.text('Tracking'), findsOneWidget);
+    expect(stack(), ['dashboard', 'activity-tracking']);
   });
 
   testWidgets('a timer already open is not opened again', (tester) async {
@@ -71,16 +87,16 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
   });
 
-  testWidgets('pages above an open timer close', (tester) async {
+  testWidgets('pages above an open activity screen close', (tester) async {
     await pumpRouter(tester);
-    router.pushNamed('workout-timer');
-    await tester.pumpAndSettle();
     router.pushNamed('activity-tracking');
+    await tester.pumpAndSettle();
+    router.pushNamed('activity-history');
     await tester.pumpAndSettle();
 
     openWorkoutTimer(home);
     await tester.pumpAndSettle();
-    expect(stack(), ['dashboard', 'workout-timer']);
-    expect(find.text('Timer'), findsOneWidget);
+    expect(stack(), ['dashboard', 'activity-tracking']);
+    expect(find.text('Tracking'), findsOneWidget);
   });
 }

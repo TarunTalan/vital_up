@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -25,7 +26,13 @@ class _CustomizeLayoutPageState extends State<CustomizeLayoutPage> {
   @override
   void initState() {
     super.initState();
-    _selected = List.from(widget.prefsNotifier.value.selectedMetrics);
+    final prefs = widget.prefsNotifier.value;
+    // Not customised yet: start from what the default workout shows.
+    _selected = List.from(
+      prefs.selectedMetrics.isEmpty
+          ? defaultStatsFor(ActivityType.walk)
+          : prefs.selectedMetrics,
+    );
     _unselected = StatMetric.values
         .where((m) => !_selected.contains(m))
         .toList();

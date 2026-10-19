@@ -1,15 +1,21 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_target_result.dart';
+import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
+import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
+import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
+import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
@@ -18,19 +24,31 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/entities/workout_intensity.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_format_utils.dart';
-import 'package:vital_up/features/activity_tracking/presentation/utils/activity_type_ui.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_common_widgets.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_controls.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/activity_completion_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/activity_settings_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_tracking_stats.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/countdown_overlay.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 
-/// Shows the timer screen for the workout being timed (the tray
-/// notification, the tracking page). One already open is brought back to
-/// the top instead of stacking a second copy, so Back returns to where the
-/// user came from rather than to another timer.
+/// Shows the workout being timed (the tray notification). An activity
+/// screen already open is brought back to the top instead of stacking a
+/// second copy (with a timer running it shows the timer), so Back returns
+/// to where the user came from.
 void openWorkoutTimer(BuildContext context) {
   const name = 'workout-timer';
+  const screens = {name, 'activity-tracking'};
   final router = GoRouter.of(context);
   final matches = router.routerDelegate.currentConfiguration.matches;
   final open = matches.reversed
-      .where((m) => m.route is GoRoute && (m.route as GoRoute).name == name)
+      .where(
+        (m) =>
+            m.route is GoRoute && screens.contains((m.route as GoRoute).name),
+      )
       .firstOrNull;
   if (open == null) {
     router.pushNamed(name);
@@ -44,19 +62,31 @@ void openWorkoutTimer(BuildContext context) {
 }
 
 /// Times a workout without a route (gym, yoga, a match). No map and no GPS:
-/// the timer runs off the clock, so leaving the screen or closing the app
-/// doesn't stop it. Opening this page again shows the workout being timed.
+/// the timer runs off the clock, so closing the app doesn't stop it.
+/// Like a GPS workout, the screen can't be left until the workout is
+/// finished or discarded, and its controls start locked (slide to unlock)
+/// so a pocket tap can't pause or finish it. Opening this page again shows
+/// the workout being timed.
 class WorkoutTimerPage extends StatelessWidget {
   /// Type to start with; ignored while a workout is already being timed.
   final ActivityType type;
 
-  const WorkoutTimerPage({super.key, this.type = ActivityType.strength});
+  /// An outdoor type was picked: the activity screen shows the GPS view.
+  final ValueChanged<ActivityType>? onOutdoorSelected;
+
+  const WorkoutTimerPage({
+    super.key,
+    this.type = ActivityType.strength,
+    this.onOutdoorSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<WorkoutTimerCubit>(param1: type),
-      child: const _ReloadOnResume(child: _WorkoutTimerView()),
+      child: _ReloadOnResume(
+        child: _WorkoutTimerView(onOutdoorSelected: onOutdoorSelected),
+      ),
     );
   }
 }
@@ -95,8 +125,122 @@ class _ReloadOnResumeState extends State<_ReloadOnResume> {
   Widget build(BuildContext context) => widget.child;
 }
 
-class _WorkoutTimerView extends StatelessWidget {
-  const _WorkoutTimerView();
+class _WorkoutTimerView extends StatefulWidget {
+  final ValueChanged<ActivityType>? onOutdoorSelected;
+
+  const _WorkoutTimerView({this.onOutdoorSelected});
+
+  @override
+  State<_WorkoutTimerView> createState() => _WorkoutTimerViewState();
+}
+
+class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
+  /// Pause / Finish need a slide first while a workout is timed.
+  bool _locked = true;
+
+  final _prefs = WorkoutPrefsNotifier();
+  final _units = DistanceUnitNotifier();
+  final _heartRate = HeartRateManager();
+  StreamSubscription<int?>? _bpmSubscription;
+  int? _bpm;
+
+  /// The state before the change [_onTimerChanged] is told about.
+  WorkoutTimerState? _before;
+
+  /// The 3-2-1 before a workout starts, as on the GPS screen.
+  bool _countingDown = false;
+
+  late final WorkoutMusic _music = WorkoutMusic(
+    _prefs,
+    voiceCoach: sl<VoiceCoachService>(),
+    onError: (message) {
+      if (mounted) showErrorSnackBar(context, message);
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _units.load();
+    _prefs.load().then((_) => _music.refreshFavorite());
+    _loadGoalTarget();
+    _bpmSubscription = _heartRate.bpmStream.listen((bpm) {
+      if (mounted) setState(() => _bpm = bpm);
+    });
+  }
+
+  @override
+  void dispose() {
+    // Music is for this workout only, as on the GPS screen.
+    _prefs.setBackgroundAudioTrack('None');
+    _music.stop();
+    _music.dispose();
+    _bpmSubscription?.cancel();
+    _heartRate.dispose();
+    _units.dispose();
+    _prefs.dispose();
+    super.dispose();
+  }
+
+  /// What's left of today's active-minutes (else calories) goal: the
+  /// target of a workout started without one set by hand.
+  ({WorkoutTargetType type, double value})? _goalTarget;
+
+  Future<void> _loadGoalTarget() async {
+    try {
+      final snapshot = await sl<ActivityGoalsRepository>().getProgress(
+        TrendRange.week,
+      );
+      if (mounted) _goalTarget = timerTargetFromGoals(snapshot.goals);
+    } catch (e) {
+      debugPrint('Reading activity goals failed: $e');
+    }
+  }
+
+  /// The target set in settings, or null.
+  ({WorkoutTargetType type, double value})? get _target {
+    final p = _prefs.value;
+    return p.timerTargetType == WorkoutTargetType.none
+        ? null
+        : (type: p.timerTargetType, value: p.timerTargetValue);
+  }
+
+  /// Starts the timer; today's goal becomes the target unless one is set.
+  void _start(WorkoutTimerCubit cubit) {
+    final goal = _goalTarget;
+    if (goal != null && _target == null) {
+      _prefs.setTimerTarget(goal.type, goal.value);
+    }
+    cubit.start();
+  }
+
+  /// Music follows the timer, whichever way it changed (these controls or
+  /// the notification's Pause / Resume).
+  void _onTimerChanged(WorkoutTimerState before, WorkoutTimerState after) {
+    if (!after.isStarted) {
+      _music.stop();
+    } else if (!before.isStarted) {
+      _music.play();
+    } else if (after.isRunning) {
+      _music.resume();
+    } else {
+      _music.pause();
+    }
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActivitySettingsPage(
+          unitNotifier: _units,
+          prefsNotifier: _prefs,
+          hrManager: _heartRate,
+          liveHeartRate: _bpm,
+          activityType: context.read<WorkoutTimerCubit>().state.type,
+        ),
+      ),
+    );
+  }
 
   Future<void> _finish(BuildContext context) async {
     final cubit = context.read<WorkoutTimerCubit>();
@@ -108,12 +252,27 @@ class _WorkoutTimerView extends StatelessWidget {
       builder: (_) => _FinishSheet(state: cubit.state),
     );
     if (intensity == null || !context.mounted) return;
-    final outcome = await cubit.finish(intensity);
+    final outcome = await cubit.finish(intensity, target: _target);
+    if (outcome == WorkoutSaveOutcome.saved) _prefs.clearTimerTarget();
     if (!context.mounted) return;
     switch (outcome) {
       case WorkoutSaveOutcome.saved:
-        showSuccessSnackBar(context, 'Workout saved');
-        context.pop();
+        // The same result screen as a GPS workout; back on it returns here.
+        final session = cubit.lastSaved;
+        if (session == null) {
+          showSuccessSnackBar(context, 'Workout saved');
+          return;
+        }
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (resultContext) => ActivityCompletionPage(
+              session: session,
+              onBack: () => Navigator.of(resultContext).pop(),
+              onNewActivity: () => Navigator.of(resultContext).pop(),
+              onViewHistory: () => resultContext.pushNamed('activity-history'),
+            ),
+          ),
+        );
       case WorkoutSaveOutcome.tooShort:
         await _tooShort(context);
       case WorkoutSaveOutcome.failed:
@@ -143,6 +302,7 @@ class _WorkoutTimerView extends StatelessWidget {
     final cubit = context.read<WorkoutTimerCubit>();
     if (discard == true) {
       await cubit.discard();
+      await _prefs.clearTimerTarget();
     } else {
       await cubit.resume();
     }
@@ -170,76 +330,153 @@ class _WorkoutTimerView extends StatelessWidget {
     );
     if (confirmed == true && context.mounted) {
       await context.read<WorkoutTimerCubit>().discard();
-    }
-  }
-
-  Future<void> _logPast(BuildContext context) async {
-    final type = context.read<WorkoutTimerCubit>().state.type;
-    final saved = await showLogWorkoutSheet(context, initialType: type);
-    if (saved && context.mounted) {
-      showSuccessSnackBar(context, 'Workout saved');
-      context.pop();
+      await _prefs.clearTimerTarget();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<WorkoutTimerCubit, WorkoutTimerState>(
+    return BlocConsumer<WorkoutTimerCubit, WorkoutTimerState>(
+      listenWhen: (before, after) {
+        _before = before;
+        return before.isStarted != after.isStarted ||
+            before.isRunning != after.isRunning;
+      },
+      listener: (context, after) => _onTimerChanged(_before ?? after, after),
       builder: (context, state) {
         final cubit = context.read<WorkoutTimerCubit>();
-        return AppScaffold(
-          header: const AppPageHeader(title: 'Workout'),
-          bottomBar: _Controls(
-            state: state,
-            onStart: () {
-              HapticFeedback.mediumImpact();
-              cubit.start();
-            },
-            onPause: cubit.pause,
-            onResume: cubit.resume,
-            onFinish: () => _finish(context),
-          ),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        final locked = _locked && state.isStarted;
+        return PopScope(
+          canPop: !state.isStarted,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) {
+              showErrorSnackBar(context, 'Finish the workout before leaving.');
+            }
+          },
+          child: Stack(
             children: [
-              const SizedBox(height: AppDimens.space16),
-              _TimerCard(state: state),
-              const SizedBox(height: AppDimens.sectionGap),
-              if (!state.isStarted) ...[
-                const AppCaption('Workout'),
-                const SizedBox(height: AppDimens.space8),
-                WorkoutTypePicker(
-                  selected: state.type,
-                  onSelected: cubit.selectType,
+              AppScaffold(
+                // The GPS view's top: back and history while idle,
+                // nothing during a workout.
+                header: SafeArea(
+                  bottom: false,
+                  child: state.isStarted
+                      ? const SizedBox(height: AppDimens.space12)
+                      : Padding(
+                          padding: EdgeInsets.all(context.gutter),
+                          child: Row(
+                            children: [
+                              RoundIconButton(
+                                icon: Icons.arrow_back_rounded,
+                                tooltip: MaterialLocalizations.of(
+                                  context,
+                                ).backButtonTooltip,
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                              const Spacer(),
+                              RoundIconButton(
+                                icon: Icons.history_rounded,
+                                tooltip: 'History',
+                                onPressed: () =>
+                                    context.pushNamed('activity-history'),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
-                const SizedBox(height: AppDimens.sectionGap),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => _logPast(context),
-                    icon: const Icon(Icons.edit_calendar_rounded),
-                    label: const Text('Log a past workout instead'),
-                  ),
-                ),
-              ] else ...[
-                const AppInfoNote(
-                  message:
-                      'The timer keeps going if you leave this screen or '
-                      'close the app.',
-                ),
-                if (!state.isRunning) ...[
-                  const SizedBox(height: AppDimens.space8),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => _discard(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: context.colors.error,
+                // AppScaffold pads it to the gutter. Hidden during the
+                // countdown, as on the GPS screen.
+                bottomBar: _countingDown
+                    ? null
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          WorkoutMusicBar(music: _music),
+                          if (!state.isStarted) ...[
+                            ActivitySelector(
+                              selected: state.type,
+                              enabled: !_countingDown,
+                              // The GPS view's tiles: an outdoor type switches to it.
+                              onSelected: (type) {
+                                if (type.isGpsBased) {
+                                  widget.onOutdoorSelected?.call(type);
+                                } else {
+                                  cubit.selectType(type);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: AppDimens.space8),
+                          ],
+                          StartPauseControl(
+                            isIdle: !state.isStarted,
+                            isRunning: state.isRunning,
+                            startLabel: 'Start ${state.type.label}',
+                            canResume: !state.reachedLimit,
+                            isLocked: locked,
+                            onLockToggle: (value) =>
+                                setState(() => _locked = value),
+                            onStart: () {
+                              HapticFeedback.mediumImpact();
+                              setState(() => _locked = true);
+                              if (_prefs.value.countdownDurationSeconds > 0) {
+                                setState(() => _countingDown = true);
+                              } else {
+                                _start(cubit);
+                              }
+                            },
+                            onPause: cubit.pause,
+                            onResume: cubit.resume,
+                            onStop: () => _finish(context),
+                            onSettingsTap: _openSettings,
+                            onMusicTap: () => _music.openPicker(context),
+                          ),
+                        ],
                       ),
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      label: const Text('Discard workout'),
+                body: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ValueListenableBuilder<WorkoutPrefs>(
+                      valueListenable: _prefs,
+                      builder: (context, _, _) => _TimerCard(
+                        state: state,
+                        heartRate: _bpm,
+                        target: _target,
+                      ),
                     ),
+                    const SizedBox(height: AppDimens.sectionGap),
+                    if (state.isStarted) ...[
+                      const AppInfoNote(
+                        message: 'The timer keeps going if you close the app.',
+                      ),
+                      if (!state.isRunning && !locked) ...[
+                        const SizedBox(height: AppDimens.space8),
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () => _discard(context),
+                            style: TextButton.styleFrom(
+                              foregroundColor: context.colors.error,
+                            ),
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            label: const Text('Discard workout'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              if (_countingDown)
+                Positioned.fill(
+                  child: CountdownOverlay(
+                    durationSeconds: _prefs.value.countdownDurationSeconds,
+                    voiceCoachEnabled: _prefs.value.voiceCoachEnabled,
+                    onFinished: () {
+                      if (!mounted) return;
+                      setState(() => _countingDown = false);
+                      _start(cubit);
+                    },
                   ),
-                ],
-              ],
+                ),
             ],
           ),
         );
@@ -248,10 +485,22 @@ class _WorkoutTimerView extends StatelessWidget {
   }
 }
 
+/// The same card as on the GPS screen: the time, then the workout's own
+/// figures (calories so far, heart rate with a strap connected).
 class _TimerCard extends StatelessWidget {
   final WorkoutTimerState state;
+  final int? heartRate;
+  final ({WorkoutTargetType type, double value})? target;
 
-  const _TimerCard({required this.state});
+  const _TimerCard({required this.state, this.heartRate, this.target});
+
+  /// Share of the target done, 0-1.
+  double _progress(({WorkoutTargetType type, double value}) target) {
+    final done = target.type == WorkoutTargetType.duration
+        ? state.elapsed.inSeconds / 60
+        : state.caloriesSoFar.toDouble();
+    return (done / target.value).clamp(0.0, 1.0);
+  }
 
   String get _status {
     if (!state.isStarted) return 'Ready';
@@ -261,23 +510,11 @@ class _TimerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
+    final bpm = heartRate;
     return AppCard(
+      padding: AppDimens.cardPaddingCompact,
       child: Column(
         children: [
-          AppIconBadge(
-            icon: Icon(activityTypeIcon(state.type)),
-            size: AppDimens.iconBadgeLarge,
-          ),
-          const SizedBox(height: AppDimens.space12),
-          Text(
-            state.type.label,
-            textAlign: TextAlign.center,
-            style: context.text.titleMedium?.copyWith(
-              color: context.colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space8),
           FitText(
             formatDuration(state.elapsed),
             maxLines: 1,
@@ -287,70 +524,63 @@ class _TimerCard extends StatelessWidget {
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: AppDimens.space8),
-          Text(
-            _status,
-            textAlign: TextAlign.center,
-            style: context.text.bodySmall?.copyWith(color: v.grayText),
+          const SizedBox(height: AppDimens.space4),
+          AppCaption(_status),
+          const SizedBox(height: AppDimens.space12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: StatColumn(value: state.type.label, label: 'ACTIVITY'),
+              ),
+              Expanded(
+                child: StatColumn(
+                  value: '${state.caloriesSoFar}',
+                  label: 'CALORIES',
+                ),
+              ),
+              if (bpm != null)
+                Expanded(
+                  child: StatColumn(value: '$bpm', label: 'HEART RATE'),
+                ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Controls extends StatelessWidget {
-  final WorkoutTimerState state;
-  final VoidCallback onStart;
-  final VoidCallback onPause;
-  final VoidCallback onResume;
-  final VoidCallback onFinish;
-
-  const _Controls({
-    required this.state,
-    required this.onStart,
-    required this.onPause,
-    required this.onResume,
-    required this.onFinish,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget content;
-    if (!state.isStarted) {
-      content = AppPrimaryButton(label: 'Start', onTap: onStart);
-    } else {
-      final secondary = state.isRunning
-          ? AppSecondaryButton(label: 'Pause', onTap: onPause)
-          : AppSecondaryButton(
-              label: 'Resume',
-              enabled: !state.reachedLimit,
-              onTap: onResume,
-            );
-      content = Row(
-        children: [
-          Expanded(child: secondary),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: AppPrimaryButton(
-              label: 'Finish',
-              isLoading: state.saving,
-              onTap: onFinish,
+          if (target case final target?) ...[
+            const SizedBox(height: AppDimens.space12),
+            Builder(
+              builder: (context) {
+                final v = context.vColors;
+                final progress = _progress(target);
+                return Row(
+                  children: [
+                    Icon(
+                      Icons.flag_rounded,
+                      size: AppDimens.iconXs,
+                      color: v.grayText,
+                    ),
+                    const SizedBox(width: AppDimens.space4),
+                    Expanded(
+                      child: AppProgressBar(
+                        value: progress,
+                        color: progress >= 1.0
+                            ? v.success
+                            : context.colors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppDimens.space8),
+                    Text(
+                      formatActivityTarget(target.type.name, target.value),
+                      style: context.text.labelSmall?.copyWith(
+                        color: v.grayText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
+          ],
         ],
-      );
-    }
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          context.gutter,
-          AppDimens.space12,
-          context.gutter,
-          AppDimens.space16,
-        ),
-        child: content,
       ),
     );
   }
