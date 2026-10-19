@@ -27,10 +27,22 @@ supabase functions deploy <name>
   hangs inside Claude Code: the user runs it in their own terminal. The CLI
   is logged in, so `supabase functions deploy` / `functions list` work here.
   Deploy migrations before edge functions that depend on them.
+- Migrations reach production through `supabase db push` or Supabase's
+  GitHub integration on `main` (all applied through `20261026`, Oct 19).
+  Never paste a migration into the SQL editor: it isn't recorded in
+  `supabase_migrations.schema_migrations`, so the next deploy runs it again
+  (`20261021` renames a function and then fails with 42723). To fix the
+  history: check what's really in the database, then the user runs
+  `supabase migration repair --status applied <version>` for files that
+  can't run twice (re-runnable ones can simply run again).
+  `supabase migration list` hangs here too ("Initialising login role").
 
 - Environment variables & secrets: `.env` (copy `.env.example`); compiled
   and XOR-obfuscated via `envied` into `lib/core/config/env.dart`
-  (`env.g.dart` is gitignored; run build_runner after cloning).
+  (`env.g.dart` is gitignored; run build_runner after cloning and after
+  every `.env` edit: a build doesn't regenerate it, so the APK keeps the
+  old values; a mistyped Mapbox token shows a black map with only the logo
+  and scale bar).
   `lib/core/config/supabase_config.dart` delegates to `Env`.
   `android/key.properties` holds release signing (the local build silently
   falls back to the debug key without it; the release workflow refuses).
@@ -748,8 +760,8 @@ Route names are GoRouter `name`s.
 ### Pre-release audit plan (status):
 - Done: 1 server security, 2 release build (except a full release-build
   pass on a device and Play Console declarations), 6 async patterns.
-- Done in code (Oct 18; `20261023` migration and scan-food logs not yet
-  deployed): 4 dates & time (midnight reload on Home, nights across
+- Done (Oct 18; `20261023` and the scan-food logs deployed Oct 19):
+  4 dates & time (midnight reload on Home, nights across
   midnight, DST-safe day math via `date_range_utils.dart` `nextDay` /
   `previousDay` / `calendarDaysBetween`, future timestamps count as stale
   via `isWithinLast`, per-user server days) and 8 privacy (AI consent +
@@ -761,7 +773,7 @@ Route names are GoRouter `name`s.
   tests (loading/error/empty/loaded + max text (1.5) on 360 dp), in-process flow
   tests (`test/flows/`: offline -> online, two devices, sign-out, startup
   routing, midnight). No on-device `integration_test/` yet.
-- Done in code (Oct 18, device checks pending; `20261024` not deployed):
+- Done in code (Oct 18, device checks pending; `20261024` applied Oct 19):
   5 input & display (system text size honoured up to 2.0 in
   `ResponsiveTextScale`, scrolling sheets/dialogs, text shrinks to a readable floor then ellipsis (`FitText`), names or
   stats, `NameWithYouTag`, meal macros summed, two-device merges in
@@ -795,9 +807,9 @@ food scan has no long-wait hint or cancel; label-scan loader
    `revenuecat-webhook` with the `REVENUECAT_WEBHOOK_SECRET` header);
    secrets `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_SECRET`;
    `REVENUECAT_GOOGLE_API_KEY` in `.env` and in the workflows' `ENV_CONTENT` secret;
-   then `supabase db push` (`20261026`) and deploy scan-food, vita-chat,
-   generate-diet-plan, revenuecat-webhook, sync-subscription,
-   delete-account. Data safety form: add "Purchase history".
+   server side is done (Oct 19: `20261026` applied; scan-food, vita-chat,
+   generate-diet-plan, revenuecat-webhook, sync-subscription and
+   delete-account deployed). Data safety form: add "Purchase history".
 4. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
