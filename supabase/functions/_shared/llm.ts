@@ -25,6 +25,15 @@ export class ProviderError extends Error {
   }
 }
 
+/**
+ * One turn of a multi-turn conversation. Sent as real provider roles, so a
+ * user can't fake a model turn by typing "Vita:" into a message.
+ */
+export interface ChatTurn {
+  role: 'user' | 'model';
+  text: string;
+}
+
 export const envList = (key: string, fallback: string[]): string[] => {
   const raw = Deno.env.get(key);
   const list = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
@@ -136,6 +145,10 @@ export interface GeminiOptions {
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
+  /** System instruction (rules that user text can't override as easily as prompt text). */
+  system?: string;
+  /** Whole conversation; replaces [parts] when given. */
+  turns?: ChatTurn[];
 }
 
 function geminiRank(name: string): number {
@@ -179,7 +192,11 @@ async function geminiCall(apiKey: string, model: string, parts: GeminiPart[], op
   // Keep reasoning short: it's the dominant latency cost on 3.x Flash models.
   if (!geminiNoThinkingConfig.has(model)) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
 
-  const body: Record<string, unknown> = { contents: [{ role: 'user', parts }], generationConfig };
+  const contents = opts.turns
+    ? opts.turns.map((t) => ({ role: t.role, parts: [{ text: t.text }] }))
+    : [{ role: 'user', parts }];
+  const body: Record<string, unknown> = { contents, generationConfig };
+  if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
   if (opts.googleSearch) body.tools = [{ googleSearch: {} }];
 
   const res = await fetchWithSignal(
@@ -248,6 +265,10 @@ export interface GroqOptions {
   json?: boolean;
   temperature?: number;
   maxTokens?: number;
+  /** System message, sent before the JSON-only rule. */
+  system?: string;
+  /** Whole conversation; replaces `content` when given. */
+  turns?: ChatTurn[];
 }
 
 async function discoverGroqModels(apiKey: string, capability: 'vision' | 'text', signal?: AbortSignal): Promise<string[]> {
@@ -275,10 +296,16 @@ async function discoverGroqModels(apiKey: string, capability: 'vision' | 'text',
 async function groqCall(apiKey: string, model: string, content: unknown, opts: GroqOptions): Promise<string> {
   const plain = groqPlainParams.has(model);
   const messages: unknown[] = [];
-  if (opts.json) {
-    messages.push({ role: 'system', content: 'You output only valid JSON. No reasoning, no markdown, no <think> tags.' });
+  const system = [
+    opts.system,
+    opts.json ? 'You output only valid JSON. No reasoning, no markdown, no <think> tags.' : undefined,
+  ].filter(Boolean).join('\n\n');
+  if (system) messages.push({ role: 'system', content: system });
+  if (opts.turns) {
+    for (const t of opts.turns) messages.push({ role: t.role === 'model' ? 'assistant' : 'user', content: t.text });
+  } else {
+    messages.push({ role: 'user', content });
   }
-  messages.push({ role: 'user', content });
 
   const body: Record<string, unknown> = {
     model,

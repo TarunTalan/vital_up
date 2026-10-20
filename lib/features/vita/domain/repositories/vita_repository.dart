@@ -22,6 +22,7 @@ class VitaException implements Exception {
   static String get dailyLimitReached =>
       "You've hit today's Vita limit. It resets at ${quotaResetTime()}.";
   static const tooSlow = 'Vita is taking too long. Try again.';
+  static const tooFast = "You're sending messages quickly. Wait a minute.";
   static const offlineMessage = "You're offline. Try again when connected.";
   static const consentNeeded = 'Allow Vita to use your data to get a reply.';
 

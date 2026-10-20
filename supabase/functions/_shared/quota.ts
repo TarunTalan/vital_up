@@ -81,3 +81,35 @@ export async function refundDailyQuota(serviceClient: Client, userId: string, fe
   const { error } = await serviceClient.rpc('refund_ai_quota', { p_user_id: userId, p_feature: feature });
   if (error) console.error(`Quota refund for ${feature} failed: ${error.message}`);
 }
+
+/**
+ * Per-minute cap on top of the daily one, so a script can't spend a whole
+ * day's allowance (and the shared provider rate limit) in a few seconds.
+ * Backed by ai_burst_allowed (20261028_ai_burst_limit.sql).
+ *
+ * Fails open: the daily quota above already fails closed and bounds the
+ * spend, so a broken burst check (or the migration not pushed yet) only
+ * loses the smoothing, not the cap.
+ */
+export async function burstAllowed(
+  serviceClient: Client,
+  userId: string,
+  feature: AiFeature,
+  maxPerMinute: number,
+): Promise<boolean> {
+  try {
+    const { data, error } = await serviceClient.rpc('ai_burst_allowed', {
+      p_user_id: userId,
+      p_feature: feature,
+      p_max: maxPerMinute,
+    });
+    if (error) {
+      console.error(`Burst check for ${feature} failed (allowing): ${error.message}`);
+      return true;
+    }
+    return data !== false;
+  } catch (e) {
+    console.error(`Burst check for ${feature} threw (allowing):`, e);
+    return true;
+  }
+}

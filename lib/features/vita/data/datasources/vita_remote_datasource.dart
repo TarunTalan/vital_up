@@ -73,6 +73,21 @@ class VitaRemoteDataSource {
   static String _clip(String text) =>
       text.length <= maxTurnChars ? text : text.substring(0, maxTurnChars);
 
+  static String? _code(Object? details) {
+    final data = details is String ? _tryDecode(details) : details;
+    return data is Map && data['code'] is String
+        ? data['code'] as String
+        : null;
+  }
+
+  static Object? _tryDecode(String text) {
+    try {
+      return jsonDecode(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// headline / stressTip / dietNote for today.
   Future<Map<String, dynamic>> insights(Map<String, dynamic> snapshot) =>
       _invoke({'mode': 'insights', 'snapshot': snapshot});
@@ -120,6 +135,10 @@ class VitaRemoteDataSource {
       }
       throw switch (e.status) {
         401 => const VitaException(VitaException.sessionExpired),
+        // The per-minute cap isn't the daily limit: no Pro offer for it.
+        429 when _code(e.details) == 'too_fast' => const VitaException(
+          VitaException.tooFast,
+        ),
         429 => VitaException(VitaException.dailyLimitReached, dailyLimit: true),
         _ => const VitaException(VitaException.couldNotReply),
       };
