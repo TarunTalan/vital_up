@@ -223,12 +223,32 @@ make one back press skip two tabs).
   (`core/utils/responsive.dart`): body text gets the full factor, larger
   styles less (Android 14 curve, every platform). Size boxes with
   `context.textScaled(x)` (body rate, never below `x`), never
-  `textScaler.scale(height)`. From 1.2 (`context.isLargeText`) dense rows
-  reflow: `TrackerTilePair` stacks, the Today card is 2 x 2,
-  `TrackerFigureRow` has two a row; bottom nav labels stop growing at 1.2.
+  `textScaler.scale(height)`. From 1.2 (`context.isLargeText`)
+  `TrackerFigureRow` / `AdaptiveRow` have two a row; bottom nav labels
+  stop growing at 1.2. Home cards never switch on `isLargeText`: each one
+  reflows only when its own content stops fitting (so 1.15 and 1.25 look
+  alike), see the Home notes below.
   Card figures use `AppTextStyles.metric` at one size everywhere:
-  `TrackerProgress` moves the goal to its own line ("of 8h 0m") rather
-  than shrinking the figure; the mood label wraps to two lines.
+  `TrackerProgress` always puts the goal on its own line ("of 8h 0m"), so
+  side-by-side tiles read alike; the mood label wraps to two lines.
+  `TrackerCard` centres its child in a fixed-height slot (tile pairs) and
+  takes its natural height otherwise (pass the content, never `Expanded`);
+  stacked tile pairs have no fixed height. Home reflows by fit, never by
+  one text-size switch, and adapts content before layout: card figures
+  use `figureSpan` (number in the metric style, unit small grey: "72.4
+  kg", "7h 12m"); a `TrackerQuickAction` drops its icon when the label
+  wouldn't fit whole with it; a tile's done check gives way to its title;
+  rings grow like the metric style (`metricGrowth`), not body text. Only
+  then: tile pairs stack when a tile is under `dashboardTileMinWidth`
+  (130dp, room for "229.9 lbs") x `metricGrowth` (360dp stacks at 1.5,
+  not 1.3); button pairs stack when a label wouldn't fit whole
+  (`TrackerQuickAction.widthFor`); rings go above their details when
+  details would get under 124dp body-scaled; the Today card goes 2 x 2
+  when four columns would cut a label (360dp at 1.0 does); the insight
+  button (sized to its label) moves under the message when the message
+  would get under 160dp. Home header: greeting on a grey `bodyMedium`
+  line, first name under it in `headlineSmall` (greeting alone when
+  there's no name).
   Rows of 3+ stats use `AdaptiveRow` (`core/widgets/adaptive_row.dart`:
   two a row at large text or under 72dp a column); Home tile pairs are
   `TrackerTilePair`; tile headers move the status chip under the title
@@ -270,6 +290,37 @@ make one back press skip two tabs).
   `TrackerRing`, `TrackerPrompt`, quick-log hub. Sheets/dialogs/snackbars:
   `core/utils/smooth_ui_helper.dart` (`showAppBottomSheet` pads for the
   keyboard; `showSmoothDialog`, `showSuccessSnackBar`, `showErrorSnackBar`).
+- Home sections: `AppSectionHeader` ("Today" with a date `note` and
+  History, "Nutrition & activity", "Body & wellbeing"); card titles are
+  not repeated as section titles. Tracker labels are sentence case.
+  `test/features/dashboard/home_cards_screenshot_test.dart` renders the
+  Home feed (typical, longest values (lbs, 10h 45m, "Very stressed") and
+  empty data; 360/384/412 dp; text 1.0 to 1.5; dark) and fails on any
+  cut text, overflow or text `FitText` had to shrink (`shrunkTexts`); `HOME_SHOTS=1` writes PNGs to
+  `build/home_shots/` (keep its `homeFeed()` in step with `_HomeTab`;
+  the insight shown depends on the time of day).
+- Home Nutrition and Activity cards (the MVP cards) lead with a
+  `TrackerHeroRing` inside `TrackerHeroLayout` (ring beside the details,
+  centred above them at large text or when details would get under
+  150dp). Nutrition: kcal left (or eaten / over) in the ring, macro bars
+  beside it, one `TrackerSummaryLine` ("1,240 of 2,000 kcal · 2 of 4
+  meals"), Log meal + Diet plan. Every bar on Home is `AppProgressBar` at
+  its defaults (8dp, grey `vColors.track`) and rings use the same grey
+  track; don't give one card thinner or tinted bars.
+  Home spacing: every card's content sits 16dp from its edge (Today card:
+  12 + 4dp figure tap padding); 12dp between cards, between a card's
+  header, body and actions, and between rows/columns of figures or goal
+  lines; 16dp ring-to-details; 6dp small label to bar, 8dp big figure to
+  bar and bar to caption; 24dp between sections. Stick to 4/8/12/16.
+  Home type tiers: card title `titleSmall` (16/500); hero figure
+  `AppTextStyles.metric` (light) with its "of goal" line in grey
+  `bodyMedium`; compact figures (Today card, rings, Screen time row)
+  `titleMedium` w600 with 12 grey captions; bar rows (`TrackerBarRow`:
+  macros, secondary goals) name `bodyMedium` + figure grey `bodySmall`;
+  eyebrow labels and summary lines grey 12. No new sizes or weights. Activity: `ActivityGoalsState.headline`
+  (daily steps, else the first goal) as % in the ring with its figure,
+  up to two more goals as lines (`GoalMetricIcon`: SVG when the
+  metric has one, steps and workouts), Start activity.
 - Dashboard cards: `features/dashboard/presentation/widgets/`
   (`today_summary_card.dart` is the Today hero with one insight;
   `dashboard_card_header.dart` has `DashboardCardHeader`,
