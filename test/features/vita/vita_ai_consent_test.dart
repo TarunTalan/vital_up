@@ -143,8 +143,7 @@ void main() {
       // "20061995" used to be parsed as the year 2006.
       final age = HealthSnapshotBuilder.ageFromDob('20061995');
       final now = DateTime.now();
-      final hadBirthday =
-          now.month > 6 || (now.month == 6 && now.day >= 20);
+      final hadBirthday = now.month > 6 || (now.month == 6 && now.day >= 20);
       expect(age, now.year - 1995 - (hadBirthday ? 0 : 1));
     });
 

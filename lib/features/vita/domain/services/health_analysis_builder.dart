@@ -17,7 +17,7 @@ class HealthAnalysisBuilder {
       rows.add(
         HealthSignal(
           kind: HealthSignalKind.diet,
-          title: 'Diet & Nutrition',
+          title: 'Diet & nutrition',
           summary: parts.join(' · '),
           dataPoints: parts.length,
         ),
@@ -37,7 +37,7 @@ class HealthAnalysisBuilder {
       rows.add(
         HealthSignal(
           kind: HealthSignalKind.sleep,
-          title: 'Sleep Analysis',
+          title: 'Sleep',
           summary: parts.join(' · '),
           dataPoints: parts.length,
         ),
@@ -48,7 +48,7 @@ class HealthAnalysisBuilder {
     rows.add(
       HealthSignal(
         kind: HealthSignalKind.stress,
-        title: 'Stress Detection',
+        title: 'Stress',
         summary:
             '${_level(stress.level)} · '
             '${triggerCount == 0 ? 'No triggers' : '$triggerCount trigger${_s(triggerCount)}'} today',
@@ -102,7 +102,7 @@ class HealthAnalysisBuilder {
     if (parts.isNotEmpty) {
       return HealthSignal(
         kind: HealthSignalKind.metrics,
-        title: 'Health Metrics',
+        title: 'Health metrics',
         summary: parts.take(3).join(' · '),
         dataPoints: parts.length,
       );
@@ -111,7 +111,7 @@ class HealthAnalysisBuilder {
     if (p.bloodPressureTop != null && p.bloodPressureBottom != null) {
       return HealthSignal(
         kind: HealthSignalKind.metrics,
-        title: 'Health Metrics',
+        title: 'Health metrics',
         summary:
             'From your profile: BP ${p.bloodPressureTop}/${p.bloodPressureBottom}',
       );

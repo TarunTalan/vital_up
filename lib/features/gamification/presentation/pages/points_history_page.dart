@@ -7,6 +7,8 @@ import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
@@ -59,7 +61,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
         } catch (e) {
           debugPrint('Refreshing points history failed: $e');
           if (mounted) {
-            showErrorSnackBar(context, "Couldn't refresh your points.");
+            showErrorSnackBar(this.context, "Couldn't refresh your points.");
           }
         }
       },
@@ -86,58 +88,67 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  LevelRing(stats: stats),
-                  const SizedBox(width: AppDimens.space16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              AppCard(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          '${_points.format(stats.totalPoints)} pts',
-                          style: context.text.headlineSmall,
-                        ),
-                        Row(
-                          children: [
-                            GameIcon(
-                              GamificationIcons.levelHexagon(stats.level.level),
-                              fallback: Icons.shield_rounded,
-                              size: AppDimens.iconSm,
-                              color: context.colors.primary,
-                            ),
-                            const SizedBox(width: AppDimens.space6),
-                            Flexible(
-                              child: Text(
-                                'Level ${stats.level.level} · ${stats.level.title}',
-                                style: context.text.bodyMedium?.copyWith(
-                                  color: context.vColors.grayText,
-                                ),
+                        LevelRing(stats: stats),
+                        const SizedBox(width: AppDimens.space16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_points.format(stats.totalPoints)} pts',
+                                style: context.text.headlineSmall,
                               ),
-                            ),
-                          ],
+                              Row(
+                                children: [
+                                  GameIcon(
+                                    GamificationIcons.levelHexagon(
+                                      stats.level.level,
+                                    ),
+                                    fallback: Icons.shield_rounded,
+                                    size: AppDimens.iconSm,
+                                    color: context.colors.primary,
+                                  ),
+                                  const SizedBox(width: AppDimens.space6),
+                                  Flexible(
+                                    child: Text(
+                                      'Level ${stats.level.level} · ${stats.level.title}',
+                                      style: context.text.bodyMedium?.copyWith(
+                                        color: context.vColors.grayText,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppDimens.space8),
+                              StreakPill(streak: stats.streak),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: AppDimens.space8),
-                        StreakPill(streak: stats.streak),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              AdaptiveRow(
-                children: [
-                  for (final c in ScoreCategory.values)
-                    CategoryPointsTile(
-                      category: c,
-                      points: stats.pointsIn(c),
-                      signed: false,
+                    const SizedBox(height: AppDimens.cardInnerGap),
+                    AdaptiveRow(
+                      children: [
+                        for (final c in ScoreCategory.values)
+                          CategoryPointsTile(
+                            category: c,
+                            points: stats.pointsIn(c),
+                            signed: false,
+                          ),
+                      ],
                     ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: AppDimens.sectionGap),
-              Text('Last 30 days', style: context.text.titleMedium),
-              const SizedBox(height: AppDimens.space12),
+              const AppSectionHeader('Last 30 days'),
               if (days.isEmpty)
                 const AppInfoNote(
                   message:
@@ -149,8 +160,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                 const SizedBox(height: AppDimens.cardGap),
               ],
               const SizedBox(height: AppDimens.space12),
-              Text('How to earn', style: context.text.titleMedium),
-              const SizedBox(height: AppDimens.space12),
+              const AppSectionHeader('How to earn'),
               for (final c in ScoreCategory.values)
                 if (rules.any((r) => r.category == c && r.points > 0)) ...[
                   _RulesCard(
@@ -197,12 +207,7 @@ class _DayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = events.fold<int>(0, (sum, e) => sum + e.points);
-    final today = startOfDay(DateTime.now());
-    final label = day == today
-        ? 'Today'
-        : day == DateTime(today.year, today.month, today.day - 1)
-        ? 'Yesterday'
-        : DateFormat('EEE, MMM d').format(day);
+    final label = formatLogDay(day);
     final sorted = [...events]
       ..sort(
         (a, b) => a.category.index != b.category.index
@@ -221,7 +226,7 @@ class _DayCard extends StatelessWidget {
               Text(
                 '+${_points.format(total)}',
                 style: context.text.titleSmall?.copyWith(
-                  color: context.colors.primary,
+                  color: context.vColors.accentText,
                 ),
               ),
             ],
@@ -276,12 +281,12 @@ class _RulesCard extends StatelessWidget {
                   ? GameIcon(
                       category.iconAsset!,
                       fallback: category.icon,
-                      color: category.color,
+                      color: context.iconTint(category.color),
                       size: AppDimens.iconMd,
                     )
                   : Icon(
                       category.icon,
-                      color: category.color,
+                      color: context.iconTint(category.color),
                       size: AppDimens.iconMd,
                     ),
               const SizedBox(width: AppDimens.space8),
@@ -289,21 +294,19 @@ class _RulesCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppDimens.space8),
+          // Points under each rule, so long rule names never get squeezed.
           for (final r in rules)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      r.name,
-                      style: context.text.bodyMedium?.copyWith(
-                        color: context.colors.onSurface,
-                      ),
+                  Text(
+                    r.name,
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurface,
                     ),
                   ),
-                  const SizedBox(width: AppDimens.space8),
                   Text(
                     '+${r.points} ${r.unit}'
                     '${r.dailyCap != null && r.dailyCap != r.points ? ' · max ${r.dailyCap}/day' : ''}',

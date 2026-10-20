@@ -12,6 +12,7 @@ import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/nutrition_target.dart';
 import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
 import 'package:vital_up/core/utils/quota_reset.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
 
 abstract class DietPlanRemoteDataSource {
   /// With [instructions], the function tweaks [basePlan] instead of
@@ -32,7 +33,10 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
   /// agreement to the AI data notice.
   final VitaAiConsent? _consent;
 
-  DietPlanRemoteDataSourceImpl(this._dioClient, [this._consent]);
+  /// Told how many plans are left after each one (and 0 at the limit).
+  final AiQuotaService? _quota;
+
+  DietPlanRemoteDataSourceImpl(this._dioClient, [this._consent, this._quota]);
 
   /// The edge function retries internally (two attempts, each with a
   /// provider fallback), so allow for the worst case before giving up.
@@ -120,6 +124,9 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
         );
         return const ApiError(message: _badPlanMessage, code: 502);
       }
+      final left = data['remaining'];
+      if (left is num)
+        unawaited(_quota?.report(AiQuota.dietPlan, left.toInt()));
       final dateKey = DateTime.now().toIso8601String().split('T')[0];
       final plan = MealPlanModel.fromJson(
         Map<String, dynamic>.from(data),
@@ -135,6 +142,7 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
       debugPrint(
         'generate-diet-plan failed: status=${e.status} details=${e.details}',
       );
+      if (e.status == 429) unawaited(_quota?.report(AiQuota.dietPlan, 0));
       return ApiError(message: _messageForStatus(e.status), code: e.status);
     } on TimeoutException {
       return const ApiError(

@@ -238,7 +238,7 @@ class MonthlyChampionsCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Monthly champions', style: context.text.titleMedium),
+                    Text('Monthly champions', style: context.text.titleSmall),
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       start == null

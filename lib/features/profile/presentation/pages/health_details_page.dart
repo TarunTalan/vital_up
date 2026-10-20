@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +20,7 @@ import 'package:vital_up/core/widgets/app_segmented_control.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/widgets/tracker/goal_controls.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
 import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
@@ -60,6 +64,8 @@ class _HealthDetailsPageState extends State<HealthDetailsPage> {
       context: context,
       builder: (_) => sheet(profile),
     );
+    if (!mounted) return;
+    setState(() {});
     if (updated != null && updated != profile) {
       await cubit.updateProfile(updated);
     }
@@ -212,9 +218,7 @@ class _HealthBody extends StatelessWidget {
               icon: Icons.bedtime_rounded,
               iconColor: AppColors.trackSleep,
               title: 'Sleep goal',
-              subtitle: 'Set in My goals',
               value: sleepGoal,
-              onTap: () => context.pushNamed('my-goals'),
             ),
           ],
         ),
@@ -628,6 +632,18 @@ class _LifestyleSheet extends StatefulWidget {
 
 class _LifestyleSheetState extends State<_LifestyleSheet> {
   late String _smokes = widget.profile.smokes;
+  late int _sleepMinutes = sl<SleepService>().getGoalMinutes();
+
+  void _setSleepGoal(int minutes) {
+    final clamped = minutes.clamp(
+      InputLimits.sleepGoalMinMin,
+      InputLimits.sleepGoalMinMax,
+    );
+    if (clamped != _sleepMinutes) {
+      HapticFeedback.lightImpact();
+      setState(() => _sleepMinutes = clamped);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -646,8 +662,81 @@ class _LifestyleSheetState extends State<_LifestyleSheet> {
           onChanged: (value) => setState(() => _smokes = value),
         ),
         _fieldGap,
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppDimens.inputLabelGap),
+          child: Text('Nightly sleep goal', style: context.text.titleSmall),
+        ),
+        AppCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space12,
+            vertical: AppDimens.space12,
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  IconButton.outlined(
+                    tooltip: 'Decrease sleep goal',
+                    onPressed: _sleepMinutes > InputLimits.sleepGoalMinMin
+                        ? () => _setSleepGoal(_sleepMinutes - 30)
+                        : null,
+                    icon: const Icon(Icons.remove_rounded),
+                  ),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          formatMinutesGoal(_sleepMinutes.toDouble()),
+                          textAlign: TextAlign.center,
+                          style: context.text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.trackSleep,
+                          ),
+                        ),
+                        const SizedBox(height: AppDimens.space2),
+                        Text(
+                          'Recommended: 7–9 hrs',
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.vColors.grayText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton.outlined(
+                    tooltip: 'Increase sleep goal',
+                    onPressed: _sleepMinutes < InputLimits.sleepGoalMinMax
+                        ? () => _setSleepGoal(_sleepMinutes + 30)
+                        : null,
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.space8),
+              SleepGoalDial(
+                value: _sleepMinutes.toDouble().clamp(
+                  InputLimits.sleepGoalMinMin.toDouble(),
+                  InputLimits.sleepGoalMinMax.toDouble(),
+                ),
+                min: InputLimits.sleepGoalMinMin.toDouble(),
+                max: InputLimits.sleepGoalMinMax.toDouble(),
+                step: 30,
+                // The dial gives its own sound and vibration.
+                onChanged: (v) => setState(() => _sleepMinutes = v.round()),
+              ),
+            ],
+          ),
+        ),
+        _fieldGap,
       ],
-      onSave: () => widget.profile.copyWith(smokes: _smokes),
+      onSave: () {
+        unawaited(sl<SleepService>().setGoalMinutes(_sleepMinutes));
+        return widget.profile.copyWith(
+          smokes: _smokes,
+          sleep: formatMinutesGoal(_sleepMinutes.toDouble()),
+        );
+      },
     );
   }
 }

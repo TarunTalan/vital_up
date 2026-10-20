@@ -6,10 +6,9 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
-import 'package:vital_up/features/vita/presentation/widgets/chat_bubble.dart';
 
-/// Horizontally scrolling suggested prompts — Figma Frame 412 (teal chips
-/// shaped like user bubbles).
+/// Suggested questions, scrolling sideways: outlined chips, so they don't
+/// read as messages already sent.
 class QuickReplies extends StatelessWidget {
   final List<String> prompts;
   final ValueChanged<String> onSelected;
@@ -22,18 +21,22 @@ class QuickReplies extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = context.text.bodyLarge?.copyWith(color: VitaColors.userText);
+    final v = context.vColors;
+    final style = context.text.bodyMedium?.copyWith(color: v.accentText);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: context.pagePadding,
       child: Row(
         children: [
           for (var i = 0; i < prompts.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppDimens.space10),
+            if (i > 0) const SizedBox(width: AppDimens.space8),
             Material(
-              color: VitaColors.userBubble,
-              shape: const RoundedRectangleBorder(
-                borderRadius: vitaUserBubbleRadius,
+              color: v.glassFill,
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: v.primaryBorder!,
+                  width: AppDimens.borderThin,
+                ),
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
@@ -41,7 +44,7 @@ class QuickReplies extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppDimens.space16,
-                    vertical: AppDimens.space12,
+                    vertical: AppDimens.space8,
                   ),
                   child: Text(prompts[i], style: style),
                 ),
@@ -54,13 +57,24 @@ class QuickReplies extends StatelessWidget {
   }
 }
 
-/// Message input — Figma Frame 415: glass panel with top-rounded corners,
-/// placeholder text and a 52dp round send button.
+/// Message input: glass panel with top-rounded corners and a round send
+/// button that lights up once there's something to send.
 class ChatComposer extends StatefulWidget {
   final ValueChanged<String> onSend;
   final bool enabled;
 
-  const ChatComposer({super.key, required this.onSend, this.enabled = true});
+  /// Off for the day (no messages left): typing is off too and the hint
+  /// says why.
+  final bool locked;
+  final String hintText;
+
+  const ChatComposer({
+    super.key,
+    required this.onSend,
+    this.enabled = true,
+    this.locked = false,
+    this.hintText = 'Ask Vita anything',
+  });
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -71,6 +85,7 @@ class _ChatComposerState extends State<ChatComposer> {
 
   bool get _canSend =>
       widget.enabled &&
+      !widget.locked &&
       sanitizeText(_controller.text, multiline: true).isNotEmpty;
 
   @override
@@ -110,9 +125,9 @@ class _ChatComposerState extends State<ChatComposer> {
             minHeight: VitaDimens.composerHeight + context.safePadding.bottom,
           ),
           padding: EdgeInsets.fromLTRB(
-            AppDimens.space24,
+            context.gutter,
             AppDimens.space16,
-            AppDimens.space24,
+            context.gutter,
             AppDimens.space16 + context.safePadding.bottom,
           ),
           decoration: BoxDecoration(
@@ -122,13 +137,16 @@ class _ChatComposerState extends State<ChatComposer> {
             border: Border.all(color: v.glassBorder!),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space4,
+                  ),
                   child: TextField(
                     controller: _controller,
+                    enabled: !widget.locked,
                     minLines: 1,
                     maxLines: 4,
                     textCapitalization: TextCapitalization.sentences,
@@ -154,9 +172,9 @@ class _ChatComposerState extends State<ChatComposer> {
                       disabledBorder: InputBorder.none,
                       errorBorder: InputBorder.none,
                       focusedErrorBorder: InputBorder.none,
-                      hintText: 'Type your message...',
+                      hintText: widget.hintText,
                       hintStyle: context.text.bodyLarge?.copyWith(
-                        color: VitaColors.composerMuted,
+                        color: v.grayText,
                       ),
                     ),
                   ),
@@ -185,7 +203,7 @@ class _SendButton extends StatelessWidget {
       width: VitaDimens.sendButton,
       height: VitaDimens.sendButton,
       decoration: BoxDecoration(
-        color: enabled ? context.colors.primary : VitaColors.composerMuted,
+        color: enabled ? context.colors.primary : context.vColors.track,
         shape: BoxShape.circle,
       ),
       child: Material(
@@ -197,9 +215,15 @@ class _SendButton extends StatelessWidget {
           child: Center(
             child: SvgPicture.asset(
               VitaIcons.send,
-              width: AppDimens.iconLg,
-              height: AppDimens.iconLg,
+              width: AppDimens.iconMd,
+              height: AppDimens.iconMd,
               semanticsLabel: 'Send',
+              colorFilter: ColorFilter.mode(
+                enabled
+                    ? context.vColors.buttonText!
+                    : context.vColors.grayText!,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ),

@@ -49,9 +49,8 @@ class VitaRepositoryImpl implements VitaRepository {
     sender: VitaSender.vita,
     sentAt: DateTime.now(),
     text:
-        "Hi, I'm Vita, your health companion in VitalUp. I can see "
-        'your diet, sleep, stress, activity and more. '
-        "What's on your mind today?",
+        "Hi, I'm Vita. Ask me about food, sleep, stress or activity, or "
+        "how to use VitalUp. What's on your mind today?",
   );
 
   // --- Chat -----------------------------------------------------------------

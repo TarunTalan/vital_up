@@ -5,14 +5,15 @@ import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_avatar.dart';
 
+/// Vita's bubble: rounded except the corner by its avatar (bottom left).
 const _botRadius = BorderRadius.only(
   topLeft: Radius.circular(VitaDimens.bubbleRadius),
   topRight: Radius.circular(VitaDimens.bubbleRadius),
   bottomRight: Radius.circular(VitaDimens.bubbleRadius),
 );
 
-/// User bubble / quick-reply shape: rounded except bottom-right.
-const vitaUserBubbleRadius = BorderRadius.only(
+/// The user's bubble: rounded except bottom right.
+const _userRadius = BorderRadius.only(
   topLeft: Radius.circular(VitaDimens.bubbleRadius),
   topRight: Radius.circular(VitaDimens.bubbleRadius),
   bottomLeft: Radius.circular(VitaDimens.bubbleRadius),
@@ -28,9 +29,19 @@ TextStyle? _bubbleText(BuildContext context, Color color) => context
     .bodyLarge
     ?.copyWith(color: color, height: VitaDimens.bubbleLineHeight);
 
-/// One chat message — Figma `health coach/chat` bubbles. Vita's replies sit
-/// left in a light-cyan bubble with avatar + time underneath; the user's sit
-/// right in teal with the time underneath.
+/// Glass like every card, so Vita's replies follow the theme.
+BoxDecoration _botDecoration(BuildContext context) => BoxDecoration(
+  color: context.vColors.glassFill,
+  borderRadius: _botRadius,
+  border: Border.all(
+    color: context.vColors.glassBorder!,
+    width: AppDimens.borderThin,
+  ),
+);
+
+/// One chat message. Vita's replies sit left in a glass bubble with its
+/// avatar and the time underneath; the user's sit right in deep teal with
+/// the time underneath.
 class ChatBubble extends StatelessWidget {
   final VitaMessage message;
   final ValueChanged<VitaAction>? onAction;
@@ -47,35 +58,36 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeLabel = DateFormat('h:mm a').format(message.sentAt).toLowerCase();
+    final grey = context.vColors.grayText;
+    final timeLabel = DateFormat.jm().format(message.sentAt);
     final Widget time = message.failed
         ? InkWell(
             onTap: onRetry,
             borderRadius: BorderRadius.circular(AppDimens.radiusXs),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline_rounded,
-                  size: AppDimens.iconXs,
-                  color: context.colors.error,
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  'Not sent · Tap to retry',
-                  style: context.text.bodySmall?.copyWith(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: AppDimens.iconXs,
                     color: context.colors.error,
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppDimens.space4),
+                  Flexible(
+                    child: Text(
+                      'Not sent. Tap to retry',
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.colors.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           )
-        : Text(
-            timeLabel,
-            style: context.text.bodySmall?.copyWith(
-              color: context.vColors.grayText,
-            ),
-          );
+        : Text(timeLabel, style: context.text.bodySmall?.copyWith(color: grey));
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -92,91 +104,62 @@ class ChatBubble extends StatelessWidget {
                   padding: _bubblePadding,
                   decoration: const BoxDecoration(
                     color: VitaColors.userBubble,
-                    borderRadius: vitaUserBubbleRadius,
+                    borderRadius: _userRadius,
                   ),
                   child: Text(
                     message.text,
-                    textAlign: TextAlign.start,
                     style: _bubbleText(context, VitaColors.userText),
                   ),
                 ),
               ),
-              const SizedBox(height: AppDimens.space10),
+              const SizedBox(height: AppDimens.space8),
               time,
             ],
           );
         }
 
         final action = message.action;
+        final maxWidth = constraints.maxWidth * VitaDimens.botBubbleFraction;
+        final onSurface = context.colors.onSurface;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _BotBubble(
-              maxWidth: constraints.maxWidth * VitaDimens.botBubbleFraction,
-              expand: action != null,
-              children: [
-                Text(
-                  message.text,
-                  style: _bubbleText(context, VitaColors.botText),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Container(
+                width: action != null ? maxWidth : null,
+                padding: _bubblePadding,
+                decoration: _botDecoration(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(message.text, style: _bubbleText(context, onSurface)),
+                    if (message.bullets.isNotEmpty)
+                      const SizedBox(height: AppDimens.space4),
+                    for (final bullet in message.bullets) _Bullet(bullet),
+                    if (action != null) ...[
+                      const SizedBox(height: AppDimens.space12),
+                      AppSecondaryButton(
+                        label: action.label,
+                        onTap: () => onAction?.call(action),
+                      ),
+                    ],
+                  ],
                 ),
-                for (final bullet in message.bullets) _Bullet(bullet),
-                if (action != null) ...[
-                  const SizedBox(height: AppDimens.space24),
-                  AppPrimaryButton(
-                    label: action.label,
-                    showRightArrow: true,
-                    onTap: () => onAction?.call(action),
-                  ),
-                ],
-              ],
+              ),
             ),
-            const SizedBox(height: AppDimens.space12),
+            const SizedBox(height: AppDimens.space8),
             Row(
               children: [
                 const VitaAvatar(),
-                const SizedBox(width: AppDimens.space12),
-                time,
+                const SizedBox(width: AppDimens.space8),
+                Flexible(child: time),
               ],
             ),
           ],
         );
       },
-    );
-  }
-}
-
-class _BotBubble extends StatelessWidget {
-  final double maxWidth;
-  final bool expand;
-  final List<Widget> children;
-
-  const _BotBubble({
-    required this.maxWidth,
-    required this.expand,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Container(
-        width: expand ? maxWidth : null,
-        padding: _bubblePadding,
-        decoration: BoxDecoration(
-          color: VitaColors.botBubble,
-          borderRadius: _botRadius,
-          border: Border.all(
-            color: VitaColors.botBubbleBorder,
-            width: AppDimens.borderThin,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: children,
-        ),
-      ),
     );
   }
 }
@@ -188,9 +171,9 @@ class _Bullet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _bubbleText(context, VitaColors.botText);
+    final style = _bubbleText(context, context.colors.onSurface);
     return Padding(
-      padding: const EdgeInsets.only(left: AppDimens.space8),
+      padding: const EdgeInsets.only(top: AppDimens.space4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -205,7 +188,7 @@ class _Bullet extends StatelessWidget {
   }
 }
 
-/// Vita "typing…" bubble shown while a reply is on its way.
+/// Vita's "typing" dots, in the same glass bubble as its replies.
 class TypingBubble extends StatefulWidget {
   const TypingBubble({super.key});
 
@@ -228,51 +211,51 @@ class _TypingBubbleState extends State<TypingBubble>
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.space20,
-          vertical: AppDimens.space16,
-        ),
-        decoration: BoxDecoration(
-          color: VitaColors.botBubble,
-          borderRadius: _botRadius,
-          border: Border.all(color: VitaColors.botBubbleBorder),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < 3; i++) ...[
-              if (i > 0) const SizedBox(width: AppDimens.space6),
-              FadeTransition(
-                opacity:
-                    TweenSequence<double>([
-                      TweenSequenceItem(
-                        tween: Tween(begin: 0.3, end: 1),
-                        weight: 1,
+    final dot = context.vColors.grayText;
+    return Semantics(
+      label: 'Vita is typing',
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space16,
+            vertical: AppDimens.space16,
+          ),
+          decoration: _botDecoration(context),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: AppDimens.space6),
+                FadeTransition(
+                  opacity:
+                      TweenSequence<double>([
+                        TweenSequenceItem(
+                          tween: Tween(begin: 0.3, end: 1),
+                          weight: 1,
+                        ),
+                        TweenSequenceItem(
+                          tween: Tween(begin: 1, end: 0.3),
+                          weight: 1,
+                        ),
+                      ]).animate(
+                        CurvedAnimation(
+                          parent: _controller,
+                          curve: Interval(i * 0.2, 0.6 + i * 0.2),
+                        ),
                       ),
-                      TweenSequenceItem(
-                        tween: Tween(begin: 1, end: 0.3),
-                        weight: 1,
-                      ),
-                    ]).animate(
-                      CurvedAnimation(
-                        parent: _controller,
-                        curve: Interval(i * 0.2, 0.6 + i * 0.2),
-                      ),
+                  child: Container(
+                    width: AppDimens.bulletDot,
+                    height: AppDimens.bulletDot,
+                    decoration: BoxDecoration(
+                      color: dot,
+                      shape: BoxShape.circle,
                     ),
-                child: Container(
-                  width: AppDimens.bulletDot,
-                  height: AppDimens.bulletDot,
-                  decoration: const BoxDecoration(
-                    color: VitaColors.botText,
-                    shape: BoxShape.circle,
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

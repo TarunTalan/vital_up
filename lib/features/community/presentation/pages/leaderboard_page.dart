@@ -334,6 +334,19 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
           ],
         ),
       ],
+      if (state.coverageNote case final note? when !canShowMore) ...[
+        const SizedBox(height: AppDimens.space12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppDimens.space4),
+          child: Text(
+            note,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ),
+      ],
     ];
   }
 }
@@ -681,11 +694,10 @@ class _PodiumPlace extends StatelessWidget {
             ringColor: color,
           ),
           const SizedBox(height: AppDimens.space6),
-          // Names wrap; points shrink to fit rather than being cut.
-          Text(
+          // Names and points shrink to fit on one line rather than
+          // breaking mid-name.
+          FitText(
             e.isMe ? 'You' : e.username,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: context.text.titleSmall?.copyWith(
               color: context.colors.onSurface,

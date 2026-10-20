@@ -271,31 +271,14 @@ class AppColors {
 class VitaColors {
   VitaColors._();
 
-  /// "Meet **Vita**" highlight and home tile labels — Figma #17B0CA.
+  /// Vita's brand cyan, for fills, badges and icons only (about 2:1 as
+  /// text on light: text uses `vColors.accentText`).
   static const Color accent = Color(0xFF17B0CA);
 
-  /// Bot chat bubble — Figma #E8F9FC fill, #B8ECF5 border, teal text.
-  static const Color botBubble = Color(0xFFE8F9FC);
-  static const Color botBubbleBorder = AppColors.highlight;
-  static const Color botText = AppColors.teal;
-
-  /// User chat bubble and quick-reply chips — teal fill, lighter text.
+  /// The user's chat bubble: deep teal under near-white text (5:1). Vita's
+  /// own bubbles are glass cards, so both follow the theme.
   static const Color userBubble = AppColors.teal;
   static const Color userText = AppColors.lighter;
-
-  /// Composer placeholder + idle send button — Figma #A2B8C8.
-  static const Color composerMuted = Color(0xFFA2B8C8);
-
-  /// Calorie pill on diet plan cards — highlight fill, Figma #0B5865 text.
-  static const Color pillFill = AppColors.highlight;
-  static const Color pillText = Color(0xFF0B5865);
-
-  /// Vita avatar placeholders — Figma #E3E3E3 (large) / #C7C5C5 (insight).
-  static const Color avatar = AppColors.lightText;
-  static const Color avatarInsight = Color(0xFFC7C5C5);
-
-  /// Health analysis icon badge — rgba(0,191,165,0.2).
-  static const Color signalBadge = Color(0x3300BFA5);
 }
 
 /// Fixed accents for activity tracking (map markers, soundtrack icons).

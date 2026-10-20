@@ -8,6 +8,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/challenges_cubit.dart';
@@ -40,30 +41,63 @@ bool challengeIsOpen(Challenge c, DateTime now) =>
         c.myStatus == ParticipantStatus.joined);
 
 /// Second line of a challenge tile: who, how many and when, or how it
-/// ended for you.
-String challengeSubtitle(Challenge c, DateTime now) {
+/// ended for you. [withTimeLeft] false drops the time left (a running
+/// tile shows it under its progress bar).
+String challengeSubtitle(
+  Challenge c,
+  DateTime now, {
+  bool withTimeLeft = true,
+}) {
   final people =
       '${c.participants} ${c.participants == 1 ? 'person' : 'people'}';
   if (c.myStatus == ParticipantStatus.left) {
-    return 'You left · by @${c.creatorUsername}';
+    return 'by @${c.creatorUsername} · $people';
   }
   if (!c.isActiveAt(now)) {
     return 'Ended ${DateFormat('d MMM').format(c.endsAt)} · $people';
   }
   final from = c.myStatus == ParticipantStatus.invited ? 'Invite from' : 'by';
-  return '$from @${c.creatorUsername} · $people · ${challengeTimeLeft(c.endsAt)}';
+  return [
+    '$from @${c.creatorUsername}',
+    people,
+    if (withTimeLeft) challengeTimeLeft(c.endsAt),
+  ].join(' · ');
 }
 
-String challengeTitle(Challenge c) =>
-    'Most ${c.metric.label.toLowerCase()} · '
-    // Nearest whole day: in local time a week across a clock change is
-    // 6 days 23 h, which inDays would call "6 days".
-    '${(c.endsAt.difference(c.startsAt).inHours / 24).round()} days';
+/// Whole days the challenge runs. Nearest whole day: in local time a week
+/// across a clock change is 6 days 23 h, which inDays would call "6 days".
+int challengeDays(Challenge c) =>
+    (c.endsAt.difference(c.startsAt).inHours / 24).round().clamp(1, 365);
 
-/// One challenge: metric, length, who started it and time left (or how it
-/// ended), with your rank and score once you've joined. An open invite
-/// shows Decline / Join; anything else opens the standings, where a running
-/// challenge can be left. Needs a [ChallengesCubit] above.
+String challengeTitle(Challenge c) =>
+    'Most ${c.metric.label.toLowerCase()} · ${challengeDays(c)} days';
+
+/// Share of a running challenge's time that has passed (0-1).
+double challengeElapsed(Challenge c, DateTime now) {
+  final total = c.endsAt.difference(c.startsAt).inSeconds;
+  if (total <= 0) return 1;
+  return (now.difference(c.startsAt).inSeconds / total).clamp(0.0, 1.0);
+}
+
+/// "Day 3 of 7" for a running challenge.
+String challengeDayLabel(Challenge c, DateTime now) {
+  final days = challengeDays(c);
+  final day = (now.difference(c.startsAt).inHours ~/ 24 + 1).clamp(1, days);
+  return 'Day $day of $days';
+}
+
+Color _medalColor(int rank) => switch (rank) {
+  1 => AppColors.rankGold,
+  2 => AppColors.rankSilver,
+  _ => AppColors.rankBronze,
+};
+
+/// One challenge. Running ones lead with the brand colour and a bar of the
+/// time gone ("Day 3 of 7 · 4 days left"); finished ones are grey and say
+/// how they ended ("You won", "Finished", "You left"). Your rank and score
+/// sit on the right once you've joined. An open invite shows Decline /
+/// Join; anything else opens the standings, where a running challenge can
+/// be left. Needs a [ChallengesCubit] above.
 class ChallengeTile extends StatelessWidget {
   final Challenge challenge;
   final bool busy;
@@ -78,12 +112,15 @@ class ChallengeTile extends StatelessWidget {
     final now = DateTime.now();
     final active = c.isActiveAt(now);
     final left = c.myStatus == ParticipantStatus.left;
-    final grey = context.vColors.grayText;
+    final running = active && !left && !invited;
+    final finished = !active || left;
+    final grey = context.vColors.grayText!;
+    final rank = c.myRank;
     return AppCard(
       width: double.infinity,
       padding: AppDimens.cardPaddingCompact,
       onTap: invited ? null : () => ChallengeStandingsSheet.show(context, c),
-      showChevron: true,
+      showChevron: !invited,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -91,7 +128,7 @@ class ChallengeTile extends StatelessWidget {
             children: [
               AppIconBadge(
                 icon: Icon(challengeMetricIcon(c.metric)),
-                color: context.colors.primary,
+                color: finished ? grey : context.colors.primary,
               ),
               const SizedBox(width: AppDimens.space12),
               Expanded(
@@ -106,55 +143,63 @@ class ChallengeTile extends StatelessWidget {
                     ),
                     const SizedBox(height: AppDimens.space2),
                     Text(
-                      challengeSubtitle(c, now),
+                      challengeSubtitle(c, now, withTimeLeft: !running),
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
                   ],
                 ),
               ),
-              if (left) ...[
-                const SizedBox(width: AppDimens.space8),
-                Text(
-                  'Left',
-                  style: context.text.labelMedium?.copyWith(color: grey),
-                ),
-              ] else if (!invited && c.myRank != null) ...[
-                const SizedBox(width: AppDimens.space8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Top three get the medal alone; the number would
-                    // repeat it.
-                    if (c.myRank! <= 3)
-                      Semantics(
-                        label: 'Rank ${c.myRank}',
-                        child: GameIcon(
-                          GamificationIcons.leaderboardRank(c.myRank!)!,
-                          fallback: Icons.military_tech_rounded,
-                          size: AppDimens.iconLg,
-                          color: c.myRank == 1
-                              ? AppColors.rankGold
-                              : c.myRank == 2
-                              ? AppColors.rankSilver
-                              : AppColors.rankBronze,
-                        ),
-                      )
-                    else
-                      Text(
-                        '#${c.myRank}',
-                        style: context.text.titleMedium?.copyWith(
-                          color: context.colors.onSurface,
-                        ),
-                      ),
-                    Text(
-                      c.metric.format(c.myScore ?? 0),
-                      style: context.text.bodySmall?.copyWith(color: grey),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
+          if (running || finished) ...[
+            const SizedBox(height: AppDimens.space12),
+            if (running) ...[
+              AppProgressBar(
+                value: challengeElapsed(c, now),
+                color: context.colors.primary,
+              ),
+              const SizedBox(height: AppDimens.space8),
+            ],
+            // Status at the start, your place at the end; the place moves
+            // under the status when both don't fit (large text).
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppDimens.space8,
+              runSpacing: AppDimens.space8,
+              children: [
+                if (running)
+                  Text(
+                    '${challengeDayLabel(c, now)} · '
+                    '${challengeTimeLeft(c.endsAt)}',
+                    style: context.text.bodySmall?.copyWith(color: grey),
+                  )
+                else if (left)
+                  const TrackerStatusChip(
+                    TrackerStatus.notLogged,
+                    label: 'You left',
+                    icon: Icons.logout_rounded,
+                  )
+                else if (rank == 1)
+                  const TrackerStatusChip(
+                    TrackerStatus.done,
+                    label: 'You won',
+                    icon: Icons.emoji_events_rounded,
+                  )
+                else
+                  const TrackerStatusChip(
+                    TrackerStatus.notLogged,
+                    label: 'Finished',
+                    icon: Icons.flag_rounded,
+                  ),
+                if (!left && rank != null)
+                  _RankFigure(
+                    rank: rank,
+                    score: c.metric.format(c.myScore ?? 0),
+                  ),
+              ],
+            ),
+          ],
           if (invited && active) ...[
             const SizedBox(height: AppDimens.cardInnerGap),
             Row(
@@ -177,6 +222,49 @@ class ChallengeTile extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Your place and score on a challenge tile: the medal for the top three
+/// (the number would repeat it), otherwise "#5", then the score.
+class _RankFigure extends StatelessWidget {
+  final int rank;
+  final String score;
+
+  const _RankFigure({required this.rank, required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Rank $rank, $score',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (rank <= 3)
+            GameIcon(
+              GamificationIcons.leaderboardRank(rank)!,
+              fallback: Icons.military_tech_rounded,
+              size: AppDimens.iconMd,
+              color: _medalColor(rank),
+            )
+          else
+            Text(
+              '#$rank',
+              style: context.text.titleSmall?.copyWith(
+                color: context.colors.onSurface,
+              ),
+            ),
+          const SizedBox(width: AppDimens.space4),
+          Text(
+            score,
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
         ],
       ),
     );
@@ -311,11 +399,7 @@ class _ChallengeStandingsSheetState extends State<ChallengeStandingsSheet> {
                                       )!,
                                       fallback: Icons.military_tech_rounded,
                                       size: AppDimens.iconLg,
-                                      color: s.rank == 1
-                                          ? AppColors.rankGold
-                                          : s.rank == 2
-                                          ? AppColors.rankSilver
-                                          : AppColors.rankBronze,
+                                      color: _medalColor(s.rank!),
                                     )
                                   : FitText(
                                       s.rank == null ? '–' : '#${s.rank}',

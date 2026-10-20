@@ -3,8 +3,12 @@
 // POST { target: { calories, protein, carbs, fat },
 //        preferences: { dietaryType?, mealsPerDay?, region?, allergies?, avoid?, recentItems? },
 //        instructions?, basePlan?: { meals: [{ name, items, calories }] } }
-//   -> { meals: [{ name, items, calories, protein, carbs, fat }],
-//        totalCalories, totalProtein, totalCarbs, totalFat, approximate? }
+//   -> { meals: [{ name, items, calories, protein, carbs, fat,
+//                  alternatives: [{ items, calories, protein, carbs, fat }] }],
+//        totalCalories, totalProtein, totalCarbs, totalFat, approximate?, remaining? }
+// remaining: plans left today after this one (the app's "2 of 3 plans left").
+// Each meal offers up to 2 alternatives (other dishes for the same slot,
+// close in calories) that the app can swap in without another AI call.
 // Errors: 400 invalid input, 401 not signed in, 405, 413, 415,
 //         422 no valid / safe plan, 429 daily limit (code: daily_limit), 500.
 
@@ -32,6 +36,7 @@ import {
   requireMethod,
   requireNumber,
 } from "../_shared/validate.ts";
+import { allergyList, ALTERNATIVES_PER_MEAL, containsAllergen, MAX_ITEMS_PER_MEAL, MAX_MEALS, normalizePlan } from "./plan.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,8 +47,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const MAX_BODY_BYTES = 64 * KB;
-const MAX_MEALS = 8;
-const MAX_ITEMS_PER_MEAL = 10;
 const MAX_RECENT_ITEMS = 40;
 /** Options offered by the app's preferences page, plus the prompt's own wording. */
 const DIETARY_TYPES = ["Any", "Vegetarian", "Vegan", "Eggetarian", "Pescatarian", "Non-Vegetarian"] as const;
@@ -62,15 +65,6 @@ interface Preferences {
   avoid?: string;
   mealsPerDay: number;
   recentItems: string[];
-}
-
-interface Meal {
-  name: string;
-  items: string[];
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
 }
 
 function parseTarget(value: unknown): Target {
@@ -119,42 +113,6 @@ function parseBaseMeals(value: unknown): { name: string; items: string[]; calori
       : [],
     calories: Math.round(clampNumber(m.calories, 0, RANGES.calories.max)),
   }));
-}
-
-/**
- * Validates the model's plan: at least one meal, strings sanitised and
- * clipped, numbers clamped and rounded. Totals the model left out (or got
- * wrong type) are summed from the meals. Throws when there's nothing usable.
- */
-function normalizePlan(raw: unknown): { meals: Meal[]; totalCalories: number; totalProtein: number; totalCarbs: number; totalFat: number } {
-  if (!isObject(raw) || !Array.isArray(raw.meals)) throw new Error("Plan has no meals array");
-  const cal = (v: unknown) => Math.round(clampNumber(v, 0, RANGES.calories.max));
-  const g = (v: unknown) => Math.round(clampNumber(v, 0, RANGES.grams.max));
-  const meals: Meal[] = raw.meals
-    .filter(isObject)
-    .slice(0, MAX_MEALS)
-    .map((m: JsonObject, i: number) => ({
-      name: cleanText(m.name, 40) || `Meal ${i + 1}`,
-      items: Array.isArray(m.items)
-        ? m.items.slice(0, MAX_ITEMS_PER_MEAL).map((it) => cleanText(it, LIMITS.shortText)).filter(Boolean)
-        : [],
-      calories: cal(m.calories),
-      protein: g(m.protein),
-      carbs: g(m.carbs),
-      fat: g(m.fat),
-    }))
-    .filter((m) => m.items.length > 0);
-  if (meals.length === 0) throw new Error("Plan has no usable meals");
-  const sum = (key: "calories" | "protein" | "carbs" | "fat") => meals.reduce((s, m) => s + m[key], 0);
-  const total = (v: unknown, key: "calories" | "protein" | "carbs" | "fat", max: number) =>
-    typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(Math.min(v, max)) : sum(key);
-  return {
-    meals,
-    totalCalories: total(raw.totalCalories, "calories", RANGES.calories.max),
-    totalProtein: total(raw.totalProtein, "protein", RANGES.grams.max),
-    totalCarbs: total(raw.totalCarbs, "carbs", RANGES.grams.max),
-    totalFat: total(raw.totalFat, "fat", RANGES.grams.max),
-  };
 }
 
 let serviceClient: ReturnType<typeof createClient> | null = null;
@@ -247,7 +205,8 @@ serve(async (req) => {
     The user wants to change their current plan as follows: "${tweak}"
     ${baseMealLines ? `Current plan:\n${baseMealLines}\n    Keep meals and dishes the request does not mention as close to the current plan as possible; change only what is needed.` : ""}
     If the request asks for more/less calories or a macro, adjust the totals accordingly; otherwise match the target.
-    The VARIETY rules below do not apply to dishes kept from the current plan.`
+    The VARIETY rules below do not apply to dishes kept from the current plan.
+    Give fresh alternatives for every meal, including meals kept unchanged.`
       : "";
 
     const prompt = `You are a meal-planning assistant specializing in Indian cuisine.
@@ -282,7 +241,16 @@ serve(async (req) => {
           "calories": number,
           "protein": number,
           "carbs": number,
-          "fat": number
+          "fat": number,
+          "alternatives": [
+            {
+              "items": ["string", "string"],
+              "calories": number,
+              "protein": number,
+              "carbs": number,
+              "fat": number
+            }
+          ]
         }
       ],
       "totalCalories": number,
@@ -290,6 +258,14 @@ serve(async (req) => {
       "totalCarbs": number,
       "totalFat": number
     }
+
+    ALTERNATIVES: give every meal exactly ${ALTERNATIVES_PER_MEAL} alternatives: other dishes
+    for the same meal slot that the user could eat instead. Each alternative
+    follows every rule here (dietary type, allergies, avoid list, recently
+    used items, meal timing), is within 10% of that meal's calories and close
+    in protein, so it can replace the main dish without changing the day's
+    totals. Alternatives differ from the main dish and from each other. Totals
+    count the main dishes only.
 
     Meal calories/macros must sum to within 5% of the target. Do not include
     any allergen from the exclude list under any circumstance. Provide extremely
@@ -320,10 +296,7 @@ serve(async (req) => {
     // can be overridden without a deploy via these secrets.
     const geminiModels = envList("DIET_PLAN_GEMINI_MODELS", GEMINI_DEFAULT_MODELS);
     const groqModels = envList("DIET_PLAN_GROQ_MODELS", ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]);
-    const allergiesList = (preferences.allergies ?? "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
+    const allergiesList = allergyList(preferences.allergies);
     let resultJson: (ReturnType<typeof normalizePlan> & { approximate?: boolean }) | null = null;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -331,7 +304,8 @@ serve(async (req) => {
       try {
         let aiResponseText = "";
 
-        const timeoutMs = attempt === 1 ? 20000 : 15000;
+        // The answer carries 3 dishes per meal, so the first try gets longer.
+        const timeoutMs = attempt === 1 ? 25000 : 15000;
         const promptText = prompt + (attempt > 1 ? "\n\nCRITICAL: RETURN ONLY JSON, NO MARKDOWN." : "");
 
         console.time(`GeminiCall_Attempt${attempt}`);
@@ -360,8 +334,10 @@ serve(async (req) => {
         }
         console.timeEnd(`GeminiCall_Attempt${attempt}`);
 
+        // Alternatives with an allergen (or off in calories) are dropped here.
         const plan: ReturnType<typeof normalizePlan> & { approximate?: boolean } = normalizePlan(
           extractJson(aiResponseText),
+          allergiesList,
         );
         console.log(`generate-diet-plan served by ${usedProvider} (attempt ${attempt})`);
 
@@ -373,13 +349,7 @@ serve(async (req) => {
         }
 
         if (allergiesList.length > 0) {
-          const containsAllergen = plan.meals.some((meal) =>
-            meal.items.some((item) => {
-              const itemLower = item.toLowerCase();
-              return allergiesList.some((al) => itemLower.includes(al));
-            })
-          );
-          if (containsAllergen) {
+          if (plan.meals.some((meal) => containsAllergen(meal.items, allergiesList))) {
             if (attempt === 1) throw new Error("Contains allergen");
             await refundQuota();
             console.timeEnd("TotalExecution");
@@ -400,7 +370,7 @@ serve(async (req) => {
     }
 
     console.timeEnd("TotalExecution");
-    return json(resultJson);
+    return json(quota.remaining === null ? resultJson : { ...resultJson, remaining: quota.remaining });
   } catch (error) {
     return handleError(error, "generate-diet-plan", corsHeaders);
   }

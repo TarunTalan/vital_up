@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 
@@ -13,6 +14,9 @@ import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart'
 class VitaRemoteDataSource {
   final SupabaseClient _client;
 
+  /// Told how many chats are left after each answer (and 0 at the limit).
+  final AiQuotaService? _quota;
+
   static const _function = 'vita-chat';
   static const _timeout = Duration(seconds: 45);
   static const _refreshTimeout = Duration(seconds: 15);
@@ -20,7 +24,7 @@ class VitaRemoteDataSource {
   /// Last N turns sent as context (the server caps this too).
   static const maxContextMessages = 12;
 
-  VitaRemoteDataSource(this._client);
+  VitaRemoteDataSource(this._client, [this._quota]);
 
   Future<VitaMessage> chat({
     required List<VitaMessage> history,
@@ -48,6 +52,8 @@ class VitaRemoteDataSource {
       ],
     });
 
+    final left = data['remaining'];
+    if (left is num) unawaited(_quota?.report(AiQuota.vitaChat, left.toInt()));
     final text = data['text'];
     final plan = data['planInstructions'];
     return VitaMessage(
@@ -72,6 +78,14 @@ class VitaRemoteDataSource {
 
   static String _clip(String text) =>
       text.length <= maxTurnChars ? text : text.substring(0, maxTurnChars);
+
+  /// Today's limit for [body]'s mode; the chat count drops to 0.
+  VitaException _limitReached(Map<String, dynamic> body) {
+    if (body['mode'] == 'chat') {
+      unawaited(_quota?.report(AiQuota.vitaChat, 0));
+    }
+    return VitaException(VitaException.dailyLimitReached, dailyLimit: true);
+  }
 
   static String? _code(Object? details) {
     final data = details is String ? _tryDecode(details) : details;
@@ -139,7 +153,7 @@ class VitaRemoteDataSource {
         429 when _code(e.details) == 'too_fast' => const VitaException(
           VitaException.tooFast,
         ),
-        429 => VitaException(VitaException.dailyLimitReached, dailyLimit: true),
+        429 => _limitReached(body),
         _ => const VitaException(VitaException.couldNotReply),
       };
     } on TimeoutException {

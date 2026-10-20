@@ -91,6 +91,20 @@ class VitaChatCubit extends Cubit<VitaChatState> {
     ]);
   }
 
+  /// Starts over: the saved chat is removed and Vita greets again.
+  Future<void> clear() async {
+    if (state.isTyping || state.isLoading) return;
+    await _save(const []);
+    var history = const <VitaMessage>[];
+    try {
+      history = await _repository.loadHistory();
+    } catch (e) {
+      debugPrint('Vita chat history unreadable: $e');
+    }
+    if (isClosed) return;
+    emit(state.copyWith(messages: history, error: () => null));
+  }
+
   /// Re-sends a user message Vita couldn't answer.
   Future<void> retry(VitaMessage message) async {
     if (state.isTyping || state.isLoading || !message.failed) return;

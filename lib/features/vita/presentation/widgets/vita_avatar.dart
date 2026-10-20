@@ -1,41 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
 
-/// Vita's avatar. Renders the brand character artwork [vita.svg].
+/// Vita's mark in a tinted circle, like every icon badge in the app: the
+/// glyph keeps 3:1 on its circle in either theme.
 class VitaAvatar extends StatelessWidget {
   final double size;
-  final Color color;
-  final Color? iconColor;
 
-  const VitaAvatar({
-    super.key,
-    this.size = VitaDimens.avatarSmall,
-    this.color = VitaColors.avatar,
-    this.iconColor,
-  });
+  const VitaAvatar({super.key, this.size = VitaDimens.avatarSmall});
 
-  const VitaAvatar.large({super.key, this.iconColor})
-    : size = VitaDimens.avatarLarge,
-      color = VitaColors.avatar;
-
-  const VitaAvatar.insight({super.key, this.iconColor})
-    : size = VitaDimens.avatarSmall,
-      color = VitaColors.avatarInsight;
+  const VitaAvatar.large({super.key}) : size = VitaDimens.avatarLarge;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: SvgPicture.asset(
-        'assets/icons/nav/vita.svg',
-        width: size * 0.6,
-        height: size * 0.6,
+    return AppIconBadge(
+      size: size,
+      color: VitaColors.accent,
+      icon: SvgPicture.asset(
+        VitaIcons.vita,
+        width: size / 2,
+        height: size / 2,
         colorFilter: ColorFilter.mode(
-          iconColor ?? AppColors.darker,
+          AppIconBadge.glyphColor(context, VitaColors.accent),
           BlendMode.srcIn,
         ),
       ),

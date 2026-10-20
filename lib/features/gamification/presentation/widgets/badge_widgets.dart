@@ -133,6 +133,8 @@ class BadgeTile extends StatelessWidget {
 class _TileFooter extends StatelessWidget {
   final IconData icon;
   final String label;
+
+  /// Icon colour; the label stays grey (gold is too light for text).
   final Color? color;
 
   const _TileFooter({required this.icon, required this.label, this.color});
@@ -142,7 +144,11 @@ class _TileFooter extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: AppDimens.iconXs, color: color),
+        Icon(
+          icon,
+          size: AppDimens.iconXs,
+          color: color == null ? null : context.iconTint(color!),
+        ),
         const SizedBox(width: AppDimens.space4),
         Flexible(
           child: Text(
@@ -150,7 +156,9 @@ class _TileFooter extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: context.text.labelSmall?.copyWith(color: color),
+            style: context.text.labelSmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
           ),
         ),
       ],
@@ -319,12 +327,14 @@ class _StatusChip extends StatelessWidget {
                 ? Icons.check_circle_rounded
                 : Icons.lock_outline_rounded,
             size: AppDimens.iconXs,
-            color: color,
+            color: context.iconTint(color),
           ),
           const SizedBox(width: AppDimens.space4),
           Text(
             badge.earned ? badgeEarnedLabel(badge) : 'Locked',
-            style: context.text.labelMedium?.copyWith(color: color),
+            style: context.text.labelMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
           ),
         ],
       ),

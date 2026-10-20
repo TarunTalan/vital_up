@@ -4,10 +4,10 @@ enum VitaSender { vita, user }
 
 /// Follow-up a Vita reply can offer as a button inside its bubble.
 enum VitaAction {
-  viewDietPlan('View Diet Plan', 'view_diet_plan'),
-  updateDietPlan('Update My Plan', 'update_diet_plan'),
-  viewAnalysis('View Health Analysis', 'view_analysis'),
-  viewStressGuide('Open Stress Guide', 'view_stress_guide');
+  viewDietPlan('View diet plan', 'view_diet_plan'),
+  updateDietPlan('Update my plan', 'update_diet_plan'),
+  viewAnalysis('View health analysis', 'view_analysis'),
+  viewStressGuide('Open stress guide', 'view_stress_guide');
 
   final String label;
 

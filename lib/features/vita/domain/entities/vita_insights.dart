@@ -60,9 +60,9 @@ class StressTrigger extends Equatable {
 }
 
 enum StressLevel {
-  low('Low Stress'),
-  moderate('Moderate Stress'),
-  high('High Stress');
+  low('Low stress'),
+  moderate('Moderate stress'),
+  high('High stress');
 
   final String label;
   const StressLevel(this.label);

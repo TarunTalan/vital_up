@@ -1,66 +1,83 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
+import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
+import 'package:vital_up/features/subscription/presentation/widgets/ai_quota_line.dart';
 import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_avatar.dart';
 
-/// Vita tab — Figma `health coach/default` (1893:14545): "Meet Vita" intro,
-/// four feature tiles and the AI disclaimer, centred on the page.
+/// Vita tab: what Vita is with the way into the chat, then Vita's other
+/// pages as a list, then the AI note. Same header as Arena and Profile.
 class VitaHomePage extends StatelessWidget {
-  final VoidCallback? onBack;
-
-  const VitaHomePage({super.key, this.onBack});
+  const VitaHomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // The dashboard uses Scaffold.extendBody, so the floating nav bar height
-    // arrives as bottom padding.
-    final bottom = context.safePadding.bottom + AppDimens.sectionGap;
-
     return AppScaffold(
-      header: AppTitleBar(onBack: onBack),
-      scrollable: false,
-      padBody: false,
-      body: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            context.gutter,
-            0,
-            context.gutter,
-            bottom,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: (constraints.maxHeight - bottom).clamp(
-                0,
-                double.infinity,
-              ),
+      header: AppPageHeader(
+        title: 'Vita',
+        showBack: false,
+        action: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _ProAction(),
+            AppHeaderAction(
+              tooltip: 'AI coach data',
+              icon: const Icon(Icons.shield_outlined),
+              onTap: () => context.pushNamed('ai-coach-data'),
             ),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MeetVitaCard(),
-                  SizedBox(height: VitaDimens.homeGap),
-                  _FeatureGrid(),
-                  SizedBox(height: VitaDimens.homeGap),
-                  AppInfoNote(
-                    message:
-                        "VitalUp's health coach is AI-powered and for "
-                        'informational purposes only. Always consult a '
-                        'qualified healthcare professional for medical '
-                        'decisions.',
-                  ),
-                ],
-              ),
-            ),
-          ),
+          ],
         ),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _MeetVitaCard(),
+          const SizedBox(height: AppDimens.sectionGap),
+          AppListGroup(
+            title: 'More from Vita',
+            children: [
+              AppListTile(
+                svgAsset: VitaIcons.dietPlan,
+                iconColor: VitaColors.accent,
+                title: 'Diet plan',
+                subtitle: "Today's meals, with Vita's notes",
+                onTap: () => context.pushNamed('vita-diet-plan'),
+              ),
+              AppListTile(
+                svgAsset: VitaIcons.healthAnalysis,
+                iconColor: VitaColors.accent,
+                title: 'Health analysis',
+                subtitle: 'What your logs say about your health',
+                onTap: () => context.pushNamed('vita-analysis'),
+              ),
+              AppListTile(
+                svgAsset: VitaIcons.stressGuide,
+                iconColor: VitaColors.accent,
+                title: 'Stress guide',
+                subtitle: 'Your stress estimate and a tip for today',
+                onTap: () => context.pushNamed('vita-stress'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.sectionGap),
+          const AppInfoNote(
+            message:
+                'Vita gives general wellness tips, not medical advice. For '
+                'medical decisions, talk to a healthcare professional.',
+          ),
+          // The dashboard extends under its floating nav bar, whose height
+          // arrives as bottom padding (as on Profile).
+          SizedBox(height: context.safePadding.bottom + AppDimens.space16),
+        ],
       ),
     );
   }
@@ -71,145 +88,59 @@ class _MeetVitaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = context.colors.onSurface;
     return AppCard(
-      width: double.infinity,
+      highlighted: true,
       padding: AppDimens.cardPaddingLarge,
       child: Column(
         children: [
           const VitaAvatar.large(),
-          const SizedBox(height: AppDimens.space24),
-          Text.rich(
-            TextSpan(
-              children: [
-                const TextSpan(text: 'Meet '),
-                TextSpan(
-                  text: 'Vita',
-                  style: TextStyle(color: VitaColors.accent),
-                ),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            style: context.text.headlineMedium?.copyWith(color: onSurface),
-          ),
-          const SizedBox(height: AppDimens.space24),
+          const SizedBox(height: AppDimens.space16),
           Text(
-            'Your AI health companion, the soul of VitalUp. '
-            'I live in every corner of the app.',
+            'Meet Vita',
             textAlign: TextAlign.center,
-            style: context.text.bodyLarge?.copyWith(color: onSurface),
+            style: context.text.headlineSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
           ),
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            'Your AI health coach. Ask about food, sleep, stress, activity '
+            'or how to use VitalUp.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space16),
+          AppPrimaryButton(
+            label: 'Chat with Vita',
+            onTap: () => context.pushNamed('vita-chat'),
+          ),
+          const SizedBox(height: AppDimens.space8),
+          const AiQuotaLine(quota: AiQuota.vitaChat),
         ],
       ),
     );
   }
 }
 
-class _FeatureGrid extends StatelessWidget {
-  const _FeatureGrid();
+/// VitalUp Pro in the header: free users see what Pro adds, Pro users
+/// their plan. Hidden where Pro can't be bought and the user isn't Pro.
+class _ProAction extends StatelessWidget {
+  const _ProAction();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _FeatureTile(
-                label: 'Diet Plan',
-                icon: VitaIcons.dietPlan,
-                onTap: () => context.pushNamed('vita-diet-plan'),
-              ),
-            ),
-            const SizedBox(width: VitaDimens.tileGapX),
-            Expanded(
-              child: _FeatureTile(
-                label: 'Health Analysis',
-                icon: VitaIcons.healthAnalysis,
-                onTap: () => context.pushNamed('vita-analysis'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: VitaDimens.tileGapY),
-        Row(
-          children: [
-            Expanded(
-              child: _FeatureTile(
-                label: 'Stress Guide',
-                icon: VitaIcons.stressGuide,
-                onTap: () => context.pushNamed('vita-stress'),
-              ),
-            ),
-            const SizedBox(width: VitaDimens.tileGapX),
-            Expanded(
-              child: _FeatureTile(
-                label: 'Vita Chat',
-                icon: VitaIcons.chat,
-                onTap: () => context.pushNamed('vita-chat'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Figma `Container` tile: cyan glass (primaryFill + primaryBorder),
-/// 24dp icon + body-16 accent label.
-class _FeatureTile extends StatelessWidget {
-  final String label;
-  final String icon;
-  final VoidCallback onTap;
-
-  const _FeatureTile({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-    final radius = BorderRadius.circular(AppDimens.radiusCard);
-
-    return Material(
-      color: v.primaryFill,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: v.primaryBorder!),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: VitaDimens.tileHeight),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimens.space12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SvgPicture.asset(
-                  icon,
-                  width: AppDimens.iconLg,
-                  height: AppDimens.iconLg,
-                ),
-                const SizedBox(width: AppDimens.space16),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodyLarge?.copyWith(
-                      color: VitaColors.accent,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    final plan = context.watch<SubscriptionCubit?>()?.state;
+    if (plan == null || !(plan.isPro || plan.canPurchase)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: AppDimens.space8),
+      child: AppHeaderAction(
+        tooltip: plan.isPro ? 'Your Pro plan' : 'Get VitalUp Pro',
+        icon: const Icon(Icons.workspace_premium_outlined),
+        onTap: () => context.pushNamed('vitalup-pro'),
       ),
     );
   }

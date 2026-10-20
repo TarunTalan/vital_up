@@ -84,6 +84,7 @@ import 'package:vital_up/features/food_scanner/data/repositories/nutrition_repos
 import 'package:vital_up/core/config/env.dart';
 import 'package:vital_up/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:vital_up/features/subscription/data/services/store_billing.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/meal_log_repository.dart';
@@ -345,6 +346,9 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<StoreBilling>(
     () => RevenueCatBilling(apiKey: Env.revenueCatGoogleApiKey),
   );
+  sl.registerLazySingleton(
+    () => AiQuotaService(sl<CacheStore>(), client: sl<SupabaseClient>()),
+  );
   sl.registerLazySingleton<SubscriptionRepository>(
     () => SubscriptionRepositoryImpl(
       supabaseClient: sl<SupabaseClient>(),
@@ -422,7 +426,11 @@ Future<void> initDependencies() async {
   );
   // 9. Diet Plan
   sl.registerLazySingleton<DietPlanRemoteDataSource>(
-    () => DietPlanRemoteDataSourceImpl(sl<DioClient>(), sl<VitaAiConsent>()),
+    () => DietPlanRemoteDataSourceImpl(
+      sl<DioClient>(),
+      sl<VitaAiConsent>(),
+      sl<AiQuotaService>(),
+    ),
   );
   sl.registerLazySingleton<DietPlanRepository>(
     () => DietPlanRepositoryImpl(
@@ -671,7 +679,7 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<VitaRepository>(
     () => VitaRepositoryImpl(
-      remote: VitaRemoteDataSource(sl<SupabaseClient>()),
+      remote: VitaRemoteDataSource(sl<SupabaseClient>(), sl<AiQuotaService>()),
       local: VitaLocalDataSource(sl<SharedPreferences>()),
       snapshots: sl<HealthSnapshotBuilder>(),
       vitals: sl<HealthVitalsService>(),

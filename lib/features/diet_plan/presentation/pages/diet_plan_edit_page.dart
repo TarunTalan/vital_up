@@ -188,8 +188,12 @@ class _MealDraft {
   /// Shown on the name field after an attempted save.
   String? nameError;
 
+  /// Kept as they were: editing a dish doesn't change the other options.
+  final List<MealOption> alternatives;
+
   _MealDraft(Meal meal)
-    : name = TextEditingController(text: meal.name),
+    : alternatives = meal.alternatives,
+      name = TextEditingController(text: meal.name),
       items = [for (final i in meal.items) TextEditingController(text: i)],
       calories = TextEditingController(text: '${meal.calories}'),
       protein = TextEditingController(text: '${meal.protein}'),
@@ -219,6 +223,7 @@ class _MealDraft {
     protein: _int(protein),
     carbs: _int(carbs),
     fat: _int(fat),
+    alternatives: alternatives,
   );
 
   void dispose() {

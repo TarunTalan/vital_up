@@ -2,9 +2,11 @@
 //
 // POST { mode: "chat", messages: [{ role, text }], snapshot }
 //   -> { text, bullets: string[], action: "view_diet_plan" | "update_diet_plan" | "view_analysis" | "view_stress_guide" | null,
-//        planInstructions: string | null, offTopic?: true }  (offTopic: the reply is SCOPE_REFUSAL)
+//        planInstructions: string | null, offTopic?: true, remaining? }  (offTopic: the reply is SCOPE_REFUSAL)
 // POST { mode: "insights", snapshot }
-//   -> { headline, stressTip, dietNote }
+//   -> { headline, stressTip, dietNote, remaining? }
+// remaining: uses of this mode left today after this one (for the app's
+// "12 of 15 messages left" line); absent when nothing was counted.
 //
 // `snapshot` is a compact summary of the user's on-device health data (meals,
 // sleep, water, screen time, activity, vitals, stress estimate, profile, diet
@@ -190,6 +192,7 @@ serve(async (req) => {
       );
     }
     const refund = () => refundDailyQuota(client, user.id, feature);
+    const left = quota.remaining === null ? {} : { remaining: quota.remaining };
 
     const canary = newCanary();
     // App how-to questions get the app guide (Help & support sends them here).
@@ -233,7 +236,7 @@ serve(async (req) => {
       if (!isObject(parsed)) throw new Error("Model output is not a JSON object");
       if (mode === "chat") {
         const text = cleanText(parsed.text, 1200, { multiline: true });
-        if (parsed.offTopic === true) return json(refusal());
+        if (parsed.offTopic === true) return json({ ...refusal(), ...left });
         if (!text) throw new Error("Empty reply");
         const bullets = Array.isArray(parsed.bullets)
           ? parsed.bullets.map((b: unknown) => cleanText(b, 200)).filter(Boolean).slice(0, 4)
@@ -244,9 +247,9 @@ serve(async (req) => {
         if (action === "update_diet_plan" && !planInstructions) action = "view_diet_plan";
         if ([text, ...bullets, planInstructions].some((t) => replyLeaks(t, canary))) {
           console.warn("vita-chat reply replaced: leaked instructions or code");
-          return json(refusal());
+          return json({ ...refusal(), ...left });
         }
-        return json({ text, bullets, action, planInstructions: planInstructions || null });
+        return json({ text, bullets, action, planInstructions: planInstructions || null, ...left });
       }
 
       const headline = cleanText(parsed.headline, 200);
@@ -254,7 +257,7 @@ serve(async (req) => {
       const dietNote = cleanText(parsed.dietNote, 400);
       if (!headline && !stressTip && !dietNote) throw new Error("Empty insights");
       if ([headline, stressTip, dietNote].some((t) => replyLeaks(t, canary))) throw new Error("Insights leaked");
-      return json({ headline, stressTip, dietNote });
+      return json({ headline, stressTip, dietNote, ...left });
     } catch (e) {
       console.error(`vita-chat ${mode} failed:`, e, raw.slice(0, 300));
       await refund();

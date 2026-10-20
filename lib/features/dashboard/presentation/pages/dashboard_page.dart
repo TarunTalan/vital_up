@@ -356,7 +356,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
       1 => FoodScannerPage(onBack: _handlePop, busy: _scanBusy),
-      2 => VitaHomePage(onBack: _handlePop),
+      2 => const VitaHomePage(),
       3 => const CommunityHubPage(),
       _ => BlocProvider.value(
         value: _profileCubit,

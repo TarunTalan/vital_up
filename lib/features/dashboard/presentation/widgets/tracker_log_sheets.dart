@@ -522,7 +522,7 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
     return TrackerSheet(
       metric: TrackerMetric.sleep,
       title: 'Log sleep',
-      subtitle: 'Drag the moon and sun, or the arc to move the night',
+      subtitle: 'Drag to set your night',
       // The clock sizes itself to the room left, so the sheet never needs
       // scrolling and the time cards never sit behind Save.
       scrollable: false,
@@ -555,6 +555,10 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
                         : 'Night ending ${DateFormat('EEE d MMM').format(_wakeDay)}',
                   ),
                   onPressed: _pickDay,
+                  // Tight so the clock keeps its room on short phones; the
+                  // chip still has a full-height touch area at normal text.
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                 ),
               ),
               const SizedBox(height: AppDimens.space12),

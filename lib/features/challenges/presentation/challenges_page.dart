@@ -51,7 +51,7 @@ class ChallengesPage extends StatelessWidget {
                       )
                       .toList(),
                 ),
-                ('History', challenges.where((c) => !open(c)).toList()),
+                ('Finished', challenges.where((c) => !open(c)).toList()),
               ];
         return AppScaffold(
           onRefresh: () async => cubit.load(),

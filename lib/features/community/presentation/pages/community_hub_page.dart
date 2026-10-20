@@ -19,8 +19,8 @@ import 'package:vital_up/features/community/presentation/widgets/public_profile_
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
-/// The Arena tab: your level with shortcuts, last month's champions,
-/// challenges, friends, and one leaderboards list, in that order.
+/// The Arena tab: your level with shortcuts, challenges, friends, one
+/// leaderboards list and (once there are winners) last month's champions.
 /// Leaderboard settings sit in the header. A new monthly trophy gets a
 /// one-time celebration.
 class CommunityHubPage extends StatelessWidget {
@@ -84,18 +84,6 @@ class _ArenaHubView extends StatelessWidget {
                     const ScoreStreakCard(),
                     const SizedBox(height: AppDimens.sectionGap),
 
-                    MonthlyChampionsCard(
-                      champions: state.champions,
-                      onOpenPlayer: (w) => PublicProfileSheet.show(
-                        context,
-                        username: w.username,
-                        level: w.level,
-                        avatarUrl: w.avatarUrl,
-                        userId: w.userId,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimens.sectionGap),
-
                     ArenaChallengesSection(onRefresh: challengesCubit.load),
                     const SizedBox(height: AppDimens.sectionGap),
 
@@ -109,6 +97,23 @@ class _ArenaHubView extends StatelessWidget {
                     const SizedBox(height: AppDimens.sectionGap),
 
                     const CommunityLeaderboardsSection(),
+
+                    // Only with winners: the rules and countdown live on
+                    // each leaderboard, so an empty card would only repeat
+                    // them.
+                    if (state.champions.any((c) => c.winners.isNotEmpty)) ...[
+                      const SizedBox(height: AppDimens.sectionGap),
+                      MonthlyChampionsCard(
+                        champions: state.champions,
+                        onOpenPlayer: (w) => PublicProfileSheet.show(
+                          context,
+                          username: w.username,
+                          level: w.level,
+                          avatarUrl: w.avatarUrl,
+                          userId: w.userId,
+                        ),
+                      ),
+                    ],
 
                     // Clears the floating bottom navigation bar.
                     SizedBox(

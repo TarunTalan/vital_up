@@ -64,7 +64,10 @@ const MealPlanModelSchema = CollectionSchema(
     ),
   },
   links: {},
-  embeddedSchemas: {r'MealModel': MealModelSchema},
+  embeddedSchemas: {
+    r'MealModel': MealModelSchema,
+    r'MealOptionModel': MealOptionModelSchema,
+  },
 
   getId: _mealPlanModelGetId,
   getLinks: _mealPlanModelGetLinks,
@@ -1197,16 +1200,624 @@ extension MealPlanModelQueryProperty
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
 
-const MealModelSchema = Schema(
-  name: r'MealModel',
-  id: -8574582237306330440,
+const MealOptionModelSchema = Schema(
+  name: r'MealOptionModel',
+  id: 7225791199147205361,
   properties: {
     r'calories': PropertySchema(id: 0, name: r'calories', type: IsarType.long),
     r'carbs': PropertySchema(id: 1, name: r'carbs', type: IsarType.long),
     r'fat': PropertySchema(id: 2, name: r'fat', type: IsarType.long),
     r'items': PropertySchema(id: 3, name: r'items', type: IsarType.stringList),
-    r'name': PropertySchema(id: 4, name: r'name', type: IsarType.string),
-    r'protein': PropertySchema(id: 5, name: r'protein', type: IsarType.long),
+    r'protein': PropertySchema(id: 4, name: r'protein', type: IsarType.long),
+  },
+
+  estimateSize: _mealOptionModelEstimateSize,
+  serialize: _mealOptionModelSerialize,
+  deserialize: _mealOptionModelDeserialize,
+  deserializeProp: _mealOptionModelDeserializeProp,
+);
+
+int _mealOptionModelEstimateSize(
+  MealOptionModel object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  {
+    final list = object.items;
+    if (list != null) {
+      bytesCount += 3 + list.length * 3;
+      {
+        for (var i = 0; i < list.length; i++) {
+          final value = list[i];
+          bytesCount += value.length * 3;
+        }
+      }
+    }
+  }
+  return bytesCount;
+}
+
+void _mealOptionModelSerialize(
+  MealOptionModel object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeLong(offsets[0], object.calories);
+  writer.writeLong(offsets[1], object.carbs);
+  writer.writeLong(offsets[2], object.fat);
+  writer.writeStringList(offsets[3], object.items);
+  writer.writeLong(offsets[4], object.protein);
+}
+
+MealOptionModel _mealOptionModelDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = MealOptionModel();
+  object.calories = reader.readLongOrNull(offsets[0]);
+  object.carbs = reader.readLongOrNull(offsets[1]);
+  object.fat = reader.readLongOrNull(offsets[2]);
+  object.items = reader.readStringList(offsets[3]);
+  object.protein = reader.readLongOrNull(offsets[4]);
+  return object;
+}
+
+P _mealOptionModelDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readLongOrNull(offset)) as P;
+    case 1:
+      return (reader.readLongOrNull(offset)) as P;
+    case 2:
+      return (reader.readLongOrNull(offset)) as P;
+    case 3:
+      return (reader.readStringList(offset)) as P;
+    case 4:
+      return (reader.readLongOrNull(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+extension MealOptionModelQueryFilter
+    on QueryBuilder<MealOptionModel, MealOptionModel, QFilterCondition> {
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'calories'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'calories'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'calories', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'calories',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'calories',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  caloriesBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'calories',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'carbs'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'carbs'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'carbs', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'carbs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'carbs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  carbsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'carbs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'fat'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'fat'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'fat', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'fat',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'fat',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  fatBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'fat',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'items'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'items'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'items',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'items',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'items',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'items', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'items', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'items', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'items', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'items', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'items', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'items', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  itemsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'items',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'protein'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'protein'),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'protein', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'protein',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'protein',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<MealOptionModel, MealOptionModel, QAfterFilterCondition>
+  proteinBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'protein',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+}
+
+extension MealOptionModelQueryObject
+    on QueryBuilder<MealOptionModel, MealOptionModel, QFilterCondition> {}
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
+const MealModelSchema = Schema(
+  name: r'MealModel',
+  id: -8574582237306330440,
+  properties: {
+    r'alternatives': PropertySchema(
+      id: 0,
+      name: r'alternatives',
+      type: IsarType.objectList,
+
+      target: r'MealOptionModel',
+    ),
+    r'calories': PropertySchema(id: 1, name: r'calories', type: IsarType.long),
+    r'carbs': PropertySchema(id: 2, name: r'carbs', type: IsarType.long),
+    r'fat': PropertySchema(id: 3, name: r'fat', type: IsarType.long),
+    r'items': PropertySchema(id: 4, name: r'items', type: IsarType.stringList),
+    r'name': PropertySchema(id: 5, name: r'name', type: IsarType.string),
+    r'protein': PropertySchema(id: 6, name: r'protein', type: IsarType.long),
   },
 
   estimateSize: _mealModelEstimateSize,
@@ -1221,6 +1832,23 @@ int _mealModelEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final list = object.alternatives;
+    if (list != null) {
+      bytesCount += 3 + list.length * 3;
+      {
+        final offsets = allOffsets[MealOptionModel]!;
+        for (var i = 0; i < list.length; i++) {
+          final value = list[i];
+          bytesCount += MealOptionModelSchema.estimateSize(
+            value,
+            offsets,
+            allOffsets,
+          );
+        }
+      }
+    }
+  }
   {
     final list = object.items;
     if (list != null) {
@@ -1248,12 +1876,18 @@ void _mealModelSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.calories);
-  writer.writeLong(offsets[1], object.carbs);
-  writer.writeLong(offsets[2], object.fat);
-  writer.writeStringList(offsets[3], object.items);
-  writer.writeString(offsets[4], object.name);
-  writer.writeLong(offsets[5], object.protein);
+  writer.writeObjectList<MealOptionModel>(
+    offsets[0],
+    allOffsets,
+    MealOptionModelSchema.serialize,
+    object.alternatives,
+  );
+  writer.writeLong(offsets[1], object.calories);
+  writer.writeLong(offsets[2], object.carbs);
+  writer.writeLong(offsets[3], object.fat);
+  writer.writeStringList(offsets[4], object.items);
+  writer.writeString(offsets[5], object.name);
+  writer.writeLong(offsets[6], object.protein);
 }
 
 MealModel _mealModelDeserialize(
@@ -1263,12 +1897,18 @@ MealModel _mealModelDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = MealModel();
-  object.calories = reader.readLongOrNull(offsets[0]);
-  object.carbs = reader.readLongOrNull(offsets[1]);
-  object.fat = reader.readLongOrNull(offsets[2]);
-  object.items = reader.readStringList(offsets[3]);
-  object.name = reader.readStringOrNull(offsets[4]);
-  object.protein = reader.readLongOrNull(offsets[5]);
+  object.alternatives = reader.readObjectList<MealOptionModel>(
+    offsets[0],
+    MealOptionModelSchema.deserialize,
+    allOffsets,
+    MealOptionModel(),
+  );
+  object.calories = reader.readLongOrNull(offsets[1]);
+  object.carbs = reader.readLongOrNull(offsets[2]);
+  object.fat = reader.readLongOrNull(offsets[3]);
+  object.items = reader.readStringList(offsets[4]);
+  object.name = reader.readStringOrNull(offsets[5]);
+  object.protein = reader.readLongOrNull(offsets[6]);
   return object;
 }
 
@@ -1280,16 +1920,24 @@ P _mealModelDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readObjectList<MealOptionModel>(
+            offset,
+            MealOptionModelSchema.deserialize,
+            allOffsets,
+            MealOptionModel(),
+          ))
+          as P;
     case 1:
       return (reader.readLongOrNull(offset)) as P;
     case 2:
       return (reader.readLongOrNull(offset)) as P;
     case 3:
-      return (reader.readStringList(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readStringList(offset)) as P;
     case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
       return (reader.readLongOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1298,6 +1946,77 @@ P _mealModelDeserializeProp<P>(
 
 extension MealModelQueryFilter
     on QueryBuilder<MealModel, MealModel, QFilterCondition> {
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'alternatives'),
+      );
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'alternatives'),
+      );
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'alternatives', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'alternatives', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'alternatives', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'alternatives', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'alternatives', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition>
+  alternativesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'alternatives',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
   QueryBuilder<MealModel, MealModel, QAfterFilterCondition> caloriesIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1976,4 +2695,12 @@ extension MealModelQueryFilter
 }
 
 extension MealModelQueryObject
-    on QueryBuilder<MealModel, MealModel, QFilterCondition> {}
+    on QueryBuilder<MealModel, MealModel, QFilterCondition> {
+  QueryBuilder<MealModel, MealModel, QAfterFilterCondition> alternativesElement(
+    FilterQuery<MealOptionModel> q,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.object(q, r'alternatives');
+    });
+  }
+}

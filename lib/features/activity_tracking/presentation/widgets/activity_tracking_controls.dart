@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/log_workout_sheet.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -524,6 +525,7 @@ class SlidingButton extends StatefulWidget {
 class _SlidingButtonState extends State<SlidingButton> {
   double _position = 0.0;
   bool _triggered = false;
+  int _lastQuarter = 0;
 
   static const double _knobSize = AppDimens.headerActionSize - AppDimens.space4;
   static const double _inset = AppDimens.space4;
@@ -566,18 +568,30 @@ class _SlidingButtonState extends State<SlidingButton> {
               Positioned(
                 left: _position,
                 child: GestureDetector(
+                  onHorizontalDragStart: (_) {
+                    _lastQuarter = 0;
+                  },
                   onHorizontalDragUpdate: (details) {
                     if (_triggered) return;
+                    final nextPos = (_position + details.delta.dx).clamp(
+                      0.0,
+                      maxDistance,
+                    );
+                    if (maxDistance > 0) {
+                      final quarter = (nextPos / maxDistance * 4).floor();
+                      if (quarter != _lastQuarter) {
+                        _lastQuarter = quarter;
+                        HapticFeedback.lightImpact();
+                      }
+                    }
                     setState(() {
-                      _position = (_position + details.delta.dx).clamp(
-                        0.0,
-                        maxDistance,
-                      );
+                      _position = nextPos;
                     });
                   },
                   onHorizontalDragEnd: (details) {
                     if (_triggered) return;
                     if (_position >= maxDistance * 0.85) {
+                      HapticFeedback.mediumImpact();
                       setState(() {
                         _position = maxDistance;
                         _triggered = true;
@@ -588,12 +602,14 @@ class _SlidingButtonState extends State<SlidingButton> {
                           setState(() {
                             _position = 0.0;
                             _triggered = false;
+                            _lastQuarter = 0;
                           });
                         }
                       });
                     } else {
                       setState(() {
                         _position = 0.0;
+                        _lastQuarter = 0;
                       });
                     }
                   },

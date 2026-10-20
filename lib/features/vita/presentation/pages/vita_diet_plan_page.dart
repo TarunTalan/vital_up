@@ -1,27 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
-import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
-import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
-import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.dart';
+import 'package:vital_up/features/diet_plan/presentation/widgets/meal_alternatives.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
+import 'package:vital_up/features/subscription/presentation/widgets/ai_quota_line.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
-import 'package:vital_up/features/vita/presentation/widgets/vita_page_body.dart';
+import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
+import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.dart';
 
-/// Figma `health coach/ diet plan` (1912:17481) — shows the user's active
-/// meal plan with Vita's rationale.
+/// The user's active meal plan with Vita's note on why it fits. Edit and
+/// New plan sit in the header; asking Vita for a change is the main
+/// action.
 class VitaDietPlanPage extends StatefulWidget {
-  /// True when opened from Vita Chat, so "Ask Vita" returns to that chat
+  /// True when opened from Vita's chat, so "Ask Vita" returns to that chat
   /// instead of stacking a new one.
   final bool fromChat;
 
@@ -39,131 +42,138 @@ class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
     if (widget.fromChat) {
       context.pop();
     } else {
-      context.pushNamed('vita-chat', extra: 'Can you tweak my diet plan?');
+      context.pushNamed('vita-chat', extra: 'Can you change my diet plan?');
     }
+  }
+
+  Future<void> _edit(DietPlanCubit cubit) async {
+    final saved = await context.pushNamed<bool>('diet-plan-edit');
+    if (saved == true) cubit.loadActiveMealPlan();
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<DietPlanCubit>()..loadActiveMealPlan(),
-      child: AppScaffold(
-        header: const AppTitleBar(title: 'Diet Plan'),
-        bodyPadding: vitaBodyPadding(context),
-        body: BlocBuilder<DietPlanCubit, DietPlanState>(
-          builder: (context, state) {
-            if (state is DietPlanLoading) {
-              return const Center(child: VitalUpLoader());
-            }
-            if (state is! DietPlanLoaded) return const _NoPlan();
+      child: BlocBuilder<DietPlanCubit, DietPlanState>(
+        builder: (context, state) {
+          final cubit = context.read<DietPlanCubit>();
+          final plan = state is DietPlanLoaded ? state.mealPlan : null;
+          return AppScaffold(
+            header: AppPageHeader(
+              title: 'Diet plan',
+              action: plan == null
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppHeaderAction(
+                          tooltip: 'Edit plan',
+                          svgAsset: 'assets/icons/ui/edit.svg',
+                          onTap: () => _edit(cubit),
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        AppHeaderAction(
+                          tooltip: 'New plan',
+                          icon: const Icon(Icons.add_rounded),
+                          onTap: () => _createPlan(context),
+                        ),
+                      ],
+                    ),
+            ),
+            body: switch (state) {
+              DietPlanLoading() => const Center(child: VitalUpLoader()),
+              DietPlanLoaded(:final mealPlan) => _PlanBody(
+                plan: mealPlan,
+                insights: _insights,
+                onAskVita: _askVita,
+              ),
+              // No saved plan comes back as DietPlanInitial.
+              _ => const _NoPlan(),
+            },
+          );
+        },
+      ),
+    );
+  }
+}
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FutureBuilder<VitaDailyInsights?>(
-                  future: _insights,
-                  builder: (context, snapshot) {
-                    final note = snapshot.data?.dietNote;
-                    if (note == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppDimens.space16),
-                      child: VitaInsightCard(child: _VitaSays(note)),
-                    );
-                  },
-                ),
-                for (final meal in state.mealPlan.meals) ...[
-                  _MealCard(meal: meal),
-                  const SizedBox(height: AppDimens.space16),
-                ],
-                AppPrimaryButton(
-                  label: 'Ask Vita to tweak this plan',
-                  leadingIcon: SvgPicture.asset(
-                    VitaIcons.vita,
-                    width: AppDimens.iconLg,
-                    height: AppDimens.iconLg,
-                    colorFilter: ColorFilter.mode(
-                      context.vColors.buttonText ?? Colors.black,
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  onTap: _askVita,
-                ),
-                const SizedBox(height: AppDimens.space12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Edit plan',
-                        onTap: () async {
-                          final cubit = context.read<DietPlanCubit>();
-                          final saved = await context.pushNamed<bool>(
-                            'diet-plan-edit',
-                          );
-                          if (saved == true) cubit.loadActiveMealPlan();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.cardGap),
-                    Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Create new plan',
-                        onTap: () => context.pushNamed('diet-plan-prefs'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+class _PlanBody extends StatelessWidget {
+  final MealPlan plan;
+  final Future<VitaDailyInsights?> insights;
+  final VoidCallback onAskVita;
+
+  const _PlanBody({
+    required this.plan,
+    required this.insights,
+    required this.onAskVita,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final meals = plan.meals.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TrackerSummaryLine(
+          parts: [
+            '${formatCount(plan.totalCalories)} kcal',
+            '$meals meal${meals == 1 ? '' : 's'}',
+            '${plan.totalProtein} g protein',
+          ],
+        ),
+        const SizedBox(height: AppDimens.cardGap),
+        FutureBuilder<VitaDailyInsights?>(
+          future: insights,
+          builder: (context, snapshot) {
+            final note = snapshot.data?.dietNote;
+            if (note == null || note.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppDimens.cardGap),
+              child: VitaInsightCard.message(note),
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-class _VitaSays extends StatelessWidget {
-  final String note;
-
-  const _VitaSays(this.note);
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = context.colors.onSurface;
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: 'Vita says: ',
-            style: context.text.titleSmall?.copyWith(color: onSurface),
+        for (final (i, meal) in plan.meals.indexed) ...[
+          _MealCard(
+            meal: meal,
+            // The active plan: a swap is saved at once.
+            onOptions: () => pickMealAlternative(
+              context,
+              context.read<DietPlanCubit>(),
+              plan,
+              i,
+              save: true,
+            ),
           ),
-          TextSpan(text: note),
+          const SizedBox(height: AppDimens.cardGap),
         ],
-      ),
-      style: context.text.bodyMedium?.copyWith(color: onSurface),
+        const SizedBox(height: AppDimens.space4),
+        AppPrimaryButton(label: 'Ask Vita to change it', onTap: onAskVita),
+      ],
     );
   }
 }
 
-/// Figma `card/list`: meal name + calorie pill, then indented grey items.
+/// A meal: name with its kcal on the right, its foods in grey, then the
+/// way to its other options when it has some.
 class _MealCard extends StatelessWidget {
   final Meal meal;
+  final VoidCallback onOptions;
 
-  const _MealCard({required this.meal});
+  const _MealCard({required this.meal, required this.onOptions});
 
   @override
   Widget build(BuildContext context) {
-    final itemStyle = context.text.bodyMedium?.copyWith(
-      color: context.vColors.grayText,
-    );
+    final grey = context.vColors.grayText;
+    final itemStyle = context.text.bodyMedium?.copyWith(color: grey);
 
     return AppCard(
-      sheen: false,
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Text(
@@ -173,37 +183,23 @@ class _MealCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                padding: VitaDimens.pillPadding,
-                decoration: BoxDecoration(
-                  color: VitaColors.pillFill,
-                  borderRadius: BorderRadius.circular(VitaDimens.pillRadius),
-                ),
-                child: Text(
-                  '${meal.calories} cal',
-                  style: context.text.bodySmall?.copyWith(
-                    color: VitaColors.pillText,
-                  ),
-                ),
+              const SizedBox(width: AppDimens.space12),
+              Text(
+                '${formatCount(meal.calories)} kcal',
+                style: context.text.bodyMedium?.copyWith(color: grey),
               ),
             ],
           ),
           if (meal.items.isNotEmpty) ...[
-            const SizedBox(height: AppDimens.space12),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: VitaDimens.mealItemIndent,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < meal.items.length; i++) ...[
-                    if (i > 0) const SizedBox(height: AppDimens.space6),
-                    Text(meal.items[i], style: itemStyle),
-                  ],
-                ],
-              ),
-            ),
+            const SizedBox(height: AppDimens.space8),
+            for (var i = 0; i < meal.items.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppDimens.space4),
+              Text(meal.items[i], style: itemStyle),
+            ],
+          ],
+          if (meal.alternatives.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.space8),
+            MealAlternativesLink(meal: meal, onTap: onOptions),
           ],
         ],
       ),
@@ -220,16 +216,24 @@ class _NoPlan extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         VitaInsightCard.message(
-          "You don't have a diet plan yet. Tell me your preferences and "
-          "I'll build one around your health data.",
+          "You don't have a diet plan yet. Tell me what you like and I'll "
+          'build one around your goal.',
         ),
-        const SizedBox(height: AppDimens.space16),
+        const SizedBox(height: AppDimens.cardGap),
         AppPrimaryButton(
           label: 'Create my diet plan',
-          showRightArrow: true,
-          onTap: () => context.pushNamed('diet-plan-prefs'),
+          onTap: () => _createPlan(context),
         ),
+        const SizedBox(height: AppDimens.space8),
+        const AiQuotaLine(quota: AiQuota.dietPlan),
       ],
     );
   }
+}
+
+/// Opens the plan setup, then shows whatever plan is active afterwards.
+Future<void> _createPlan(BuildContext context) async {
+  final cubit = context.read<DietPlanCubit>();
+  await context.pushNamed('diet-plan-prefs');
+  cubit.loadActiveMealPlan();
 }

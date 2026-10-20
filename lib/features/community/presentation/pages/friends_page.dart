@@ -277,23 +277,21 @@ class _FriendsViewState extends State<_FriendsView> {
             friend: f,
             subtitle: _levelLine(f),
             onTap: () => _showProfile(f),
-            trailing: state.busy.contains(f.userId)
-                ? const _Busy()
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _RowButton(
-                        label: 'Decline',
-                        onTap: () => cubit.respond(f, accept: false),
-                      ),
-                      const SizedBox(width: AppDimens.space6),
-                      _RowButton(
-                        label: 'Accept',
-                        filled: true,
-                        onTap: () => cubit.respond(f, accept: true),
-                      ),
-                    ],
-                  ),
+            trailing: state.busy.contains(f.userId) ? const _Busy() : null,
+            // Under the name, so a long name never gets squeezed.
+            actions: state.busy.contains(f.userId)
+                ? null
+                : [
+                    _RowButton(
+                      label: 'Decline',
+                      onTap: () => cubit.respond(f, accept: false),
+                    ),
+                    _RowButton(
+                      label: 'Accept',
+                      filled: true,
+                      onTap: () => cubit.respond(f, accept: true),
+                    ),
+                  ],
           ),
       ],
     );
@@ -363,7 +361,9 @@ class _RowButton extends StatelessWidget {
           child: Text(
             label,
             style: context.text.labelLarge?.copyWith(
-              color: filled ? context.colors.onPrimary : primary,
+              color: filled
+                  ? context.colors.onPrimary
+                  : context.vColors.accentText,
             ),
           ),
         ),
@@ -443,6 +443,9 @@ class _PersonRow extends StatelessWidget {
   final bool showRank;
   final int? rank;
   final Widget? trailing;
+
+  /// Buttons on their own line under the name (request answers).
+  final List<Widget>? actions;
   final VoidCallback? onTap;
 
   const _PersonRow({
@@ -452,6 +455,7 @@ class _PersonRow extends StatelessWidget {
     this.showRank = false,
     this.rank,
     this.trailing,
+    this.actions,
     this.onTap,
   });
 
@@ -491,7 +495,7 @@ class _PersonRow extends StatelessWidget {
                       : Text(
                           r == null ? '–' : '$r',
                           style: context.text.titleSmall?.copyWith(
-                            color: isMe ? context.colors.primary : grey,
+                            color: isMe ? context.vColors.accentText : grey,
                           ),
                         ),
                 ),
@@ -520,6 +524,14 @@ class _PersonRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
+                    if (actions case final actions?) ...[
+                      const SizedBox(height: AppDimens.space8),
+                      Wrap(
+                        spacing: AppDimens.space8,
+                        runSpacing: AppDimens.space8,
+                        children: actions,
+                      ),
+                    ],
                   ],
                 ),
               ),

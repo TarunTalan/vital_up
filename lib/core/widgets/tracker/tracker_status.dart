@@ -87,7 +87,16 @@ class TrackerStatusChip extends StatelessWidget {
   /// Overrides the status colour (e.g. a mood level colour).
   final Color? color;
 
-  const TrackerStatusChip(this.status, {super.key, this.label, this.color});
+  /// Overrides the status icon (e.g. a challenge result).
+  final IconData? icon;
+
+  const TrackerStatusChip(
+    this.status, {
+    super.key,
+    this.label,
+    this.color,
+    this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +117,7 @@ class TrackerStatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(status.icon, size: AppDimens.iconXs, color: c),
+          Icon(icon ?? status.icon, size: AppDimens.iconXs, color: c),
           const SizedBox(width: AppDimens.space4),
           Text(
             label ?? status.label,

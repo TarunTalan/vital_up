@@ -443,7 +443,20 @@ Route names are GoRouter `name`s.
 - **about:** rate (Play id from `PackageInfo.packageName`), feedback mailto
   `support@vitalup.live`, Legal links (`LegalLinks`).
 - **goals:** `my-goals` gathers every goal (plan, weight, activity, water,
-  sleep, screen time).
+  sleep, screen time). Goal sheet `showTrackerGoalSheet` (`tracker_sheet.dart`):
+  weight uses `ValueRuler` (leave as is); water / screen time use
+  `GoalSlider` and sleep `SleepGoalDial` (`core/widgets/tracker/goal_controls.dart`:
+  grey track, metric accent the only colour, sheet-coloured knob with an
+  accent ring that lifts while dragged, recommended range as a light band,
+  square-root scale for water / screen time, labels dropped when crowded,
+  grey `GoalNote` under it; quick picks are wrapping `GoalPresetChip`s
+  (tint + hairline when selected, label in the text colour). Haptics match
+  `ValueRuler` everywhere: selection click + `UiSounds.tick` per step,
+  firmer on labelled marks; the ruler and controls give their own, so
+  callers pass a setter without haptics; +/- and chips give a selection
+  click). Test:
+  `test/core/tracker/goal_controls_layout_test.dart` (`HOME_SHOTS=1` writes
+  `build/goal_shots/`).
 - **dashboard trackers:** routes `water-trends`, `sleep-trends`,
   `screen-time-trends`, `stress-trends`, `diet-progress`, `weight-trends`.
   `TrendsService` / `TrendCubit<T>` are shared by cards and trend pages.
@@ -474,7 +487,8 @@ Route names are GoRouter `name`s.
   drags never scroll or close the sheet. The sheet doesn't scroll
   (`TrackerSheet(scrollable: false)`): the clock takes the room left (max
   280dp, min `minClockSize` 200dp); only if 200dp didn't fit would the
-  sheet grow by the difference and scroll (360x640 at 1.5 still fits). `test/features/dashboard/log_sheets_screenshot_test.dart`
+  sheet grow by the difference and scroll (360x640 at 1.5 still fits: keep the subtitle one line there, "Drag to
+  set your night", and the day chip compact). `test/features/dashboard/log_sheets_screenshot_test.dart`
   checks both sheets (sizes, text scales, dark) and the scale's gestures
   and feedback; `HOME_SHOTS=1` writes `build/sheet_shots/`.
   `SleepService` (dashboard/data/services) merges Health Connect
@@ -652,6 +666,16 @@ Route names are GoRouter `name`s.
   overlay and photo crop); gallery photos are checked for a barcode before
   going to the AI; the camera is let go in the background. Photo scans: 5 a day free, 100 with
   Pro (`get_remaining_scans`); a 429 opens the Pro sheet (`offerProForLimit`).
+  Vita chats and AI diet plans show `AiQuotaLine` ("12 of 15 messages
+  left today · Get more with Pro"; free users only; Pro link where Pro
+  can be bought): `AiQuotaService` (`subscription/data/services`) starts
+  from the user's own `ai_usage_daily` row (owner-readable) for today's
+  server day (`serverQuotaDay`, IST) and takes `remaining` from each
+  `vita-chat` / `generate-diet-plan` answer (0 on a daily-limit 429);
+  CacheStore key `ai_left_<feature>_<uid>`. At 0 the chat composer
+  locks ("No messages left today"; Pro unlocks it at once). Vita tab:
+  the line under "Chat with Vita" and a Pro header action (`vitalup-pro`).
+  Diet plans: above Regenerate and under "Create my diet plan".
   Free users see `ScansLeftHint` above Capture ("3 photo scans left today";
   follows `SubscriptionRepository.remainingScansChanges`; at zero a tap
   offers Pro; hidden with Pro or while unknown).
@@ -661,7 +685,28 @@ Route names are GoRouter `name`s.
   `active_plan_preferences`. `generate-diet-plan` (75 s timeout, 3/day free, 20 Pro;
   `instructions` + `basePlan` tweak a plan). The result page asks before
   leaving mid-generation (it would waste a generation).
-- **vita:** `vita-chat` (extra `VitaChatArgs` or initial prompt String),
+  Alternatives (Oct 21): every meal comes with up to 2 other dishes
+  (`Meal.alternatives`, `MealOption`; Isar `MealOptionModel`, null on
+  older plans) in the same AI call. `generate-diet-plan/plan.ts`
+  (`node --test .../plan.test.ts`) drops alternatives that repeat a dish,
+  name an allergen or are over 25% off the meal's calories (the prompt asks
+  10%); totals count main dishes. A swap (`MealAlternativesLink` ->
+  `showMealAlternativesSheet` -> `DietPlanCubit.chooseAlternative`) needs
+  no AI call: the old dish becomes an option, totals move by the
+  difference; the active plan saves at once with its preferences kept (a
+  failed save puts the dish back), a new plan waits for "Set as active".
+  Editing a meal keeps its alternatives. Vita's snapshot sends main dishes
+  only. Tests: `test/features/diet_plan/meal_alternatives_test.dart`.
+- **vita:** UI (Oct 21): every page uses `AppPageHeader` (tab "Vita"
+  like Arena / Profile, then "Ask Vita", "Health analysis", "Diet plan",
+  "Stress guide"), default card padding and 12dp card gaps; Vita's chat
+  bubbles are glass (theme-aware), the user's deep teal; suggestions are
+  outlined chips shown until the first question; day labels via
+  `formatLogDay`; "Clear chat" asks first (`VitaChatCubit.clear`);
+  `VitaAvatar` is an `AppIconBadge`; `VitaColors.accent` is never text.
+  Stress guide check-in reuses Home's `MoodLevelPicker`. Tests:
+  `test/features/vita/vita_pages_test.dart` (1.0 / 1.5, light / dark).
+  `vita-chat` (extra `VitaChatArgs` or initial prompt String),
   `vita-analysis`, `vita-diet-plan`, `vita-stress`. Prefs
   `vita_{chat|checkins|scores|insights}_<userId>` (chat keeps 50 messages,
   history 90 days). `vita-chat` 45 s timeout, last 12 turns sent, chats
@@ -722,6 +767,25 @@ Route names are GoRouter `name`s.
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
+  - **Arena UI (Oct 21):** hub order = level card + shortcuts,
+    Challenges, Friends, Leaderboards, then Monthly champions only when
+    there are winners (rules and countdown live on each leaderboard).
+    `ChallengeTile`: running = brand icon badge + time bar ("Day 6 of 7 ·
+    1 day left"); finished / left = grey badge + `TrackerStatusChip`
+    ("You won", "Finished", "You left"); rank + score sit in the footer
+    (wraps under at large text). Challenges page sections: Invites,
+    Active, Finished. Leaderboards list only players with points that
+    period (never hidden profiles), so the page explains the gap under
+    the board (`LeaderboardState.coverageNote`: "8 of 23 members have
+    points this week..."); the global member count is every profile.
+    Friend requests put Decline / Accept under the name. Badges: no
+    separate "closest" card, locked grid sorted by progress; gold is never
+    text (icons via `iconTint`, labels grey). Points: hero in a card,
+    `AppSectionHeader`s, days via `formatLogDay`, rule points under the
+    rule. Shots: `HOME_SHOTS=1 flutter test
+    test/features/community/arena_pages_layout_test.dart` ->
+    `build/arena_shots/` (hub, leaderboard, challenges, friends, badges,
+    points; 360 / 412, 1.0 / 1.5, dark).
   - **Achievement Badges (32):** shipped as lossless WebP in
     `assets/images/badges/` (converted pixel-identical from the source SVGs
     in `assets/icons/badges/`, which stay in the repo but out of
@@ -775,6 +839,13 @@ Route names are GoRouter `name`s.
   `SubscriptionRepositoryImpl`: Pro if the store or `is_premium_user` says
   so (CacheStore, offline last copy); after a purchase / restore it calls
   `sync-subscription` so the AI functions see Pro before the webhook.
+  Paywall look (`pro_paywall.dart`): centred hero (badge in a soft brand
+  glow; Pro users see "You're on VitalUp Pro" + plan there), a Free / Pro
+  "Daily limits" card (`ProLimitsList`: rows stack to "Free 5 · Pro up to
+  100" when the columns would squeeze names), plan tiles side by side when
+  half the width is `proPlanTileMinWidth` x text scale (else stacked),
+  selected = brand border + `primaryFill`. Shots: `HOME_SHOTS=1 flutter
+  test test/features/subscription` -> `build/pro_shots/`.
   `SubscriptionCubit` is a lazy singleton provided in `main.dart`, follows
   auth (`logIn` / `logOut`), loads plans on demand. Gates: scan 429
   (`ScanQuotaExceededFailure`), Vita `limitReached`, `DietPlanError

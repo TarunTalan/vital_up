@@ -56,6 +56,38 @@ class LeaderboardState extends Equatable {
       if (!e.isMe) e.userId,
   };
 
+  /// Players with points this period, once every page is loaded (null
+  /// while more pages remain).
+  int? get rankedCount {
+    final list = entries;
+    if (list == null || hasMore) return null;
+    return list.where((e) => e.rank != null).length;
+  }
+
+  /// Why the board lists fewer players than the community has members:
+  /// only players with points this period show, and never ones who hide
+  /// from leaderboards. Null when everyone is listed, on the friends board
+  /// (it lists friends without points too) or before the whole board is in.
+  String? get coverageNote {
+    final ranked = rankedCount;
+    final members = community.memberCount;
+    if (ranked == null ||
+        ranked == 0 ||
+        ranked >= members ||
+        community.type == CommunityType.friends) {
+      return null;
+    }
+    final when = switch (period) {
+      LeaderboardPeriod.week => 'this week',
+      LeaderboardPeriod.month => 'this month',
+      LeaderboardPeriod.all => 'so far',
+    };
+    final scoredIn = category == null ? '' : ' in ${category!.label}';
+    return '$ranked of $members members have points$scoredIn $when. '
+        "Members without points, or who hide from leaderboards, aren't "
+        'listed.';
+  }
+
   /// Category filters offered for this community.
   List<ScoreCategory> get categories => community.scoreCategories.length == 1
       ? const []

@@ -268,7 +268,8 @@ class _Shortcut extends StatelessWidget {
               color: context.vColors.accentText,
             ),
             const SizedBox(height: AppDimens.space6),
-            Text(
+            // One word: shrinks to fit rather than breaking mid-word.
+            FitText(
               label,
               textAlign: TextAlign.center,
               style: context.text.labelLarge?.copyWith(
@@ -416,9 +417,13 @@ class CategoryPointsTile extends StatelessWidget {
                   category.iconAsset!,
                   fallback: category.icon,
                   size: AppDimens.iconSm,
-                  color: color,
+                  color: context.iconTint(color),
                 )
-              : Icon(category.icon, size: AppDimens.iconSm, color: color),
+              : Icon(
+                  category.icon,
+                  size: AppDimens.iconSm,
+                  color: context.iconTint(color),
+                ),
           const SizedBox(height: AppDimens.space6),
           // Narrow tiles (4 across on small phones): the total shrinks to
           // fit instead of breaking mid-number, and the label wraps.
