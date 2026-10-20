@@ -231,6 +231,9 @@ make one back press skip two tabs).
   Card figures use `AppTextStyles.metric` at one size everywhere:
   `TrackerProgress` always puts the goal on its own line ("of 8h 0m"), so
   side-by-side tiles read alike; the mood label wraps to two lines.
+  Half-width tiles show a met goal / today logged as a check on the
+  badge corner (`_DoneMark`), never beside the title, so it shows at any
+  width or text size.
   `TrackerCard` centres its child in a fixed-height slot (tile pairs) and
   takes its natural height otherwise (pass the content, never `Expanded`);
   stacked tile pairs have no fixed height. Home reflows by fit, never by
@@ -317,8 +320,20 @@ make one back press skip two tabs).
   `bodyMedium`; compact figures (Today card, rings, Screen time row)
   `titleMedium` w600 with 12 grey captions; bar rows (`TrackerBarRow`:
   macros, secondary goals) name `bodyMedium` + figure grey `bodySmall`;
-  eyebrow labels and summary lines grey 12. No new sizes or weights. Activity: `ActivityGoalsState.headline`
-  (daily steps, else the first goal) as % in the ring with its figure,
+  eyebrow labels and summary lines grey 12. No new sizes or weights.
+  Home icons: asset SVG when one exists (`TrackerMetric.iconAsset` /
+  `logIconAsset`, `TrackerIcons`: edit, add (plus), goal (target), plan
+  (vita); `GoalMetricIcon`: steps, workouts (barbell), calories (flame)),
+  Material otherwise (play, retry, review, chips, chevrons). An action
+  never reuses its tracker's icon (log water / sleep / weight = plus).
+  Tints: `context.iconTint(accent)` (same hue, 3:1 on a card in either
+  theme, `AppColors.readableOn`); glyphs inside `AppIconBadge` use
+  `AppIconBadge.glyphColor` (3:1 on the tinted circle); never tint an
+  icon with a raw accent. `test/core/theme/icon_contrast_test.dart`. Activity: the ring is that goal's % with one
+  goal; with several, "1 of 2 goals met" over the average progress (the
+  status chip uses the same average); beside it `ActivityGoalsState.headline`
+  (daily steps, else the first goal) with its figure; met goals get a
+  check in their `TrackerBarRow`;
   up to two more goals as lines (`GoalMetricIcon`: SVG when the
   metric has one, steps and workouts), Start activity.
 - Dashboard cards: `features/dashboard/presentation/widgets/`
