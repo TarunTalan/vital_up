@@ -66,6 +66,16 @@ class VitaRepositoryImpl implements VitaRepository {
       _local.writeChat(_userId, messages);
 
   @override
+  String get chatOwnerId => _userId;
+
+  @override
+  double? readChatScroll() => _local.readChatScroll(_userId);
+
+  @override
+  Future<void> saveChatScroll(double? offsetFromEnd) =>
+      _local.writeChatScroll(_userId, offsetFromEnd);
+
+  @override
   Future<VitaMessage> reply(
     List<VitaMessage> history, {
     MealPlan? draftPlan,

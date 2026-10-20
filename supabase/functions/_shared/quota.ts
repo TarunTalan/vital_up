@@ -77,9 +77,30 @@ export function quotaUpgradeInfo(quota: QuotaResult): { pro: boolean; upgradable
   return { pro, upgradable: quota.pro === false };
 }
 
-export async function refundDailyQuota(serviceClient: Client, userId: string, feature: AiFeature): Promise<void> {
-  const { error } = await serviceClient.rpc('refund_ai_quota', { p_user_id: userId, p_feature: feature });
-  if (error) console.error(`Quota refund for ${feature} failed: ${error.message}`);
+/**
+ * Gives back the use taken for a request that got no answer. At most
+ * [maxRefunds] a day per feature (server default 3). Resolves to whether a
+ * use was given back; never throws.
+ */
+export async function refundDailyQuota(
+  serviceClient: Client,
+  userId: string,
+  feature: AiFeature,
+  maxRefunds?: number,
+): Promise<boolean> {
+  try {
+    const params: Record<string, unknown> = { p_user_id: userId, p_feature: feature };
+    if (maxRefunds !== undefined) params.p_max_refunds = maxRefunds;
+    const { data, error } = await serviceClient.rpc('refund_ai_quota', params);
+    if (error) {
+      console.error(`Quota refund for ${feature} failed: ${error.message}`);
+      return false;
+    }
+    return data === true;
+  } catch (e) {
+    console.error(`Quota refund for ${feature} threw:`, e);
+    return false;
+  }
 }
 
 /**

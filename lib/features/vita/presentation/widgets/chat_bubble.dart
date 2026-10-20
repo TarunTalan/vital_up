@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -49,11 +50,15 @@ class ChatBubble extends StatelessWidget {
   /// Tapped on a [VitaMessage.failed] user message.
   final VoidCallback? onRetry;
 
+  /// Long press on the bubble (delete).
+  final VoidCallback? onLongPress;
+
   const ChatBubble({
     super.key,
     required this.message,
     this.onAction,
     this.onRetry,
+    this.onLongPress,
   });
 
   @override
@@ -77,10 +82,23 @@ class ChatBubble extends StatelessWidget {
                   const SizedBox(width: AppDimens.space4),
                   Flexible(
                     child: Text(
-                      'Not sent. Tap to retry',
+                      'Not sent',
                       style: context.text.bodySmall?.copyWith(
                         color: context.colors.error,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.space12),
+                  Icon(
+                    Icons.refresh_rounded,
+                    size: AppDimens.iconXs,
+                    color: context.vColors.accentText,
+                  ),
+                  const SizedBox(width: AppDimens.space4),
+                  Text(
+                    'Retry',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.vColors.accentText,
                     ),
                   ),
                 ],
@@ -89,7 +107,7 @@ class ChatBubble extends StatelessWidget {
           )
         : Text(timeLabel, style: context.text.bodySmall?.copyWith(color: grey));
 
-    return LayoutBuilder(
+    final bubble = LayoutBuilder(
       builder: (context, constraints) {
         if (!message.isFromVita) {
           return Column(
@@ -160,6 +178,15 @@ class ChatBubble extends StatelessWidget {
           ],
         );
       },
+    );
+    if (onLongPress == null) return bubble;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: () {
+        HapticFeedback.mediumImpact();
+        onLongPress!();
+      },
+      child: bubble,
     );
   }
 }

@@ -61,6 +61,19 @@ class _FakeVita implements VitaRepository {
   }
 
   @override
+  String get chatOwnerId => 'user';
+
+  double? scroll;
+
+  @override
+  double? readChatScroll() => scroll;
+
+  @override
+  Future<void> saveChatScroll(double? offsetFromEnd) async {
+    scroll = offsetFromEnd;
+  }
+
+  @override
   Future<VitaMessage> reply(
     List<VitaMessage> history, {
     MealPlan? draftPlan,
@@ -336,6 +349,13 @@ void main() {
       ],
     );
     await _expectFits(tester, () => const VitaChatPage());
+    // Opens at the latest message; older days are above it.
+    expect(find.text('And today?'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Yesterday'),
+      find.byType(ListView),
+      const Offset(0, 200),
+    );
     expect(find.text('Yesterday'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('View health analysis'), findsOneWidget);
@@ -348,6 +368,31 @@ void main() {
     expect(repo.history, isEmpty);
     expect(find.text('How was my sleep?'), findsNothing);
     expect(find.text(_FakeVita.greeting.text), findsOneWidget);
+  });
+
+  testWidgets('chat reopens where it was left, already in place', (
+    tester,
+  ) async {
+    final repo = await _register(
+      history: [
+        for (var i = 0; i < 30; i++)
+          VitaMessage(
+            sender: i.isEven ? VitaSender.user : VitaSender.vita,
+            text: 'Message $i',
+            sentAt: DateTime.now(),
+          ),
+      ],
+    );
+    repo.scroll = 300;
+    await pumpPage(tester, const VitaChatPage());
+    await settle(tester);
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(list.controller!.offset, 300);
+
+    // Scrolled back to the latest message: nothing to remember.
+    list.controller!.jumpTo(0);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(repo.scroll, isNull);
   });
 
   testWidgets('health analysis fits and reads plainly', (tester) async {

@@ -706,6 +706,14 @@ Route names are GoRouter `name`s.
   `VitaAvatar` is an `AppIconBadge`; `VitaColors.accent` is never text.
   Stress guide check-in reuses Home's `MoodLevelPicker`. Tests:
   `test/features/vita/vita_pages_test.dart` (1.0 / 1.5, light / dark).
+  Chat (Oct 21): a reply outlives the page (`VitaChatCubit._pending`,
+  static: saved when it lands unless the account changed
+  (`VitaRepository.chatOwnerId`); a chat opened meanwhile shows the
+  typing dots); the list is `reverse` (offset 0 = latest) and opens at
+  the saved spot via `initialScrollOffset` (pref `vita_chatscroll_<uid>`,
+  saved on scroll end and leave; null at the end), so it's in place on
+  the first frame; failed messages show "Not sent" + Retry; long press
+  deletes a message (asks first; not while a reply is coming).
   `vita-chat` (extra `VitaChatArgs` or initial prompt String),
   `vita-analysis`, `vita-diet-plan`, `vita-stress`. Prefs
   `vita_{chat|checkins|scores|insights}_<userId>` (chat keeps 50 messages,
@@ -936,6 +944,14 @@ Route names are GoRouter `name`s.
   `20261028_ai_burst_limit.sql` (NOT pushed yet): `ai_burst_allowed`
   per-minute window on `ai_usage_daily` (`window_start`, `window_count`;
   rows it creates have `use_count` 0); service role only.
+  `20261029_friend_request_expiry.sql` (NOT pushed yet): hourly cron
+  `expire-friend-requests` (:25) deletes pending requests older than 30
+  days (the trigger removes their notification).
+  `20261030_vita_chat_refunds.sql` (NOT pushed yet): `refund_ai_quota(...,
+  p_max_refunds DEFAULT 3)` returns whether it refunded; vita-chat passes
+  the daily chat limit, so a chat only counts when it gets a real answer
+  (errors, off-topic and replaced replies are refunded). Push it before
+  redeploying vita-chat.
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):

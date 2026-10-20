@@ -302,7 +302,7 @@ class _FriendsViewState extends State<_FriendsView> {
       return _TabEmpty(
         icon: Icons.outgoing_mail,
         title: 'No pending requests',
-        message: 'Requests you send wait here until they accept.',
+        message: 'Requests you send wait here for 30 days.',
         action: AppSecondaryButton(label: 'Add a friend', onTap: _openAddSheet),
       );
     }

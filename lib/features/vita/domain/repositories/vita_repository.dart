@@ -38,6 +38,17 @@ abstract class VitaRepository {
 
   Future<void> saveHistory(List<VitaMessage> messages);
 
+  /// Whose chat [loadHistory] / [saveHistory] read and write right now
+  /// (changes on sign-out), so a reply that lands later is never saved into
+  /// another account's chat.
+  String get chatOwnerId;
+
+  /// How far up from the latest message the chat was left (logical
+  /// pixels); null when it was at the latest message.
+  double? readChatScroll();
+
+  Future<void> saveChatScroll(double? offsetFromEnd);
+
   /// Vita's answer to the latest user message in [history].
   /// [draftPlan] replaces the active plan in Vita's context when the user is
   /// tweaking a plan they haven't saved yet. Throws [VitaException].

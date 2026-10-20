@@ -20,6 +20,19 @@ class VitaLocalDataSource {
 
   // --- Chat -----------------------------------------------------------------
 
+  /// How far up from the latest message the chat was left; null at the end.
+  double? readChatScroll(String userId) {
+    final value = _prefs.getDouble(_key('chatscroll', userId));
+    return value != null && value.isFinite && value > 0 ? value : null;
+  }
+
+  Future<void> writeChatScroll(String userId, double? offset) {
+    final key = _key('chatscroll', userId);
+    return offset == null || !offset.isFinite || offset <= 0
+        ? _prefs.remove(key)
+        : _prefs.setDouble(key, offset);
+  }
+
   List<VitaMessage> readChat(String userId) =>
       _readList(_key('chat', userId), VitaMessage.fromJson);
 

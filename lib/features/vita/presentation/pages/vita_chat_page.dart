@@ -70,7 +70,14 @@ class _VitaChatViewState extends State<_VitaChatView> {
     'How do I log water?',
   ];
 
-  final _scroll = ScrollController();
+  /// The list is reversed: offset 0 is the latest message, so the chat
+  /// opens there, or where it was left, on its first frame (no visible
+  /// scroll), and a new message only has to scroll to 0.
+  late final ScrollController _scroll;
+  late final VitaChatCubit _cubit;
+
+  /// Closer than this to the latest message counts as being at the end.
+  static const _endSlack = 48.0;
 
   /// Free messages left today (null: unknown or Pro), from [AiQuotaLine].
   int? _chatsLeft;
@@ -78,6 +85,8 @@ class _VitaChatViewState extends State<_VitaChatView> {
   @override
   void initState() {
     super.initState();
+    _cubit = context.read<VitaChatCubit>();
+    _scroll = ScrollController(initialScrollOffset: _cubit.savedScroll ?? 0);
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
@@ -98,15 +107,23 @@ class _VitaChatViewState extends State<_VitaChatView> {
 
   @override
   void dispose() {
+    _rememberScroll();
     _scroll.dispose();
     super.dispose();
   }
 
+  /// Saved per user, so the chat reopens here (also after a restart).
+  void _rememberScroll() {
+    if (!_scroll.hasClients || _cubit.state.isLoading) return;
+    final pixels = _scroll.position.pixels;
+    _cubit.saveScroll(pixels < _endSlack ? null : pixels);
+  }
+
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
+      if (!_scroll.hasClients || _scroll.position.pixels == 0) return;
       _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
+        0,
         duration: AppDurations.medium,
         curve: Curves.easeOutCubic,
       );
@@ -153,6 +170,35 @@ class _VitaChatViewState extends State<_VitaChatView> {
     if (clear == true && mounted) {
       await context.read<VitaChatCubit>().clear();
     }
+  }
+
+  Future<void> _confirmDelete(VitaMessage message) async {
+    final cubit = context.read<VitaChatCubit>();
+    if (cubit.state.isTyping) {
+      showErrorSnackBar(context, 'Wait for Vita to reply, then try again.');
+      return;
+    }
+    final delete = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this message?'),
+        content: const Text('It will be removed from this chat.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: dialogContext.colors.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (delete == true && mounted) await cubit.delete(message);
   }
 
   void _onAction(VitaMessage message, VitaAction action) {
@@ -213,18 +259,25 @@ class _VitaChatViewState extends State<_VitaChatView> {
                   showErrorSnackBar(context, error);
                 }
               },
+              // Not on the load itself: the controller's initial offset
+              // already opened the chat where it was left.
               listenWhen: (prev, next) =>
-                  prev.messages.length != next.messages.length ||
-                  prev.isTyping != next.isTyping ||
-                  (next.error != null && prev.error != next.error),
+                  !prev.isLoading &&
+                  (next.messages.length > prev.messages.length ||
+                      prev.isTyping != next.isTyping ||
+                      (next.error != null && prev.error != next.error)),
               builder: (context, state) {
                 if (state.isLoading) {
                   return const Center(child: VitalUpLoader());
                 }
                 final items = _chatItems(state.messages);
                 final typing = state.isTyping ? 1 : 0;
-                return ListView.separated(
+                // Newest first from the bottom; a short chat still starts
+                // at the top.
+                final list = ListView.separated(
                   controller: _scroll,
+                  reverse: true,
+                  shrinkWrap: true,
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
@@ -237,16 +290,24 @@ class _VitaChatViewState extends State<_VitaChatView> {
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: VitaDimens.messageGap),
                   itemBuilder: (context, index) {
-                    if (index == items.length) return const TypingBubble();
-                    final item = items[index];
+                    if (index < typing) return const TypingBubble();
+                    final item = items[items.length - 1 - (index - typing)];
                     if (item is DateTime) return _DayLabel(formatLogDay(item));
                     final message = item as VitaMessage;
                     return ChatBubble(
                       message: message,
                       onAction: (action) => _onAction(message, action),
                       onRetry: () => cubit.retry(message),
+                      onLongPress: () => _confirmDelete(message),
                     );
                   },
+                );
+                return NotificationListener<ScrollEndNotification>(
+                  onNotification: (_) {
+                    _rememberScroll();
+                    return false;
+                  },
+                  child: Align(alignment: Alignment.topCenter, child: list),
                 );
               },
             ),

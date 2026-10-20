@@ -16,7 +16,10 @@
 // Vita answers health, wellbeing and VitalUp questions only (guard.ts).
 // Obvious jailbreaks and coding jobs get SCOPE_REFUSAL without a model call
 // (not counted against the daily quota); anything the model marks off topic
-// gets the same text (counted: tokens were spent). Every request also passes
+// gets the same text. A chat only counts when the user gets a real answer:
+// the use is taken before the model call (so parallel requests can't pass
+// the cap) and given back for errors, off-topic and replaced replies, up to
+// the daily chat limit in refunds. Every request also passes
 // a per-minute cap, and prompts are size-capped, so the most one account can
 // spend is its daily quota of small calls.
 
@@ -191,8 +194,18 @@ serve(async (req) => {
         429,
       );
     }
-    const refund = () => refundDailyQuota(client, user.id, feature);
+    // Chats: every unanswered request is given back (up to [limit] a day);
+    // insights keep the shared default.
+    const refund = () => refundDailyQuota(client, user.id, feature, mode === "chat" ? limit : undefined);
     const left = quota.remaining === null ? {} : { remaining: quota.remaining };
+    /** Refusal text in place of an answer: the chat isn't counted. */
+    const refusedReply = async () => {
+      const refunded = await refund();
+      const remaining = quota.remaining !== null && quota.remaining >= 0 && refunded
+        ? { remaining: quota.remaining + 1 }
+        : left;
+      return json({ ...refusal(), ...remaining });
+    };
 
     const canary = newCanary();
     // App how-to questions get the app guide (Help & support sends them here).
@@ -236,7 +249,7 @@ serve(async (req) => {
       if (!isObject(parsed)) throw new Error("Model output is not a JSON object");
       if (mode === "chat") {
         const text = cleanText(parsed.text, 1200, { multiline: true });
-        if (parsed.offTopic === true) return json({ ...refusal(), ...left });
+        if (parsed.offTopic === true) return await refusedReply();
         if (!text) throw new Error("Empty reply");
         const bullets = Array.isArray(parsed.bullets)
           ? parsed.bullets.map((b: unknown) => cleanText(b, 200)).filter(Boolean).slice(0, 4)
@@ -247,7 +260,7 @@ serve(async (req) => {
         if (action === "update_diet_plan" && !planInstructions) action = "view_diet_plan";
         if ([text, ...bullets, planInstructions].some((t) => replyLeaks(t, canary))) {
           console.warn("vita-chat reply replaced: leaked instructions or code");
-          return json({ ...refusal(), ...left });
+          return await refusedReply();
         }
         return json({ text, bullets, action, planInstructions: planInstructions || null, ...left });
       }

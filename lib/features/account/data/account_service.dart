@@ -174,7 +174,7 @@ class AccountService {
   /// Per-user Vita history keys (`vita_<name>_<userId>`).
   @visibleForTesting
   static bool isVitaUserKey(String key) =>
-      RegExp(r'^vita_(chat|checkins|scores|insights)_').hasMatch(key);
+      RegExp(r'^vita_(chat|chatscroll|checkins|scores|insights)_').hasMatch(key);
 
   Future<void> _deleteMealPhotos() async {
     final paths = await _isar.isar.mealLogCaches
