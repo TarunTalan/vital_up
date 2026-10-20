@@ -21,6 +21,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val AUDIO_CHANNEL = "com.example.vital_up/audio_intent"
     private val USAGE_CHANNEL = "com.example.vital_up/usage_stats"
     private val WINDOW_CHANNEL = "com.vitalup.app/window"
+    private val FEEDBACK_CHANNEL = "com.vitalup.app/feedback"
+    private var uiSounds: UiSounds? = null
 
     /** Usage queries can take a while on busy phones: keep them off the UI thread. */
     private val usageExecutor = Executors.newSingleThreadExecutor()
@@ -55,6 +57,8 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        uiSounds?.release()
+        uiSounds = null
         usageExecutor.shutdown()
         super.onDestroy()
     }
@@ -112,6 +116,20 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         disableMapboxTelemetry()
+
+        // Short UI sounds (the weight scale's tick), only with the ringer on.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FEEDBACK_CHANNEL).setMethodCallHandler { call, result ->
+            val sounds = uiSounds ?: UiSounds(applicationContext).also { uiSounds = it }
+            when (call.method) {
+                // Loads the sounds ahead, so the first tick isn't silent.
+                "prepare" -> result.success(null)
+                "tick" -> {
+                    sounds.tick(call.argument<Boolean>("strong") ?: false)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         // App lock on: hide the app in recents and block screenshots.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WINDOW_CHANNEL).setMethodCallHandler { call, result ->
