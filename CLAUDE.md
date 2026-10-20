@@ -801,18 +801,7 @@ food scan has no long-wait hint or cancel; label-scan loader
 
 ### Remaining:
 1. **Production Release Review:** Initial bundle and all required declarations (Health apps / Health Connect, Usage Access video, Location foreground service video, Data safety form) submitted to Google Play Console; currently under review.
-2. **VitalUp Pro setup:** Play Console subscription `vitalup_pro` with
-   base plans monthly + yearly (7-day free trial offer on yearly) — can now be created in Play Console since the bundle has been uploaded; a
-   RevenueCat project (Google Play app + service account, entitlement
-   `pro`, default offering with both packages, webhook to
-   `revenuecat-webhook` with the `REVENUECAT_WEBHOOK_SECRET` header);
-   secrets `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_SECRET`;
-   `REVENUECAT_GOOGLE_API_KEY` in `.env` and in the workflows' `ENV_CONTENT` secret;
-   server side is done (Oct 19: `20261026` applied; scan-food, vita-chat,
-   generate-diet-plan, revenuecat-webhook, sync-subscription and
-   delete-account deployed); Oct 20: the RevenueCat secrets
-   aren't set yet, so the webhook refuses every event; `.env` has no
-   `REVENUECAT_GOOGLE_API_KEY`, so the app shows no paywall). Data safety form: add "Purchase history".
+2. **VitalUp Pro setup:** Play Console subscription `vitalup_pro` (monthly + yearly with 7-day trial) and RevenueCat configuration (app, entitlement `pro`, default offering packages, webhook) are set up. `REVENUECAT_GOOGLE_API_KEY` is in `.env` and built into `env.g.dart`. `REVENUECAT_WEBHOOK_SECRET` is set in Supabase. Remaining: generate the secret key (`sk_...`) under RevenueCat Secret API keys and run `supabase secrets set REVENUECAT_SECRET_API_KEY=sk_...`; add `REVENUECAT_GOOGLE_API_KEY` to GitHub Actions `ENV_CONTENT` secret; declare "Purchase history" in Play Console Data safety form.
 3. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
