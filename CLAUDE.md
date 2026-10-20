@@ -321,7 +321,8 @@ make one back press skip two tabs).
   `titleMedium` w600 with 12 grey captions; bar rows (`TrackerBarRow`:
   macros, secondary goals) name `bodyMedium` + figure grey `bodySmall`;
   eyebrow labels and summary lines grey 12. No new sizes or weights.
-  Figures round down (`formatMl`, `GoalMetric.format`, percents) so
+  Figures never round up (`formatMl` shows "1.25 L" / "2.96 L" exactly,
+  `GoalMetric.format` and percents round down) so
   progress never reads as the goal before it's met; goals of 0 are no
   goal (`calorieGoalFor`, `macroTargets`); weekly goals use
   `TrackerStatus.weekPace` and say "this week"; "1 workout"; sleep and
