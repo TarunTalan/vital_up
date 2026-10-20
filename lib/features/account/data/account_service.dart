@@ -20,6 +20,9 @@ import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart'
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
+import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 
 /// Permanently deletes the signed-in user's account (server: the
 /// `delete-account` Edge Function) and everything stored on this device.
@@ -128,8 +131,41 @@ class AccountService {
         await _prefs.remove(key);
       }
     });
+    // Goal weight (old device-wide key), "in bed" taps and the Health
+    // Connect import mark: the next account must start from its own.
+    await _step('other per-user values', () async {
+      await _prefs.remove(WeightService.legacyTargetKey);
+      await _prefs.remove(HealthImportService.lastImportKey);
+      for (final key in _prefs
+          .getKeys()
+          .where((k) => k.startsWith(bedtimeKey('')))
+          .toList()) {
+        await _prefs.remove(key);
+      }
+    });
     // Camera / picker photos, exports and health reports shared from here.
     await _step('temporary files', _deleteTemporaryFiles);
+    // Wiped: whoever signs in next starts clean without another wipe.
+    await _step('device owner', () async {
+      await _prefs.remove(deviceOwnerKey);
+    });
+  }
+
+  /// The account whose data is on this device.
+  static const deviceOwnerKey = 'local_data_owner_id';
+
+  /// Called on sign-in before the first sync. If another account's data
+  /// is still here (sign-out was cut short, the app was killed during it,
+  /// or the session simply expired), it is wiped first: otherwise this
+  /// account would show it and upload it as its own.
+  Future<void> claimDevice(String userId) async {
+    final owner = _prefs.getString(deviceOwnerKey);
+    if (owner == userId) return;
+    if (owner != null) {
+      debugPrint("Another account's data was on this device; clearing it.");
+      await clearLocalUserData();
+    }
+    await _prefs.setString(deviceOwnerKey, userId);
   }
 
   /// Per-user Vita history keys (`vita_<name>_<userId>`).

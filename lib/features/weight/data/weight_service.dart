@@ -89,7 +89,9 @@ class WeightService {
   ]);
 
   /// Pre-cache builds kept the goal here (not per user); read as a fallback.
-  static const _keyTargetKg = 'weight_target_kg';
+  /// Legacy device-wide goal weight; cleared on sign-out.
+  static const legacyTargetKey = 'weight_target_kg';
+  static const _keyTargetKg = legacyTargetKey;
 
   /// Goal weight (kg) in [CacheStore]; onboarding writes it too.
   static String targetCacheKey(String userId) => 'weight:target:$userId';

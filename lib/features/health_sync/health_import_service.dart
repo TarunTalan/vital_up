@@ -33,7 +33,9 @@ class HealthImportService {
     Health? health,
   }) : _health = health ?? Health();
 
-  static const _keyLastImport = 'health_import_last';
+  /// Device-wide; cleared on sign-out so the next account imports fully.
+  static const lastImportKey = 'health_import_last';
+  static const _keyLastImport = lastImportKey;
   static const _firstImport = Duration(days: 30);
   static const _minInterval = Duration(hours: 1);
 
