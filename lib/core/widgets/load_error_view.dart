@@ -29,8 +29,9 @@ class LoadErrorView extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: context.text.bodyMedium
-                ?.copyWith(color: context.vColors.grayText),
+            style: context.text.bodyMedium?.copyWith(
+              color: context.vColors.grayText,
+            ),
           ),
           const SizedBox(height: AppDimens.space8),
           TextButton.icon(

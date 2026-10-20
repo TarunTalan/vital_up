@@ -18,4 +18,12 @@ extension ThemeContext on BuildContext {
   VitalUpColors get vColors =>
       Theme.of(this).extension<VitalUpColors>() ??
       (isDark ? AppTheme.darkCustomColors : AppTheme.lightCustomColors);
+
+  /// [accent] as an icon tint with 3:1 contrast on a card in this theme:
+  /// the same hue, a shade deeper in light mode or lighter in dark mode
+  /// where the brand colour alone would be too faint.
+  Color iconTint(Color accent) => AppColors.readableOn(
+    accent,
+    isDark ? AppColors.cardBackdropDark : AppColors.cardBackdropLight,
+  );
 }

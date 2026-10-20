@@ -8,10 +8,7 @@ import 'package:vital_up/core/services/app_loading_controller.dart';
 class AppLoadingBarrier extends StatelessWidget {
   final Widget child;
 
-  const AppLoadingBarrier({
-    super.key,
-    required this.child,
-  });
+  const AppLoadingBarrier({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +21,7 @@ class AppLoadingBarrier extends StatelessWidget {
           canPop: !isBusy,
           child: MouseRegion(
             cursor: isBusy ? SystemMouseCursors.wait : MouseCursor.defer,
-            child: AbsorbPointer(
-              absorbing: isBusy,
-              child: child,
-            ),
+            child: AbsorbPointer(absorbing: isBusy, child: child),
           ),
         );
       },

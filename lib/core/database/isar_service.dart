@@ -142,12 +142,10 @@ class IsarService {
         }
 
         // Get existing names to avoid duplicating (names only, not rows).
-        final existingNames = (await isar.offlineFoods
-                .where()
-                .nameProperty()
-                .findAll())
-            .map((n) => n.toLowerCase())
-            .toSet();
+        final existingNames =
+            (await isar.offlineFoods.where().nameProperty().findAll())
+                .map((n) => n.toLowerCase())
+                .toSet();
 
         final List<OfflineFood> newFoods = [];
         for (final item in products) {

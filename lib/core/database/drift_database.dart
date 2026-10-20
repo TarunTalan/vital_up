@@ -18,10 +18,12 @@ class DriftActivitySessions extends Table {
   IntColumn get avgPaceSecondsPerKm => integer()();
   IntColumn get calories => integer()();
   IntColumn get steps => integer()();
-  BoolColumn get stepCountReliable => boolean().withDefault(const Constant(true))();
+  BoolColumn get stepCountReliable =>
+      boolean().withDefault(const Constant(true))();
   TextColumn get targetType => text().nullable()();
   RealColumn get targetValue => real().nullable()();
-  BoolColumn get targetAchieved => boolean().nullable().withDefault(const Constant(false))();
+  BoolColumn get targetAchieved =>
+      boolean().nullable().withDefault(const Constant(false))();
 
   /// Uploaded to `activity_sessions` (SyncService). Reset on every save.
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
@@ -36,7 +38,11 @@ class DriftActivitySessions extends Table {
 
 class DriftTrackPoints extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get sessionId => text().references(DriftActivitySessions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get sessionId => text().references(
+    DriftActivitySessions,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
   RealColumn get latitude => real()();
   RealColumn get longitude => real()();
   DateTimeColumn get timestamp => dateTime()();
@@ -63,58 +69,55 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-          await customStatement(_trackPointIndex);
-        },
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.stepCountReliable,
-            );
-          }
-          if (from < 3) {
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.targetType,
-            );
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.targetValue,
-            );
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.targetAchieved,
-            );
-          }
-          if (from < 4) {
-            await m.addColumn(driftTrackPoints, driftTrackPoints.altitude);
-          }
-          if (from < 5) {
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.synced,
-            );
-          }
-          if (from < 6) {
-            await customStatement(_trackPointIndex);
-          }
-          if (from < 7) {
-            await m.addColumn(
-              driftActivitySessions,
-              driftActivitySessions.intensity,
-            );
-          }
-        },
-        beforeOpen: (details) async {
-          // Prevent SQLITE_BUSY / database locked errors during concurrent startup.
-          await customStatement('PRAGMA busy_timeout = 5000');
-          // SQLite ships with foreign keys off; without this the cascade on
-          // track points never fires and deleted sessions leave them behind.
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+      await customStatement(_trackPointIndex);
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(
+          driftActivitySessions,
+          driftActivitySessions.stepCountReliable,
+        );
+      }
+      if (from < 3) {
+        await m.addColumn(
+          driftActivitySessions,
+          driftActivitySessions.targetType,
+        );
+        await m.addColumn(
+          driftActivitySessions,
+          driftActivitySessions.targetValue,
+        );
+        await m.addColumn(
+          driftActivitySessions,
+          driftActivitySessions.targetAchieved,
+        );
+      }
+      if (from < 4) {
+        await m.addColumn(driftTrackPoints, driftTrackPoints.altitude);
+      }
+      if (from < 5) {
+        await m.addColumn(driftActivitySessions, driftActivitySessions.synced);
+      }
+      if (from < 6) {
+        await customStatement(_trackPointIndex);
+      }
+      if (from < 7) {
+        await m.addColumn(
+          driftActivitySessions,
+          driftActivitySessions.intensity,
+        );
+      }
+    },
+    beforeOpen: (details) async {
+      // Prevent SQLITE_BUSY / database locked errors during concurrent startup.
+      await customStatement('PRAGMA busy_timeout = 5000');
+      // SQLite ships with foreign keys off; without this the cascade on
+      // track points never fires and deleted sessions leave them behind.
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 
   /// Deletes every workout and its track points.
   Future<void> clearAll() => transaction(() async {
@@ -123,16 +126,17 @@ class AppDatabase extends _$AppDatabase {
   });
 
   // Insert or update an activity session. Any local change needs uploading.
-  Future<int> saveSession(DriftActivitySession session) =>
-      into(driftActivitySessions)
-          .insertOnConflictUpdate(session.copyWith(synced: false));
+  Future<int> saveSession(DriftActivitySession session) => into(
+    driftActivitySessions,
+  ).insertOnConflictUpdate(session.copyWith(synced: false));
 
   Future<int> saveSessionCompanion(DriftActivitySessionsCompanion session) =>
-      into(driftActivitySessions)
-          .insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
+      into(
+        driftActivitySessions,
+      ).insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
 
   // Insert a track point
-  Future<int> saveTrackPoint(DriftTrackPoint point) => 
+  Future<int> saveTrackPoint(DriftTrackPoint point) =>
       into(driftTrackPoints).insert(point);
 
   // Insert multiple track points in batch
@@ -142,7 +146,9 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  Future<void> saveTrackPointsCompanion(List<DriftTrackPointsCompanion> points) async {
+  Future<void> saveTrackPointsCompanion(
+    List<DriftTrackPointsCompanion> points,
+  ) async {
     await batch((batch) {
       batch.insertAll(driftTrackPoints, points);
     });
@@ -153,7 +159,9 @@ class AppDatabase extends _$AppDatabase {
     List<DriftTrackPointsCompanion> points,
   ) async {
     await transaction(() async {
-      await (delete(driftTrackPoints)..where((t) => t.sessionId.equals(sessionId))).go();
+      await (delete(
+        driftTrackPoints,
+      )..where((t) => t.sessionId.equals(sessionId))).go();
       if (points.isNotEmpty) {
         await batch((batch) {
           batch.insertAll(driftTrackPoints, points);
@@ -169,21 +177,22 @@ class AppDatabase extends _$AppDatabase {
     List<DriftTrackPointsCompanion> points,
   ) async {
     await transaction(() async {
-      await into(driftActivitySessions)
-          .insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
+      await into(
+        driftActivitySessions,
+      ).insertOnConflictUpdate(session.copyWith(synced: const Value(false)));
       await replaceTrackPointsForSession(session.id.value, points);
     });
   }
 
   /// Finished workouts not uploaded yet.
-  Future<List<DriftActivitySession>> unsyncedFinishedSessions() =>
-      (select(driftActivitySessions)
-            ..where((t) => t.synced.equals(false) & t.endTime.isNotNull()))
-          .get();
+  Future<List<DriftActivitySession>> unsyncedFinishedSessions() => (select(
+    driftActivitySessions,
+  )..where((t) => t.synced.equals(false) & t.endTime.isNotNull())).get();
 
   Future<void> markSessionsSynced(Iterable<String> ids) =>
-      (update(driftActivitySessions)..where((t) => t.id.isIn(ids)))
-          .write(const DriftActivitySessionsCompanion(synced: Value(true)));
+      (update(driftActivitySessions)..where((t) => t.id.isIn(ids))).write(
+        const DriftActivitySessionsCompanion(synced: Value(true)),
+      );
 
   /// Stores a workout downloaded from the cloud, already in sync.
   Future<void> saveSyncedSession(
@@ -191,8 +200,9 @@ class AppDatabase extends _$AppDatabase {
     List<DriftTrackPointsCompanion> points,
   ) async {
     await transaction(() async {
-      await into(driftActivitySessions)
-          .insertOnConflictUpdate(session.copyWith(synced: const Value(true)));
+      await into(
+        driftActivitySessions,
+      ).insertOnConflictUpdate(session.copyWith(synced: const Value(true)));
       await replaceTrackPointsForSession(session.id.value, points);
     });
   }
@@ -206,13 +216,14 @@ class AppDatabase extends _$AppDatabase {
     final grouped = <String, List<DriftTrackPoint>>{};
     for (var i = 0; i < sessionIds.length; i += 500) {
       final chunk = sessionIds.sublist(i, min(i + 500, sessionIds.length));
-      final rows = await (select(driftTrackPoints)
-            ..where((t) => t.sessionId.isIn(chunk))
-            ..orderBy([
-              (t) => OrderingTerm(expression: t.sessionId),
-              (t) => OrderingTerm(expression: t.timestamp),
-            ]))
-          .get();
+      final rows =
+          await (select(driftTrackPoints)
+                ..where((t) => t.sessionId.isIn(chunk))
+                ..orderBy([
+                  (t) => OrderingTerm(expression: t.sessionId),
+                  (t) => OrderingTerm(expression: t.timestamp),
+                ]))
+              .get();
       for (final row in rows) {
         (grouped[row.sessionId] ??= []).add(row);
       }
@@ -240,15 +251,16 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Retrieve a session with its track points
-  Future<DriftActivitySession?> getSession(String id) =>
-      (select(driftActivitySessions)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<DriftActivitySession?> getSession(String id) => (select(
+    driftActivitySessions,
+  )..where((t) => t.id.equals(id))).getSingleOrNull();
 
   // Retrieve track points for a session
   Future<List<DriftTrackPoint>> getTrackPointsForSession(String sessionId) =>
       (select(driftTrackPoints)
-        ..where((t) => t.sessionId.equals(sessionId))
-        ..orderBy([(t) => OrderingTerm(expression: t.timestamp)]))
-      .get();
+            ..where((t) => t.sessionId.equals(sessionId))
+            ..orderBy([(t) => OrderingTerm(expression: t.timestamp)]))
+          .get();
 
   // Retrieve all sessions in reverse chronological order
   Future<List<DriftActivitySession>> getAllSessions({DateTime? since}) {
@@ -264,9 +276,9 @@ class AppDatabase extends _$AppDatabase {
 
   // Delete a session and cascaded points
   Future<void> deleteSession(String id) => transaction(() async {
-        await (delete(driftTrackPoints)..where((t) => t.sessionId.equals(id))).go();
-        await (delete(driftActivitySessions)..where((t) => t.id.equals(id))).go();
-      });
+    await (delete(driftTrackPoints)..where((t) => t.sessionId.equals(id))).go();
+    await (delete(driftActivitySessions)..where((t) => t.id.equals(id))).go();
+  });
 }
 
 LazyDatabase _openConnection() {

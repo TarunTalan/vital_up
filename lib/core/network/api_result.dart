@@ -20,7 +20,9 @@ class ResponseHandler {
   ResponseHandler._();
 
   static ApiResult<T> handleResponse<T>(Response<T> response) {
-    if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
+    if (response.statusCode != null &&
+        response.statusCode! >= 200 &&
+        response.statusCode! < 300) {
       final body = response.data;
       if (body != null) {
         return ApiSuccess(body);
@@ -39,14 +41,20 @@ class ResponseHandler {
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.error is SocketException) {
-        return const ApiError(message: 'Network error. Please check your connection.', code: -1);
+        return const ApiError(
+          message: 'Network error. Please check your connection.',
+          code: -1,
+        );
       }
       final statusCode = e.response?.statusCode ?? -1;
       final serverMessage = e.response?.data?['message']?.toString();
       final message = serverMessage ?? mapCodeToMessage(statusCode);
       return ApiError(message: message, code: statusCode);
     } else if (e is IOException) {
-      return const ApiError(message: 'Network error. Please check your connection.', code: -1);
+      return const ApiError(
+        message: 'Network error. Please check your connection.',
+        code: -1,
+      );
     } else {
       return ApiError(message: e.toString(), code: -1);
     }

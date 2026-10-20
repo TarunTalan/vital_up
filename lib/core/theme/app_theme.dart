@@ -42,24 +42,34 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
   // --- Figma glass / status tokens ---
   /// Glass card & input fill — Figma rgba(186,186,186,0.13).
   final Color? glassFill;
+
   /// Glass card & input border — Figma rgba(186,186,186,0.27).
   final Color? glassBorder;
+
   /// Divider — Figma #BABABA @ 30%.
   final Color? divider;
+
   /// Progress-bar track.
   final Color? track;
+
   /// Cyan tinted fill (filled input, header action button).
   final Color? primaryFill;
+
   /// Cyan icon-badge background.
   final Color? primaryTint;
+
   /// Cyan tinted border (header action button).
   final Color? primaryBorder;
+
   /// Secondary button outline — Figma #B9B9B9.
   final Color? secondaryButtonBorder;
+
   /// Back button fill.
   final Color? backButtonFill;
+
   /// Elevated opaque surface (bottom sheets, dialogs, nav bar).
   final Color? surfaceElevated;
+
   /// Error input fill — Figma rgba(226,75,74,0.13).
   final Color? errorFill;
   final Color? success;
@@ -71,6 +81,7 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
   /// Primary as readable text (numbers, ranks, links) in either mode; keep
   /// `colors.primary` for fills, bars and rings.
   final Color? accentText;
+
   /// Hairline outline (toast/info) — Figma #D8D8D8.
   final Color? hairline;
 
@@ -255,8 +266,10 @@ class VitalUpColors extends ThemeExtension<VitalUpColors> {
       primaryFill: l(primaryFill, other.primaryFill),
       primaryTint: l(primaryTint, other.primaryTint),
       primaryBorder: l(primaryBorder, other.primaryBorder),
-      secondaryButtonBorder:
-          l(secondaryButtonBorder, other.secondaryButtonBorder),
+      secondaryButtonBorder: l(
+        secondaryButtonBorder,
+        other.secondaryButtonBorder,
+      ),
       backButtonFill: l(backButtonFill, other.backButtonFill),
       surfaceElevated: l(surfaceElevated, other.surfaceElevated),
       errorFill: l(errorFill, other.errorFill),
@@ -419,70 +432,70 @@ class AppTheme {
   // ---------------------------------------------------------------------------
 
   static ThemeData get lightTheme => _build(
-        brightness: Brightness.light,
-        custom: lightCustomColors,
-        scheme: const ColorScheme.light(
-          primary: AppColors.primary,
-          onPrimary: AppColors.buttonText,
-          primaryContainer: AppColors.primaryTint,
-          onPrimaryContainer: AppColors.teal,
-          secondary: AppColors.highlight,
-          onSecondary: AppColors.darker,
-          tertiary: Color(0xFFF1F1F1),
-          onTertiary: AppColors.greyText,
-          surface: AppColors.lighter,
-          onSurface: AppColors.darker,
-          onSurfaceVariant: AppColors.greyText,
-          surfaceContainerLowest: AppColors.white,
-          surfaceContainerLow: Color(0xFFF8F8F8),
-          surfaceContainer: Color(0xFFF3F3F3),
-          surfaceContainerHigh: Color(0xFFEDEDED),
-          surfaceContainerHighest: Color(0x1A1C1C1C),
-          surfaceBright: AppColors.primaryFill,
-          outline: AppColors.outline,
-          outlineVariant: AppColors.glassBorder,
-          error: AppColors.error,
-          onError: AppColors.white,
-          errorContainer: AppColors.errorFill,
-          onErrorContainer: AppColors.error,
-          shadow: AppColors.black,
-          inverseSurface: AppColors.darker,
-          onInverseSurface: AppColors.lighter,
-        ),
-      );
+    brightness: Brightness.light,
+    custom: lightCustomColors,
+    scheme: const ColorScheme.light(
+      primary: AppColors.primary,
+      onPrimary: AppColors.buttonText,
+      primaryContainer: AppColors.primaryTint,
+      onPrimaryContainer: AppColors.teal,
+      secondary: AppColors.highlight,
+      onSecondary: AppColors.darker,
+      tertiary: Color(0xFFF1F1F1),
+      onTertiary: AppColors.greyText,
+      surface: AppColors.lighter,
+      onSurface: AppColors.darker,
+      onSurfaceVariant: AppColors.greyText,
+      surfaceContainerLowest: AppColors.white,
+      surfaceContainerLow: Color(0xFFF8F8F8),
+      surfaceContainer: Color(0xFFF3F3F3),
+      surfaceContainerHigh: Color(0xFFEDEDED),
+      surfaceContainerHighest: Color(0x1A1C1C1C),
+      surfaceBright: AppColors.primaryFill,
+      outline: AppColors.outline,
+      outlineVariant: AppColors.glassBorder,
+      error: AppColors.error,
+      onError: AppColors.white,
+      errorContainer: AppColors.errorFill,
+      onErrorContainer: AppColors.error,
+      shadow: AppColors.black,
+      inverseSurface: AppColors.darker,
+      onInverseSurface: AppColors.lighter,
+    ),
+  );
 
   static ThemeData get darkTheme => _build(
-        brightness: Brightness.dark,
-        custom: darkCustomColors,
-        scheme: const ColorScheme.dark(
-          primary: AppColors.primary,
-          onPrimary: AppColors.buttonText,
-          primaryContainer: AppColors.primaryTint,
-          onPrimaryContainer: AppColors.primary,
-          secondary: AppColors.highlightDark,
-          onSecondary: AppColors.lightText,
-          tertiary: Colors.transparent,
-          onTertiary: AppColors.greyText,
-          surface: AppColors.surfaceDark,
-          onSurface: AppColors.lightText,
-          onSurfaceVariant: Color(0xFF9E9E9E),
-          surfaceContainerLowest: Color(0xFF141414),
-          surfaceContainerLow: Color(0xFF202020),
-          surfaceContainer: Color(0xFF242424),
-          surfaceContainerHigh: AppColors.surfaceDarkElevated,
-          surfaceContainerHighest: Color(0x1AFEFEFE),
-          surfaceBright: AppColors.primaryFill,
-          outline: AppColors.outlineDark,
-          outlineVariant: AppColors.glassBorderDark,
-          error: AppColors.errorDark,
-          onError: AppColors.white,
-          errorContainer: AppColors.errorFill,
-          onErrorContainer: AppColors.errorDark,
-          shadow: AppColors.black,
-          inverseSurface: AppColors.lightText,
-          onInverseSurface: AppColors.darker,
-        ),
-      );
+    brightness: Brightness.dark,
+    custom: darkCustomColors,
+    scheme: const ColorScheme.dark(
+      primary: AppColors.primary,
+      onPrimary: AppColors.buttonText,
+      primaryContainer: AppColors.primaryTint,
+      onPrimaryContainer: AppColors.primary,
+      secondary: AppColors.highlightDark,
+      onSecondary: AppColors.lightText,
+      tertiary: Colors.transparent,
+      onTertiary: AppColors.greyText,
+      surface: AppColors.surfaceDark,
+      onSurface: AppColors.lightText,
+      onSurfaceVariant: Color(0xFF9E9E9E),
+      surfaceContainerLowest: Color(0xFF141414),
+      surfaceContainerLow: Color(0xFF202020),
+      surfaceContainer: Color(0xFF242424),
+      surfaceContainerHigh: AppColors.surfaceDarkElevated,
+      surfaceContainerHighest: Color(0x1AFEFEFE),
+      surfaceBright: AppColors.primaryFill,
+      outline: AppColors.outlineDark,
+      outlineVariant: AppColors.glassBorderDark,
+      error: AppColors.errorDark,
+      onError: AppColors.white,
+      errorContainer: AppColors.errorFill,
+      onErrorContainer: AppColors.errorDark,
+      shadow: AppColors.black,
+      inverseSurface: AppColors.lightText,
+      onInverseSurface: AppColors.darker,
+    ),
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -524,7 +537,10 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.displayMedium,
-        iconTheme: IconThemeData(color: scheme.onSurface, size: AppDimens.iconLg),
+        iconTheme: IconThemeData(
+          color: scheme.onSurface,
+          size: AppDimens.iconLg,
+        ),
       ),
       cardTheme: CardThemeData(
         color: custom.glassFill,
@@ -533,7 +549,10 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-          side: BorderSide(color: custom.glassBorder!, width: AppDimens.borderThin),
+          side: BorderSide(
+            color: custom.glassBorder!,
+            width: AppDimens.borderThin,
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -648,14 +667,20 @@ class AppTheme {
         circularTrackColor: custom.track,
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? AppColors.white : null),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? scheme.primary : null),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? AppColors.white : null,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? scheme.primary : null,
+        ),
       ),
       checkboxTheme: CheckboxThemeData(
-        fillColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? scheme.primary : null),
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? scheme.primary : null,
+        ),
         checkColor: WidgetStatePropertyAll(custom.buttonText),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimens.radiusXs),
@@ -669,8 +694,12 @@ class AppTheme {
       listTileTheme: ListTileThemeData(
         iconColor: scheme.onSurface,
         titleTextStyle: textTheme.titleSmall,
-        subtitleTextStyle: textTheme.bodyMedium?.copyWith(color: custom.grayText),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.space16),
+        subtitleTextStyle: textTheme.bodyMedium?.copyWith(
+          color: custom.grayText,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: custom.navBg,

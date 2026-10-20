@@ -95,18 +95,15 @@ class AppLoadingController extends ChangeNotifier {
   void _armSafetyWatchdog() {
     if (_safetyWatchdog == null || !_safetyWatchdog!.isActive) {
       _safetyWatchdog?.cancel();
-      _safetyWatchdog = Timer(
-        const Duration(seconds: _safetyTimeoutSeconds),
-        () {
-          if (isLoading) {
-            debugPrint(
-              'AppLoadingController: Safety watchdog triggered after '
-              '$_safetyTimeoutSeconds seconds. Auto-clearing un-interactive state.',
-            );
-            reset();
-          }
-        },
-      );
+      _safetyWatchdog = Timer(const Duration(seconds: _safetyTimeoutSeconds), () {
+        if (isLoading) {
+          debugPrint(
+            'AppLoadingController: Safety watchdog triggered after '
+            '$_safetyTimeoutSeconds seconds. Auto-clearing un-interactive state.',
+          );
+          reset();
+        }
+      });
     }
   }
 

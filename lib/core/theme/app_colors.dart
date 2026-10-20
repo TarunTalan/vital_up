@@ -230,6 +230,41 @@ class AppColors {
   /// BPM heart pulse glow.
   static const Color heartGlow = Color(0xFFFF3DBF);
   static const Color heartGlowSoft = Color(0xFFFF6FD8);
+
+  /// What a glass card looks like over the app background, for contrast
+  /// checks (glass fill blended over the light / dark page).
+  static const Color cardBackdropLight = Color(0xFFF1F2F3);
+  static const Color cardBackdropDark = Color(0xFF2C2C2C);
+
+  /// Icons and other non-text marks need 3:1 against what's behind them
+  /// (WCAG 1.4.11).
+  static const double iconContrast = 3.0;
+
+  /// [color] with its hue kept but darkened (on a light [background]) or
+  /// lightened (on a dark one) just enough to reach [minContrast]. Colours
+  /// that already reach it come back unchanged.
+  static Color readableOn(
+    Color color,
+    Color background, {
+    double minContrast = iconContrast,
+  }) {
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance(), lb = b.computeLuminance();
+      final hi = la > lb ? la : lb, lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    if (ratio(color, background) >= minContrast) return color;
+    final darken = background.computeLuminance() > 0.5;
+    var hsl = HSLColor.fromColor(color);
+    for (var i = 0; i < 50; i++) {
+      final l = (hsl.lightness + (darken ? -0.02 : 0.02)).clamp(0.0, 1.0);
+      hsl = hsl.withLightness(l);
+      final c = hsl.toColor().withValues(alpha: color.a);
+      if (ratio(c, background) >= minContrast || l == 0 || l == 1) return c;
+    }
+    return hsl.toColor();
+  }
 }
 
 /// Vita health coach — Figma section "Health coach" (1893:14544).

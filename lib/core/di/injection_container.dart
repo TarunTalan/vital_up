@@ -518,9 +518,7 @@ Future<void> initDependencies() async {
       MapDownloadNotifier(sl<FlutterLocalNotificationsPlugin>()),
     ),
   );
-  sl.registerLazySingleton(
-    () => OfflineMapPrefetcher(sl<MapTileRepository>()),
-  );
+  sl.registerLazySingleton(() => OfflineMapPrefetcher(sl<MapTileRepository>()));
   sl.registerLazySingleton(
     () => BodyWeightSource(
       weights: sl<WeightService>(),
@@ -564,9 +562,7 @@ Future<void> initDependencies() async {
       weightKg: () => sl<BodyWeightSource>()(),
     ),
   );
-  sl.registerLazySingleton(
-    () => WorkoutTimerStore(sl<SharedPreferences>()),
-  );
+  sl.registerLazySingleton(() => WorkoutTimerStore(sl<SharedPreferences>()));
   sl.registerLazySingleton<WorkoutTimerNotifier>(
     () => LocalWorkoutTimerNotifier(sl<FlutterLocalNotificationsPlugin>()),
   );

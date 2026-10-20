@@ -217,6 +217,14 @@ class AppDimens {
 
   /// Trackers: progress ring on detail heroes, status chip, quick-log tiles,
   /// stage/legend dots and the alpha used for tinted fills and borders.
+  // Value ruler (sliding scale picker, e.g. the weight sheet).
+  static const double rulerTickSpacing = 10.0;
+  static const double rulerTickMajor = 32.0;
+  static const double rulerTickMid = 20.0;
+  static const double rulerTickMinor = 12.0;
+  static const double rulerIndicatorWidth = 4.0;
+  static const double rulerIndicatorHeight = 44.0;
+
   static const double trackerRing = 96.0;
   static const double trackerRingStroke = 10.0;
   static const double trackerTile = 96.0;

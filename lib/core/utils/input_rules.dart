@@ -75,7 +75,11 @@ String sanitizeText(String input, {int? maxLength, bool multiline = false}) {
 }
 
 /// [sanitizeText], or null when nothing is left (for optional fields).
-String? sanitizeOptional(String? input, {int? maxLength, bool multiline = false}) {
+String? sanitizeOptional(
+  String? input, {
+  int? maxLength,
+  bool multiline = false,
+}) {
   if (input == null) return null;
   final s = sanitizeText(input, maxLength: maxLength, multiline: multiline);
   return s.isEmpty ? null : s;
@@ -83,7 +87,11 @@ String? sanitizeOptional(String? input, {int? maxLength, bool multiline = false}
 
 /// Parses a typed number ("1,5" or "1.5") and returns it only when it is
 /// finite and within [min, max].
-double? parseNumberInRange(String? input, {required num min, required num max}) {
+double? parseNumberInRange(
+  String? input, {
+  required num min,
+  required num max,
+}) {
   final text = input?.trim().replaceAll(',', '.');
   if (text == null || text.isEmpty) return null;
   final value = double.tryParse(text);
@@ -101,7 +109,10 @@ abstract final class InputFormatters {
   /// Single-line fields: also blocks line breaks.
   static final singleLine = FilteringTextInputFormatter.deny(RegExp('[\n\r]'));
 
-  static List<TextInputFormatter> text(int maxLength, {bool multiline = false}) => [
+  static List<TextInputFormatter> text(
+    int maxLength, {
+    bool multiline = false,
+  }) => [
     noInvisible,
     if (!multiline) singleLine,
     LengthLimitingTextInputFormatter(maxLength),
@@ -110,7 +121,10 @@ abstract final class InputFormatters {
 
 /// Short, plain message for [error] to show the user (snackbar, inline
 /// error). Never shows exception text: technical detail goes to logs.
-String userMessage(Object error, {String fallback = 'Something went wrong. Try again.'}) {
+String userMessage(
+  Object error, {
+  String fallback = 'Something went wrong. Try again.',
+}) {
   if (isOfflineError(error)) return "You're offline. Try again when connected.";
   if (error is TimeoutException) return 'This is taking too long. Try again.';
   if (error is AuthException) {

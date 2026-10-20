@@ -10,7 +10,7 @@ class EmailService {
   final Logger _logger = Logger();
 
   EmailService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+    : _supabase = supabase ?? Supabase.instance.client;
 
   /// Submits a contact support ticket:
   /// 1. Sends full user details and ticket inputs formatted into the brand template to support@vitalup.live

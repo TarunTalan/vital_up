@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
+/// Shared action icons from the assets, used wherever a card offers that
+/// action (Material icons only where the assets have none). An action never
+/// reuses its tracker's own icon: logging water or sleep shows a plus, not
+/// a second drop or moon.
+abstract final class TrackerIcons {
+  static const String edit = 'assets/icons/ui/edit.svg';
+  static const String add = 'assets/icons/ui/plus.svg';
+  static const String goal = 'assets/icons/gamification/target.svg';
+  static const String plan = 'assets/icons/nav/vita.svg';
+}
+
 /// Every metric VitalUp tracks. Each one follows the same pattern —
 /// goal, daily logging, progress (home card) and insights (detail page) —
 /// and is drawn with the same icon and accent everywhere.
@@ -14,6 +25,7 @@ enum TrackerMetric {
     route: 'diet-progress',
     logLabel: 'Log meal',
     logIcon: Icons.photo_camera_rounded,
+    logIconAsset: 'assets/icons/ui/camera.svg',
   ),
   activity(
     label: 'Activity',
@@ -32,6 +44,7 @@ enum TrackerMetric {
     route: 'stress-trends',
     logLabel: 'Check in',
     logIcon: Icons.add_reaction_rounded,
+    logIconAsset: 'assets/icons/ui/smile.svg',
   ),
   water(
     label: 'Water',
@@ -41,6 +54,8 @@ enum TrackerMetric {
     route: 'water-trends',
     logLabel: 'Log water',
     logIcon: Icons.add_rounded,
+    // A plus, not the drop: the card title already shows the drop.
+    logIconAsset: TrackerIcons.add,
   ),
   sleep(
     label: 'Sleep',
@@ -49,7 +64,9 @@ enum TrackerMetric {
     color: AppColors.trackSleep,
     route: 'sleep-trends',
     logLabel: 'Log sleep',
-    logIcon: Icons.bedtime_rounded,
+    // A plus, not the moon: the card title already shows the moon.
+    logIcon: Icons.add_rounded,
+    logIconAsset: TrackerIcons.add,
   ),
   weight(
     label: 'Weight',
@@ -59,6 +76,7 @@ enum TrackerMetric {
     route: 'weight-trends',
     logLabel: 'Log weight',
     logIcon: Icons.add_rounded,
+    logIconAsset: TrackerIcons.add,
   ),
   screenTime(
     label: 'Screen time',
@@ -87,6 +105,9 @@ enum TrackerMetric {
   final String logLabel;
   final IconData logIcon;
 
+  /// SVG for the log action when the assets have one; [logIcon] otherwise.
+  final String? logIconAsset;
+
   const TrackerMetric({
     required this.label,
     required this.iconAsset,
@@ -95,6 +116,7 @@ enum TrackerMetric {
     required this.route,
     required this.logLabel,
     required this.logIcon,
+    this.logIconAsset,
   });
 
   /// Screen time is read from the device, so it has nothing to log by hand.

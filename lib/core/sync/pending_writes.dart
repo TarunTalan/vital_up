@@ -169,11 +169,9 @@ class PendingWrite {
       case 'upsert':
         await client.from(target).upsert(values, onConflict: onConflict);
       case 'insert':
-        await client.from(target).upsert(
-          values,
-          onConflict: onConflict,
-          ignoreDuplicates: true,
-        );
+        await client
+            .from(target)
+            .upsert(values, onConflict: onConflict, ignoreDuplicates: true);
       case 'delete':
         var q = client.from(target).delete();
         for (final e in match.entries) {
@@ -340,8 +338,7 @@ class PendingWrites {
     // fields of the same row, must go first: queue behind it.
     final queuedAhead = _all().any(
       (w) =>
-          (w.key == write.key && w.userId == write.userId) ||
-          w.overlaps(write),
+          (w.key == write.key && w.userId == write.userId) || w.overlaps(write),
     );
     if (!_connectivity.hasNetwork || queuedAhead) {
       await enqueue(write);

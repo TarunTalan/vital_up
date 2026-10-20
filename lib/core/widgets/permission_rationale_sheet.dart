@@ -93,10 +93,7 @@ class _PermissionRationaleContent extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: type.color.withAlpha(25),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: type.color.withAlpha(70),
-                    width: 2,
-                  ),
+                  border: Border.all(color: type.color.withAlpha(70), width: 2),
                 ),
                 child: Center(
                   child: Icon(type.icon, size: 36, color: type.color),
@@ -172,9 +169,7 @@ class _PermissionRationaleContent extends StatelessWidget {
               onPressed: () => Navigator.pop(context, false),
               child: Text(
                 'Maybe Later',
-                style: context.text.bodySmall?.copyWith(
-                  color: v.grayText,
-                ),
+                style: context.text.bodySmall?.copyWith(color: v.grayText),
               ),
             ),
           ],

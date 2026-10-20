@@ -69,7 +69,8 @@ class _BiometricLockGuardState extends State<BiometricLockGuard>
     try {
       // No screen lock on the device any more: nothing can confirm the
       // user, so don't lock them out of their own data.
-      authenticated = !await _bioService.canConfirmUser() ||
+      authenticated =
+          !await _bioService.canConfirmUser() ||
           await _bioService.authenticate(
             reason: 'Unlock VitalUp to see your health data',
           );
@@ -89,9 +90,7 @@ class _BiometricLockGuardState extends State<BiometricLockGuard>
         widget.child,
         if (_isLocked)
           Positioned.fill(
-            child: _BiometricLockScreen(
-              onUnlockPressed: _triggerUnlock,
-            ),
+            child: _BiometricLockScreen(onUnlockPressed: _triggerUnlock),
           ),
       ],
     );

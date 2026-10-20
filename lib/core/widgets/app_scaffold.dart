@@ -72,7 +72,8 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   void didUpdateWidget(covariant AppScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final wasLoading = oldWidget.isLoading ||
+    final wasLoading =
+        oldWidget.isLoading ||
         oldWidget.isBusy ||
         (oldWidget.body is VitalUpLoader) ||
         (oldWidget.body is Center &&
@@ -108,7 +109,8 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final padding = widget.bodyPadding ??
+    final padding =
+        widget.bodyPadding ??
         (widget.padBody
             ? EdgeInsets.fromLTRB(
                 context.gutter,
@@ -143,10 +145,7 @@ class _AppScaffoldState extends State<AppScaffold> {
     }
 
     if (widget.onRefresh != null) {
-      content = RefreshIndicator(
-        onRefresh: _refresh,
-        child: content,
-      );
+      content = RefreshIndicator(onRefresh: _refresh, child: content);
     }
 
     final isPageLoading = widget.isLoading || _isLoaderBody;
@@ -156,9 +155,7 @@ class _AppScaffoldState extends State<AppScaffold> {
         ?widget.header,
         if (widget.header == null) SizedBox(height: context.safePadding.top),
         Expanded(
-          child: isPageLoading
-              ? const Center(child: VitalUpLoader())
-              : content,
+          child: isPageLoading ? const Center(child: VitalUpLoader()) : content,
         ),
         if (widget.bottomBar != null)
           SafeArea(

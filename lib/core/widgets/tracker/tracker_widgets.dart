@@ -30,7 +30,10 @@ class TrackerIcon extends StatelessWidget {
       metric.iconAsset,
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(color ?? metric.color, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(
+        color ?? context.iconTint(metric.color),
+        BlendMode.srcIn,
+      ),
     );
   }
 }
@@ -47,7 +50,11 @@ class TrackerBadge extends StatelessWidget {
     return AppIconBadge(
       color: metric.color,
       size: size,
-      icon: TrackerIcon(metric, size: size / 2),
+      icon: TrackerIcon(
+        metric,
+        size: size / 2,
+        color: AppIconBadge.glyphColor(context, metric.color),
+      ),
     );
   }
 }
@@ -120,25 +127,29 @@ class TrackerCardHeader extends StatelessWidget {
           );
         }
         final titleWidget = FitText(titleText, style: titleStyle);
-        // A met goal's check gives way in a narrow tile when the title
-        // wouldn't fit whole beside it (the muted card still says done).
-        final showCheck =
-            chip == null &&
-            status == TrackerStatus.done &&
-            FitText.fits(
-              context,
-              TextSpan(text: titleText, style: titleStyle),
-              constraints.maxWidth -
-                  badge -
-                  gap -
-                  AppDimens.space8 -
-                  AppDimens.iconSm,
-            );
+        // Tiles have no chip: a met goal shows as a check on the badge's
+        // corner, which takes no room from the title, so it shows on
+        // every phone and text size.
+        final doneMark = chip == null && status == TrackerStatus.done;
         // Half-width tiles get a smaller badge and gap so the title fits
         // whole at its normal size.
         return Row(
           children: [
-            TrackerBadge(metric, size: badge),
+            Semantics(
+              label: doneMark ? (statusLabel ?? status!.label) : null,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  TrackerBadge(metric, size: badge),
+                  if (doneMark)
+                    Positioned(
+                      right: -AppDimens.space4,
+                      bottom: -AppDimens.space4,
+                      child: _DoneMark(color: statusColor),
+                    ),
+                ],
+              ),
+            ),
             SizedBox(width: gap),
             Expanded(
               child: chipBelow
@@ -155,14 +166,6 @@ class TrackerCardHeader extends StatelessWidget {
             if (chip != null && !chipBelow) ...[
               const SizedBox(width: AppDimens.space8),
               chip,
-            ] else if (showCheck) ...[
-              const SizedBox(width: AppDimens.space8),
-              Icon(
-                Icons.check_circle_rounded,
-                size: AppDimens.iconSm,
-                color: statusColor ?? context.vColors.success,
-                semanticLabel: statusLabel ?? status!.label,
-              ),
             ],
             if (chevron) ...[
               const SizedBox(width: AppDimens.space4),
@@ -175,6 +178,31 @@ class TrackerCardHeader extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Green check on a tile badge's corner: the tracker's goal is met (or
+/// today is logged). Ringed in the card colour so it reads on the badge.
+class _DoneMark extends StatelessWidget {
+  final Color? color;
+
+  const _DoneMark({this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: context.isDark
+            ? AppColors.cardBackdropDark
+            : AppColors.cardBackdropLight,
+      ),
+      child: Icon(
+        Icons.check_circle_rounded,
+        size: AppDimens.iconXs,
+        color: context.iconTint(color ?? context.vColors.success!),
+      ),
     );
   }
 }
@@ -811,13 +839,15 @@ class TrackerHeroLayout extends StatelessWidget {
 /// · 2 of 4 meals"). It wraps only between facts, never inside one.
 class TrackerSummaryLine extends StatelessWidget {
   final List<String> parts;
+  final TextAlign? textAlign;
 
-  const TrackerSummaryLine({super.key, required this.parts});
+  const TrackerSummaryLine({super.key, required this.parts, this.textAlign});
 
   @override
   Widget build(BuildContext context) {
     return Text(
       parts.map((p) => p.replaceAll(' ', '\u00a0')).join('  ·  '),
+      textAlign: textAlign,
       style: context.text.bodySmall?.copyWith(color: context.vColors.grayText),
     );
   }
@@ -833,18 +863,23 @@ class TrackerBarRow extends StatelessWidget {
   final double fraction;
   final Color color;
 
+  /// The goal is met: a green check before the figure.
+  final bool done;
+
   const TrackerBarRow({
     super.key,
     required this.name,
     required this.figure,
     required this.fraction,
     required this.color,
+    this.done = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final grey = context.vColors.grayText;
     return Semantics(
-      label: '$name $figure',
+      label: '$name $figure${done ? ', goal met' : ''}',
       excludeSemantics: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -860,11 +895,27 @@ class TrackerBarRow extends StatelessWidget {
                   color: context.colors.onSurface,
                 ),
               ),
-              Text(
-                figure,
-                style: context.text.bodySmall?.copyWith(
-                  color: context.vColors.grayText,
+              Text.rich(
+                TextSpan(
+                  children: [
+                    if (done)
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            right: AppDimens.space4,
+                          ),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: AppDimens.iconXs,
+                            color: context.iconTint(context.vColors.success!),
+                          ),
+                        ),
+                      ),
+                    TextSpan(text: figure),
+                  ],
                 ),
+                style: context.text.bodySmall?.copyWith(color: grey),
               ),
             ],
           ),

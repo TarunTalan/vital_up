@@ -64,18 +64,21 @@ class AppPageHeader extends StatelessWidget {
               children: [
                 if (hasBack) ...[
                   BackIcon(
-                    onClick: onBack ?? () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      } else {
-                        context.goNamed('dashboard');
-                      }
-                    },
+                    onClick:
+                        onBack ??
+                        () {
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            context.goNamed('dashboard');
+                          }
+                        },
                   ),
                   const SizedBox(width: AppDimens.space12),
                 ],
                 Expanded(
-                  child: titleWidget ??
+                  child:
+                      titleWidget ??
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -91,8 +94,9 @@ class AppPageHeader extends StatelessWidget {
                             const SizedBox(height: AppDimens.space4),
                             Text(
                               subtitle!,
-                              style: context.text.bodyMedium
-                                  ?.copyWith(color: v.grayText),
+                              style: context.text.bodyMedium?.copyWith(
+                                color: v.grayText,
+                              ),
                             ),
                           ],
                         ],
@@ -159,13 +163,15 @@ class AppTitleBar extends StatelessWidget {
             children: [
               if (hasBack)
                 BackIcon(
-                  onClick: onBack ?? () {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    } else {
-                      context.goNamed('dashboard');
-                    }
-                  },
+                  onClick:
+                      onBack ??
+                      () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          context.goNamed('dashboard');
+                        }
+                      },
                 )
               else
                 slot,
@@ -228,10 +234,7 @@ class AppHeaderAction extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: IconTheme(
-            data: IconThemeData(
-              color: v.accentText,
-              size: AppDimens.iconLg,
-            ),
+            data: IconThemeData(color: v.accentText, size: AppDimens.iconLg),
             child: Center(child: icon),
           ),
         ),

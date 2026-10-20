@@ -70,7 +70,10 @@ class AppCard extends StatelessWidget {
     // The sheen gradient replaces the flat fill, so layer the fill underneath.
     if (sheen && tint == null) {
       content = DecoratedBox(
-        decoration: BoxDecoration(color: v.glassFill, borderRadius: borderRadius),
+        decoration: BoxDecoration(
+          color: v.glassFill,
+          borderRadius: borderRadius,
+        ),
         child: content,
       );
     }
@@ -90,7 +93,10 @@ class AppCard extends StatelessWidget {
 
     if (shadow != null) {
       content = DecoratedBox(
-        decoration: BoxDecoration(borderRadius: borderRadius, boxShadow: shadow),
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          boxShadow: shadow,
+        ),
         child: content,
       );
     }
@@ -113,22 +119,33 @@ class AppIconBadge extends StatelessWidget {
     this.size = AppDimens.iconBadge,
   });
 
+  static const double _fillAlpha = 0.2;
+
+  /// Colour for a glyph on a badge of [accent]. It sits on the tinted
+  /// circle, not the bare card, so it gets 3:1 against the circle: a
+  /// deeper shade in light mode, lighter in dark. Pass it to icons that
+  /// set their own colour (SVGs).
+  static Color glyphColor(BuildContext context, Color accent) =>
+      AppColors.readableOn(
+        accent,
+        Color.alphaBlend(
+          accent.withValues(alpha: _fillAlpha),
+          context.isDark
+              ? AppColors.cardBackdropDark
+              : AppColors.cardBackdropLight,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final accent = color ?? context.colors.primary;
-    // The brand cyan is too light for an icon on its own tint in light
-    // mode; draw the glyph in the readable shade.
-    final glyph = accent == AppColors.primary
-        ? context.vColors.accentText ?? accent
-        : accent;
+    final fill = accent.withValues(alpha: _fillAlpha);
+    final glyph = glyphColor(context, accent);
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
       child: IconTheme(
         data: IconThemeData(color: glyph, size: size / 2),
         child: icon,
@@ -173,12 +190,7 @@ class AppCaption extends StatelessWidget {
   final Color? color;
   final bool uppercase;
 
-  const AppCaption(
-    this.text, {
-    super.key,
-    this.color,
-    this.uppercase = true,
-  });
+  const AppCaption(this.text, {super.key, this.color, this.uppercase = true});
 
   @override
   Widget build(BuildContext context) {

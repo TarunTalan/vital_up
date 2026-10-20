@@ -46,7 +46,8 @@ class AppListGroup extends StatelessWidget {
                     color: context.vColors.divider,
                     height: AppDimens.borderThin,
                     thickness: AppDimens.borderThin,
-                    indent: AppDimens.space16 +
+                    indent:
+                        AppDimens.space16 +
                         AppDimens.iconBadge +
                         AppDimens.space12,
                     endIndent: AppDimens.space16,

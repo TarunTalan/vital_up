@@ -3,15 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 
-/// An interactive, circular 24-hour sleep clock picker with drag handles for
-/// Bedtime (🌙) and Wake-up time (☀️).
+/// A 24-hour clock for a night's sleep: drag the moon (bedtime) or the sun
+/// (wake time), or drag the arc between them to move the whole night and
+/// keep its length. Snaps to 5 minutes with a light haptic tick. The middle
+/// shows how long that is and how it compares with the sleep [goal].
 class CircularSleepClockPicker extends StatefulWidget {
   final TimeOfDay initialBedTime;
   final TimeOfDay initialWakeTime;
   final ValueChanged<TimeOfDay>? onBedTimeChanged;
   final ValueChanged<TimeOfDay>? onWakeTimeChanged;
   final void Function(TimeOfDay bed, TimeOfDay wake)? onChanged;
+
+  /// Nightly sleep goal: the middle says "Goal met" or how far short.
+  final Duration? goal;
 
   const CircularSleepClockPicker({
     super.key,
@@ -20,6 +26,7 @@ class CircularSleepClockPicker extends StatefulWidget {
     this.onBedTimeChanged,
     this.onWakeTimeChanged,
     this.onChanged,
+    this.goal,
   });
 
   @override
@@ -31,6 +38,11 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
   late TimeOfDay _bedTime;
   late TimeOfDay _wakeTime;
   _ActiveHandle _activeHandle = _ActiveHandle.none;
+
+  /// While dragging the arc: where the drag began and the times then.
+  double _arcStartAngle = 0;
+  TimeOfDay _arcStartBed = const TimeOfDay(hour: 0, minute: 0);
+  TimeOfDay _arcStartWake = const TimeOfDay(hour: 0, minute: 0);
 
   @override
   void initState() {
@@ -79,6 +91,13 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
     return TimeOfDay(hour: hours, minute: minutes);
   }
 
+  /// "45m", "1h 10m", "8h".
+  static String _short(Duration d) {
+    final h = d.inHours, m = d.inMinutes % 60;
+    if (h == 0) return '${m}m';
+    return m == 0 ? '${h}h' : '${h}h ${m}m';
+  }
+
   Duration _getSleepDuration() {
     final bedMinutes = _bedTime.hour * 60 + _bedTime.minute;
     var wakeMinutes = _wakeTime.hour * 60 + _wakeTime.minute;
@@ -86,22 +105,6 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
       wakeMinutes += 24 * 60;
     }
     return Duration(minutes: wakeMinutes - bedMinutes);
-  }
-
-  int _calculateSleepScore(Duration duration) {
-    final hours = duration.inMinutes / 60.0;
-    if (hours >= 7.0 && hours <= 9.0) {
-      // Optimal range
-      return (90 + (10 * (1 - (hours - 8.0).abs()))).round().clamp(90, 100);
-    } else if (hours >= 6.0 && hours < 7.0) {
-      return (75 + ((hours - 6.0) * 15)).round().clamp(70, 89);
-    } else if (hours > 9.0 && hours <= 10.5) {
-      return (85 - ((hours - 9.0) * 10)).round().clamp(70, 85);
-    } else if (hours >= 4.5 && hours < 6.0) {
-      return (50 + ((hours - 4.5) * 16)).round().clamp(50, 69);
-    } else {
-      return 45;
-    }
   }
 
   void _onPanStart(Offset localPosition, Size size) {
@@ -131,6 +134,16 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
     } else if (distToWake < hitRadius) {
       _activeHandle = _ActiveHandle.wake;
       HapticFeedback.selectionClick();
+    } else if (_onArc(localPosition, center, radius)) {
+      // Grabbing the arc itself moves the whole night.
+      _activeHandle = _ActiveHandle.arc;
+      _arcStartAngle = math.atan2(
+        localPosition.dy - center.dy,
+        localPosition.dx - center.dx,
+      );
+      _arcStartBed = _bedTime;
+      _arcStartWake = _wakeTime;
+      HapticFeedback.selectionClick();
     } else {
       _activeHandle = _ActiveHandle.none;
     }
@@ -144,7 +157,28 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
     final angle = math.atan2(touchOffset.dy, touchOffset.dx);
     final newTime = _angleToTime(angle);
 
-    if (_activeHandle == _ActiveHandle.bed) {
+    if (_activeHandle == _ActiveHandle.arc) {
+      var delta = angle - _arcStartAngle;
+      while (delta > math.pi) {
+        delta -= 2 * math.pi;
+      }
+      while (delta < -math.pi) {
+        delta += 2 * math.pi;
+      }
+      final minutes = (delta / (2 * math.pi) * 24 * 60 / 5).round() * 5;
+      final bed = _shift(_arcStartBed, minutes);
+      final wake = _shift(_arcStartWake, minutes);
+      if (bed != _bedTime) {
+        setState(() {
+          _bedTime = bed;
+          _wakeTime = wake;
+        });
+        widget.onBedTimeChanged?.call(bed);
+        widget.onWakeTimeChanged?.call(wake);
+        widget.onChanged?.call(_bedTime, _wakeTime);
+        HapticFeedback.lightImpact();
+      }
+    } else if (_activeHandle == _ActiveHandle.bed) {
       if (_bedTime != newTime) {
         setState(() => _bedTime = newTime);
         widget.onBedTimeChanged?.call(newTime);
@@ -165,13 +199,41 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
     _activeHandle = _ActiveHandle.none;
   }
 
+  /// [time] moved by [minutes], wrapping round midnight.
+  static TimeOfDay _shift(TimeOfDay time, int minutes) {
+    final total = (time.hour * 60 + time.minute + minutes) % (24 * 60);
+    return TimeOfDay(hour: total ~/ 60, minute: total % 60);
+  }
+
+  /// [point] is on the ring, inside the arc from bedtime to wake time.
+  bool _onArc(Offset point, Offset center, double radius) {
+    final distance = (point - center).distance;
+    if ((distance - radius).abs() > _ringStroke) return false;
+    final bed = _timeToAngle(_bedTime);
+    var sweep = _timeToAngle(_wakeTime) - bed;
+    if (sweep < 0) sweep += 2 * math.pi;
+    var at = math.atan2(point.dy - center.dy, point.dx - center.dx) - bed;
+    while (at < 0) {
+      at += 2 * math.pi;
+    }
+    return at <= sweep;
+  }
+
+  static const double _ringStroke = 26;
+
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
     final duration = _getSleepDuration();
-    final score = _calculateSleepScore(duration);
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
+    final goal = widget.goal;
+    final goalMet = goal != null && duration >= goal;
+    final goalNote = goal == null
+        ? null
+        : goalMet
+        ? 'Goal met'
+        : '${_short(goal - duration)} under your ${_short(goal)} goal';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -200,6 +262,7 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
                     trackColor: v.track ?? Colors.grey.withAlpha(50),
                     arcColor: AppColors.sleep,
                     dialTextColor: v.grayText ?? Colors.grey,
+                    textScaler: MediaQuery.textScalerOf(context),
                   ),
                   child: Center(
                     child: Padding(
@@ -207,39 +270,27 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.bedtime_rounded,
-                            size: AppDimens.iconMd,
-                            color: AppColors.sleep,
-                          ),
-                          const SizedBox(height: AppDimens.space4),
-                          Text(
-                            '${hours}h ${minutes > 0 ? '${minutes}m' : ''}',
-                            style: context.text.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: context.colors.onSurface,
+                          Text.rich(
+                            figureSpan(
+                              context,
+                              minutes == 0
+                                  ? '${hours}h'
+                                  : '${hours}h ${minutes}m',
                             ),
                           ),
-                          const SizedBox(height: AppDimens.space2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppDimens.space8,
-                              vertical: AppDimens.space2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getScoreColor(score).withAlpha(35),
-                              borderRadius: BorderRadius.circular(
-                                AppDimens.radiusToast,
-                              ),
-                            ),
-                            child: Text(
-                              'Score: $score% · ${_getScoreLabel(score)}',
+                          if (goalNote case final note?) ...[
+                            const SizedBox(height: AppDimens.space4),
+                            Text(
+                              note,
+                              textAlign: TextAlign.center,
                               style: context.text.labelSmall?.copyWith(
-                                color: _getScoreColor(score),
+                                color: goalMet
+                                    ? context.iconTint(v.success!)
+                                    : v.grayText,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -297,23 +348,9 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
       ],
     );
   }
-
-  Color _getScoreColor(int score) {
-    if (score >= 85) return AppColors.success;
-    if (score >= 70) return AppColors.teal;
-    if (score >= 50) return AppColors.warning;
-    return AppColors.error;
-  }
-
-  String _getScoreLabel(int score) {
-    if (score >= 85) return 'Optimal';
-    if (score >= 70) return 'Good';
-    if (score >= 50) return 'Fair';
-    return 'Low';
-  }
 }
 
-enum _ActiveHandle { none, bed, wake }
+enum _ActiveHandle { none, bed, wake, arc }
 
 class _ScheduleTimeCard extends StatelessWidget {
   final IconData icon;
@@ -399,6 +436,7 @@ class _SleepClockPainter extends CustomPainter {
   final Color trackColor;
   final Color arcColor;
   final Color dialTextColor;
+  final TextScaler textScaler;
 
   _SleepClockPainter({
     required this.bedAngle,
@@ -406,13 +444,14 @@ class _SleepClockPainter extends CustomPainter {
     required this.trackColor,
     required this.arcColor,
     required this.dialTextColor,
+    required this.textScaler,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 24;
-    const strokeWidth = 26.0;
+    const strokeWidth = _CircularSleepClockPickerState._ringStroke;
 
     // 1. Draw outer 24-hour background track
     final trackPaint = Paint()
@@ -431,6 +470,7 @@ class _SleepClockPainter extends CustomPainter {
     final textPainter = TextPainter(
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
+      textScaler: textScaler,
     );
 
     const labels = {0: '12A', 6: '6A', 12: '12P', 18: '6P'};
@@ -579,6 +619,7 @@ class _SleepClockPainter extends CustomPainter {
         oldDelegate.wakeAngle != wakeAngle ||
         oldDelegate.trackColor != trackColor ||
         oldDelegate.arcColor != arcColor ||
-        oldDelegate.dialTextColor != dialTextColor;
+        oldDelegate.dialTextColor != dialTextColor ||
+        oldDelegate.textScaler != textScaler;
   }
 }

@@ -11,10 +11,10 @@ class SleepLogCache {
 
   late DateTime startTime;
   late DateTime endTime;
-  
+
   late int durationMinutes;
-  
+
   String source = 'manual';
-  
+
   bool isSynced = false;
 }
