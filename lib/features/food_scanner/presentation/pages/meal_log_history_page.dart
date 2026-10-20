@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
@@ -46,7 +49,10 @@ class _MealLogHistoryView extends StatelessWidget {
         top: false,
         child: RefreshIndicator(
           onRefresh: () async {
-            context.read<MealLogBloc>().add(const LoadAllMealLogs());
+            final done = Completer<void>();
+            context.read<MealLogBloc>().add(LoadAllMealLogs(done: done));
+            // The spinner stays until the list has reloaded.
+            await done.future.timeout(kLoadTimeout, onTimeout: () {});
           },
           child: BlocConsumer<MealLogBloc, MealLogState>(
             listenWhen: (_, state) => state is MealLogLoaded && state.notice != null,

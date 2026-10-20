@@ -126,6 +126,8 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/usecases/log_workout.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/services/body_weight_source.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_prefetcher.dart';
 import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
@@ -516,6 +518,15 @@ Future<void> initDependencies() async {
       MapDownloadNotifier(sl<FlutterLocalNotificationsPlugin>()),
     ),
   );
+  sl.registerLazySingleton(
+    () => OfflineMapPrefetcher(sl<MapTileRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => BodyWeightSource(
+      weights: sl<WeightService>(),
+      profiles: sl<ProfileRepository>(),
+    ),
+  );
 
   sl.registerLazySingleton<LocationTrackingRepository>(
     () => LocationTrackingRepositoryImpl(),
@@ -550,8 +561,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton(
     () => LogWorkout(
       repository: sl<ActivityRepository>(),
-      weightKg: () async => (await sl<AuthRepository>().getCurrentUser())
-          .fold((_) => null, (user) => user?.weightKg),
+      weightKg: () => sl<BodyWeightSource>()(),
     ),
   );
   sl.registerLazySingleton(
@@ -570,7 +580,7 @@ Future<void> initDependencies() async {
       getLiveLocationStream: sl<GetLiveLocationStream>(),
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
-      authRepository: sl<AuthRepository>(),
+      weightKg: () => sl<BodyWeightSource>()(),
       checkpointStore: sl<WorkoutCheckpointStore>(),
     ),
   );
@@ -851,6 +861,7 @@ Future<void> initDependencies() async {
       ],
       sl<ConnectivityService>(),
       sl<PendingWrites>(),
+      beforeFirstSync: (userId) => sl<AccountService>().claimDevice(userId),
     ),
   );
 

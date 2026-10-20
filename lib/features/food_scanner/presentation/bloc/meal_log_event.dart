@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 
 abstract class MealLogEvent extends Equatable {
@@ -14,7 +16,11 @@ class LoadTodaysMeals extends MealLogEvent {
 
 /// Load all meal logs history across all dates.
 class LoadAllMealLogs extends MealLogEvent {
-  const LoadAllMealLogs();
+  /// Completed when the load has finished, so pull-to-refresh can keep
+  /// its spinner until then.
+  final Completer<void>? done;
+
+  const LoadAllMealLogs({this.done});
 }
 
 /// Triggered after FoodScanBloc saves a meal — refreshes today's totals.

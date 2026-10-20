@@ -170,8 +170,17 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
     return BlocConsumer<LeaderboardCubit, LeaderboardState>(
       // A new filter starts from the top ten again.
       listenWhen: (prev, next) =>
-          prev.period != next.period || prev.category != next.category,
-      listener: (_, _) => setState(() => _shown = _initialShown),
+          prev.period != next.period ||
+          prev.category != next.category ||
+          (next.failed && !prev.failed && next.entries != null),
+      listener: (context, state) {
+        if (state.failed && state.entries != null) {
+          // The board stays as it was; only say the refresh didn't work.
+          showErrorSnackBar(context, "Couldn't refresh the leaderboard.");
+          return;
+        }
+        setState(() => _shown = _initialShown);
+      },
       builder: (context, state) {
         final cubit = context.read<LeaderboardCubit>();
         final community = state.community;
@@ -199,19 +208,25 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
                 const SizedBox(height: AppDimens.space16),
               ],
               _Filters(state: state, cubit: cubit),
-              const SizedBox(height: AppDimens.space16),
-              if (state.loading && entries != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimens.space8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                    child: LinearProgressIndicator(
-                      minHeight: AppDimens.progressHeight,
-                      color: context.colors.primary,
-                      backgroundColor: context.vColors.track,
-                    ),
-                  ),
+              // The reload bar sits in the gap under the filters, so the
+              // board doesn't move down and back while it reloads.
+              SizedBox(
+                height: AppDimens.space16,
+                child: Center(
+                  child: state.loading && entries != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppDimens.radiusPill,
+                          ),
+                          child: LinearProgressIndicator(
+                            minHeight: AppDimens.progressHeight,
+                            color: context.colors.primary,
+                            backgroundColor: context.vColors.track,
+                          ),
+                        )
+                      : null,
                 ),
+              ),
               if (entries == null)
                 Padding(
                   padding: const EdgeInsets.symmetric(

@@ -18,6 +18,11 @@ class WaterIntakeService {
   static const _dailyGoalKey = 'daily_water_goal';
   static const _defaultGoalMl = 2500;
 
+  /// The daily goal in ml from [prefs]; for background isolates, which
+  /// have no service instance.
+  static int dailyGoalFrom(SharedPreferences prefs) =>
+      sanitizeWaterGoal(prefs.getInt(_dailyGoalKey), fallback: _defaultGoalMl);
+
   WaterIntakeService(
     this._isarService,
     this._prefs, [
@@ -28,8 +33,7 @@ class WaterIntakeService {
   Isar get _isar => _isarService.isar;
 
   /// The daily goal in ml; the default when unset or out of range.
-  int getDailyGoal() =>
-      sanitizeWaterGoal(_prefs.getInt(_dailyGoalKey), fallback: _defaultGoalMl);
+  int getDailyGoal() => dailyGoalFrom(_prefs);
 
   /// Saves the daily goal, kept within the allowed range.
   Future<void> setDailyGoal(int goal) async {

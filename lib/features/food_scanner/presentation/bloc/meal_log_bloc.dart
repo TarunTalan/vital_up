@@ -32,8 +32,17 @@ class MealLogBloc extends Bloc<MealLogEvent, MealLogState> {
   Future<void> _onLoad(LoadTodaysMeals event, Emitter<MealLogState> emit) =>
       _load(all: false, emit);
 
-  Future<void> _onLoadAll(LoadAllMealLogs event, Emitter<MealLogState> emit) =>
-      _load(all: true, emit);
+  Future<void> _onLoadAll(
+    LoadAllMealLogs event,
+    Emitter<MealLogState> emit,
+  ) async {
+    try {
+      await _load(all: true, emit);
+    } finally {
+      final done = event.done;
+      if (done != null && !done.isCompleted) done.complete();
+    }
+  }
 
   /// Reloads keep the current list on screen (resume, refresh, a goal
   /// change); only a first load or a switch of range shows the loader.

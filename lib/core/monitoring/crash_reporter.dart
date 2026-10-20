@@ -54,6 +54,22 @@ abstract final class CrashReporter {
     hookCurrentIsolate();
   }
 
+  /// For entrypoints that run in their own engine (the GPS service, widget
+  /// buttons, notification actions): Firebase and the enabled flag are per
+  /// isolate, so without this their errors reached nothing. Also silences
+  /// debugPrint in release there, as `main` does. Safe to call repeatedly.
+  static Future<void> initBackground() async {
+    if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
+    if (_enabled) return;
+    try {
+      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+      _enabled = !kDebugMode;
+    } catch (_) {
+      // Not configured (iOS today): errors stay local.
+    }
+    hookCurrentIsolate();
+  }
+
   static void _hookLocalErrorHandlers() {
     FlutterError.onError = FlutterError.presentError;
     PlatformDispatcher.instance.onError = (error, stack) {

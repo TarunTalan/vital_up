@@ -488,7 +488,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       try {
         final sent = await pendingWrites.sendOrQueue(
           supabaseClient,
-          PendingWrite.upsert(
+          // Adds products nobody has entered yet; the shared catalogue's
+          // existing entries can't be changed from the app (RLS).
+          PendingWrite.insertIfMissing(
             'proprietary_products',
             values: payload,
             userId: userId,

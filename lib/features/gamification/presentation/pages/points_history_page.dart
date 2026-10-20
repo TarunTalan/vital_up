@@ -4,6 +4,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
@@ -46,15 +47,20 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
   Widget build(BuildContext context) {
     return AppScaffold(
       // Keeps the pull spinner up until the new data has arrived.
+      // The current points stay on screen until the new ones arrive; a
+      // failed refresh keeps them and says so.
       onRefresh: () async {
-        final next = _load();
-        setState(() {
-          _data = next;
-        });
         try {
-          await next;
-        } catch (_) {
-          // Shown by the FutureBuilder below.
+          final next = await _load();
+          if (!mounted) return;
+          setState(() {
+            _data = Future.value(next);
+          });
+        } catch (e) {
+          debugPrint('Refreshing points history failed: $e');
+          if (mounted) {
+            showErrorSnackBar(context, "Couldn't refresh your points.");
+          }
         }
       },
       header: const AppPageHeader(title: 'Points'),

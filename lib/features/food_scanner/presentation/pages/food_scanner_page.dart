@@ -40,20 +40,63 @@ import 'package:vital_up/features/food_scanner/presentation/utils/scan_frame.dar
 
 final GetIt _sl = GetIt.instance;
 
+/// Asks before leaving while a photo is being analysed: the scan already
+/// counts toward today's limit, and leaving throws its result away.
+Future<bool> confirmLeaveFoodScan(BuildContext context) async {
+  final leave = await showSmoothDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Leave now?'),
+      content: const Text(
+        'Your meal is still being analysed. Leaving discards this scan, '
+        'and it still counts toward today.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Stay'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Leave'),
+        ),
+      ],
+    ),
+  );
+  return leave ?? false;
+}
+
 class FoodScannerPage extends StatelessWidget {
   final VoidCallback? onBack;
   final bool isEditingImage;
 
-  const FoodScannerPage({super.key, this.onBack, this.isEditingImage = false});
+  /// Set while a photo is being analysed, for a host (the dashboard) that
+  /// handles back itself and must ask before leaving.
+  final ValueNotifier<bool>? busy;
+
+  const FoodScannerPage({
+    super.key,
+    this.onBack,
+    this.isEditingImage = false,
+    this.busy,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (isEditingImage) {
-      return FoodScannerView(onBack: onBack, isEditingImage: isEditingImage);
+      return FoodScannerView(
+        onBack: onBack,
+        isEditingImage: isEditingImage,
+        busy: busy,
+      );
     }
     return BlocProvider<FoodScanBloc>(
       create: (_) => _sl<FoodScanBloc>(),
-      child: FoodScannerView(onBack: onBack, isEditingImage: isEditingImage),
+      child: FoodScannerView(
+        onBack: onBack,
+        isEditingImage: isEditingImage,
+        busy: busy,
+      ),
     );
   }
 }
@@ -61,8 +104,14 @@ class FoodScannerPage extends StatelessWidget {
 class FoodScannerView extends StatefulWidget {
   final VoidCallback? onBack;
   final bool isEditingImage;
+  final ValueNotifier<bool>? busy;
 
-  const FoodScannerView({super.key, this.onBack, this.isEditingImage = false});
+  const FoodScannerView({
+    super.key,
+    this.onBack,
+    this.isEditingImage = false,
+    this.busy,
+  });
 
   @override
   State<FoodScannerView> createState() => _FoodScannerViewState();
@@ -173,6 +222,7 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
     _cameraController?.dispose();
     _barcodeScanner.close();
     _textRecognizer.close();
+    widget.busy?.value = false;
     super.dispose();
   }
 
@@ -506,33 +556,31 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
     return false;
   }
 
+  /// The photo whose nutrition label is being read; null otherwise. Shown
+  /// as an overlay on this page: a loader dialog had to be closed with a
+  /// pop that could take the wrong screen with it after a back press.
+  String? _readingLabelPath;
+
   Future<void> _processNutritionLabelOcr(String path) async {
-    // Show a loading indicator
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const Center(
-          child: VitalUpLoader(),
-        );
-      },
-    );
+    if (_readingLabelPath != null) return;
+    setState(() => _readingLabelPath = path);
 
     try {
       final inputImage = InputImage.fromFilePath(path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText = await _textRecognizer
+          .processImage(inputImage)
+          .timeout(const Duration(seconds: 30));
       final parsed = NutritionOcrParser.parseNutritionText(recognizedText.text);
 
       if (!mounted) return;
-      // Close the loading dialog (shown on the root navigator)
-      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _readingLabelPath = null);
 
       // Open the verify/edit nutrition dialog
       _openNutritionManualEntry(parsed);
     } catch (e) {
       debugPrint('OCR processing error: $e');
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Close loader
+        setState(() => _readingLabelPath = null);
         showErrorSnackBar(
           context,
           mlKitErrorMessage(
@@ -745,7 +793,13 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
     }
   }
 
-  void _handleBack() {
+  Future<void> _handleBack() async {
+    if (context.read<FoodScanBloc>().state is RecognizingFood &&
+        widget.onBack == null) {
+      // A dashboard host asks in its own back handler.
+      if (!await confirmLeaveFoodScan(context) || !mounted) return;
+    }
+    if (!mounted) return;
     if (widget.onBack != null) {
       widget.onBack!();
     } else {
@@ -817,6 +871,9 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
       },
       builder: (context, state) {
         final isRecognizing = state is RecognizingFood;
+        // Only read by the host's back handler, never listened to, so
+        // setting it during build triggers nothing.
+        widget.busy?.value = isRecognizing;
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
@@ -967,6 +1024,14 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
                 Positioned.fill(
                   child: _RecognizingOverlay(
                     image: File(_selectedImage?.path ?? state.image.path),
+                    hint: 'This can take up to a minute.',
+                  ),
+                ),
+              if (_readingLabelPath case final labelPath?)
+                Positioned.fill(
+                  child: _RecognizingOverlay(
+                    image: File(labelPath),
+                    title: 'Reading the label...',
                   ),
                 ),
             ],
@@ -1031,7 +1096,16 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
 class _RecognizingOverlay extends StatelessWidget {
   final File image;
 
-  const _RecognizingOverlay({required this.image});
+  /// Second line under the title (how long it may take).
+  final String? hint;
+
+  final String title;
+
+  const _RecognizingOverlay({
+    required this.image,
+    this.title = 'Analysing your meal...',
+    this.hint,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1075,12 +1149,22 @@ class _RecognizingOverlay extends StatelessWidget {
                 const VitalUpLoader(),
                 const SizedBox(height: AppDimens.space20),
                 Text(
-                  'Analysing your meal...',
+                  title,
                   textAlign: TextAlign.center,
                   style: context.text.titleSmall?.copyWith(
                     color: AppColors.white,
                   ),
                 ),
+                if (hint != null) ...[
+                  const SizedBox(height: AppDimens.space8),
+                  Text(
+                    hint!,
+                    textAlign: TextAlign.center,
+                    style: context.text.bodySmall?.copyWith(
+                      color: AppColors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
