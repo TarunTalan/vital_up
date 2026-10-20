@@ -45,10 +45,7 @@ void main() {
 
   test('a rising "less is better" metric is flagged, not praised', () {
     final insights = seriesInsights(
-      _series(
-        [100, 100, 100, 200, 200, 200],
-        direction: GoalDirection.down,
-      ),
+      _series([100, 100, 100, 200, 200, 200], direction: GoalDirection.down),
       format: _f,
       noun: 'screen time',
     );

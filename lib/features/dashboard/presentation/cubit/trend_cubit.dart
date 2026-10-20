@@ -27,7 +27,7 @@ class TrendCubit<L> extends Cubit<TrendState<L>> {
   final Future<TrendData<L>> Function(TrendRange range) _loader;
 
   TrendCubit(this._loader, {TrendRange range = TrendRange.week})
-      : super(TrendState<L>(range: range));
+    : super(TrendState<L>(range: range));
 
   /// Bumped per load, so a slow earlier load (say 30D, then 7D tapped
   /// quickly) can't overwrite a newer one.
@@ -49,12 +49,14 @@ class TrendCubit<L> extends Cubit<TrendState<L>> {
     } catch (e) {
       debugPrint('Trend load failed: $e');
       if (request != _request) return;
-      emit(TrendState<L>(
-        range: r,
-        loading: false,
-        data: state.data,
-        error: kLoadErrorMessage,
-      ));
+      emit(
+        TrendState<L>(
+          range: r,
+          loading: false,
+          data: state.data,
+          error: kLoadErrorMessage,
+        ),
+      );
     }
   }
 
@@ -64,15 +66,17 @@ class TrendCubit<L> extends Cubit<TrendState<L>> {
   Future<bool> deleteLog(L log, Future<void> Function() delete) async {
     final data = state.data;
     if (data != null) {
-      emit(TrendState<L>(
-        range: state.range,
-        loading: state.loading,
-        data: TrendData<L>(data.series, [
-          for (final l in data.logs)
-            if (!identical(l, log) && l != log) l,
-        ]),
-        error: state.error,
-      ));
+      emit(
+        TrendState<L>(
+          range: state.range,
+          loading: state.loading,
+          data: TrendData<L>(data.series, [
+            for (final l in data.logs)
+              if (!identical(l, log) && l != log) l,
+          ]),
+          error: state.error,
+        ),
+      );
     }
     var ok = true;
     try {

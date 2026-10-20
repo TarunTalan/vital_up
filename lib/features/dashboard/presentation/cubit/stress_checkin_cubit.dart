@@ -41,28 +41,26 @@ class StressCheckInState extends Equatable {
     Set<StressTag>? selectedTags,
     bool? editing,
     int? celebrations,
-  }) =>
-      StressCheckInState(
-        today: today == null ? this.today : today(),
-        week: week ?? this.week,
-        streak: streak ?? this.streak,
-        selectedLevel:
-            selectedLevel == null ? this.selectedLevel : selectedLevel(),
-        selectedTags: selectedTags ?? this.selectedTags,
-        editing: editing ?? this.editing,
-        celebrations: celebrations ?? this.celebrations,
-      );
+  }) => StressCheckInState(
+    today: today == null ? this.today : today(),
+    week: week ?? this.week,
+    streak: streak ?? this.streak,
+    selectedLevel: selectedLevel == null ? this.selectedLevel : selectedLevel(),
+    selectedTags: selectedTags ?? this.selectedTags,
+    editing: editing ?? this.editing,
+    celebrations: celebrations ?? this.celebrations,
+  );
 
   @override
   List<Object?> get props => [
-        today,
-        week,
-        streak,
-        selectedLevel,
-        selectedTags,
-        editing,
-        celebrations,
-      ];
+    today,
+    week,
+    streak,
+    selectedLevel,
+    selectedTags,
+    editing,
+    celebrations,
+  ];
 }
 
 /// Dashboard mood check-in: pick a face, optional tags, log; tracks the
@@ -87,11 +85,13 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
     }
     final byDay = {for (final c in checkIns) startOfDay(c.date): c};
     final days = lastNDays(7);
-    emit(state.copyWith(
-      today: () => byDay[days.last],
-      week: [for (final d in days) byDay[d]],
-      streak: stressStreak(checkIns),
-    ));
+    emit(
+      state.copyWith(
+        today: () => byDay[days.last],
+        week: [for (final d in days) byDay[d]],
+        streak: stressStreak(checkIns),
+      ),
+    );
   }
 
   Future<void> reload() async {
@@ -114,18 +114,22 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
 
   void edit() {
     final today = state.today;
-    emit(state.copyWith(
-      editing: true,
-      selectedLevel: () => today?.level,
-      selectedTags: {...?today?.tags},
-    ));
+    emit(
+      state.copyWith(
+        editing: true,
+        selectedLevel: () => today?.level,
+        selectedTags: {...?today?.tags},
+      ),
+    );
   }
 
-  void cancelEdit() => emit(state.copyWith(
-        editing: false,
-        selectedLevel: () => null,
-        selectedTags: const {},
-      ));
+  void cancelEdit() => emit(
+    state.copyWith(
+      editing: false,
+      selectedLevel: () => null,
+      selectedTags: const {},
+    ),
+  );
 
   /// Saves the picked mood. Returns false when it couldn't be saved.
   Future<bool> submit() async {
@@ -141,12 +145,14 @@ class StressCheckInCubit extends Cubit<StressCheckInState> {
       return false;
     }
     if (isClosed) return true;
-    emit(state.copyWith(
-      editing: false,
-      selectedLevel: () => null,
-      selectedTags: const {},
-      celebrations: state.celebrations + 1,
-    ));
+    emit(
+      state.copyWith(
+        editing: false,
+        selectedLevel: () => null,
+        selectedTags: const {},
+        celebrations: state.celebrations + 1,
+      ),
+    );
     load();
     return true;
   }

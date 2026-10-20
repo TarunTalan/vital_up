@@ -137,7 +137,11 @@ class ScreenTimeService {
     // Query past 7 days from oldest (6 days ago) to today
     for (int i = 6; i >= 0; i--) {
       // Calendar days, not 24h steps, so DST changes don't shift them.
-      final day = DateTime(todayStart.year, todayStart.month, todayStart.day - i);
+      final day = DateTime(
+        todayStart.year,
+        todayStart.month,
+        todayStart.day - i,
+      );
       final dayEnd = i == 0 ? now : nextDay(day);
       final cached = _finishedDays[day];
       if (cached != null) {

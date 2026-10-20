@@ -25,8 +25,11 @@ DateTime? readBedtime(SharedPreferences prefs, String userId, DateTime now) {
   return at;
 }
 
-Future<void> writeBedtime(SharedPreferences prefs, String userId, DateTime at) =>
-    prefs.setInt(bedtimeKey(userId), at.millisecondsSinceEpoch);
+Future<void> writeBedtime(
+  SharedPreferences prefs,
+  String userId,
+  DateTime at,
+) => prefs.setInt(bedtimeKey(userId), at.millisecondsSinceEpoch);
 
 Future<void> clearBedtime(SharedPreferences prefs, String userId) =>
     prefs.remove(bedtimeKey(userId));

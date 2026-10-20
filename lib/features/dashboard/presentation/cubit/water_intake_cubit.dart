@@ -156,7 +156,10 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
       await _service.setDailyGoal(goal);
     } catch (e) {
       debugPrint('Water goal not saved: $e');
-      _refresh(goal: s.dailyGoalMl, notice: "Couldn't save your goal. Try again.");
+      _refresh(
+        goal: s.dailyGoalMl,
+        notice: "Couldn't save your goal. Try again.",
+      );
     }
   }
 }

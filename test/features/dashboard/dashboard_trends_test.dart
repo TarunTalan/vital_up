@@ -8,24 +8,24 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 
 MealLogEntry _log(MealType type) => MealLogEntry(
-      id: type.name,
-      capturedAt: DateTime.now(),
-      imagePath: '',
-      items: const [],
-      nutrition: const [],
-      totalCalories: 300,
-      mealType: type,
-      userConfirmed: true,
-    );
+  id: type.name,
+  capturedAt: DateTime.now(),
+  imagePath: '',
+  items: const [],
+  nutrition: const [],
+  totalCalories: 300,
+  mealType: type,
+  userConfirmed: true,
+);
 
 Meal _meal(String name) => Meal(
-      name: name,
-      items: const [],
-      calories: 400,
-      protein: 20,
-      carbs: 40,
-      fat: 10,
-    );
+  name: name,
+  items: const [],
+  calories: 400,
+  protein: 20,
+  carbs: 40,
+  fat: 10,
+);
 
 void main() {
   group('date range utils', () {
@@ -56,14 +56,11 @@ void main() {
   group('TrendSeries.weekly', () {
     test('averages logged days per week, newest week ends today', () {
       final days = lastNDays(30);
-      final source = TrendSeries(
-        [
-          for (var i = 0; i < 30; i++)
-            // Oldest two days fall outside the 4 weeks; one gap in week 1.
-            DailyPoint(days[i], i == 2 ? null : (i ~/ 7 + 1) * 10.0),
-        ],
-        goal: 25,
-      );
+      final source = TrendSeries([
+        for (var i = 0; i < 30; i++)
+          // Oldest two days fall outside the 4 weeks; one gap in week 1.
+          DailyPoint(days[i], i == 2 ? null : (i ~/ 7 + 1) * 10.0),
+      ], goal: 25);
       final weekly = source.weekly();
       expect(weekly.points.length, 4);
       expect(weekly.points.first.day, days[2]);
@@ -74,8 +71,9 @@ void main() {
 
     test('a week with nothing logged is a gap', () {
       final days = lastNDays(7);
-      final weekly = TrendSeries([for (final d in days) DailyPoint(d, null)])
-          .weekly();
+      final weekly = TrendSeries([
+        for (final d in days) DailyPoint(d, null),
+      ]).weekly();
       expect(weekly.points.single.value, isNull);
     });
   });
@@ -83,8 +81,10 @@ void main() {
   group('TrendSeries.monthly', () {
     test('averages per calendar month and drops a partial oldest month', () {
       // 14 Apr .. 16 Oct 2026: April is partial, May..Oct are kept.
-      final days = lastNDays(TrendRange.halfYear.days,
-          now: DateTime(2026, 10, 16, 9));
+      final days = lastNDays(
+        TrendRange.halfYear.days,
+        now: DateTime(2026, 10, 16, 9),
+      );
       expect(days.first, DateTime(2026, 4, 14));
       final source = TrendSeries(
         [
@@ -100,9 +100,10 @@ void main() {
         direction: GoalDirection.near,
       );
       final monthly = source.monthly();
-      expect([for (final p in monthly.points) p.day], [
-        for (var m = 5; m <= 10; m++) DateTime(2026, m),
-      ]);
+      expect(
+        [for (final p in monthly.points) p.day],
+        [for (var m = 5; m <= 10; m++) DateTime(2026, m)],
+      );
       expect(monthly.points[1].value, isNull); // June: nothing logged
       expect(monthly.points.last.value, 70.5); // 1 Oct = 71, 2 Oct = 70
       expect(monthly.goal, 68);
@@ -112,13 +113,15 @@ void main() {
 
   group('TrendSeries', () {
     final days = lastNDays(4);
-    TrendSeries series(List<double?> values,
-            {double? goal, GoalDirection direction = GoalDirection.up}) =>
-        TrendSeries(
-          [for (var i = 0; i < 4; i++) DailyPoint(days[i], values[i])],
-          goal: goal,
-          direction: direction,
-        );
+    TrendSeries series(
+      List<double?> values, {
+      double? goal,
+      GoalDirection direction = GoalDirection.up,
+    }) => TrendSeries(
+      [for (var i = 0; i < 4; i++) DailyPoint(days[i], values[i])],
+      goal: goal,
+      direction: direction,
+    );
 
     test('stats ignore days with no data', () {
       final s = series([1000, null, 3000, null], goal: 2000);
@@ -136,8 +139,11 @@ void main() {
     });
 
     test('near goal counts days within 10%', () {
-      final s = series([1900, 2300, 2050, null],
-          goal: 2000, direction: GoalDirection.near);
+      final s = series(
+        [1900, 2300, 2050, null],
+        goal: 2000,
+        direction: GoalDirection.near,
+      );
       expect(s.daysMetGoal, 2);
       expect(s.best, 2050);
     });
@@ -167,9 +173,10 @@ void main() {
       );
       expect(StressCheckIn.fromJson(checkIn.toJson()), checkIn);
 
-      final legacy = StressCheckIn.fromJson(
-        {'d': '2026-09-30T20:00:00.000', 'l': 2},
-      );
+      final legacy = StressCheckIn.fromJson({
+        'd': '2026-09-30T20:00:00.000',
+        'l': 2,
+      });
       expect(legacy.tags, isEmpty);
       expect(legacy.label, 'Calm');
 
@@ -189,10 +196,11 @@ void main() {
 
       expect(stressStreak([on(28), on(29), on(30)], now: now), 3);
       expect(
-        stressStreak(
-          [on(29), on(30), StressCheckIn(date: DateTime(2026, 10, 1, 7), level: 1)],
-          now: now,
-        ),
+        stressStreak([
+          on(29),
+          on(30),
+          StressCheckIn(date: DateTime(2026, 10, 1, 7), level: 1),
+        ], now: now),
         3,
       );
       expect(stressStreak([on(27), on(29)], now: now), 0);
@@ -227,8 +235,10 @@ void main() {
         _log(MealType.snack),
         _log(MealType.lunch),
       ]);
-      expect([for (final s in statuses) s.logged],
-          [true, true, true, false, false]);
+      expect(
+        [for (final s in statuses) s.logged],
+        [true, true, true, false, false],
+      );
     });
   });
 
@@ -241,8 +251,14 @@ void main() {
       );
       expect(ActivityGoal.fromJson(goal.toJson()), goal);
       expect(goal.id, 'distance_weekly');
-      expect(ActivityGoal.fromJson({'m': 'swim', 'p': 'daily', 't': 1}), isNull);
-      expect(ActivityGoal.fromJson({'m': 'steps', 'p': 'daily', 't': 0}), isNull);
+      expect(
+        ActivityGoal.fromJson({'m': 'swim', 'p': 'daily', 't': 1}),
+        isNull,
+      );
+      expect(
+        ActivityGoal.fromJson({'m': 'steps', 'p': 'daily', 't': 0}),
+        isNull,
+      );
     });
   });
 }
