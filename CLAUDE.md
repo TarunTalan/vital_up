@@ -321,6 +321,13 @@ make one back press skip two tabs).
   `titleMedium` w600 with 12 grey captions; bar rows (`TrackerBarRow`:
   macros, secondary goals) name `bodyMedium` + figure grey `bodySmall`;
   eyebrow labels and summary lines grey 12. No new sizes or weights.
+  Figures round down (`formatMl`, `GoalMetric.format`, percents) so
+  progress never reads as the goal before it's met; goals of 0 are no
+  goal (`calorieGoalFor`, `macroTargets`); weekly goals use
+  `TrackerStatus.weekPace` and say "this week"; "1 workout"; sleep and
+  water nudges wait for 4 am / 7 am; water Undo removes the drink its
+  snackbar named (`WaterIntakeLoaded.addedLogId`). Edge cases:
+  `test/features/dashboard/tracker_edge_cases_test.dart`.
   Home icons: asset SVG when one exists (`TrackerMetric.iconAsset` /
   `logIconAsset`, `TrackerIcons`: edit, add (plus), goal (target), plan
   (vita); `GoalMetricIcon`: steps, workouts (barbell), calories (flame)),
@@ -409,7 +416,27 @@ Route names are GoRouter `name`s.
   Water: Isar `WaterLogCache`, goal pref `daily_water_goal`. Screen time:
   pref `daily_screen_time_limit_min`, Usage Access permission, usage channel.
   Mood/stress: `StressCheckInCubit` -> `VitaRepository`.
-- **sleep:** `SleepService` (dashboard/data/services) merges Health Connect
+- **sleep:** log sheet `SleepLogSheet` uses `CircularSleepClockPicker`
+  (`core/widgets/circular_sleep_clock.dart`: drag moon / sun, or the arc
+  to move the whole night; handles stop at 30 min / 18 h (`clampSleepGap`,
+  the save rules; pushed past each other they stick to the side they came
+  from), so dial, middle and Save always agree; a future wake-up shows its
+  error live and turns Save off; opened before 7 am it starts at wake =
+  now, bed = goal earlier; a phone estimate keeps its time asleep (dial,
+  Save, saved `asleep:` and source) until the times change; band shades night (sleep) to morning
+  (primary), handles are flat sheet-coloured circles inside the band ends,
+  the dragged one larger with a glow; middle shows the duration and "Goal met" /
+  "35m under your 8h goal" from `goal`, shown only when it fits the dial;
+  bed / wake cards: icon + label + pencil over the time, side by side at
+  every tested size (stack only if a time can't fit half the width)). A touch on a handle or
+  the band wins the gesture at once (`_GrabPanRecognizer`), so vertical
+  drags never scroll or close the sheet. The sheet doesn't scroll
+  (`TrackerSheet(scrollable: false)`): the clock takes the room left (max
+  280dp, min `minClockSize` 200dp); only if 200dp didn't fit would the
+  sheet grow by the difference and scroll (360x640 at 1.5 still fits). `test/features/dashboard/log_sheets_screenshot_test.dart`
+  checks both sheets (sizes, text scales, dark) and the scale's gestures
+  and feedback; `HOME_SHOTS=1` writes `build/sheet_shots/`.
+  `SleepService` (dashboard/data/services) merges Health Connect
   nights (win), saved entries (`SleepLogCache`, source `manual`/`phone`) and
   a screen-off estimate (`domain/sleep_detection.dart`, native
   `getScreenEvents`) that the Home card asks the user to confirm. "Going to
@@ -424,7 +451,17 @@ Route names are GoRouter `name`s.
   after 2 pm when it can't change), in bed, prompt, and a
   saved night (done status: "Goal met" or "Logged"; Edit, or Details for
   Health Connect nights).
-- **weight:** `WeightService`, Isar `WeightLogCache` (always kg), mirrored to
+- **weight:** log sheet `WeightEntrySheet` (`showWeightEntrySheet`): big
+  readout over `ValueRuler` (`core/widgets/value_ruler.dart`: drag / fling
+  / tap, snaps to 0.1, haptic + `UiSounds.tick` per step, firmer and
+  deeper per whole unit, max one per 35 ms of frame time; slider
+  semantics), "0.7 kg less
+  than 14 Oct · 2.4 kg to your goal", "Type instead" keyboard mode; starts
+  at the latest weight, else `BodyWeightSource`, else 70 kg.
+  Card and page show the latest weigh-in ever and progress from the first
+  (`WeightLatestBuilder`, `weightGoalProgress`: full only at the goal),
+  "Goal 65.0 kg"; one `weightGoalReachedKg` (0.5) everywhere.
+  `WeightService`, Isar `WeightLogCache` (always kg), mirrored to
   `user_health_data`; goal weight in CacheStore (legacy pref
   `weight_target_kg` fallback).
 - **health_report / weekly_summary:** `health-report`
@@ -915,6 +952,12 @@ Route names are GoRouter `name`s.
 
 ## Native Android
 
+- `UiSounds` (`core/services/ui_sounds.dart` -> `UiSounds.kt`, channel
+  `com.vitalup.app/feedback`: `prepare`, `tick(strong)`): SoundPool with
+  `res/raw/scale_tick.wav` (generated 18 ms click), sonification usage (no
+  audio focus, music keeps playing), only with the ringer on (silent /
+  vibrate stay quiet), whatever the Touch sounds setting; other platforms
+  use the system click.
 - `MainActivity` (FlutterFragmentActivity) channels:
   `com.example.vital_up/audio_intent` (`getInstalledAudioApps`,
   `launchAudioApp`, `playAudioImplicitly`),
