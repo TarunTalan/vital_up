@@ -1,11 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/measured_layout_builder.dart';
 import 'package:vital_up/core/widgets/adaptive_row.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 
@@ -115,6 +117,20 @@ class TrackerCardHeader extends StatelessWidget {
           );
         }
         final titleWidget = FitText(titleText, style: titleStyle);
+        // A met goal's check gives way in a narrow tile when the title
+        // wouldn't fit whole beside it (the muted card still says done).
+        final showCheck =
+            chip == null &&
+            status == TrackerStatus.done &&
+            FitText.fits(
+              context,
+              TextSpan(text: titleText, style: titleStyle),
+              constraints.maxWidth -
+                  badge -
+                  gap -
+                  AppDimens.space8 -
+                  AppDimens.iconSm,
+            );
         // Half-width tiles get a smaller badge and gap so the title fits
         // whole at its normal size.
         return Row(
@@ -136,7 +152,7 @@ class TrackerCardHeader extends StatelessWidget {
             if (chip != null && !chipBelow) ...[
               const SizedBox(width: AppDimens.space8),
               chip,
-            ] else if (chip == null && status == TrackerStatus.done) ...[
+            ] else if (showCheck) ...[
               const SizedBox(width: AppDimens.space8),
               Icon(
                 Icons.check_circle_rounded,
@@ -173,8 +189,23 @@ double _textWidth(BuildContext context, String text, TextStyle? style) {
   return width;
 }
 
+/// Line height of [text] in [style] at the current text size.
+double _textHeight(BuildContext context, String text, TextStyle? style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final height = painter.height;
+  painter.dispose();
+  return height;
+}
+
 /// Home card shell for a tracker: tapping anywhere opens its detail page;
-/// [actions] (quick logs) sit at the bottom. A met goal mutes the card a
+/// [actions] (quick logs) sit at the bottom. In a fixed-height slot (Home
+/// tile pairs) [child] is centred in the room between header and actions;
+/// otherwise the card takes its content's height, with no empty bands. A met goal mutes the card a
 /// little, adds a check to the header and turns filled actions into
 /// outlined ones, so only unfinished trackers carry a call to action.
 class TrackerCard extends StatelessWidget {
@@ -213,29 +244,40 @@ class TrackerCard extends StatelessWidget {
         child: AppCard(
           width: double.infinity,
           onTap: onOpen,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TrackerCardHeader(
-                metric: metric,
-                title: title,
-                status: status,
-                statusLabel: statusLabel,
-                statusColor: statusColor,
-                showChevron: onOpen != null,
-              ),
-              if (child != null) ...[
-                const SizedBox(height: AppDimens.cardInnerGap),
-                child!,
-              ],
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: AppDimens.cardInnerGap),
-                _GoalMetScope(
-                  goalMet: done,
-                  child: TrackerActionRow(actions: actions),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TrackerCardHeader(
+                  metric: metric,
+                  title: title,
+                  status: status,
+                  statusLabel: statusLabel,
+                  statusColor: statusColor,
+                  showChevron: onOpen != null,
                 ),
+                if (child != null) ...[
+                  const SizedBox(height: AppDimens.cardInnerGap),
+                  if (constraints.hasBoundedHeight)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [child!],
+                      ),
+                    )
+                  else
+                    child!,
+                ],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: AppDimens.cardInnerGap),
+                  _GoalMetScope(
+                    goalMet: done,
+                    child: TrackerActionRow(actions: actions),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -257,23 +299,52 @@ class _GoalMetScope extends InheritedWidget {
   bool updateShouldNotify(_GoalMetScope old) => old.goalMet != goalMet;
 }
 
-/// Lays quick actions out in equal-width columns.
+/// Lays quick actions out in equal-width columns; when a label wouldn't
+/// show whole in its column (narrow phone, large text) they stack full
+/// width instead.
 class TrackerActionRow extends StatelessWidget {
   final List<Widget> actions;
 
   const TrackerActionRow({super.key, required this.actions});
 
+  static const double _gap = AppDimens.space8;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppDimens.space8),
-          Expanded(child: actions[i]),
-        ],
-      ],
+    if (actions.length < 2) return _row();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final column =
+            (constraints.maxWidth - _gap * (actions.length - 1)) /
+            actions.length;
+        final fits = actions.every(
+          (a) =>
+              a is! TrackerQuickAction ||
+              TrackerQuickAction.widthFor(context, a.label) <= column,
+        );
+        return fits ? _row() : _column();
+      },
     );
   }
+
+  Widget _column() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < actions.length; i++) ...[
+        if (i > 0) const SizedBox(height: _gap),
+        actions[i],
+      ],
+    ],
+  );
+
+  Widget _row() => Row(
+    children: [
+      for (var i = 0; i < actions.length; i++) ...[
+        if (i > 0) const SizedBox(width: _gap),
+        Expanded(child: actions[i]),
+      ],
+    ],
+  );
 }
 
 /// Compact tinted button for one-tap logging on cards and sheets
@@ -303,6 +374,24 @@ class TrackerQuickAction extends StatelessWidget {
     this.filled = false,
     this.semanticLabel,
   });
+
+  /// Width that shows [label] whole at its full size, with the icon
+  /// (or without it, [withIcon] false).
+  static double widthFor(
+    BuildContext context,
+    String label, {
+    bool withIcon = true,
+  }) =>
+      _textWidth(
+        context,
+        label,
+        context.text.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+      ) +
+      (withIcon ? AppDimens.iconSm + AppDimens.space6 : 0) +
+      AppDimens.space8 * 2 +
+      AppDimens.borderThin * 2 +
+      // Rounding headroom so the label never lands a hair too wide.
+      AppDimens.space2;
 
   @override
   Widget build(BuildContext context) {
@@ -342,30 +431,54 @@ class TrackerQuickAction extends StatelessWidget {
                 horizontal: AppDimens.space8,
                 vertical: AppDimens.space8,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (svgAsset != null)
-                    SvgPicture.asset(
-                      svgAsset!,
-                      width: AppDimens.iconSm,
-                      height: AppDimens.iconSm,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    )
-                  else if (icon != null)
-                    Icon(icon, size: AppDimens.iconSm, color: fg),
-                  const SizedBox(width: AppDimens.space6),
-                  Flexible(
-                    child: FitText(
+              // In a narrow button the icon gives way so the label shows
+              // whole at its full size.
+              child: MeasuredLayoutBuilder(
+                measures: LayoutMeasures(
+                  maxWidth: () =>
+                      widthFor(context, label) - AppDimens.space8 * 2,
+                  minWidth: () =>
+                      widthFor(context, label, withIcon: false) -
+                      AppDimens.space8 * 2,
+                  heightFor: (_) => math.max(
+                    AppDimens.iconSm,
+                    _textHeight(
+                      context,
                       label,
-                      maxLines: 1,
-                      style: context.text.labelMedium?.copyWith(
-                        color: fg,
+                      context.text.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
+                ),
+                builder: (context, constraints) => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (constraints.maxWidth + AppDimens.space8 * 2 >=
+                        widthFor(context, label)) ...[
+                      if (svgAsset != null)
+                        SvgPicture.asset(
+                          svgAsset!,
+                          width: AppDimens.iconSm,
+                          height: AppDimens.iconSm,
+                          colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                        )
+                      else if (icon != null)
+                        Icon(icon, size: AppDimens.iconSm, color: fg),
+                      const SizedBox(width: AppDimens.space6),
+                    ],
+                    Flexible(
+                      child: FitText(
+                        label,
+                        maxLines: 1,
+                        style: context.text.labelMedium?.copyWith(
+                          color: fg,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -375,8 +488,10 @@ class TrackerQuickAction extends StatelessWidget {
   }
 }
 
-/// "value / goal unit" readout with a progress bar and a hint line —
-/// today's progress, the same on every card.
+/// Figure with its goal on the line below ("of 2.5 L"), a progress bar
+/// and a hint line: today's progress, the same on every card and in the
+/// Today summary. The figure keeps one size everywhere; it never shares a
+/// line with the goal, so side-by-side tiles always read alike.
 class TrackerProgress extends StatelessWidget {
   final String value;
   final String? goal;
@@ -396,37 +511,15 @@ class TrackerProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
-    final valueStyle = AppTextStyles.metric.copyWith(
-      color: context.colors.onSurface,
-    );
-    final goalStyle = context.text.bodyMedium?.copyWith(color: grey);
-    final inline = TextSpan(
-      children: [
-        TextSpan(text: value, style: valueStyle),
-        if (goal != null) TextSpan(text: '  / $goal', style: goalStyle),
-      ],
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // The figure keeps the same size on every card: when "value / goal"
-        // doesn't fit one line, the goal moves to its own line instead of
-        // shrinking the figure.
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (goal == null ||
-                FitText.fits(context, inline, constraints.maxWidth)) {
-              return Text.rich(inline, maxLines: 1);
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FitText(value, style: valueStyle),
-                FitText('of $goal', style: goalStyle),
-              ],
-            );
-          },
-        ),
+        FitText.rich(figureSpan(context, value), semanticsLabel: value),
+        if (goal != null)
+          FitText(
+            'of $goal',
+            style: context.text.bodyMedium?.copyWith(color: grey),
+          ),
         if (fraction != null) ...[
           const SizedBox(height: AppDimens.space8),
           TweenAnimationBuilder<double>(
@@ -437,12 +530,32 @@ class TrackerProgress extends StatelessWidget {
           ),
         ],
         if (caption != null) ...[
-          const SizedBox(height: AppDimens.space6),
+          const SizedBox(height: AppDimens.space8),
           Text(caption!, style: context.text.bodySmall?.copyWith(color: grey)),
         ],
       ],
     );
   }
+}
+
+/// A figure in the metric style with its units smaller and grey: "72.4"
+/// big and "kg" small, "7h 12m" with small h and m. Reads cleaner and
+/// takes less room, so half-width tiles keep their figures whole.
+TextSpan figureSpan(BuildContext context, String value) {
+  final number = AppTextStyles.metric.copyWith(color: context.colors.onSurface);
+  final unit = context.text.bodyLarge?.copyWith(
+    color: context.vColors.grayText,
+  );
+  return TextSpan(
+    style: number,
+    children: [
+      for (final m in RegExp(r'[0-9.,:]+|[^0-9.,:]+').allMatches(value))
+        TextSpan(
+          text: m[0],
+          style: RegExp(r'^[0-9.,:]+$').hasMatch(m[0]!) ? null : unit,
+        ),
+    ],
+  );
 }
 
 /// Small labelled figure ("Avg 7h 10m") used in rows of two or three.
@@ -556,6 +669,211 @@ class TrackerRing extends StatelessWidget {
               AppDimens.trackerRingStroke + AppDimens.space4,
             ),
             child: FittedBox(fit: BoxFit.scaleDown, child: center),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Progress ring with a figure and a one-word caption inside ("760",
+/// "kcal left"): the hero of the Home Nutrition and Activity cards. The
+/// ring grows with the text size, so its figure never has to shrink.
+class TrackerHeroRing extends StatelessWidget {
+  final double? fraction;
+  final Color color;
+  final String value;
+  final String caption;
+
+  const TrackerHeroRing({
+    super.key,
+    required this.fraction,
+    required this.color,
+    required this.value,
+    required this.caption,
+  });
+
+  /// Outer size at the current text size: it grows like the big figures
+  /// (the metric style), less than body text.
+  static double sizeOf(BuildContext context) =>
+      AppDimens.trackerRing * metricGrowth(context);
+
+  @override
+  Widget build(BuildContext context) {
+    final f = fraction;
+    return Semantics(
+      label: '$value $caption',
+      excludeSemantics: true,
+      child: SizedBox.square(
+        dimension: sizeOf(context),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(
+                begin: 0,
+                end: f != null && f.isFinite ? f.clamp(0.0, 1.0) : 0.0,
+              ),
+              duration: AppDurations.slow,
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => CircularProgressIndicator(
+                value: v,
+                strokeWidth: AppDimens.trackerRingStroke,
+                color: color,
+                backgroundColor: context.vColors.track,
+                strokeCap: StrokeCap.round,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(
+                AppDimens.trackerRingStroke + AppDimens.space4,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FitText(
+                    value,
+                    textAlign: TextAlign.center,
+                    // Same weight as the Today card's figures.
+                    style: context.text.titleMedium?.copyWith(
+                      color: context.colors.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  FitText(
+                    caption,
+                    textAlign: TextAlign.center,
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.vColors.grayText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A [TrackerHeroRing] with its [details] (macros, goal figure) beside it,
+/// or centred above them only when the details would get too narrow (a
+/// narrow phone at large text), never just because text is large.
+class TrackerHeroLayout extends StatelessWidget {
+  final Widget ring;
+  final Widget details;
+
+  const TrackerHeroLayout({
+    super.key,
+    required this.ring,
+    required this.details,
+  });
+
+  /// Narrowest the details may get beside the ring: "of 10,000 steps"
+  /// at full size.
+  static const double _minDetailsWidth = 124;
+
+  @override
+  Widget build(BuildContext context) {
+    const gap = AppDimens.space16;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final beside =
+            constraints.maxWidth - TrackerHeroRing.sizeOf(context) - gap >=
+            context.textScaled(_minDetailsWidth);
+        if (beside) {
+          return Row(
+            children: [
+              ring,
+              const SizedBox(width: gap),
+              Expanded(child: details),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(child: ring),
+            const SizedBox(height: AppDimens.space16),
+            details,
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One quiet grey line of facts under a card's hero ("1,240 of 2,000 kcal
+/// · 2 of 4 meals"). It wraps only between facts, never inside one.
+class TrackerSummaryLine extends StatelessWidget {
+  final List<String> parts;
+
+  const TrackerSummaryLine({super.key, required this.parts});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      parts.map((p) => p.replaceAll(' ', '\u00a0')).join('  ·  '),
+      style: context.text.bodySmall?.copyWith(color: context.vColors.grayText),
+    );
+  }
+}
+
+/// One named figure with a bar: "Protein ... 68 / 150g" over its
+/// progress. Macros and secondary activity goals both use it, so every
+/// bar row on Home reads the same: name in body text, figure in small grey
+/// (it drops under the name when both don't fit), standard bar.
+class TrackerBarRow extends StatelessWidget {
+  final String name;
+  final String figure;
+  final double fraction;
+  final Color color;
+
+  const TrackerBarRow({
+    super.key,
+    required this.name,
+    required this.figure,
+    required this.fraction,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$name $figure',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppDimens.space8,
+            children: [
+              Text(
+                name,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+              Text(
+                figure,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.vColors.grayText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space6),
+          TweenAnimationBuilder<double>(
+            tween: Tween(
+              begin: 0,
+              end: fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0,
+            ),
+            duration: AppDurations.slow,
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) => AppProgressBar(value: v, color: color),
           ),
         ],
       ),
@@ -756,7 +1074,9 @@ class TrackerLoading extends StatelessWidget {
   }
 }
 
-/// Card shell while loading, or "couldn't load" + Retry on failure.
+/// Card shell while loading, or "Couldn't load" + Retry on failure: the
+/// same on full-width cards and half-width tiles, shaped like a loaded
+/// card (header, prompt, one button).
 class TrackerCardPlaceholder extends StatelessWidget {
   final TrackerMetric metric;
   final VoidCallback? onRetry;
@@ -771,43 +1091,21 @@ class TrackerCardPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Fixed-height Home tiles: same shape as a loaded tile, with Retry
-        // as the card's one button, so the error view can't overflow.
-        if (constraints.hasBoundedHeight) {
-          return TrackerCard(
-            metric: metric,
-            title: title,
-            actions: [
-              if (onRetry != null)
-                TrackerQuickAction(
-                  label: 'Retry',
-                  icon: Icons.refresh_rounded,
-                  color: metric.color,
-                  onTap: onRetry,
-                ),
-            ],
-            child: Expanded(
-              child: Center(
-                child: onRetry == null
-                    ? TrackerLoading(color: metric.color)
-                    : TrackerPrompt(
-                        title: "Couldn't load",
-                        color: metric.color,
-                      ),
-              ),
-            ),
-          );
-        }
-        return TrackerCard(
-          metric: metric,
-          title: title,
-          child: onRetry == null
-              ? TrackerLoading(color: metric.color)
-              : LoadErrorView(onRetry: onRetry!),
-        );
-      },
+    return TrackerCard(
+      metric: metric,
+      title: title,
+      actions: [
+        if (onRetry != null)
+          TrackerQuickAction(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            color: metric.color,
+            onTap: onRetry,
+          ),
+      ],
+      child: onRetry == null
+          ? TrackerLoading(color: metric.color)
+          : TrackerPrompt(title: "Couldn't load", color: metric.color),
     );
   }
 }
@@ -888,11 +1186,20 @@ class TrackerPrompt extends StatelessWidget {
   }
 }
 
+/// How much the metric style (big card figures) has grown with the
+/// system text size: less than body text ([AppTextScaler]).
+double metricGrowth(BuildContext context) {
+  final size = AppTextStyles.metric.fontSize!;
+  return MediaQuery.textScalerOf(context).scale(size) / size;
+}
+
 /// Two half-width tracker tiles side by side at a shared height, which
 /// grows with the system text size so tile content never clips (never
-/// below the base height: icons, padding and buttons don't shrink). With
-/// large text the two stack as full-width tiles, so titles and figures
-/// stay whole instead of ending in "...".
+/// below the base height: icons, padding and buttons don't shrink). Only
+/// when a tile would get narrower than [AppDimens.dashboardTileMinWidth]
+/// grown like the tiles' figures do the two stack as full-width tiles at
+/// their own height, so figures keep their full size. The layout changes
+/// with the room there is, not at one text size for the whole page.
 class TrackerTilePair extends StatelessWidget {
   final Widget left;
   final Widget right;
@@ -901,16 +1208,28 @@ class TrackerTilePair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - AppDimens.cardGap) / 2;
+        // Tiles need room for their figures, and the metric style grows
+        // less than body text with the system size.
+        if (tileWidth <
+            AppDimens.dashboardTileMinWidth * metricGrowth(context)) {
+          return Column(
+            children: [
+              left,
+              const SizedBox(height: AppDimens.cardGap),
+              right,
+            ],
+          );
+        }
+        return _row(context);
+      },
+    );
+  }
+
+  Widget _row(BuildContext context) {
     final height = context.textScaled(AppDimens.dashboardTileHeight);
-    if (context.isLargeText) {
-      return Column(
-        children: [
-          SizedBox(height: height, child: left),
-          const SizedBox(height: AppDimens.cardGap),
-          SizedBox(height: height, child: right),
-        ],
-      );
-    }
     return SizedBox(
       height: height,
       child: Row(

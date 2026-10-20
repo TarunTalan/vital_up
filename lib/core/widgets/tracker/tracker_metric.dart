@@ -25,7 +25,7 @@ enum TrackerMetric {
     logIcon: Icons.play_arrow_rounded,
   ),
   mood(
-    label: 'Mood & Stress',
+    label: 'Mood & stress',
     iconAsset: 'assets/icons/trackers/mood.svg',
     icon: Icons.self_improvement_rounded,
     color: AppColors.trackMood,
@@ -61,7 +61,7 @@ enum TrackerMetric {
     logIcon: Icons.add_rounded,
   ),
   screenTime(
-    label: 'Screen Time',
+    label: 'Screen time',
     iconAsset: 'assets/icons/trackers/devices.svg',
     icon: Icons.smartphone_rounded,
     color: AppColors.trackScreenTime,

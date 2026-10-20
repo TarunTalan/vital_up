@@ -40,7 +40,8 @@ class AppSectionHeader extends StatelessWidget {
                 children: [
                   if (note != null)
                     TextSpan(
-                      text: '  ·  $note',
+                      // Non-breaking spaces keep a date on one line.
+                      text: '  ·  ${note!.replaceAll(' ', '\u00a0')}',
                       style: const TextStyle(
                         fontWeight: FontWeight.normal,
                         letterSpacing: 0,

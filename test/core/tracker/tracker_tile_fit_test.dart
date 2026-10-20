@@ -23,19 +23,11 @@ Widget _tile(TrackerMetric metric, String value, String goal) => TrackerCard(
       onTap: () {},
     ),
   ],
-  child: Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        TrackerProgress(
-          value: value,
-          goal: goal,
-          fraction: 0.9,
-          color: metric.color,
-        ),
-      ],
-    ),
+  child: TrackerProgress(
+    value: value,
+    goal: goal,
+    fraction: 0.9,
+    color: metric.color,
   ),
 );
 

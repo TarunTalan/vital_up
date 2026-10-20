@@ -33,19 +33,11 @@ Widget _tile(
       onTap: () {},
     ),
   ],
-  child: Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        TrackerProgress(
-          value: value,
-          goal: goal,
-          fraction: 0.6,
-          color: metric.color,
-        ),
-      ],
-    ),
+  child: TrackerProgress(
+    value: value,
+    goal: goal,
+    fraction: 0.6,
+    color: metric.color,
   ),
 );
 

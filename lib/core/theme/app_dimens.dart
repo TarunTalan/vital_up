@@ -196,6 +196,11 @@ class AppDimens {
   /// Dashboard: height of a half-width tracker tile at 1x text scale.
   static const double dashboardTileHeight = 216.0;
 
+  /// Narrowest a half-width Home tile may be at normal text: room for the
+  /// longest tile figure ("229.9 lbs") at full size. Grown like the metric
+  /// style with the text size; narrower, the pair stacks.
+  static const double dashboardTileMinWidth = 130.0;
+
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.
   static const double miniChartHeight = 64.0;

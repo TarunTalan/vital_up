@@ -181,7 +181,8 @@ class AppColors {
   static const Color trackMood = Color(0xFF26C6A6);
   static const Color trackWater = water;
   static const Color trackSleep = sleep;
-  static const Color trackWeight = teal;
+  // A lighter shade of [teal]: brand teal is too dark to see on dark cards.
+  static const Color trackWeight = Color(0xFF1C9AAF);
   static const Color trackScreenTime = info;
 
   /// Sleep stage segments (deep / REM; light and awake reuse teal / warning).
