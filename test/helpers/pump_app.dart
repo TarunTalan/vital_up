@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:vital_up/core/services/app_loading_controller.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// A small phone (360x690 dp), the narrowest layout the app supports.
 const Size kSmallPhone = Size(360, 690);
@@ -117,3 +120,48 @@ List<Object> takeAllExceptions(WidgetTester tester) {
 /// The text scale [finder]'s widget is laid out with.
 double shownTextScale(WidgetTester tester, Finder finder) =>
     MediaQuery.textScalerOf(tester.element(finder)).scale(10) / 10;
+
+/// Texts [FitText] drew smaller than their style to fit: on Home every
+/// figure and label should show at its own size, so two tiles side by side
+/// never end up with different-sized figures.
+List<String> shrunkTexts(WidgetTester tester) {
+  final out = <String>[];
+  void visit(RenderObject node) {
+    if (node is RenderParagraph && node.hasSize) {
+      final scaler = node.textScaler;
+      if (scaler is ShrunkTextScaler && scaler.factor < 0.995) {
+        out.add(
+          '"${node.text.toPlainText()}" at '
+          '${(scaler.factor * 100).round()}%',
+        );
+      }
+    }
+    node.visitChildren(visit);
+  }
+
+  for (final view in tester.binding.renderViews) {
+    visit(view);
+  }
+  return out;
+}
+
+bool _iconFontsLoaded = false;
+
+/// Loads every font in the test bundle's FontManifest (Material Icons
+/// above all: without it icons draw as empty boxes).
+Future<void> loadAllFonts() async {
+  await loadAppFonts();
+  if (_iconFontsLoaded) return;
+  final manifest =
+      jsonDecode(await rootBundle.loadString('FontManifest.json')) as List;
+  for (final entry in manifest.cast<Map<String, dynamic>>()) {
+    final family = entry['family'] as String;
+    if (family == 'Nunito') continue;
+    final loader = FontLoader(family);
+    for (final font in (entry['fonts'] as List).cast<Map<String, dynamic>>()) {
+      loader.addFont(rootBundle.load(font['asset'] as String));
+    }
+    await loader.load();
+  }
+  _iconFontsLoaded = true;
+}

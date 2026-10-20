@@ -23,7 +23,6 @@ import 'package:vital_up/features/notifications/presentation/widgets/notificatio
 import 'package:vital_up/features/profile/domain/entities/profile_entity.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
-import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
@@ -704,27 +703,6 @@ Widget _page(_Scenario s) => _providers(
 // Fonts, images and capture
 // ---------------------------------------------------------------------------
 
-bool _iconFontsLoaded = false;
-
-/// Loads every font in the test bundle's FontManifest (Material Icons
-/// above all: without it icons draw as empty boxes).
-Future<void> _loadAllFonts() async {
-  await loadAppFonts();
-  if (_iconFontsLoaded) return;
-  final manifest =
-      jsonDecode(await rootBundle.loadString('FontManifest.json')) as List;
-  for (final entry in manifest.cast<Map<String, dynamic>>()) {
-    final family = entry['family'] as String;
-    if (family == 'Nunito') continue;
-    final loader = FontLoader(family);
-    for (final font in (entry['fonts'] as List).cast<Map<String, dynamic>>()) {
-      loader.addFont(rootBundle.load(font['asset'] as String));
-    }
-    await loader.load();
-  }
-  _iconFontsLoaded = true;
-}
-
 /// Lets asset loads (background image, SVG icons) finish and the cards'
 /// progress animations run to the end.
 Future<void> _settleAssets(WidgetTester tester) async {
@@ -749,30 +727,6 @@ Future<void> _capture(WidgetTester tester, String path) async {
       ..createSync(recursive: true)
       ..writeAsBytesSync(bytes!.buffer.asUint8List());
   });
-}
-
-/// Texts [FitText] drew smaller than their style to fit: on Home every
-/// figure and label should show at its own size, so two tiles side by side
-/// never end up with different-sized figures.
-List<String> shrunkTexts(WidgetTester tester) {
-  final out = <String>[];
-  void visit(RenderObject node) {
-    if (node is RenderParagraph && node.hasSize) {
-      final scaler = node.textScaler;
-      if (scaler is ShrunkTextScaler && scaler.factor < 0.995) {
-        out.add(
-          '"${node.text.toPlainText()}" at '
-          '${(scaler.factor * 100).round()}%',
-        );
-      }
-    }
-    node.visitChildren(visit);
-  }
-
-  for (final view in tester.binding.renderViews) {
-    visit(view);
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -823,7 +777,7 @@ void main() {
 
       testWidgets('home cards: $id', (tester) async {
         sl.registerSingleton<WeightService>(_FakeWeightService(s.weightUnit));
-        await tester.runAsync(_loadAllFonts);
+        await tester.runAsync(loadAllFonts);
         await pumpPage(
           tester,
           _page(s),
