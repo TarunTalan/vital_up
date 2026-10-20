@@ -165,6 +165,13 @@
         <!-- Home screen widgets, one receiver per size the app offers: Android
              pins a widget at its provider's default size (see WidgetSizes.kt).
              Original class names are kept so placed widgets keep working. -->
+        <!-- Redraws the widgets just after midnight (WidgetMidnight.kt). -->
+        <receiver android:name=".WidgetMidnightReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".TodaySmallWidgetProvider"
             android:exported="true"
             android:label="@string/wg_label_today_small">

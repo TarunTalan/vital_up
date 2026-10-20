@@ -9,6 +9,7 @@ import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/features/home_widget/data/widget_data.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
@@ -33,6 +34,7 @@ import 'package:vital_up/core/config/secure_session_storage.dart';
 Future<void> homeWidgetCallback(Uri? uri) async {
   if (uri == null || uri.host != 'widget') return;
   DartPluginRegistrant.ensureInitialized();
+  await CrashReporter.initBackground();
   try {
     final userId = await HomeWidget.getWidgetData<String>('user_id');
     final signedIn = await HomeWidget.getWidgetData<bool>('signed_in') ?? false;
@@ -61,8 +63,8 @@ Future<void> homeWidgetCallback(Uri? uri) async {
       return;
     }
     await refreshFromDevice(userId).timeout(timeout);
-  } catch (e) {
-    debugPrint('Home widget background action failed: $e');
+  } catch (e, stack) {
+    CrashReporter.report(e, stack, reason: 'Home widget ${uri.path}');
     // Always redraw so the spinner clears.
     try {
       await endWidgetRefresh();
