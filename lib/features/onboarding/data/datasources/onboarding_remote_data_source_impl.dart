@@ -19,7 +19,8 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
   });
 
   /// The `user_health_data` row written for [data].
-  static Map<String, dynamic> payloadFor(String userId, OnboardingData data) => {
+  static Map<String, dynamic> payloadFor(String userId, OnboardingData data) =>
+      {
         'id': userId,
         'full_name': ProfileRules.cleanName(data.fullName),
         'dob': data.dob,
@@ -64,9 +65,11 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
         ),
       );
 
-      logger.i(sent
-          ? 'Successfully submitted onboarding data for user: ${user.id}'
-          : 'Onboarding data queued offline for user: ${user.id}');
+      logger.i(
+        sent
+            ? 'Successfully submitted onboarding data for user: ${user.id}'
+            : 'Onboarding data queued offline for user: ${user.id}',
+      );
       return sent;
     } on ServerException {
       rethrow;

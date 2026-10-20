@@ -42,7 +42,10 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
         if (state.status == SubmissionStatus.success) {
           context.go('/dashboard');
         } else if (state.status == SubmissionStatus.error) {
-          showErrorSnackBar(context, state.errorMessage ?? "Couldn't save your details. Try again.");
+          showErrorSnackBar(
+            context,
+            state.errorMessage ?? "Couldn't save your details. Try again.",
+          );
         }
       },
       builder: (context, state) {
@@ -59,7 +62,9 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                   if (healthReminders) {
                     sl<RemindersService>().enableStarterSet();
                   }
-                  context.read<OnboardingCubit>().submitOnboardingDataToBackend();
+                  context
+                      .read<OnboardingCubit>()
+                      .submitOnboardingDataToBackend();
                 },
           title: "Data privacy",
           subtitle: "We only collect what's needed.",
@@ -70,9 +75,21 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                 context: context,
                 title: "What we collect",
                 items: [
-                  _InfoItem('assets/icons/onboarding/Stethoscope.svg', Icons.medical_services_rounded, "Health details you share"),
-                  _InfoItem('assets/icons/onboarding/Watch.svg', Icons.watch_rounded, "Data from connected devices"),
-                  _InfoItem('assets/icons/ui/settings.svg', Icons.settings_rounded, "Your app preferences"),
+                  _InfoItem(
+                    'assets/icons/onboarding/Stethoscope.svg',
+                    Icons.medical_services_rounded,
+                    "Health details you share",
+                  ),
+                  _InfoItem(
+                    'assets/icons/onboarding/Watch.svg',
+                    Icons.watch_rounded,
+                    "Data from connected devices",
+                  ),
+                  _InfoItem(
+                    'assets/icons/ui/settings.svg',
+                    Icons.settings_rounded,
+                    "Your app preferences",
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -80,9 +97,24 @@ class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
                 context: context,
                 title: "What we do NOT do",
                 items: [
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never sell your data", iconSize: AppDimens.space12),
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never post without asking", iconSize: AppDimens.space12),
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never contact anyone without consent", iconSize: AppDimens.space12),
+                  _InfoItem(
+                    'assets/icons/ui/tick.svg',
+                    Icons.check_rounded,
+                    "Never sell your data",
+                    iconSize: AppDimens.space12,
+                  ),
+                  _InfoItem(
+                    'assets/icons/ui/tick.svg',
+                    Icons.check_rounded,
+                    "Never post without asking",
+                    iconSize: AppDimens.space12,
+                  ),
+                  _InfoItem(
+                    'assets/icons/ui/tick.svg',
+                    Icons.check_rounded,
+                    "Never contact anyone without consent",
+                    iconSize: AppDimens.space12,
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -203,7 +235,12 @@ class _InfoItem {
   final String text;
   final double iconSize;
 
-  _InfoItem(this.iconPath, this.fallbackIcon, this.text, {this.iconSize = AppDimens.iconXs});
+  _InfoItem(
+    this.iconPath,
+    this.fallbackIcon,
+    this.text, {
+    this.iconSize = AppDimens.iconXs,
+  });
 }
 
 class _ToggleRow extends StatelessWidget {
@@ -260,7 +297,9 @@ class _ToggleRow extends StatelessWidget {
                 activeTrackColor: context.colors.primary,
                 inactiveThumbColor: AppColors.white,
                 inactiveTrackColor: v.secondaryButtonBorder,
-                trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                trackOutlineColor: const WidgetStatePropertyAll(
+                  Colors.transparent,
+                ),
               ),
             ),
           ],

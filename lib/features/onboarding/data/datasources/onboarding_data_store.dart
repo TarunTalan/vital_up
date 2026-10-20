@@ -26,11 +26,29 @@ abstract class OnboardingDataStore {
   Future<void> savePersonalDetails(String name, String dob, String gender);
   Future<void> saveWeight(String weight, String unit);
   Future<void> saveHeight(String height, String unit);
-  Future<void> saveGoals(String calorieGoal, String targetWeight, String targetWeightUnit, String goalDurationMonths, String goalType, String weeklyPace);
+  Future<void> saveGoals(
+    String calorieGoal,
+    String targetWeight,
+    String targetWeightUnit,
+    String goalDurationMonths,
+    String goalType,
+    String weeklyPace,
+  );
   Future<void> saveCalorieGoal(String calorieGoal);
-  Future<void> saveExtraDetails(String conditions, String medicines, String allergies, String smokes);
-  Future<void> saveHealthVitals(String bpTop, String bpBottom, String dietaryPreference, String activity, String sleep);
-  
+  Future<void> saveExtraDetails(
+    String conditions,
+    String medicines,
+    String allergies,
+    String smokes,
+  );
+  Future<void> saveHealthVitals(
+    String bpTop,
+    String bpBottom,
+    String dietaryPreference,
+    String activity,
+    String sleep,
+  );
+
   Future<void> setCurrentStep(String step);
   Future<void> setOnboardingCompleted(bool completed);
   Future<void> clearOnboardingData();

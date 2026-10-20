@@ -42,7 +42,7 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     _nameController = TextEditingController(text: cubit.state.fullName);
     _dob = cubit.state.dob;
     _gender = cubit.state.gender;
-    
+
     _nameController.addListener(() {
       context.read<OnboardingCubit>().updateFullName(
         ProfileRules.cleanName(_nameController.text),
@@ -119,7 +119,8 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
   String _formatWithSlashes(String input) {
     final digits = input.replaceAll(RegExp(r'\D'), '');
     if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return '${digits.substring(0, 2)}/${digits.substring(2)}';
+    if (digits.length <= 4)
+      return '${digits.substring(0, 2)}/${digits.substring(2)}';
     return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4, math.min(8, digits.length))}';
   }
 
@@ -154,7 +155,8 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
     final nameError = _showErrors && _nameError() != null;
     final age = _calculateAge();
     final dobError = _showErrors && _dobError != null;
-    final genderError = _showErrors &&
+    final genderError =
+        _showErrors &&
         (_gender.toLowerCase() != "male" && _gender.toLowerCase() != "female");
 
     return OnboardingLayout(
@@ -254,8 +256,8 @@ class _PersonalDetailsPageState extends State<PersonalDetailsPage> {
             dobError
                 ? _dobError!
                 : (age != null
-                    ? "Age: $age"
-                    : "Tap to choose your date of birth"),
+                      ? "Age: $age"
+                      : "Tap to choose your date of birth"),
             style: context.text.bodyLarge?.copyWith(
               color: dobError
                   ? errorColor
@@ -328,7 +330,9 @@ class _GenderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
-    final accent = gender == "male" ? AppColors.genderMale : AppColors.genderFemale;
+    final accent = gender == "male"
+        ? AppColors.genderMale
+        : AppColors.genderFemale;
     final radius = BorderRadius.circular(AppDimens.radiusCard);
     final iconSize = isSelected ? AppDimens.iconXl : AppDimens.space40;
 
@@ -368,11 +372,15 @@ class _GenderButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SvgPicture.asset(
-                  gender == "male" ? 'assets/icons/onboarding/gender_male.svg' : 'assets/icons/onboarding/gender_female.svg',
+                  gender == "male"
+                      ? 'assets/icons/onboarding/gender_male.svg'
+                      : 'assets/icons/onboarding/gender_female.svg',
                   width: iconSize,
                   height: iconSize,
                   placeholderBuilder: (BuildContext context) => Icon(
-                    gender == "male" ? Icons.male_rounded : Icons.female_rounded,
+                    gender == "male"
+                        ? Icons.male_rounded
+                        : Icons.female_rounded,
                     size: iconSize,
                     color: accent,
                   ),
@@ -381,8 +389,12 @@ class _GenderButton extends StatelessWidget {
                 Text(
                   gender == "male" ? "Male" : "Female",
                   style: context.text.bodyLarge?.copyWith(
-                    color: isSelected ? context.colors.onSurface : context.vColors.grayText,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected
+                        ? context.colors.onSurface
+                        : context.vColors.grayText,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ],

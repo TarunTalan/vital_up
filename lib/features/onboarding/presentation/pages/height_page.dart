@@ -85,7 +85,7 @@ class _HeightContentState extends State<_HeightContent> {
   int? _height = 120;
   int? _inches = 0;
   String _selectedUnit = "cm";
-  
+
   @override
   void initState() {
     super.initState();
@@ -109,8 +109,12 @@ class _HeightContentState extends State<_HeightContent> {
   @override
   Widget build(BuildContext context) {
     // Dynamic bounds based on unit (the cm range is InputLimits').
-    final minHeight = _selectedUnit == "ft" ? 1 : InputLimits.heightCmMin.round();
-    final maxHeight = _selectedUnit == "ft" ? 8 : InputLimits.heightCmMax.round();
+    final minHeight = _selectedUnit == "ft"
+        ? 1
+        : InputLimits.heightCmMin.round();
+    final maxHeight = _selectedUnit == "ft"
+        ? 8
+        : InputLimits.heightCmMax.round();
 
     final error = ProfileRules.heightError(_heightCm);
     final valid = error == null;
@@ -125,7 +129,9 @@ class _HeightContentState extends State<_HeightContent> {
           flex: 1,
           child: Builder(
             builder: (context) {
-              final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
+              final physicalHeight =
+                  context.screenHeight +
+                  MediaQuery.viewInsetsOf(context).bottom;
               final svgHeight = physicalHeight * 0.35;
               return SvgPicture.asset(
                 'assets/icons/onboarding/height.svg',
@@ -133,7 +139,7 @@ class _HeightContentState extends State<_HeightContent> {
                 fit: BoxFit.contain,
                 placeholderBuilder: (context) => SizedBox(height: svgHeight),
               );
-            }
+            },
           ),
         ),
         const SizedBox(width: AppDimens.space12),
@@ -188,8 +194,9 @@ class _HeightContentState extends State<_HeightContent> {
                 child: Text(
                   error,
                   textAlign: TextAlign.center,
-                  style: context.text.bodySmall
-                      ?.copyWith(color: context.colors.error),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.error,
+                  ),
                 ),
               ),
             ],
@@ -235,7 +242,9 @@ class _HeightContentState extends State<_HeightContent> {
   void _saveHeight() {
     // Out-of-range values stay on screen (with an error) but aren't saved.
     if (_height != null && ProfileRules.heightError(_heightCm) == null) {
-      final heightStr = _selectedUnit == "ft" ? "$_height-${_inches ?? 0}" : _height.toString();
+      final heightStr = _selectedUnit == "ft"
+          ? "$_height-${_inches ?? 0}"
+          : _height.toString();
       context.read<OnboardingCubit>().updateHeight(heightStr, _selectedUnit);
     }
   }

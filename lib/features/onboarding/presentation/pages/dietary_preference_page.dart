@@ -14,7 +14,12 @@ class DietaryPreferencePage extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
-  const DietaryPreferencePage({super.key, this.onNext, this.onBack, this.onSkip});
+  const DietaryPreferencePage({
+    super.key,
+    this.onNext,
+    this.onBack,
+    this.onSkip,
+  });
 
   @override
   State<DietaryPreferencePage> createState() => _DietaryPreferencePageState();
@@ -37,7 +42,9 @@ class _DietaryPreferencePageState extends State<DietaryPreferencePage> {
     super.initState();
     final state = context.read<OnboardingCubit>().state;
     if (state.dietaryPreference.isNotEmpty) {
-      final index = options.indexWhere((o) => o.title == state.dietaryPreference);
+      final index = options.indexWhere(
+        (o) => o.title == state.dietaryPreference,
+      );
       if (index != -1) {
         selectedIndex = index;
       }

@@ -71,7 +71,8 @@ class CalculateCalorieGoal {
       };
     }
 
-    final factor = _activityFactors[data.activity] ?? _activityFactors['Mostly resting']!;
+    final factor =
+        _activityFactors[data.activity] ?? _activityFactors['Mostly resting']!;
     return bmr * factor;
   }
 

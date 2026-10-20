@@ -12,12 +12,7 @@ class GoalsPage extends StatefulWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
-  const GoalsPage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const GoalsPage({super.key, this.onNext, this.onBack, this.onSkip});
 
   @override
   State<GoalsPage> createState() => _GoalsPageState();
@@ -139,12 +134,12 @@ class _GoalsPageState extends State<GoalsPage> {
           );
 
     context.read<OnboardingCubit>().updateGoals(
-          goalType: _goal.id,
-          weeklyPace: isMaintain ? '' : _pace.id,
-          targetWeight: isMaintain ? state.weight : '${_targetWeight ?? ''}',
-          targetWeightUnit: isMaintain ? state.weightUnit : _unit,
-          goalDurationMonths: '$months',
-        );
+      goalType: _goal.id,
+      weeklyPace: isMaintain ? '' : _pace.id,
+      targetWeight: isMaintain ? state.weight : '${_targetWeight ?? ''}',
+      targetWeightUnit: isMaintain ? state.weightUnit : _unit,
+      goalDurationMonths: '$months',
+    );
   }
 
   @override
@@ -228,8 +223,9 @@ class _GoalsPageState extends State<GoalsPage> {
                         Text(
                           error,
                           textAlign: TextAlign.center,
-                          style: context.text.bodySmall
-                              ?.copyWith(color: context.colors.error),
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.colors.error,
+                          ),
                         ),
                       ],
                       const SizedBox(height: AppDimens.space32),
@@ -238,10 +234,12 @@ class _GoalsPageState extends State<GoalsPage> {
                       const _SectionLabel('Weekly pace'),
                       for (final pace in WeeklyPace.values)
                         Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppDimens.space16),
+                          padding: const EdgeInsets.only(
+                            bottom: AppDimens.space16,
+                          ),
                           child: OnboardingOptionTile(
-                            label: '${_paceName(pace)}  ·  ${_paceAmount(pace)}',
+                            label:
+                                '${_paceName(pace)}  ·  ${_paceAmount(pace)}',
                             isSelected: _pace == pace,
                             leading: _PaceDot(color: _paceColor(context, pace)),
                             onTap: () => setState(() => _pace = pace),
@@ -260,22 +258,22 @@ class _GoalsPageState extends State<GoalsPage> {
   }
 
   static String _goalLabel(GoalType goal) => switch (goal) {
-        GoalType.lose => 'Lose weight',
-        GoalType.maintain => 'Maintain weight',
-        GoalType.buildMuscle => 'Build muscle',
-      };
+    GoalType.lose => 'Lose weight',
+    GoalType.maintain => 'Maintain weight',
+    GoalType.buildMuscle => 'Build muscle',
+  };
 
   static IconData _goalIcon(GoalType goal) => switch (goal) {
-        GoalType.lose => Icons.trending_down_rounded,
-        GoalType.maintain => Icons.balance_rounded,
-        GoalType.buildMuscle => Icons.fitness_center_rounded,
-      };
+    GoalType.lose => Icons.trending_down_rounded,
+    GoalType.maintain => Icons.balance_rounded,
+    GoalType.buildMuscle => Icons.fitness_center_rounded,
+  };
 
   static String _paceName(WeeklyPace pace) => switch (pace) {
-        WeeklyPace.relaxed => 'Relaxed',
-        WeeklyPace.normal => 'Normal',
-        WeeklyPace.aggressive => 'Aggressive',
-      };
+    WeeklyPace.relaxed => 'Relaxed',
+    WeeklyPace.normal => 'Normal',
+    WeeklyPace.aggressive => 'Aggressive',
+  };
 
   static Color _paceColor(BuildContext context, WeeklyPace pace) =>
       switch (pace) {

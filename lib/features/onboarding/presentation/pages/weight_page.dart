@@ -135,8 +135,12 @@ class _WeightContentState extends State<_WeightContent> {
                     onValueChange: (val) {
                       setState(() => _weight = val);
                       // Out-of-range values show an error and aren't saved.
-                      if (val != null && ProfileRules.weightError(_weightKg) == null) {
-                        context.read<OnboardingCubit>().updateWeight(val.toString(), _selectedUnit);
+                      if (val != null &&
+                          ProfileRules.weightError(_weightKg) == null) {
+                        context.read<OnboardingCubit>().updateWeight(
+                          val.toString(),
+                          _selectedUnit,
+                        );
                       }
                     },
                     min: minWeight,
@@ -151,8 +155,9 @@ class _WeightContentState extends State<_WeightContent> {
                 Text(
                   error,
                   textAlign: TextAlign.center,
-                  style: context.text.bodySmall
-                      ?.copyWith(color: context.colors.error),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.error,
+                  ),
                 ),
               ],
               const SizedBox(height: AppDimens.space8),
@@ -176,8 +181,12 @@ class _WeightContentState extends State<_WeightContent> {
                       _selectedUnit = unit;
                     }
                   });
-                  if (_weight != null && ProfileRules.weightError(_weightKg) == null) {
-                    context.read<OnboardingCubit>().updateWeight(_weight.toString(), unit);
+                  if (_weight != null &&
+                      ProfileRules.weightError(_weightKg) == null) {
+                    context.read<OnboardingCubit>().updateWeight(
+                      _weight.toString(),
+                      unit,
+                    );
                   }
                 },
               ),
@@ -185,11 +194,12 @@ class _WeightContentState extends State<_WeightContent> {
             ],
           ),
         ),
-        
+
         // Image
         Builder(
           builder: (context) {
-            final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
+            final physicalHeight =
+                context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
             return SizedBox(
               width: double.infinity,
               height: physicalHeight * 0.28,
@@ -199,7 +209,7 @@ class _WeightContentState extends State<_WeightContent> {
                 alignment: Alignment.topCenter,
               ),
             );
-          }
+          },
         ),
       ],
     );

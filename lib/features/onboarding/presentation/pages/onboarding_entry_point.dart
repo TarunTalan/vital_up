@@ -40,7 +40,7 @@ class _OnboardingEntryPointState extends State<OnboardingEntryPoint> {
         routeName = 'health-height';
         break;
       case 'weight':
-        routeName = 'health-weight'; 
+        routeName = 'health-weight';
         break;
       case 'blood_pressure':
         routeName = 'health-blood-pressure';
@@ -68,15 +68,12 @@ class _OnboardingEntryPointState extends State<OnboardingEntryPoint> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<OnboardingCubit, OnboardingData>(
-      listenWhen: (previous, current) => previous.currentStep != current.currentStep,
+      listenWhen: (previous, current) =>
+          previous.currentStep != current.currentStep,
       listener: (context, state) {
         _navigate(state.currentStep);
       },
-      child: const AppScaffold(
-        body: Center(
-          child: VitalUpLoader(),
-        ),
-      ),
+      child: const AppScaffold(body: Center(child: VitalUpLoader())),
     );
   }
 }
