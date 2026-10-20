@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
@@ -10,7 +12,13 @@ abstract class ActivityHistoryEvent extends Equatable {
 }
 
 /// Loads (or reloads) the full session history.
-class LoadActivityHistory extends ActivityHistoryEvent {}
+class LoadActivityHistory extends ActivityHistoryEvent {
+  /// Completed when the load has finished, so pull-to-refresh can keep
+  /// its spinner until then.
+  final Completer<void>? done;
+
+  LoadActivityHistory({this.done});
+}
 
 /// Filters the visible list to outdoor activities or workouts. Pass null to
 /// clear every filter. Replaces a type filter.

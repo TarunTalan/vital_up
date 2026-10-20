@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
@@ -64,7 +67,14 @@ class _ActivityHistoryView extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: RefreshIndicator(
-            onRefresh: () async => _reload(context),
+            onRefresh: () async {
+              final done = Completer<void>();
+              context
+                  .read<ActivityHistoryBloc>()
+                  .add(LoadActivityHistory(done: done));
+              // The spinner stays until the list has reloaded.
+              await done.future.timeout(kLoadTimeout, onTimeout: () {});
+            },
             child: BlocConsumer<ActivityHistoryBloc, ActivityHistoryState>(
               listenWhen: (previous, current) =>
                   current is ActivityHistoryLoaded &&

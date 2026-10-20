@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 
 /// Full-screen animated countdown overlay shown before a workout starts.
 ///
@@ -36,7 +37,9 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   late Animation<double> _scaleAnim;
   late Animation<double> _opacityAnim;
   Timer? _ticker;
-  final FlutterTts _tts = FlutterTts();
+  /// The shared coach: a second FlutterTts would take over the plugin's
+  /// callbacks (the coach's music ducking) and bind the engine again.
+  final VoiceCoachService _voice = sl<VoiceCoachService>();
   bool _finishedNaturally = false;
   bool _skipped = false;
 
@@ -44,9 +47,6 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   void initState() {
     super.initState();
     _count = widget.durationSeconds;
-    _tts.setSpeechRate(0.55);
-    _tts.setVolume(1.0);
-    _tts.setPitch(1.0);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -70,7 +70,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
     _controller.reset();
     _controller.forward();
     if (widget.voiceCoachEnabled && _count <= 3 && _count >= 1) {
-      _tts.speak('$_count');
+      _voice.announceCount(_count);
     }
   }
 
@@ -103,7 +103,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   void _skip() {
     HapticFeedback.mediumImpact();
     _ticker?.cancel();
-    _tts.stop();
+    _voice.stop();
     _skipped = true;
     if (mounted) widget.onFinished();
   }
@@ -113,7 +113,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
     _ticker?.cancel();
     _controller.dispose();
     if (!_finishedNaturally && !_skipped) {
-      _tts.stop();
+      _voice.stop();
     }
     super.dispose();
   }

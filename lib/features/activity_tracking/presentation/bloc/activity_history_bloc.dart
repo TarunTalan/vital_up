@@ -31,16 +31,33 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
       LoadActivityHistory event,
       Emitter<ActivityHistoryState> emit,
       ) async {
-    emit(const ActivityHistoryLoading());
+    // A reload keeps the list, its filters and search on screen; only the
+    // first load shows the loader.
+    if (state is! ActivityHistoryLoaded) emit(const ActivityHistoryLoading());
     try {
       final entries = await getActivityHistory().withLoadTimeout();
-      emit(ActivityHistoryLoaded(
-        allEntries: entries,
-        visibleEntries: entries,
-      ));
+      final s = state;
+      if (s is ActivityHistoryLoaded) {
+        final updated = s.copyWith(allEntries: entries);
+        emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
+      } else {
+        emit(ActivityHistoryLoaded(
+          allEntries: entries,
+          visibleEntries: entries,
+        ));
+      }
     } catch (e) {
       debugPrint('Loading activity history failed: $e');
-      emit(const ActivityHistoryError("Couldn't load your workouts. Try again."));
+      if (state is ActivityHistoryLoaded) {
+        _emitActionError(emit, "Couldn't refresh your workouts. Try again.");
+      } else {
+        emit(const ActivityHistoryError(
+          "Couldn't load your workouts. Try again.",
+        ));
+      }
+    } finally {
+      final done = event.done;
+      if (done != null && !done.isCompleted) done.complete();
     }
   }
 

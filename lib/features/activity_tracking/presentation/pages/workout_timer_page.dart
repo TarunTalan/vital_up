@@ -152,7 +152,6 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
 
   late final WorkoutMusic _music = WorkoutMusic(
     _prefs,
-    voiceCoach: sl<VoiceCoachService>(),
     onError: (message) {
       if (mounted) showErrorSnackBar(context, message);
     },
@@ -164,6 +163,7 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     _units.load();
     _prefs.load().then((_) => _music.refreshFavorite());
     _loadGoalTarget();
+    sl<VoiceCoachService>().init();
     _bpmSubscription = _heartRate.bpmStream.listen((bpm) {
       if (mounted) setState(() => _bpm = bpm);
     });
@@ -175,6 +175,7 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     _prefs.setBackgroundAudioTrack('None');
     _music.stop();
     _music.dispose();
+    sl<VoiceCoachService>().stop();
     _bpmSubscription?.cancel();
     _heartRate.dispose();
     _units.dispose();

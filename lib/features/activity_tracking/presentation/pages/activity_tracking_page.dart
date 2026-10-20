@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
-import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -16,7 +15,7 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
-import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_prefetcher.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -37,8 +36,6 @@ import 'package:vital_up/features/activity_tracking/presentation/widgets/interru
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
-
-const String kOfflineRegionId = 'local_workout_region_10k';
 
 /// The one screen for every activity. Outdoor types use the GPS view (map,
 /// location service, recovery); workouts without a route use the workout
@@ -138,7 +135,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   StreamSubscription<int?>? _hrSubscription;
   late final WorkoutMusic _music = WorkoutMusic(
     _prefsNotifier,
-    voiceCoach: _voiceCoach,
     onError: (message) {
       if (mounted) showErrorSnackBar(context, message);
     },
@@ -169,6 +165,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   late final Widget _mapLayer = Positioned.fill(
     child: mbx.MapWidget(
       key: const ValueKey("mapWidget"),
+      // The style in the offline pack. Left out, the widget first loads
+      // the heavy Standard style (not saved offline) and then swaps.
+      styleUri: mbx.MapboxStyles.MAPBOX_STREETS,
       onMapCreated: _onMapCreated,
       onTapListener: (context) {
         if (mounted) {
@@ -329,7 +328,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription?.cancel();
     _notificationButtons?.cancel();
     _hrManager.dispose();
-    _voiceCoach.dispose();
     _music.dispose();
     _unitNotifier.dispose();
     _prefsNotifier.dispose();
@@ -529,25 +527,12 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  /// Keeps a 10 km offline map around the user so the tracking map still
-  /// renders with no connection. Runs once per visit, silently: offline the
-  /// download simply fails and is retried on the next visit.
-  Future<void> _ensureOfflineMap(double latitude, double longitude) async {
+  /// The app downloads the offline map at start; this only catches a user
+  /// who has moved out of it since. Once per visit.
+  void _ensureOfflineMap(double latitude, double longitude) {
     if (_offlineMapChecked) return;
     _offlineMapChecked = true;
-    if (!SupabaseConfig.mapboxAccessToken.startsWith('pk.')) return;
-
-    final mapRepo = sl<MapTileRepository>();
-    try {
-      if (await mapRepo.regionCovers(kOfflineRegionId, latitude, longitude)) {
-        return;
-      }
-      await mapRepo
-          .downloadRegion(kOfflineRegionId, latitude, longitude, 10.0)
-          .drain<void>();
-    } catch (e) {
-      debugPrint('Offline map download skipped: $e');
-    }
+    sl<OfflineMapPrefetcher>().ensureAround(latitude, longitude);
   }
 
   void _openSettings() {
@@ -571,15 +556,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   void _onMapCreated(mbx.MapboxMap map) async {
     _mapboxMap = map;
-
-    // Set map style. Offline without a downloaded style pack this fails;
-    // carry on so the route and position markers are still created.
-    try {
-      await map.loadStyleURI(mbx.MapboxStyles.MAPBOX_STREETS);
-    } catch (e) {
-      debugPrint('Map style failed to load: $e');
-    }
-    if (!mounted) return;
 
     // Move compass to top right, at roughly 60% height of screen
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -808,11 +784,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             );
           }
 
-          // Set start point on first track point
-          if (_startPoint == null && state.routePoints.isNotEmpty) {
+          // Set start point on first track point (again if a bad first
+          // fix was replaced).
+          if (state.routePoints.isNotEmpty &&
+              !identical(_startPoint, state.routePoints.first)) {
+            final first = _startPoint == null;
             setState(() {
               _startPoint = state.routePoints.first;
-              _isLocked = true; // Lock when tracking actually begins
+              if (first) _isLocked = true; // Lock when tracking begins
             });
             _updateStartPoint(state.routePoints.first);
           }
@@ -853,6 +832,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _voiceCoach.announceStop(
               distanceMeters: state.session.totalDistanceMeters,
               elapsedSeconds: state.session.totalDurationSeconds,
+              unit: _unitNotifier.value,
             );
           }
           final bloc = context.read<ActivityTrackingBloc>();
@@ -860,15 +840,19 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             MaterialPageRoute(
               builder: (_) => ActivityCompletionPage(
                 session: state.session,
+                // Leaving the result cuts the summary cue short.
                 onNewActivity: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   Navigator.of(context).pop();
                 },
                 onBack: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   Navigator.of(context).pop();
                 },
                 onViewHistory: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   context.pushNamed('activity-history');
                 },

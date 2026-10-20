@@ -1,9 +1,7 @@
 import 'dart:async';
 
-import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -18,8 +16,6 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_sav
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
-import 'package:vital_up/features/auth/domain/entities/user_entity.dart';
-import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 
 class _FakeLocation implements LocationTrackingRepository {
   bool granted = true;
@@ -65,14 +61,6 @@ class _FakeActivityRepo implements ActivityRepository {
   Future<void> finalizeInterruptedSessions({String? keepOpenId}) async {}
 }
 
-class _FakeAuth implements AuthRepository {
-  @override
-  Future<Either<Failure, UserEntity?>> getCurrentUser() async => const Right(null);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
 final _t0 = DateTime.utc(2026, 10, 1, 7);
 
 TrackPoint _p(int second, double northMeters, {double altitude = 900}) => TrackPoint(
@@ -101,7 +89,7 @@ void main() {
       getLiveLocationStream: GetLiveLocationStream(location),
       getLiveStepsStream: GetLiveStepsStream(steps),
       stopAndSaveSession: StopAndSaveSession(repo),
-      authRepository: _FakeAuth(),
+      weightKg: () async => null,
     );
   });
 
@@ -271,7 +259,7 @@ void main() {
         getLiveLocationStream: GetLiveLocationStream(location),
         getLiveStepsStream: GetLiveStepsStream(steps),
         stopAndSaveSession: StopAndSaveSession(repo),
-        authRepository: _FakeAuth(),
+        weightKg: () async => null,
         checkpointStore: store,
       );
     });

@@ -6,7 +6,8 @@ import 'package:vital_up/core/monitoring/crash_reporter.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
-  CrashReporter.hookCurrentIsolate();
+  // Not awaited: the handler must be set synchronously.
+  CrashReporter.initBackground();
   FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
 }
 

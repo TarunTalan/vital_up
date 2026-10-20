@@ -5,7 +5,6 @@ import 'package:isar_community/isar.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/database/collections/downloaded_track.dart';
-import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 
 class WorkoutAudioService {
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -38,9 +37,6 @@ class WorkoutAudioService {
   Future<void> playTrack(String trackName, {String? source, String? localPath, bool play = true}) async {
     if (trackName == 'None') {
       await stop();
-      try {
-        sl<VoiceCoachService>().stop().ignore();
-      } catch (_) {}
       return;
     }
 
@@ -59,10 +55,6 @@ class WorkoutAudioService {
       }
 
       _currentTrack = trackName;
-
-      try {
-        sl<VoiceCoachService>().stop().ignore();
-      } catch (_) {}
 
       String? resolvedSource = source;
       String? resolvedLocalPath = localPath;
@@ -165,9 +157,6 @@ class WorkoutAudioService {
     if (_audioPlayer.playing) {
       await _audioPlayer.pause();
     }
-    try {
-      sl<VoiceCoachService>().stop().ignore();
-    } catch (_) {}
   }
 
   Future<void> resume() async {

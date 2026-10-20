@@ -51,7 +51,13 @@ class _SilentAudio implements WorkoutAudioService {
 
 class _SilentCoach implements VoiceCoachService {
   @override
+  Future<void> init() async {}
+
+  @override
   Future<void> stop() async {}
+
+  @override
+  Future<void> announceCount(int count) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

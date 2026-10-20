@@ -7,7 +7,9 @@ import 'package:vital_up/features/activity_tracking/data/services/workout_recove
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/activity_calories.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/geo_math.dart';
+import 'package:vital_up/features/activity_tracking/domain/services/workout_log_rules.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_location_stream.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_live_steps_stream.dart';
@@ -15,13 +17,14 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/stop_and_sav
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
-import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart';
 
 class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingState> {
   final GetLiveLocationStream getLiveLocationStream;
   final GetLiveStepsStream getLiveStepsStream;
   final StopAndSaveSession stopAndSaveSession;
-  final AuthRepository authRepository;
+
+  /// The user's weight for calories; null when unknown.
+  final Future<double?> Function() weightKg;
 
   /// Marks the workout as in progress so it can be resumed after an app
   /// kill. Optional so tests can leave it out.
@@ -82,7 +85,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   double? _elevationReference;
 
   /// User weight cached at session start to avoid hitting the DB on every tick.
-  double _cachedWeightKg = 70.0;
+  double _cachedWeightKg = WorkoutLogRules.fallbackWeightKg;
 
   Duration _lastCheckpointAt = Duration.zero;
   Future<void> _pendingSave = Future.value();
@@ -92,7 +95,7 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     required this.getLiveLocationStream,
     required this.getLiveStepsStream,
     required this.stopAndSaveSession,
-    required this.authRepository,
+    required this.weightKg,
     this.checkpointStore,
   }) : super(const TrackingIdle()) {
     on<SelectActivityType>(_onSelectActivityType);
@@ -139,15 +142,8 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
 
       final hasStepPermission = await getLiveStepsStream.ensurePermission();
 
-      // Cache user weight once per session — avoids async DB hit on every tick.
-      final userResult = await authRepository.getCurrentUser();
-      _cachedWeightKg = userResult.fold(
-        (failure) => 70.0,
-        (user) {
-          final weight = user?.weightKg;
-          return weight != null && weight > 0 ? weight : 70.0;
-        },
-      );
+      // Read once per session: every tick recomputes calories.
+      _cachedWeightKg = await _readWeightKg();
 
       // Start the foreground service (and its permission prompts) before
       // the clock starts, so time spent in system dialogs isn't counted.
@@ -197,6 +193,16 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     } finally {
       _isStarting = false;
     }
+  }
+
+  Future<double> _readWeightKg() async {
+    try {
+      final kg = await weightKg();
+      if (kg != null && kg.isFinite && kg > 0) return kg;
+    } catch (e) {
+      debugPrint('Reading weight for workout calories failed: $e');
+    }
+    return WorkoutLogRules.fallbackWeightKg;
   }
 
   Future<void> _subscribeToSteps(bool hasStepPermission) async {
@@ -523,13 +529,19 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
 
     final segmentDistance =
         previous != null ? haversineMeters(previous, point) : 0.0;
-    if (previous != null &&
-        !_skipDistanceForNextPoint &&
-        _isPlausibleSegment(s.activityType, previous, point, segmentDistance)) {
+    final plausible = previous != null &&
+        _isPlausibleSegment(s.activityType, previous, point, segmentDistance);
+    if (plausible && !_skipDistanceForNextPoint) {
       distance += segmentDistance;
     }
     _skipDistanceForNextPoint = false;
-    points.add(point);
+    if (previous != null && !plausible && points.length == 1) {
+      // The start was a bad cold-start fix: move it rather than draw a
+      // line from it.
+      points[0] = point;
+    } else {
+      points.add(point);
+    }
     _lastFixAt = _sessionClock.elapsed;
     _updateStationaryState(point, segmentDistance);
     _updateElevation(point);
@@ -659,32 +671,19 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     }
   }
 
-  /// Calculates calories burned using a MET×weight×time + distance-correction blend.
-  ///
-  /// Strategy (mirrors Adidas Running app approach):
-  ///   1. Duration-only MET estimate: `MET × weight(kg) × hours`
-  ///   2. Distance-based estimate:    `kcalPerKgPerKm × weight(kg) × distance(km)`
-  ///   3. We blend them:  when distance < 10 m use pure MET;
-  ///      otherwise return the average of both to smooth out GPS noise.
+  /// Calories so far; climb is the gain recorded up to now.
   int _calculateCalories(
     ActivityType type,
     Duration elapsed,
     double distanceMeters,
-  ) {
-    final weightKg = _cachedWeightKg;
-    final hours = elapsed.inSeconds / 3600.0;
-    final metCalories = type.met * weightKg * hours;
-
-    if (distanceMeters < 10.0) {
-      return metCalories.round();
-    }
-
-    final distanceKm = distanceMeters / 1000.0;
-    final distanceCalories = type.kcalPerKgPerKm * weightKg * distanceKm;
-
-    // Blend: 50% MET-based, 50% distance-based for best overall accuracy.
-    return ((metCalories + distanceCalories) / 2).round();
-  }
+  ) =>
+      estimateGpsCalories(
+        type,
+        elapsed: elapsed,
+        distanceMeters: distanceMeters,
+        elevationGainMeters: _elevationGain,
+        weightKg: _cachedWeightKg,
+      );
 
   int _calculateOverallPace(Duration elapsed, double distanceMeters) {
     if (elapsed.inSeconds <= 0 || distanceMeters < _minDistanceForPaceMeters) return 0;
