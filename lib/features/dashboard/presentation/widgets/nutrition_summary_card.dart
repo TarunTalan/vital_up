@@ -34,17 +34,28 @@ String mealTypeLabel(MealType type) => switch (type) {
 ({double protein, double carbs, double fat}) macroTargets(
   MealPlan? plan,
   int? calorieGoal,
-) => (
-  protein:
-      plan?.totalProtein.toDouble() ??
-      (calorieGoal != null ? calorieGoal * 0.3 / 4 : 120),
-  carbs:
-      plan?.totalCarbs.toDouble() ??
-      (calorieGoal != null ? calorieGoal * 0.5 / 4 : 250),
-  fat:
-      plan?.totalFat.toDouble() ??
-      (calorieGoal != null ? calorieGoal * 0.2 / 9 : 65),
-);
+) {
+  // A plan or goal of 0 (missing from the server, an emptied plan) counts
+  // as none, so bars never read "68 / 0g".
+  double? positive(num? v) => v != null && v > 0 ? v.toDouble() : null;
+  final goal = positive(calorieGoal);
+  return (
+    protein:
+        positive(plan?.totalProtein) ?? (goal != null ? goal * 0.3 / 4 : 120),
+    carbs: positive(plan?.totalCarbs) ?? (goal != null ? goal * 0.5 / 4 : 250),
+    fat: positive(plan?.totalFat) ?? (goal != null ? goal * 0.2 / 9 : 65),
+  );
+}
+
+/// Today's calorie goal: the plan's total, else the profile's daily goal;
+/// null when neither is above 0 ("of 0 kcal" is no goal).
+double? calorieGoalFor(MealPlan? plan, int? dailyCalorieGoal) {
+  final planned = plan?.totalCalories;
+  if (planned != null && planned > 0) return planned.toDouble();
+  return dailyCalorieGoal != null && dailyCalorieGoal > 0
+      ? dailyCalorieGoal.toDouble()
+      : null;
+}
 
 /// Home card: today's calories and macros against the plan (or calorie
 /// goal) and which meals are logged. Needs a [MealLogBloc] above it.
@@ -93,11 +104,11 @@ class NutritionSummaryCard extends StatelessWidget {
 
   Widget _loaded(BuildContext context, MealLogLoaded state) {
     final plan = this.plan;
-    final goal =
-        plan?.totalCalories.toDouble() ?? state.dailyCalorieGoal?.toDouble();
+    final goal = calorieGoalFor(plan, state.dailyCalorieGoal);
     final kcal = state.totalCalories;
     final targets = macroTargets(plan, state.dailyCalorieGoal);
-    final left = goal == null ? null : goal - kcal;
+    // Rounded first, so a few tenths over never reads "0 kcal over".
+    final left = goal == null ? null : (goal - kcal).roundToDouble();
     return TrackerCard(
       metric: _metric,
       status: TrackerStatus.of(
@@ -180,10 +191,13 @@ class NutritionSummaryCard extends StatelessWidget {
   /// "2 of 4 meals", or against the plan's meals when there is one.
   String _mealsLogged(MealLogLoaded state) {
     final plan = this.plan;
-    if (plan != null) {
-      final meals = plannedMealStatuses(plan, state.entries);
-      final done = meals.where((m) => m.logged).length;
-      return '$done of ${meals.length} planned meals';
+    final planned = plan == null
+        ? const <PlannedMealStatus>[]
+        : plannedMealStatuses(plan, state.entries);
+    // A plan without meals counts meals like no plan ("0 of 0" says nothing).
+    if (planned.isNotEmpty) {
+      final done = planned.where((m) => m.logged).length;
+      return '$done of ${planned.length} planned meals';
     }
     final done = state.loggedMealTypes.length;
     return '$done of ${MealType.values.length} meals';

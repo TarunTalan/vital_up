@@ -52,14 +52,19 @@ class WaterIntakeCard extends StatelessWidget {
             showErrorSnackBar(context, notice);
             return;
           }
+          // Captured now: Undo takes back this drink, even after more adds.
+          final cubit = context.read<WaterIntakeCubit>();
+          final logId = loaded.addedLogId;
           showSuccessSnackBar(
             context,
             'Added ${loaded.addedMl} ml of water',
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: context.colors.primary,
-              onPressed: context.read<WaterIntakeCubit>().undoLast,
-            ),
+            action: logId == null
+                ? null
+                : SnackBarAction(
+                    label: 'Undo',
+                    textColor: context.colors.primary,
+                    onPressed: () => cubit.undo(logId),
+                  ),
           );
         },
         builder: (context, state) {

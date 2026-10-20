@@ -20,8 +20,17 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_she
 class WaterTrendsPage extends StatelessWidget {
   const WaterTrendsPage({super.key});
 
-  static String formatMl(double ml) =>
-      ml >= 1000 ? '${(ml / 1000).toStringAsFixed(1)} L' : '${ml.round()} ml';
+  /// "250 ml", "1.25 L", "2.5 L". Litres show a second decimal only
+  /// when there is one, never rounded up, so 2,960 ml reads "2.96 L", not
+  /// "3.0 L of 3.0 L" before the goal is reached, and 1,250 ml isn't
+  /// undersold as "1.2 L".
+  static String formatMl(double ml) {
+    if (!ml.isFinite || ml < 1000) {
+      return '${(ml.isFinite ? ml : 0).floor()} ml';
+    }
+    final litres = ((ml / 10).floor() / 100).toStringAsFixed(2);
+    return '${litres.endsWith('0') ? litres.substring(0, litres.length - 1) : litres} L';
+  }
 
   static ({int ml, String label, IconData icon})? _presetFor(int ml) {
     for (final p in waterPresets) {

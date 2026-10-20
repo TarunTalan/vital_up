@@ -123,6 +123,8 @@ class DashboardCardLoading extends StatelessWidget {
 }
 
 String formatDashboardDuration(Duration duration) {
+  // A negative span (clock change, bad data) reads as nothing, not "-5m".
+  if (duration.isNegative) duration = Duration.zero;
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
   return hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';

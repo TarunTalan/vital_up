@@ -170,8 +170,9 @@ class _WeightEntrySheetState extends State<WeightEntrySheet> {
     final goal = widget.goalKg;
     if (goal != null) {
       final left = (_unit.fromKg(goal) - _unit.fromKg(kg)).abs();
+      // Same threshold as the Weight card's "Goal reached".
       facts.add(
-        left < 0.05
+        (goal - kg).abs() <= weightGoalReachedKg
             ? 'At your goal'
             : '${left.toStringAsFixed(1)} ${_unit.label} to your goal',
       );

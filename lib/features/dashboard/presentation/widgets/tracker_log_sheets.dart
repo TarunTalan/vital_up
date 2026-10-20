@@ -380,20 +380,69 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
   bool _saving = false;
   String? _error;
 
+  /// Height added so the clock keeps [CircularSleepClockPicker.minClockSize]
+  /// (0 unless the screen is very short at large text).
+  double _extraHeight = 0;
+
+  /// Time asleep for the night as it was opened, when it's less than
+  /// time in bed (a phone estimate leaves out screen-on check-ins). Shown
+  /// and saved while the times stay as they were.
+  Duration? _initialAsleep;
+  late final TimeOfDay _initialBed;
+  late final TimeOfDay _initialWake;
+
   @override
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _bed = initial == null
-        ? const TimeOfDay(hour: 23, minute: 0)
-        : TimeOfDay.fromDateTime(initial.bedTime);
-    _wake = initial == null
-        ? const TimeOfDay(hour: 7, minute: 0)
-        : TimeOfDay.fromDateTime(initial.wakeTime);
-    _wakeDay = startOfDay(initial?.wakeTime ?? DateTime.now());
+    if (initial != null) {
+      _bed = TimeOfDay.fromDateTime(initial.bedTime);
+      _wake = TimeOfDay.fromDateTime(initial.wakeTime);
+      _wakeDay = startOfDay(initial.wakeTime);
+      final span = initial.wakeTime.difference(initial.bedTime);
+      if (initial.duration > Duration.zero && initial.duration < span) {
+        _initialAsleep = initial.duration;
+      }
+    } else {
+      final now = DateTime.now();
+      final usualWake = DateTime(now.year, now.month, now.day, 7);
+      if (now.isBefore(usualWake)) {
+        // Logging early (up at 6:10): wake up now, in bed for the goal,
+        // instead of a 7:00 wake-up that would be in the future.
+        final wake = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          now.hour,
+          now.minute - now.minute % 5,
+        );
+        final goal = Duration(
+          minutes: widget.goalMinutes ?? sl<SleepService>().getGoalMinutes(),
+        );
+        final inBed = goal < minSleepEntry
+            ? minSleepEntry
+            : goal > maxSleepEntry
+            ? maxSleepEntry
+            : goal;
+        _bed = TimeOfDay.fromDateTime(wake.subtract(inBed));
+        _wake = TimeOfDay.fromDateTime(wake);
+      } else {
+        _bed = const TimeOfDay(hour: 23, minute: 0);
+        _wake = const TimeOfDay(hour: 7, minute: 0);
+      }
+      _wakeDay = startOfDay(now);
+    }
+    _initialBed = _bed;
+    _initialWake = _wake;
   }
 
+  /// The opened night's time asleep, while its times are unchanged.
+  Duration? get _keptAsleep =>
+      _bed == _initialBed && _wake == _initialWake ? _initialAsleep : null;
+
   Duration get _duration {
+    final kept = _keptAsleep;
+    if (kept != null) return kept;
     final (:bed, :wake) = _times;
     return wake.difference(bed);
   }
@@ -438,7 +487,17 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
     setState(() => _saving = true);
     HapticFeedback.mediumImpact();
     try {
-      await sl<SleepService>().saveManualEntry(bed, wake);
+      // Unchanged times keep the opened night's time asleep and source
+      // (a confirmed phone estimate stays one); changed times are manual.
+      final kept = _keptAsleep;
+      await sl<SleepService>().saveManualEntry(
+        bed,
+        wake,
+        asleep: kept,
+        source: kept != null && widget.initial?.source == SleepDataSource.phone
+            ? SleepDataSource.phone
+            : SleepDataSource.manual,
+      );
     } catch (e) {
       debugPrint('Sleep entry not saved: $e');
       if (!mounted) return;
@@ -455,55 +514,94 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
   Widget build(BuildContext context) {
     final isToday = isSameDay(_wakeDay, DateTime.now());
     final d = _duration;
+    // Checked as the times change (a future wake-up shows at once), not
+    // only on Save; Save stays off until the night can be saved.
+    final (:bed, :wake) = _times;
+    final ruleError = sleepEntryError(bed, wake, now: DateTime.now());
+    final error = _error ?? ruleError;
     return TrackerSheet(
       metric: TrackerMetric.sleep,
       title: 'Log sleep',
       subtitle: 'Drag the moon and sun, or the arc to move the night',
+      // The clock sizes itself to the room left, so the sheet never needs
+      // scrolling and the time cards never sit behind Save.
+      scrollable: false,
       action: AppPrimaryButton(
         label: 'Save ${d.inHours}h ${d.inMinutes.remainder(60)}m',
         isLoading: _saving,
+        enabled: ruleError == null,
         onTap: _save,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ActionChip(
-              avatar: const Icon(Icons.event_rounded, size: AppDimens.iconXs),
-              label: Text(
-                isToday
-                    ? 'Last night'
-                    : 'Night ending ${DateFormat('EEE d MMM').format(_wakeDay)}',
+      // The clock fills the room left, so the sheet doesn't scroll. Only
+      // where that room would make it smaller than readable (a short phone
+      // at the largest text) does the sheet grow by the difference and
+      // scroll, keeping the clock at its smallest usable size.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final content = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: const Icon(
+                    Icons.event_rounded,
+                    size: AppDimens.iconXs,
+                  ),
+                  label: Text(
+                    isToday
+                        ? 'Last night'
+                        : 'Night ending ${DateFormat('EEE d MMM').format(_wakeDay)}',
+                  ),
+                  onPressed: _pickDay,
+                ),
               ),
-              onPressed: _pickDay,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space12),
-          CircularSleepClockPicker(
-            goal: Duration(
-              minutes:
-                  widget.goalMinutes ?? sl<SleepService>().getGoalMinutes(),
-            ),
-            initialBedTime: _bed,
-            initialWakeTime: _wake,
-            onChanged: (b, w) => setState(() {
-              _bed = b;
-              _wake = w;
-              _error = null;
-            }),
-          ),
-          if (_error case final error?) ...[
-            const SizedBox(height: AppDimens.space8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.error,
+              const SizedBox(height: AppDimens.space12),
+              Flexible(
+                child: CircularSleepClockPicker(
+                  goal: Duration(
+                    minutes:
+                        widget.goalMinutes ??
+                        sl<SleepService>().getGoalMinutes(),
+                  ),
+                  initialBedTime: _bed,
+                  initialWakeTime: _wake,
+                  asleep: _keptAsleep,
+                  minDuration: minSleepEntry,
+                  maxDuration: maxSleepEntry,
+                  onClockSize: (size) {
+                    if (!mounted) return;
+                    final short = CircularSleepClockPicker.minClockSize - size;
+                    if (short > 0.5) setState(() => _extraHeight += short);
+                  },
+                  onChanged: (b, w) => setState(() {
+                    _bed = b;
+                    _wake = w;
+                    _error = null;
+                  }),
+                ),
               ),
+              if (error != null) ...[
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  error,
+                  textAlign: TextAlign.center,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.error,
+                  ),
+                ),
+              ],
+            ],
+          );
+          if (_extraHeight == 0) return content;
+          return SingleChildScrollView(
+            child: SizedBox(
+              height: constraints.maxHeight + _extraHeight,
+              child: content,
             ),
-          ],
-        ],
+          );
+        },
       ),
     );
   }

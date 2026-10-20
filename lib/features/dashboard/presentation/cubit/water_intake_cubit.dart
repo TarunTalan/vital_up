@@ -53,6 +53,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
     int goal, {
     String? notice,
     int? addedMl,
+    int? addedLogId,
   }) => WaterIntakeLoaded(
     currentIntakeMl:
         logs.fold<int>(0, (sum, log) => sum + log.amountMl) + _pendingMl,
@@ -60,6 +61,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
     todayLogs: logs,
     notice: notice,
     addedMl: addedMl,
+    addedLogId: addedLogId,
   );
 
   /// Re-emits the current logs (plus any pending adds), optionally with a
@@ -69,6 +71,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
     int? goal,
     String? notice,
     int? addedMl,
+    int? addedLogId,
   }) {
     final s = state;
     if (s is! WaterIntakeLoaded) return;
@@ -78,6 +81,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
         goal ?? s.dailyGoalMl,
         notice: notice,
         addedMl: addedMl,
+        addedLogId: addedLogId,
       ),
     );
   }
@@ -106,6 +110,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
       _refresh(
         logs: s is WaterIntakeLoaded ? [...s.todayLogs, newLog] : [newLog],
         addedMl: amountMl,
+        addedLogId: newLog.id,
       );
       return true;
     } catch (e) {
@@ -116,16 +121,18 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
     }
   }
 
-  Future<void> undoLast() async {
-    final s = state;
-    if (s is! WaterIntakeLoaded || s.todayLogs.isEmpty) return;
-    final lastLog = s.todayLogs.last;
+  /// Takes back the drink saved as [logId] (the snackbar's Undo), even
+  /// after other adds or past midnight.
+  Future<void> undo(int logId) async {
+    if (state is! WaterIntakeLoaded) return;
     try {
       // Not optimistic: putting a failed undo back would look like an add.
-      await _service.deleteWaterLog(lastLog.id);
+      await _service.deleteWaterLog(logId);
       final now = state;
       if (now is WaterIntakeLoaded) {
-        _refresh(logs: [...now.todayLogs]..remove(lastLog));
+        _refresh(
+          logs: [...now.todayLogs]..removeWhere((log) => log.id == logId),
+        );
       }
     } catch (e) {
       debugPrint('Undo water failed: $e');

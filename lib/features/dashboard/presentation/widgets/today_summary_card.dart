@@ -28,6 +28,7 @@ import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.d
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
 import 'dashboard_card_header.dart';
+import 'nutrition_summary_card.dart' show calorieGoalFor;
 import 'package:vital_up/core/utils/number_formats.dart';
 
 const _placeholder = '—';
@@ -39,14 +40,19 @@ const _quickWaterMl = 250;
 
 double? _calorieGoal(BuildContext context, MealLogLoaded meals) {
   final plan = context.watch<DietPlanCubit>().state;
-  return plan is DietPlanLoaded
-      ? plan.mealPlan.totalCalories.toDouble()
-      : meals.dailyCalorieGoal?.toDouble();
+  return calorieGoalFor(
+    plan is DietPlanLoaded ? plan.mealPlan : null,
+    meals.dailyCalorieGoal,
+  );
 }
 
+/// Last night as the Sleep card shows it: a saved night, or the phone's
+/// estimate still to review (not "Not logged" while the card below shows
+/// a figure).
 Duration? _lastNight(SleepState state) => switch (state) {
   SleepLoadedAuto(:final session) => session.duration,
   SleepLoadedManual(:final session) => session.duration,
+  SleepNeedsConfirmation(:final estimate) => estimate.duration,
   _ => null,
 };
 
@@ -137,8 +143,15 @@ class TodaySummaryCard extends StatelessWidget {
       goals: goal == null
           ? [state.snapshot == null ? _unknown : TrackerStatus.noGoal.label]
           : [
-              'of ${metric!.formatWithUnit(goal.goal.target)}',
-              'of ${metric.formatShortWithUnit(goal.goal.target)}',
+              // A weekly goal says so: its figure is the week's total.
+              if (goal.goal.period == GoalPeriod.weekly) ...[
+                'of ${metric!.formatWithUnit(goal.goal.target)} this week',
+                'of ${metric.formatShortWithUnit(goal.goal.target)} this week',
+                'of ${metric.formatShortWithUnit(goal.goal.target)}',
+              ] else ...[
+                'of ${metric!.formatWithUnit(goal.goal.target)}',
+                'of ${metric.formatShortWithUnit(goal.goal.target)}',
+              ],
               if (metric != GoalMetric.distance)
                 'of ${formatCompactCount(goal.goal.target)}',
             ],
@@ -448,7 +461,8 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       actionAsset: TrackerMetric.sleep.logIconAsset,
     );
   }
-  if (hour < 12 && sleep is SleepNeedsManualEntry) {
+  // Not before 4 am: at 1 am nobody has slept "last night" yet.
+  if (hour >= 4 && hour < 12 && sleep is SleepNeedsManualEntry) {
     return (
       message: "Log last night's sleep to see how rested you are.",
       metric: TrackerMetric.sleep,
@@ -466,7 +480,9 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
           paceFraction: pace,
         )
       : null;
-  if (water is WaterIntakeLoaded &&
+  // From 7 am, when the drinking day starts (not "2.5 L short" at 1 am).
+  if (hour >= 7 &&
+      water is WaterIntakeLoaded &&
       (waterStatus == TrackerStatus.behind ||
           waterStatus == TrackerStatus.notLogged)) {
     final left = water.dailyGoalMl - water.currentIntakeMl;

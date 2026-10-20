@@ -21,6 +21,10 @@ class WaterIntakeLoaded extends WaterIntakeState {
   /// snackbar); reloads and other updates leave it null.
   final int? addedMl;
 
+  /// The entry that add saved, so its Undo removes that drink and not
+  /// whichever was logged last.
+  final int? addedLogId;
+
   /// One-off message for the user (an add or undo that failed).
   final String? notice;
 
@@ -29,6 +33,7 @@ class WaterIntakeLoaded extends WaterIntakeState {
     required this.dailyGoalMl,
     required this.todayLogs,
     this.addedMl,
+    this.addedLogId,
     this.notice,
   });
 
@@ -38,6 +43,7 @@ class WaterIntakeLoaded extends WaterIntakeState {
     dailyGoalMl,
     todayLogs,
     addedMl,
+    addedLogId,
     notice,
   ];
 }

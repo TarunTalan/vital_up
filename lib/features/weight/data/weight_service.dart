@@ -45,6 +45,26 @@ enum WeightUnit {
   int get maxValue => fromKg(WeightService.maxKg).floor();
 }
 
+/// Within this many kg of the goal weight counts as reached (card, page
+/// and log sheet alike).
+const weightGoalReachedKg = 0.5;
+
+/// How far from the first weigh-in toward the goal the latest one is
+/// (0-1), or null without a goal or with nothing to measure from. Full
+/// only when the latest weight is at the goal: starting near the goal and
+/// moving away is not progress.
+double? weightGoalProgress({
+  required double? firstKg,
+  required double? latestKg,
+  required double? goalKg,
+}) {
+  if (firstKg == null || latestKg == null || goalKg == null) return null;
+  if ((latestKg - goalKg).abs() <= weightGoalReachedKg) return 1;
+  final total = (firstKg - goalKg).abs();
+  if (total <= weightGoalReachedKg) return 0;
+  return (1 - (latestKg - goalKg).abs() / total).clamp(0.0, 1.0);
+}
+
 /// Characters allowed in the weight field ("771.6").
 const weightInputMaxLength = 6;
 
@@ -183,6 +203,17 @@ class WeightService {
         .filter()
         .userIdEqualTo(userId)
         .sortByTimestampDesc()
+        .findFirst();
+  }
+
+  /// The oldest entry: where progress toward the goal is measured from.
+  Future<WeightLogCache?> first() async {
+    final userId = _userId;
+    if (userId == null) return null;
+    return _isar.weightLogCaches
+        .filter()
+        .userIdEqualTo(userId)
+        .sortByTimestamp()
         .findFirst();
   }
 

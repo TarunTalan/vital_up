@@ -6,7 +6,6 @@
 //
 // Without HOME_SHOTS only the layout checks run.
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -241,10 +240,19 @@ class _FakeScreenTimeService implements ScreenTimeService {
 class _FakeWeightService implements WeightService {
   final WeightUnit _unit;
 
-  _FakeWeightService(this._unit);
+  /// Every weigh-in, newest first (like the trend's logs).
+  final List<WeightLogCache> _logs;
+
+  _FakeWeightService(this._unit, this._logs);
 
   @override
   Future<WeightUnit> unit() async => _unit;
+
+  @override
+  Future<WeightLogCache?> latest() async => _logs.firstOrNull;
+
+  @override
+  Future<WeightLogCache?> first() async => _logs.lastOrNull;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -776,7 +784,9 @@ void main() {
       final id = '${s.name}_${c.width.round()}_${_scaleName(c.scale)}_$theme';
 
       testWidgets('home cards: $id', (tester) async {
-        sl.registerSingleton<WeightService>(_FakeWeightService(s.weightUnit));
+        sl.registerSingleton<WeightService>(
+          _FakeWeightService(s.weightUnit, s.weight?.logs ?? const []),
+        );
         await tester.runAsync(loadAllFonts);
         await pumpPage(
           tester,

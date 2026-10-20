@@ -231,9 +231,15 @@ class SleepCard extends StatelessWidget {
         ),
       );
     }
+    // "Good morning" only in the morning; in bed late at night it says
+    // since when instead.
+    final hour = DateTime.now().hour;
+    final greeting = hour >= 4 && hour < 12
+        ? 'Good morning'
+        : 'In bed since ${DateFormat.jm().format(since)}';
     return _prompt(
       context,
-      title: 'Good morning',
+      title: greeting,
       status: null,
       action: TrackerQuickAction(
         label: "I'm up",
@@ -243,7 +249,7 @@ class SleepCard extends StatelessWidget {
         onTap: () async {
           final choice = await _showChoices(
             context,
-            title: 'Good morning',
+            title: greeting,
             subtitle: 'In bed since ${DateFormat.jm().format(since)}',
             options: const [
               _SleepOption(

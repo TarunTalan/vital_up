@@ -57,12 +57,14 @@ class ActivityGoalsCard extends StatelessWidget {
               ? TrackerStatus.of(
                   value: goals.fold<double>(0, (sum, g) => sum + g.fraction),
                   goal: goals.length.toDouble(),
-                  paceFraction: TrackerStatus.dayPace(),
+                  paceFraction:
+                      goals.fold<double>(0, (sum, g) => sum + _pace(g)) /
+                      goals.length,
                 )
               : TrackerStatus.of(
                   value: headline.current,
                   goal: headline.goal.target,
-                  paceFraction: TrackerStatus.dayPace(),
+                  paceFraction: _pace(headline),
                 ),
           onOpen: () => _push(context, _metric.route),
           actions: [
@@ -107,6 +109,13 @@ class ActivityGoalsCard extends StatelessWidget {
     );
   }
 }
+
+/// Where [goal] should be by now: through the waking day for a daily
+/// goal, through the week (Monday to Sunday) for a weekly one, so Monday
+/// evening isn't "Behind" on a week's target.
+double _pace(GoalProgress goal) => goal.goal.period == GoalPeriod.weekly
+    ? TrackerStatus.weekPace()
+    : TrackerStatus.dayPace();
 
 /// "Steps", or "Steps · this week" for a weekly goal.
 String _goalName(ActivityGoal goal) => goal.period == GoalPeriod.daily
@@ -177,8 +186,9 @@ extension on _Headline {
       );
     }
     final goal = progress.goal;
+    // Rounded down, so "100%" only shows with the goal met.
     final percent = goal.target > 0
-        ? (progress.current / goal.target * 100).round()
+        ? (progress.current / goal.target * 100).floor()
         : 0;
     return TrackerHeroRing(
       fraction: progress.fraction,
