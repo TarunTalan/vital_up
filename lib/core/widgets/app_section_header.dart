@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
 /// Uppercase grey heading above a group of cards on a scrolling page, with
-/// an optional count and a trailing link ("See all >"). Shared by Home,
-/// Arena, Challenges and Friends so every section reads the same.
+/// an optional count, a plain-case [note] beside it ("Today · Tue, 20 Oct")
+/// and a trailing link ("See all >"). Shared by Home, Arena, Challenges and
+/// Friends so every section reads the same. A heading with a note wraps
+/// onto a second line with large text instead of ending in "...".
 class AppSectionHeader extends StatelessWidget {
   final String title;
   final int? count;
+  final String? note;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -14,6 +17,7 @@ class AppSectionHeader extends StatelessWidget {
     this.title, {
     super.key,
     this.count,
+    this.note,
     this.actionLabel,
     this.onAction,
   });
@@ -30,9 +34,21 @@ class AppSectionHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label.toUpperCase(),
-              maxLines: 1,
+            child: Text.rich(
+              TextSpan(
+                text: label.toUpperCase(),
+                children: [
+                  if (note != null)
+                    TextSpan(
+                      text: '  ·  $note',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                ],
+              ),
+              maxLines: note == null ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: context.text.labelMedium?.copyWith(
                 fontWeight: FontWeight.bold,

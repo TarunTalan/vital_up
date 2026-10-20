@@ -504,11 +504,16 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
 }
 
 /// One-line nudge under the summary with a single action. Water is added
-/// right here; every other action goes through [onLog].
+/// right here; every other action goes through [onLog]. The action sits
+/// beside the message when both fit, else under it (narrow phones, large
+/// text), so the message never gets squeezed into a sliver.
 class DashboardInsightCard extends StatelessWidget {
   final ValueChanged<TrackerMetric> onLog;
 
   const DashboardInsightCard({super.key, required this.onLog});
+
+  /// Narrowest the message may get beside the action before it moves down.
+  static const double _minMessageWidth = 160;
 
   @override
   Widget build(BuildContext context) {
@@ -525,37 +530,65 @@ class DashboardInsightCard extends StatelessWidget {
                 width: double.infinity,
                 highlighted: true,
                 padding: AppDimens.cardPaddingCompact,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: AppDimens.iconMd,
-                      color: context.colors.primary,
-                    ),
-                    const SizedBox(width: AppDimens.space12),
-                    Expanded(
-                      child: Text(
-                        insight.message,
-                        style: context.text.bodyMedium?.copyWith(
-                          color: context.colors.onSurface,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.space12),
-                    SizedBox(
-                      width: AppDimens.quickActionWidth,
-                      child: TrackerQuickAction(
-                        label: insight.actionLabel,
-                        icon: insight.actionIcon,
-                        color: insight.metric.color,
-                        filled: true,
-                        onTap: () => _act(context, insight.metric),
-                      ),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) =>
+                      _content(context, insight, constraints.maxWidth),
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _content(BuildContext context, _Insight insight, double width) {
+    const badge = AppDimens.iconBadgeSmall;
+    const gap = AppDimens.space12;
+    final action = TrackerQuickAction(
+      label: insight.actionLabel,
+      icon: insight.actionIcon,
+      color: insight.metric.color,
+      filled: true,
+      onTap: () => _act(context, insight.metric),
+    );
+    final message = Text(
+      insight.message,
+      style: context.text.bodyMedium?.copyWith(
+        color: context.colors.onSurface,
+      ),
+    );
+    final inline =
+        !context.isLargeText &&
+        width - badge - gap * 2 - AppDimens.quickActionWidth >=
+            context.textScaled(_minMessageWidth);
+    final lead = TrackerBadge(insight.metric, size: badge);
+    if (inline) {
+      return Row(
+        children: [
+          lead,
+          const SizedBox(width: gap),
+          Expanded(child: message),
+          const SizedBox(width: gap),
+          SizedBox(width: AppDimens.quickActionWidth, child: action),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            lead,
+            const SizedBox(width: gap),
+            Expanded(child: message),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space12),
+        // Lined up under the message, not the badge.
+        Padding(
+          padding: const EdgeInsets.only(left: badge + gap),
+          child: action,
+        ),
+      ],
     );
   }
 

@@ -278,13 +278,17 @@ class TrackerActionRow extends StatelessWidget {
 
 /// Compact tinted button for one-tap logging on cards and sheets
 /// ("+250 ml", "Log sleep"). [filled] marks the card's main action; on a
-/// card whose goal is met it shows outlined instead.
+/// card whose goal is met it shows outlined instead. Every action uses the
+/// brand colour so buttons read the same on every card; the metric's
+/// accent stays on its icon, figures and bars.
 class TrackerQuickAction extends StatelessWidget {
   final String label;
   final IconData? icon;
   final String? svgAsset;
-  final Color
-  color; // We will keep the property for compatibility, but override it visually if we want.
+
+  /// The metric's accent. Kept for callers; actions draw in the brand
+  /// colour (see above).
+  final Color color;
   final VoidCallback? onTap;
   final bool filled;
   final String? semanticLabel;
@@ -304,9 +308,12 @@ class TrackerQuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppDimens.radiusButton);
     final filled = this.filled && !_GoalMetScope.of(context);
-    final actionColor =
-        context.colors.primary; // Always use primary for actions
-    final fg = filled ? context.vColors.buttonText! : actionColor;
+    final actionColor = context.colors.primary;
+    // Brand cyan is too light as text on light mode: outlined labels use
+    // the readable shade.
+    final fg = filled
+        ? context.vColors.buttonText!
+        : context.vColors.accentText ?? actionColor;
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
