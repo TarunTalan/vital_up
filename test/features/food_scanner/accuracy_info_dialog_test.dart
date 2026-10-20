@@ -37,4 +37,45 @@ void main() {
     expect(insets.left, AppDimens.gutter);
     expect(insets.right, AppDimens.gutter);
   });
+
+  testWidgets('Got it button is fixed at bottom outside SingleChildScrollView and dismisses dialog', (tester) async {
+    var popped = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                await showDialog<void>(
+                  context: context,
+                  builder: (_) => const AccuracyInfoDialog(),
+                );
+                popped = true;
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    // Got it button must NOT be inside the SingleChildScrollView
+    final scrollView = find.byType(SingleChildScrollView);
+    expect(scrollView, findsOneWidget);
+    expect(
+      find.descendant(of: scrollView, matching: find.text('Got it')),
+      findsNothing,
+      reason: 'Got it button must be fixed at the bottom outside SingleChildScrollView',
+    );
+
+    // Tap Got it button directly without scrolling
+    await tester.tap(find.text('Got it'));
+    await tester.pumpAndSettle();
+
+    expect(popped, isTrue);
+  });
 }

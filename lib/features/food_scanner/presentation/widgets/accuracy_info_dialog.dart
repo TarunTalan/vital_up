@@ -27,7 +27,7 @@ class AccuracyInfoDialog extends StatelessWidget {
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
-        child: SingleChildScrollView(
+        child: Padding(
           padding: AppDimens.cardPaddingLarge,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -48,35 +48,44 @@ class AccuracyInfoDialog extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppDimens.space16),
-              _buildInfoRow(
-                context,
-                Icons.smart_toy_rounded,
-                'Dual AI Verification',
-                'Recognized using dual vision engines (Google Gemini + Groq Qwen) to prevent identification errors.',
-                svgAsset: 'assets/icons/nav/vita.svg',
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildInfoRow(
+                        context,
+                        Icons.smart_toy_rounded,
+                        'Dual AI Verification',
+                        'Recognized using dual vision engines (Google Gemini + Groq Qwen) to prevent identification errors.',
+                        svgAsset: 'assets/icons/nav/vita.svg',
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _buildInfoRow(
+                        context,
+                        Icons.menu_book_rounded,
+                        'Laboratory Mapped',
+                        'Calories and macros are pulled directly from USDA & Indian Food Composition Tables (IFCT) laboratory composition records—never guessed or hallucinated by AI.',
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _buildInfoRow(
+                        context,
+                        Icons.travel_explore_rounded,
+                        'Google Search Grounding',
+                        'Recipes or regional dishes are double-checked using live web searches to map verified nutritional details.',
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      _buildInfoRow(
+                        context,
+                        Icons.warning_amber_rounded,
+                        'Low Confidence Alert',
+                        'If result confidence is under 70%, a caution alert is surfaced so you can inspect and modify portion sizes or items.',
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: AppDimens.space12),
-              _buildInfoRow(
-                context,
-                Icons.menu_book_rounded,
-                'Laboratory Mapped',
-                'Calories and macros are pulled directly from USDA & Indian Food Composition Tables (IFCT) laboratory composition records—never guessed or hallucinated by AI.',
-              ),
-              const SizedBox(height: AppDimens.space12),
-              _buildInfoRow(
-                context,
-                Icons.travel_explore_rounded,
-                'Google Search Grounding',
-                'Recipes or regional dishes are double-checked using live web searches to map verified nutritional details.',
-              ),
-              const SizedBox(height: AppDimens.space12),
-              _buildInfoRow(
-                context,
-                Icons.warning_amber_rounded,
-                'Low Confidence Alert',
-                'If result confidence is under 70%, a caution alert is surfaced so you can inspect and modify portion sizes or items.',
-              ),
-              const SizedBox(height: AppDimens.space24),
+              const SizedBox(height: AppDimens.space20),
               AppPrimaryButton(
                 label: 'Got it',
                 onTap: () => Navigator.of(context).pop(),
