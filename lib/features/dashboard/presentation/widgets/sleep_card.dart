@@ -258,9 +258,9 @@ class SleepCard extends StatelessWidget {
                 "I'm up now",
                 'Save your sleep until now',
               ),
-              _SleepOption(
+              _SleepOption.asset(
                 _SleepChoice.enterTimes,
-                Icons.edit_rounded,
+                TrackerIcons.edit,
                 'Adjust times',
                 'Change when you fell asleep or woke up',
               ),
@@ -324,9 +324,9 @@ class SleepCard extends StatelessWidget {
                 'Looks right',
                 'Save it as last night',
               ),
-              _SleepOption(
+              _SleepOption.asset(
                 _SleepChoice.enterTimes,
-                Icons.edit_rounded,
+                TrackerIcons.edit,
                 'Adjust times',
                 'Change when you fell asleep or woke up',
               ),
@@ -427,6 +427,7 @@ class SleepCard extends StatelessWidget {
             for (final o in options)
               AppListTile(
                 icon: o.icon,
+                svgAsset: o.svgAsset,
                 iconColor: _metric.color,
                 title: o.title,
                 subtitle: o.subtitle,
@@ -444,11 +445,20 @@ enum _SleepChoice { enterTimes, goToBed, autoDetect, healthConnect, confirm }
 /// One row in the sleep choices sheet.
 class _SleepOption {
   final _SleepChoice choice;
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String title;
   final String subtitle;
 
-  const _SleepOption(this.choice, this.icon, this.title, this.subtitle);
+  const _SleepOption(this.choice, this.icon, this.title, this.subtitle)
+    : svgAsset = null;
+
+  const _SleepOption.asset(
+    this.choice,
+    this.svgAsset,
+    this.title,
+    this.subtitle,
+  ) : icon = null;
 }
 
 /// Deep / REM / light / awake split of one night.

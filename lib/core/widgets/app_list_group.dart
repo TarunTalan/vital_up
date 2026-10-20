@@ -149,9 +149,8 @@ class AppListTile extends StatelessWidget {
               trailing!,
             ] else if (onTap != null) ...[
               const SizedBox(width: AppDimens.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: destructive ? error.withValues(alpha: 0.5) : v.grayText,
+              AppChevron(
+                color: destructive ? error.withValues(alpha: 0.5) : null,
               ),
             ],
           ],

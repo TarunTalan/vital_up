@@ -51,6 +51,7 @@ class ScoreStreakCard extends StatelessWidget {
             AppCard(
               width: double.infinity,
               onTap: () => _push(context, 'points-history'),
+              showChevron: true,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

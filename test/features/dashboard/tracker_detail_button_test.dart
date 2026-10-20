@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
@@ -58,6 +59,19 @@ void main() {
     await _pump(tester, checkedIn: true);
     expect(
       find.widgetWithText(AppSecondaryButton, 'Edit check-in'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(AppSecondaryButton),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is SvgPicture &&
+              w.bytesLoader is SvgAssetLoader &&
+              (w.bytesLoader as SvgAssetLoader).assetName ==
+                  TrackerIcons.edit,
+        ),
+      ),
       findsOneWidget,
     );
     expect(find.byType(AppPrimaryButton), findsNothing);

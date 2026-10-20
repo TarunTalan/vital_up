@@ -27,6 +27,13 @@ enum TrendRange {
     month => 'Last 4 weeks',
     halfYear => 'Last 6 months',
   };
+
+  /// What each bar is, under the caption.
+  String get detail => switch (this) {
+    week => 'Each day',
+    month => 'Average a day, by week',
+    halfYear => 'Average a day, by month',
+  };
 }
 
 /// One day's value; null means nothing was logged (drawn as a gap, ignored

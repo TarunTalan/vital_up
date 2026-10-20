@@ -120,14 +120,17 @@ class CommunityTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppDimens.space8),
-            trailing ??
-                (rank != null
-                    ? _RankBadge(rank: rank)
-                    : Icon(
-                        Icons.chevron_right_rounded,
-                        color: context.vColors.grayText,
-                        size: AppDimens.iconMd,
-                      )),
+            // A Join button replaces the chevron (the sheet); otherwise the
+            // row opens the leaderboard, with your rank before the chevron.
+            if (trailing case final trailing?)
+              trailing
+            else ...[
+              if (rank != null) ...[
+                _RankBadge(rank: rank),
+                const SizedBox(width: AppDimens.space4),
+              ],
+              const AppChevron(),
+            ],
           ],
         ),
       ),

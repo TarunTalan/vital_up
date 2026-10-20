@@ -20,6 +20,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.da
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_event.dart';
 import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_state.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/meal_log_card.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 
 /// Nutrition: today's calories vs the plan, the daily trend, today's
@@ -83,17 +84,17 @@ class DietProgressPage extends StatelessWidget {
               await context.pushNamed('food-scan');
               reload();
             },
-            logBuilder: (context, meal) => TrackerLogTile(
-              id: meal.id,
-              icon: mealTypeIcon(meal.mealType),
-              color: metric.color,
-              title: meal.items.isEmpty
-                  ? mealTypeLabel(meal.mealType)
-                  : meal.items.map((i) => i.name).join(', '),
-              subtitle:
-                  '${mealTypeLabel(meal.mealType)} · '
-                  '${DateFormat('EEE d MMM, h:mm a').format(meal.capturedAt)}',
-              trailing: formatKcal(meal.totalCalories),
+            logBuilder: (context, meal) => MealLogCard(
+              entry: meal,
+              onDelete: () => deleteTrackerLog(
+                context,
+                trend,
+                meal,
+                () async {
+                  meals.add(DeleteMealLogEntry(meal.id));
+                  await reload();
+                },
+              ),
             ),
           );
         },

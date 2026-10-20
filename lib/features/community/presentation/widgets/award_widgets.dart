@@ -113,6 +113,10 @@ class AwardWinnerRow extends StatelessWidget {
                   color: context.vColors.grayText,
                 ),
               ),
+              if (onTap != null) ...[
+                const SizedBox(width: AppDimens.space4),
+                const AppChevron(),
+              ],
             ],
           ),
         ),

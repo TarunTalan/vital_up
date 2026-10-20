@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -7,7 +8,10 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_list_group.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
+import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
 import 'package:vital_up/features/community/presentation/cubit/community_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
 
@@ -158,11 +162,7 @@ class _ActionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppDimens.space8),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: AppDimens.iconMd,
-              color: grey,
-            ),
+            const AppChevron(),
           ],
         ),
       ),
@@ -305,49 +305,75 @@ class CommunitySettingsSheet extends StatelessWidget {
               AppCard(
                 width: double.infinity,
                 padding: AppDimens.cardPaddingCompact,
-                child: Column(
-                  children: [
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Show me on leaderboards',
-                        style: context.text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                child: state.failed
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppDimens.space16,
                         ),
-                      ),
-                      subtitle: Text(
-                        'Public boards show your username, avatar and points. When off, friends '
-                        'still see your name and level, but not your stats.',
-                        style: context.text.bodySmall?.copyWith(
-                          color: v.grayText,
+                        child: Center(
+                          child: TextButton.icon(
+                            onPressed: cubit.loadSettings,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text("Couldn't load settings. Retry"),
+                          ),
                         ),
-                      ),
-                      value: state.settings.leaderboardVisible,
-                      onChanged: cubit.setLeaderboardVisible,
-                    ),
-                    const Divider(height: AppDimens.space16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'City',
-                        style: context.text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        state.settings.city ?? 'Not set',
-                        style: context.text.bodySmall?.copyWith(
-                          color: v.grayText,
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Icons.edit_rounded,
-                        size: AppDimens.iconSm,
-                      ),
-                      onTap: () => _editCity(context),
-                    ),
-                  ],
-                ),
+                      )
+                    : state.loading &&
+                            state.settings == const CommunitySettings()
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppDimens.space24,
+                            ),
+                            child: Center(child: VitalUpLoader()),
+                          )
+                        : Column(
+                            children: [
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  'Show me on leaderboards',
+                                  style: context.text.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Public boards show your username, avatar and points. When off, friends '
+                                  'still see your name and level, but not your stats.',
+                                  style: context.text.bodySmall?.copyWith(
+                                    color: v.grayText,
+                                  ),
+                                ),
+                                value: state.settings.leaderboardVisible,
+                                onChanged: cubit.setLeaderboardVisible,
+                              ),
+                              const Divider(height: AppDimens.space16),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  'City',
+                                  style: context.text.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  state.settings.city ?? 'Not set',
+                                  style: context.text.bodySmall?.copyWith(
+                                    color: v.grayText,
+                                  ),
+                                ),
+                                trailing: SvgPicture.asset(
+                                  TrackerIcons.edit,
+                                  width: AppDimens.iconSm,
+                                  height: AppDimens.iconSm,
+                                  colorFilter: ColorFilter.mode(
+                                    v.grayText ?? context.colors.onSurface,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                                onTap: () => _editCity(context),
+                              ),
+                            ],
+                          ),
               ),
             ],
           );

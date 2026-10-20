@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
-import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
 import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
@@ -90,15 +89,12 @@ class StressTrendsPage extends StatelessWidget {
                 cubit.load();
               }
             },
-            logBuilder: (context, c) => TrackerLogTile(
-              id: c.date.millisecondsSinceEpoch,
-              icon: moodIcon(c.level),
+            logBuilder: (context, c) => LogHistoryCard(
+              icon: Icon(moodIcon(c.level)),
               color: stressColor(c.level),
               title: c.label,
-              subtitle: [
-                DateFormat('EEE d MMM').format(c.date),
-                if (c.tags.isNotEmpty) c.tags.map((t) => t.label).join(', '),
-              ].join(' · '),
+              subtitle: 'Check-in',
+              note: c.tags.map((t) => t.label).join(', '),
             ),
           );
         },

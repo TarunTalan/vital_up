@@ -23,6 +23,12 @@ class AppCard extends StatelessWidget {
   final double? width;
   final List<BoxShadow>? shadow;
 
+  /// Draws [AppChevron] at the trailing edge, centred: the card opens
+  /// another page or sheet. Every card that opens something says so,
+  /// either this way or with its own [AppChevron] in a row; cards that
+  /// pick something (radio, checkbox) and static cards never show one.
+  final bool showChevron;
+
   const AppCard({
     super.key,
     required this.child,
@@ -37,6 +43,7 @@ class AppCard extends StatelessWidget {
     this.borderColor,
     this.width,
     this.shadow,
+    this.showChevron = false,
   });
 
   @override
@@ -62,7 +69,18 @@ class AppCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(padding: padding, child: child),
+          child: Padding(
+            padding: padding,
+            child: showChevron && onTap != null
+                ? Row(
+                    children: [
+                      Expanded(child: child),
+                      const SizedBox(width: AppDimens.space8),
+                      const AppChevron(),
+                    ],
+                  )
+                : child,
+          ),
         ),
       ),
     );
@@ -102,6 +120,41 @@ class AppCard extends StatelessWidget {
     }
 
     return Container(width: width, margin: margin, child: content);
+  }
+}
+
+/// The one "opens something" mark: a grey chevron at the trailing edge of
+/// a tappable card or row. Same size and colour everywhere; text links
+/// ("See all ›") draw their own accent chevron.
+class AppChevron extends StatelessWidget {
+  final Color? color;
+
+  const AppChevron({super.key, this.color});
+
+  /// The glyph's blank side: drawn into the padding after it, so the
+  /// visible arrow lines up with the content edge and takes less room.
+  static const double _inset = 6;
+
+  /// Width the chevron takes in a row.
+  static const double width = AppDimens.iconMd - _inset;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: width,
+        height: AppDimens.iconMd,
+        child: OverflowBox(
+          alignment: AlignmentDirectional.centerStart,
+          maxWidth: AppDimens.iconMd,
+          child: Icon(
+            Icons.chevron_right_rounded,
+            size: AppDimens.iconMd,
+            color: color ?? context.vColors.grayText,
+          ),
+        ),
+      ),
+    );
   }
 }
 

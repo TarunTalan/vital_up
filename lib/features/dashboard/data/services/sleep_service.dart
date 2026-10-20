@@ -467,4 +467,34 @@ class SleepService {
       source: source,
     );
   }
+
+  /// Removes a night the user entered or confirmed. Health Connect
+  /// entries come from the watch and are left alone.
+  Future<void> deleteSleep(SleepSessionInfo session) async {
+    if (session.source == SleepDataSource.healthStore) return;
+    final userId = _userId;
+    final dayStart = startOfDay(session.wakeTime);
+    final deleted = <SleepLogCache>[];
+    await _isarService.isar.writeTxn(() async {
+      final sameNight = await _isarService.isar.sleepLogCaches
+          .filter()
+          .group(
+            (q) => q.userIdEqualTo(userId).or().userIdEqualTo(_legacyUserId),
+          )
+          .endTimeBetween(dayStart, nextDay(dayStart), includeUpper: false)
+          .findAll();
+      deleted.addAll(sameNight);
+      await _isarService.isar.sleepLogCaches.deleteAll([
+        for (final old in sameNight) old.id,
+      ]);
+    });
+    if (userId != _legacyUserId) {
+      for (final old in deleted) {
+        final id = syncId('sleep', userId, old.startTime);
+        await _sync?.recordDelete('sleep_logs', id);
+      }
+    }
+    _sync?.schedule();
+    _changes.add(null);
+  }
 }

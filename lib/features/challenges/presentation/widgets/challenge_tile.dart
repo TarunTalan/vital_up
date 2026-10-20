@@ -83,6 +83,7 @@ class ChallengeTile extends StatelessWidget {
       width: double.infinity,
       padding: AppDimens.cardPaddingCompact,
       onTap: invited ? null : () => ChallengeStandingsSheet.show(context, c),
+      showChevron: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

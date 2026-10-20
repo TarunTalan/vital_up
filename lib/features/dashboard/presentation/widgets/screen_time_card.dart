@@ -196,11 +196,7 @@ class ScreenTimeSummaryRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppDimens.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: AppDimens.iconMd,
-                color: grey,
-              ),
+              const AppChevron(),
             ],
           ),
         );

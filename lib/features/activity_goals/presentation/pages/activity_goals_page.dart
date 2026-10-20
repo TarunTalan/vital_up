@@ -16,10 +16,12 @@ import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/delete_activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_summary.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_detail_scaffold.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 
@@ -91,10 +93,8 @@ class _ActivityGoalsView extends StatelessWidget {
         return AppScaffold(
           header: AppPageHeader(
             title: _metric.label,
-            action: AppHeaderAction(
-              tooltip: 'Workout history',
-              icon: const Icon(Icons.history_rounded),
-              onTap: () => context.pushNamed('activity-history'),
+            action: TrackerHeaderActions(
+              onHistory: () => context.pushNamed('activity-history'),
             ),
           ),
           onRefresh: () => cubit.load(),
@@ -137,6 +137,7 @@ class _ActivityGoalsView extends StatelessWidget {
                         width: double.infinity,
                         padding: AppDimens.cardPaddingCompact,
                         onTap: () => _openEditor(context),
+                        showChevron: true,
                         child: TrackerPrompt(
                           icon: Icons.flag_rounded,
                           title: 'Set your first goal',
@@ -172,9 +173,10 @@ class _ActivityGoalsView extends StatelessWidget {
                     if (selected != null) ...[
                       const SizedBox(height: AppDimens.cardGap),
                       TrendChartCard(
+                        title: state.range.caption,
                         caption:
                             '${selected.goal.metric.label} · '
-                            '${state.range.caption}',
+                            '${state.range.detail.toLowerCase()}',
                         range: state.range,
                         onRange: cubit.load,
                         chart: TrendBarChart(
@@ -205,12 +207,25 @@ class _ActivityGoalsView extends StatelessWidget {
                     if (todays.isEmpty)
                       const AppInfoNote(message: 'No activities today.'),
                     // The same cards as history; tap for the summary.
-                    for (final s in todays) ...[
+                    for (final (i, s) in todays.indexed) ...[
+                      if (i > 0) const SizedBox(height: AppDimens.cardGap),
                       ActivityHistoryCard(
                         entry: HistoryEntry(session: s),
                         onTap: () => showActivitySummarySheet(context, s),
+                        onDelete: () async {
+                          try {
+                            await sl<DeleteActivitySession>()(s.id);
+                            cubit.load();
+                          } catch (_) {
+                            if (context.mounted) {
+                              showErrorSnackBar(
+                                context,
+                                "Couldn't delete that workout. Try again.",
+                              );
+                            }
+                          }
+                        },
                       ),
-                      const SizedBox(height: AppDimens.cardGap),
                     ],
                   ],
                 ),

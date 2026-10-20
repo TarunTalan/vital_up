@@ -152,7 +152,12 @@ void main() {
         _session('g', ActivityType.strength, 1, meters: 0),
       ],
     );
-    await pumpPage(tester, const ActivityHistoryPage());
+    // Tall enough for every day's heading and card at once.
+    await pumpPage(
+      tester,
+      const ActivityHistoryPage(),
+      size: const Size(390, 2000),
+    );
     await settle(tester);
 
     final cards = find.byType(ActivityHistoryCard);

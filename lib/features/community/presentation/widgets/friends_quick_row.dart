@@ -140,11 +140,7 @@ class _RequestsRow extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: context.vColors.grayText,
-          ),
+          const AppChevron(),
         ],
       ),
     );

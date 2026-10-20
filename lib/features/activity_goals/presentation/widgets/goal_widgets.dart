@@ -202,6 +202,7 @@ class GoalProgressRow extends StatelessWidget {
       ),
       borderColor: selected ? metric.color : null,
       onTap: onTap,
+      showChevron: true,
       child: row,
     );
   }

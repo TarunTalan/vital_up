@@ -19,6 +19,7 @@ Widget _tile(TrackerMetric metric, String value, String goal) => TrackerCard(
     TrackerQuickAction(
       label: 'Edit',
       icon: Icons.edit_rounded,
+      svgAsset: TrackerIcons.edit,
       color: metric.color,
       onTap: () {},
     ),

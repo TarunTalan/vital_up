@@ -79,6 +79,25 @@ class TrackerCardHeader extends StatelessWidget {
     this.showChevron = true,
   });
 
+  /// Whether [title] fits whole between a compact (tile) badge and the
+  /// chevron in a header [width] wide.
+  static bool compactTitleFits(
+    BuildContext context,
+    String title,
+    double width,
+  ) => FitText.fits(
+    context,
+    TextSpan(
+      text: title,
+      style: context.text.titleSmall?.copyWith(color: context.colors.onSurface),
+    ),
+    width - AppDimens.iconBadgeSmall - AppDimens.space8 - AppChevron.width,
+  );
+
+  /// Height the title line adds when it moves under the badge row.
+  static double titleUnderHeight(BuildContext context) =>
+      _textHeight(context, 'Water', context.text.titleSmall) + AppDimens.space8;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -98,7 +117,17 @@ class TrackerCardHeader extends StatelessWidget {
         final chip = status != null && !isCompact
             ? TrackerStatusChip(status!, label: statusLabel, color: statusColor)
             : null;
-        final chevron = showChevron && !isCompact;
+        // Every card that opens a page shows the chevron, half-width tiles
+        // too, on the title's line. Only if a title couldn't sit whole
+        // between badge and chevron (never with today's titles down to
+        // 360dp) would it move under them; a tile pair decides that for
+        // both tiles at once, so their figures still line up.
+        final chevron = showChevron;
+        final titleUnder =
+            chevron &&
+            isCompact &&
+            (_TileScope.titleUnder(context) ??
+                !compactTitleFits(context, titleText, constraints.maxWidth));
         // The chip moves under the title when both don't fit one row
         // (large text), so the title stays whole.
         var chipBelow = false;
@@ -119,7 +148,7 @@ class TrackerCardHeader extends StatelessWidget {
               gap -
               AppDimens.space8 -
               chipWidth -
-              (chevron ? AppDimens.space4 + AppDimens.iconMd : 0);
+              (chevron ? AppChevron.width : 0);
           chipBelow = !FitText.fits(
             context,
             TextSpan(text: titleText, style: titleStyle),
@@ -131,6 +160,31 @@ class TrackerCardHeader extends StatelessWidget {
         // corner, which takes no room from the title, so it shows on
         // every phone and text size.
         final doneMark = chip == null && status == TrackerStatus.done;
+        final badgeWidget = Semantics(
+          label: doneMark ? (statusLabel ?? status!.label) : null,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              TrackerBadge(metric, size: badge),
+              if (doneMark)
+                Positioned(
+                  right: -AppDimens.space4,
+                  bottom: -AppDimens.space4,
+                  child: _DoneMark(color: statusColor),
+                ),
+            ],
+          ),
+        );
+        if (titleUnder) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [badgeWidget, const Spacer(), const AppChevron()]),
+              const SizedBox(height: AppDimens.space8),
+              titleWidget,
+            ],
+          );
+        }
         // Half-width tiles get a smaller badge and gap so the title fits
         // whole at its normal size.
         return Row(
@@ -167,14 +221,8 @@ class TrackerCardHeader extends StatelessWidget {
               const SizedBox(width: AppDimens.space8),
               chip,
             ],
-            if (chevron) ...[
-              const SizedBox(width: AppDimens.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: AppDimens.iconMd,
-                color: context.vColors.grayText,
-              ),
-            ],
+            // The chevron's own blank side is the gap after the title.
+            if (chevron) const AppChevron(),
           ],
         );
       },
@@ -956,7 +1004,15 @@ class TrackerSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: context.text.headlineSmall)),
+        Expanded(
+          child: Text(
+            title,
+            style: context.text.titleMedium?.copyWith(
+              color: context.colors.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
@@ -974,95 +1030,6 @@ class TrackerSectionTitle extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// One logged entry: leading icon badge, title/subtitle, trailing value.
-/// With [onDelete] it swipes left to delete.
-class TrackerLogTile extends StatelessWidget {
-  final Object id;
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String? subtitle;
-  final String? trailing;
-  final VoidCallback? onTap;
-  final Future<void> Function()? onDelete;
-
-  const TrackerLogTile({
-    super.key,
-    required this.id,
-    required this.icon,
-    required this.color,
-    required this.title,
-    this.trailing,
-    this.subtitle,
-    this.onTap,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tile = AppCard(
-      width: double.infinity,
-      sheen: false,
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space16,
-        vertical: AppDimens.space12,
-      ),
-      child: Row(
-        children: [
-          AppIconBadge(
-            color: color,
-            icon: Icon(icon, size: AppDimens.iconMd, color: color),
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall,
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppDimens.space8),
-            Text(trailing!, style: context.text.titleSmall),
-          ],
-        ],
-      ),
-    );
-    if (onDelete == null) return tile;
-    return Dismissible(
-      key: ValueKey(id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppDimens.space20),
-        decoration: BoxDecoration(
-          color: context.vColors.errorFill,
-          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        ),
-        child: Icon(Icons.delete_outline_rounded, color: context.colors.error),
-      ),
-      onDismissed: (_) => onDelete!(),
-      child: tile,
     );
   }
 }
@@ -1246,10 +1213,17 @@ class TrackerPrompt extends StatelessWidget {
 
 /// Marks tracker cards laid out as side-by-side Home tiles.
 class _TileScope extends InheritedWidget {
-  const _TileScope({required super.child});
+  /// Both tiles' titles sit under their badge row ([TrackerCardHeader]).
+  final bool titlesUnder;
+
+  const _TileScope({required this.titlesUnder, required super.child});
 
   static bool inTile(BuildContext context) =>
       context.getInheritedWidgetOfExactType<_TileScope>() != null;
+
+  /// The pair's decision, or null outside a pair.
+  static bool? titleUnder(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_TileScope>()?.titlesUnder;
 
   @override
   bool updateShouldNotify(_TileScope old) => false;
@@ -1273,7 +1247,18 @@ class TrackerTilePair extends StatelessWidget {
   final Widget left;
   final Widget right;
 
-  const TrackerTilePair({super.key, required this.left, required this.right});
+  /// The tiles' titles, to decide whether they fit beside the chevron.
+  /// Defaults to the trackers shown as Home tiles.
+  final List<String> titles;
+
+  const TrackerTilePair({
+    super.key,
+    required this.left,
+    required this.right,
+    this.titles = defaultTitles,
+  });
+
+  static const defaultTitles = ['Water', 'Weight', 'Sleep', 'Mood'];
 
   @override
   Widget build(BuildContext context) {
@@ -1292,14 +1277,22 @@ class TrackerTilePair extends StatelessWidget {
             ],
           );
         }
-        return _row(context);
+        // Header width: the tile less its padding.
+        final headerWidth = tileWidth - AppDimens.cardPadding.horizontal;
+        final under = titles.any(
+          (t) => !TrackerCardHeader.compactTitleFits(context, t, headerWidth),
+        );
+        return _row(context, titlesUnder: under);
       },
     );
   }
 
-  Widget _row(BuildContext context) {
-    final height = context.textScaled(AppDimens.dashboardTileHeight);
+  Widget _row(BuildContext context, {required bool titlesUnder}) {
+    final height =
+        context.textScaled(AppDimens.dashboardTileHeight) +
+        (titlesUnder ? TrackerCardHeader.titleUnderHeight(context) : 0);
     return _TileScope(
+      titlesUnder: titlesUnder,
       child: SizedBox(
         height: height,
         child: Row(

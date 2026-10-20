@@ -6,6 +6,7 @@ import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -117,20 +118,34 @@ class SleepTrendsPage extends StatelessWidget {
                 } catch (_) {}
               }
             },
-            logBuilder: (context, night) => TrackerLogTile(
-              id: night.bedTime.millisecondsSinceEpoch,
-              icon: switch (night.source) {
+            logBuilder: (context, night) => LogHistoryCard(
+              icon: Icon(switch (night.source) {
                 SleepDataSource.healthStore => Icons.watch_rounded,
                 SleepDataSource.phone => Icons.smartphone_rounded,
                 SleepDataSource.manual => metric.icon,
+              }),
+              color: metric.color,
+              title: 'Sleep',
+              subtitle: switch (night.source) {
+                SleepDataSource.healthStore => 'Health Connect',
+                SleepDataSource.phone => 'Phone estimate',
+                SleepDataSource.manual => 'Logged by you',
               },
-              color: sleepScoreColor(night.sleepScore),
-              title: DateFormat('EEE d MMM').format(night.wakeTime),
-              subtitle:
-                  '${time.format(night.bedTime)} – '
-                  '${time.format(night.wakeTime)} · '
-                  'Score ${night.sleepScore} (${night.scoreCategory})',
-              trailing: formatDashboardDuration(night.duration),
+              value: formatDashboardDuration(night.duration),
+              deleteNoun: 'sleep entry',
+              onDelete: night.source == SleepDataSource.healthStore
+                  ? null
+                  : () => deleteTrackerLog(
+                        context,
+                        cubit,
+                        night,
+                        () => sl<SleepService>().deleteSleep(night),
+                      ),
+              figures: [
+                LogFigure(time.format(night.bedTime), 'Bedtime'),
+                LogFigure(time.format(night.wakeTime), 'Woke up'),
+                LogFigure('${night.sleepScore}', night.scoreCategory),
+              ],
             ),
           );
         },

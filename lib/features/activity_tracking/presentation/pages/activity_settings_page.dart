@@ -40,10 +40,7 @@ class ActivitySettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final chevron = Icon(
-      Icons.chevron_right_rounded,
-      color: context.vColors.grayText,
-    );
+    final chevron = const AppChevron();
 
     return AppScaffold(
       header: AppPageHeader(title: 'Activity Settings'),

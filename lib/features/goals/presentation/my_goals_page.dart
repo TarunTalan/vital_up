@@ -185,11 +185,7 @@ class _GoalRow extends StatelessWidget {
           ),
           const SizedBox(width: AppDimens.space8),
           !editable
-              ? Icon(
-                  Icons.chevron_right_rounded,
-                  size: AppDimens.iconMd,
-                  color: grey,
-                )
+              ? const AppChevron()
               : goal == null
               ? Icon(
                   Icons.add_circle_outline_rounded,

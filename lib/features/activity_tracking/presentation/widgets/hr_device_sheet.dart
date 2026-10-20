@@ -424,10 +424,7 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                                       strokeWidth: AppDimens.borderThick,
                                     ),
                                   )
-                                : Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: v.grayText,
-                                  ),
+                                : const AppChevron(),
                             onTap: _connectingId != null
                                 ? null
                                 : () => _connect(r),

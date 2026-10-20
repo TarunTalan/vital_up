@@ -32,7 +32,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _packageInfo = PackageInfo.fromPlatform();
-  bool _openingLeaderboards = false;
 
   static const _themes = ['system', 'light', 'dark'];
 
@@ -80,30 +79,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// Leaderboard visibility and city, the same sheet as in Arena.
   Future<void> _openLeaderboards() async {
-    if (_openingLeaderboards) return;
-    setState(() => _openingLeaderboards = true);
-    final cubit = sl<CommunityCubit>();
-    var failed = false;
-    try {
-      await cubit.load();
-      failed = cubit.state.failed;
-    } catch (e) {
-      debugPrint('Leaderboard settings failed to load: $e');
-      failed = true;
-    }
-    if (!mounted) {
-      await cubit.close();
-      return;
-    }
-    setState(() => _openingLeaderboards = false);
-    if (failed) {
-      showErrorSnackBar(
-        context,
-        "Couldn't load leaderboard settings. Try again.",
-      );
-    } else {
-      await CommunitySettingsSheet.show(context, cubit: cubit);
-    }
+    final cubit = sl<CommunityCubit>()..loadSettings();
+    await CommunitySettingsSheet.show(context, cubit: cubit);
     await cubit.close();
   }
 
@@ -112,15 +89,6 @@ class _SettingsPageState extends State<SettingsPage> {
     'dark' => 'Dark',
     _ => 'System',
   };
-
-  Widget _chevronSpinner() => SizedBox.square(
-    dimension: AppDimens.iconMd,
-    child: CircularProgressIndicator(
-      strokeWidth: AppDimens.borderThick,
-      color: context.colors.primary,
-      strokeCap: StrokeCap.round,
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -256,7 +224,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: AppColors.scoreBonus,
                     title: 'Leaderboards',
                     subtitle: 'Who sees you, and your city',
-                    trailing: _openingLeaderboards ? _chevronSpinner() : null,
                     onTap: _openLeaderboards,
                   ),
                   AppListTile(

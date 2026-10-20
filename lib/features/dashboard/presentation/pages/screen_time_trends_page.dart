@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
-import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
-import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/app_usage_info.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart';
@@ -76,19 +74,24 @@ class ScreenTimeTrendsPage extends StatelessWidget {
               ),
             ],
             dateOf: (day) => day.date,
-            allLogs: () async => (await service.trend(TrendRange.month)).logs,
-            logBuilder: (context, day) => TrackerLogTile(
-              id: day.date.millisecondsSinceEpoch,
-              icon: metric.icon,
-              color: day.duration.inMinutes > service.getDailyLimitMinutes()
-                  ? context.colors.error
-                  : metric.color,
-              title: DateFormat('EEE d MMM').format(day.date),
-              subtitle: day.topApps.isEmpty
-                  ? 'No usage recorded'
-                  : 'Most used: ${day.topApps.first.appName}',
-              trailing: formatDashboardDuration(day.duration),
-            ),
+            allLogs: service.history,
+            logBuilder: (context, day) {
+              final limit = service.getDailyLimitMinutes();
+              final over = limit > 0 && day.duration.inMinutes > limit;
+              return LogHistoryCard(
+                icon: Icon(metric.icon),
+                color: over ? context.colors.error : metric.color,
+                title: 'Screen time',
+                subtitle: over
+                    ? 'Over your ${formatMinutes(limit.toDouble())} limit'
+                    : 'Read from your phone',
+                value: formatDashboardDuration(day.duration),
+                note: day.topApps.isEmpty
+                    ? null
+                    : 'Most used: '
+                          '${day.topApps.take(3).map((a) => a.appName).join(', ')}',
+              );
+            },
           );
         },
       ),

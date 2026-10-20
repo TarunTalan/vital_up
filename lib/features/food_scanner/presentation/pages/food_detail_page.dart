@@ -1450,12 +1450,6 @@ class _SuggestionRow extends StatelessWidget {
         _NumberIcon(number),
         const SizedBox(width: AppDimens.space12),
         Expanded(child: Text(text, style: context.text.bodyMedium)),
-        const SizedBox(width: AppDimens.space8),
-        Icon(
-          Icons.chevron_right_rounded,
-          size: AppDimens.iconLg,
-          color: context.vColors.grayText,
-        ),
       ],
     );
   }

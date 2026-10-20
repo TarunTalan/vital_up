@@ -116,11 +116,7 @@ class _ModeCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppDimens.space8),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: grey,
-            size: AppDimens.iconLg,
-          ),
+          const AppChevron(),
         ],
       ),
     );

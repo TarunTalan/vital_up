@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
@@ -12,6 +11,7 @@ import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/charts/trend_bar_chart.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -23,7 +23,7 @@ import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.d
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 
-/// Swipe-to-delete for a detail page's history: removes [log] at once,
+/// Delete for a tracker history entry: removes [log] at once,
 /// deletes it, reloads, and says so if it couldn't be deleted.
 Future<void> deleteTrackerLog<L>(
   BuildContext context,
@@ -76,8 +76,10 @@ class TrackerToday {
 ///    chart with a dashed goal line and stats.
 /// 3. Insights — up to two plain-language patterns.
 /// 4. Metric-specific [sections] (macros, tags, top apps…).
-/// 5. Today's log — today's entries (swipe to delete) and "See all", which
-///    opens [TrackerLogsPage] with every entry ([allLogs]).
+/// 5. Today's log — today's entries ([LogHistoryCard]s, as in every
+///    history) and "See all", which opens [TrackerLogsPage] with every
+///    entry ([allLogs]). The header's History button opens the same page,
+///    on every tracker.
 ///
 /// The pinned bottom button is the metric's log action. Once today is
 /// logged (or its goal met) it turns into the quieter secondary button, as
@@ -126,6 +128,9 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
   final VoidCallback? onLogsAction;
   final String logsActionLabel;
 
+  /// Total shown beside each day on [TrackerLogsPage] ("1.75 L").
+  final String? Function(List<L> logs)? daySummary;
+
   /// Primary bottom action; defaults to the metric's log label.
   final VoidCallback? onLog;
   final String? logLabel;
@@ -160,6 +165,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
     this.allLogs,
     this.onLogsAction,
     this.logsActionLabel = 'See all',
+    this.daySummary,
     this.onLog,
     this.logLabel,
     this.editLabel,
@@ -198,6 +204,7 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
           load: load,
           dateOf: dateOf,
           logBuilder: logBuilder,
+          daySummary: daySummary,
         ),
       ),
     );
@@ -208,8 +215,15 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<TrendCubit<L>>();
+    final seeAll =
+        onLogsAction ??
+        (allLogs == null ? null : () => _openAll(context, cubit));
+    final extra = headerAction;
     return AppScaffold(
-      header: AppPageHeader(title: title ?? metric.label, action: headerAction),
+      header: AppPageHeader(
+        title: title ?? metric.label,
+        action: TrackerHeaderActions(onHistory: seeAll, children: [?extra]),
+      ),
       bottomBar: onLog == null
           ? null
           : BlocBuilder<TrendCubit<L>, TrendState<L>>(
@@ -220,15 +234,46 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
                 if (!logged) {
                   return AppPrimaryButton(
                     label: logLabel ?? metric.logLabel,
-                    leadingIcon: Icon(metric.logIcon),
+                    leadingIcon: metric.logIconAsset != null
+                        ? SvgPicture.asset(
+                            metric.logIconAsset!,
+                            width: AppDimens.iconMd,
+                            height: AppDimens.iconMd,
+                            colorFilter: ColorFilter.mode(
+                              context.vColors.buttonText ??
+                                  Theme.of(context).colorScheme.onPrimary,
+                              BlendMode.srcIn,
+                            ),
+                          )
+                        : Icon(metric.logIcon),
                     onTap: onLog!,
                   );
                 }
                 return AppSecondaryButton(
                   label: editLabel ?? logLabel ?? metric.logLabel,
-                  leadingIcon: Icon(
-                    editLabel != null ? Icons.edit_rounded : metric.logIcon,
-                  ),
+                  leadingIcon: editLabel != null
+                      ? SvgPicture.asset(
+                          TrackerIcons.edit,
+                          width: AppDimens.iconMd,
+                          height: AppDimens.iconMd,
+                          colorFilter: ColorFilter.mode(
+                            context.vColors.secondaryButtonText ??
+                                Theme.of(context).colorScheme.primary,
+                            BlendMode.srcIn,
+                          ),
+                        )
+                      : (metric.logIconAsset != null
+                            ? SvgPicture.asset(
+                                metric.logIconAsset!,
+                                width: AppDimens.iconMd,
+                                height: AppDimens.iconMd,
+                                colorFilter: ColorFilter.mode(
+                                  context.vColors.secondaryButtonText ??
+                                      Theme.of(context).colorScheme.primary,
+                                  BlendMode.srcIn,
+                                ),
+                              )
+                            : Icon(metric.logIcon)),
                   onTap: onLog!,
                 );
               },
@@ -263,9 +308,6 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
             for (final log in data.logs)
               if (isSameDay(dateOf(log), todayNow)) log,
           ];
-          final seeAll =
-              onLogsAction ??
-              (allLogs == null ? null : () => _openAll(context, cubit));
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -305,9 +347,9 @@ class TrackerDetailScaffold<L> extends StatelessWidget {
               if (todays.isEmpty)
                 AppInfoNote(message: emptyLogs)
               else
-                for (final log in todays) ...[
+                for (final (i, log) in todays.indexed) ...[
+                  if (i > 0) const SizedBox(height: AppDimens.cardGap),
                   logBuilder(context, log),
-                  const SizedBox(height: AppDimens.space8),
                 ],
             ],
           );
@@ -415,7 +457,7 @@ class _HeroCard extends StatelessWidget {
                   icon: goal == null
                       ? const Icon(Icons.add_rounded, size: AppDimens.iconSm)
                       : SvgPicture.asset(
-                          'assets/icons/ui/edit.svg',
+                          TrackerIcons.edit,
                           width: AppDimens.iconSm,
                           height: AppDimens.iconSm,
                           colorFilter: ColorFilter.mode(
@@ -457,7 +499,8 @@ class _TrendCard<L> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TrendChartCard(
-      caption: state.range.caption,
+      title: state.range.caption,
+      caption: state.range.detail,
       range: state.range,
       onRange: onRange,
       ranges: ranges,
@@ -479,14 +522,16 @@ class _TrendCard<L> extends StatelessWidget {
   }
 }
 
-/// Every entry of one tracker, newest first, grouped by day. Opened from
-/// "See all" on a detail page; swipe to delete works as there.
+/// Every entry of one tracker, newest first, grouped by day (with the
+/// day's total when [daySummary] gives one), laid out like the meal and
+/// activity histories. Opened from History or "See all" on a detail page.
 class TrackerLogsPage<L> extends StatefulWidget {
   final TrackerMetric metric;
   final String title;
   final Future<List<L>> Function() load;
   final DateTime Function(L log) dateOf;
   final Widget Function(BuildContext context, L log) logBuilder;
+  final String? Function(List<L> logs)? daySummary;
 
   const TrackerLogsPage({
     super.key,
@@ -495,6 +540,7 @@ class TrackerLogsPage<L> extends StatefulWidget {
     required this.load,
     required this.dateOf,
     required this.logBuilder,
+    this.daySummary,
   });
 
   @override
@@ -514,16 +560,6 @@ class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
   void dispose() {
     _cubit.close();
     super.dispose();
-  }
-
-  String _dayLabel(DateTime day, DateTime now) {
-    if (isSameDay(day, now)) return 'Today';
-    if (isSameDay(day, previousDay(now))) {
-      return 'Yesterday';
-    }
-    return DateFormat(
-      day.year == now.year ? 'EEEE d MMM' : 'EEEE d MMM y',
-    ).format(day);
   }
 
   @override
@@ -550,31 +586,37 @@ class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
                 message: 'What you log will show up here.',
               );
             }
-            final now = DateTime.now();
             final visible = logs.take(_shown).toList();
             final children = <Widget>[];
-            DateTime? day;
-            for (final log in visible) {
-              final d = startOfDay(widget.dateOf(log));
-              if (d != day) {
-                day = d;
-                if (children.isNotEmpty) {
-                  children.add(const SizedBox(height: AppDimens.space8));
-                }
-                children
-                  ..add(TrackerSectionTitle(_dayLabel(d, now)))
-                  ..add(const SizedBox(height: AppDimens.space8));
+            final days = groupLogsByDay(visible, widget.dateOf);
+            for (final (d, (day, entries)) in days.indexed) {
+              if (d > 0) {
+                children.add(const SizedBox(height: AppDimens.sectionGap));
               }
+              // No total for a day that "Show more" has cut short.
+              final whole =
+                  d < days.length - 1 || logs.length == visible.length;
               children
-                ..add(widget.logBuilder(context, log))
-                ..add(const SizedBox(height: AppDimens.space8));
+                ..add(
+                  LogDayHeader(
+                    formatLogDay(day),
+                    summary: whole ? widget.daySummary?.call(entries) : null,
+                  ),
+                )
+                ..add(const SizedBox(height: AppDimens.cardGap));
+              for (final (i, log) in entries.indexed) {
+                if (i > 0) {
+                  children.add(const SizedBox(height: AppDimens.cardGap));
+                }
+                children.add(widget.logBuilder(context, log));
+              }
             }
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ...children,
                 if (logs.length > visible.length) ...[
-                  const SizedBox(height: AppDimens.space8),
+                  const SizedBox(height: AppDimens.sectionGap),
                   AppSecondaryButton(
                     label: 'Show more',
                     onTap: () => setState(() => _shown += _pageSize),
@@ -585,6 +627,42 @@ class _TrackerLogsPageState<L> extends State<TrackerLogsPage<L>> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// The header buttons of a tracker detail page: [children] (a guide,
+/// settings), then History, so every tracker has History in the same
+/// place.
+class TrackerHeaderActions extends StatelessWidget {
+  final VoidCallback? onHistory;
+  final List<Widget> children;
+
+  const TrackerHeaderActions({
+    super.key,
+    required this.onHistory,
+    this.children = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      ...children,
+      if (onHistory != null)
+        AppHeaderAction(
+          tooltip: 'History',
+          icon: const Icon(Icons.history_rounded),
+          onTap: onHistory,
+        ),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (i, action) in actions.indexed) ...[
+          if (i > 0) const SizedBox(width: AppDimens.space8),
+          action,
+        ],
+      ],
     );
   }
 }

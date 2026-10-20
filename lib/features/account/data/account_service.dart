@@ -20,6 +20,7 @@ import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart'
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
 import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
@@ -136,6 +137,7 @@ class AccountService {
     await _step('other per-user values', () async {
       await _prefs.remove(WeightService.legacyTargetKey);
       await _prefs.remove(HealthImportService.lastImportKey);
+      await _prefs.remove(ScreenTimeService.savedDaysKey);
       for (final key
           in _prefs
               .getKeys()

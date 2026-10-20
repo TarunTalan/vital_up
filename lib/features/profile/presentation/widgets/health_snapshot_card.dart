@@ -76,6 +76,7 @@ class _HealthSnapshotCardState extends State<HealthSnapshotCard> {
         return AppCard(
           width: double.infinity,
           onTap: widget.onTap,
+          showChevron: true,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

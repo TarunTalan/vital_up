@@ -528,11 +528,7 @@ class _PersonRow extends StatelessWidget {
                 trailing!,
               ] else if (onTap != null) ...[
                 const SizedBox(width: AppDimens.space4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: AppDimens.iconMd,
-                  color: grey,
-                ),
+                const AppChevron(),
               ],
             ],
           ),

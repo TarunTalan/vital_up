@@ -828,6 +828,11 @@ class _RankRow extends StatelessWidget {
                   color: context.colors.onSurface,
                 ),
               ),
+              // Opens their profile; your own row keeps the points aligned.
+              const SizedBox(width: AppDimens.space4),
+              e.isMe
+                  ? const SizedBox(width: AppDimens.iconMd)
+                  : const AppChevron(),
             ],
           ),
         ),

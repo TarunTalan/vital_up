@@ -207,11 +207,7 @@ class _NextUpCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppDimens.space8),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: grey,
-          ),
+          const AppChevron(),
         ],
       ),
     );

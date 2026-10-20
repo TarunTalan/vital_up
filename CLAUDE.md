@@ -262,11 +262,44 @@ make one back press skip two tabs).
   A tap selects a bar, a second tap goes back to today; bars use the full
   width and the goal line is named in a legend under the dates ("Goal 10K",
   "Limit 2h"). Detail pages use
-  `TrendChartCard` (caption + compact `TrendRangeToggle`, chart, divider,
-  `TrendStatsRow`) for the same spacing everywhere. Tests: `truncatedTexts(tester, previews:)` in
+  `TrendChartCard` (title = `TrendRange.caption` "Last 7 days" over a grey
+  caption = `TrendRange.detail` (activity: "Steps · each day"), compact
+  `TrendRangeToggle` beside it or wrapped under it when both don't fit;
+  chart, divider, `TrendStatsRow`) for the same spacing everywhere.
+  Every tracker detail page (`TrackerDetailScaffold`, `ActivityGoalsPage`)
+  has History in the header (`TrackerHeaderActions`: the page's own
+  action, then History) and "See all" on its log section.
+  Every history entry, on detail pages and history pages alike, is a
+  `LogHistoryCard` (`core/widgets/tracker/log_history_card.dart`: tinted
+  icon badge, title (never cut), grey subtitle (time, source), main value
+  on the right (moves under the title when the title would get under
+  140dp), grey bin that asks first (`deleteNoun`), optional note, optional
+  `LogFigure` columns under a hairline). `ActivityHistoryCard` and
+  `MealLogCard` (`food_scanner/presentation/widgets/meal_log_card.dart`)
+  build on it. History lists (`TrackerLogsPage`, meal and activity
+  history) group by day with `groupLogsByDay` + `LogDayHeader` (day via
+  `formatLogDay`, optional total: water ml, meal kcal, activity count;
+  `TrackerDetailScaffold.daySummary`). Test:
+  `test/features/dashboard/tracker_detail_layout_test.dart`
+  (`HOME_SHOTS=1` writes `build/detail_shots/`). Tests: `truncatedTexts(tester, previews:)` in
   `test/helpers/pump_app.dart` lists cut, clipped or too-wide text; every
   largest-text page test and `test/core/widgets/text_fit_test.dart` expect
   it empty (only free-text previews allowed).
+- Tappable vs static (whole app): anything that opens a page or sheet
+  ends in `AppChevron` (`app_card.dart`: grey, iconMd; the only card/row
+  chevron): `AppCard(onTap:, showChevron: true)` draws it centred at the
+  trailing edge, rows (`AppListTile`, `LogHistoryCard` with `onTap`,
+  `TrackerCardHeader`, rank and
+  award rows) draw their own. Cards that pick something keep their radio /
+  checkbox / "Use" and no chevron; grid tiles (badges, shortcuts, quick
+  log, friend chips) are tappable by shape. Static cards show no chevron,
+  ripple or accent link text. Text links ("See all ›") keep their accent
+  chevron. `AppChevron` takes `AppChevron.width` (14dp: the glyph's
+  blank side is drawn into the padding, so the arrow lines up with the
+  content edge). Half-width Home tiles show it on the title's line at
+  every tested size; only a title that couldn't fit beside it would move
+  under the badge row (`TrackerTilePair` decides for both tiles,
+  `_TileScope.titlesUnder`; never with today's titles).
 - Rules: no hardcoded colours/sizes, 16dp gutter, no emojis (Material/SVG
   icons; icon assets are supplied by the user, never created; `GameIcon`
   falls back to a Material icon when an SVG is missing), Home is health-first
@@ -416,6 +449,11 @@ Route names are GoRouter `name`s.
   `TrendsService` / `TrendCubit<T>` are shared by cards and trend pages.
   Water: Isar `WaterLogCache`, goal pref `daily_water_goal`. Screen time:
   pref `daily_screen_time_limit_min`, Usage Access permission, usage channel.
+  Android keeps usage events ~10 days (`ScreenTimeService.systemDays`), so
+  every finished day with usage is saved on read (pref
+  `screen_time_days_v1`, 400 days, top 10 apps) and read from there after;
+  `history()` = system days + saved ones (the history page); wiped on
+  sign-out. Test: `test/features/dashboard/screen_time_history_test.dart`.
   Mood/stress: `StressCheckInCubit` -> `VitaRepository`.
 - **sleep:** log sheet `SleepLogSheet` uses `CircularSleepClockPicker`
   (`core/widgets/circular_sleep_clock.dart`: drag moon / sun, or the arc
@@ -500,12 +538,11 @@ Route names are GoRouter `name`s.
   outdoor types only; `session.hasDistance` hides distance/pace for
   workouts. History (`activity-history`) is laid out like meal history (no
   summary card): an All / Outdoor / Workouts `AppSegmentedControl` and a
-  search button (type, tag or note) as the first list item, then one
-  `ActivityHistoryCard` per entry: icon, type, `formatLogDateTime` date, a
-  grey delete button, the tag, then three neutral equal columns
-  (`AdaptiveRow`: km / time / calories, or time / calories / effort).
-  Meal history uses `LogHistoryCard` / `LogTypeBadge` / `LogValuePill`
-  (`core/widgets/tracker/log_history_card.dart`). Live workout stats
+  search button (type, tag or note) as the first list item, then days
+  (`LogDayHeader`) of `ActivityHistoryCard`s (a `LogHistoryCard`: icon,
+  type, start time, grey delete button, the tag, then three neutral equal
+  columns: km / time / calories, or time / calories / effort). Meal
+  history uses `MealLogCard` the same way. Live workout stats
   default to `defaultStatsFor(type)` (steps on foot, pace for runs, speed
   for rides) until the user saves a layout. The GPS screen opens with
   `activityForGoals` (steps goal: walk; distance or calories goal: run;
@@ -642,6 +679,22 @@ Route names are GoRouter `name`s.
   imported workouts unless "Include Health Connect readings" is on.
   Quota messages show the reset time from `core/utils/quota_reset.dart`
   (server days are IST).
+  Scope and abuse guards (`supabase/functions/vita-chat/guard.ts`, tests
+  `node --test supabase/functions/vita-chat/guard.test.ts`): Vita answers
+  only the user's health data, general health/nutrition/fitness and how to
+  use VitalUp; rules go in a real system instruction and the chat as real
+  provider turns (`ChatTurn`, `system` / `turns` in `_shared/llm.ts`), the
+  snapshot and history are labelled data. Obvious jailbreaks / coding jobs
+  get `SCOPE_REFUSAL` with no model call and no quota (patterns are
+  high-confidence only: add a false-positive case to the test with every
+  new one); a reply the model marks `offTopic`, or one that leaks the
+  per-request canary or code, is replaced by the same text (`offTopic:
+  true` in the body). Per-minute cap `ai_burst_allowed` (6 chats / 3
+  insights, env `VITA_CHAT_PER_MINUTE` / `VITA_INSIGHTS_PER_MINUTE`, fails
+  open) answers 429 `too_fast` (app: `VitaException.tooFast`, no Pro
+  offer). Transcript capped at 6,000 chars. App how-to questions
+  (`asksAboutApp`) also get `APP_GUIDE` (~700 tokens; keep it in step
+  with the app and the FAQ).
 - **reminders:** local notifications (`ReminderScheduler`, presets in
   `domain/reminder_presets.dart`, smart skip when the habit is done today).
   `reminder_actions.dart` has background-isolate helpers (add water,
@@ -729,9 +782,15 @@ Route names are GoRouter `name`s.
   users who can buy) else the plain message; a purchase from a gate retries
   the action. The paywall shows price, period, trial and "Renews
   automatically until you cancel in Google Play" (Play policy).
-- **help_support:** `help-support`, `support-chat` (local scripted bot),
-  `contact-support` (`EmailService.submitSupportTicket` -> `send-email`,
-  signed-in only; mailto fallback); static FAQ.
+- **help_support:** `help-support` (FAQ `kFaqDatabase` in
+  `data/datasources/faq_data.dart`: plain text, paths checked against the
+  app, `actionRoute`s that open without `extra` (`faq_data_test.dart`);
+  `searchFaqs` matches each word by its start; no results -> "Ask Vita"
+  sends the search to `vita-chat`; the top card is Ask Vita; thumbs down
+  opens the contact form), `contact-support`
+  (`EmailService.submitSupportTicket` -> `send-email`, signed-in only;
+  mailto fallback). The scripted `support-chat` bot was removed (Oct 21):
+  Vita answers app questions with `APP_GUIDE`.
 - **home_widget (Android):** Today (4 sizes), My metrics / Custom (3 sizes,
   `custom-widget-builder`), Water, Mood check-in, Shortcuts (2 sizes each).
   Dart formats everything (`data/widget_data.dart`: `WidgetInputs` ->
@@ -803,6 +862,9 @@ Route names are GoRouter `name`s.
   = Pro unlimited for old functions; functions now pass Pro fair-use caps);
   `get_remaining_scans` free limit 5, -1 for Pro. Deploy it before the
   functions that pass `p_pro_limit`.
+  `20261028_ai_burst_limit.sql` (NOT pushed yet): `ai_burst_allowed`
+  per-minute window on `ai_usage_daily` (`window_start`, `window_count`;
+  rows it creates have `use_count` 0); service role only.
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -928,7 +990,8 @@ Route names are GoRouter `name`s.
   another account's leftover data before the first sync
   (`AccountService.claimDevice`, pref `local_data_owner_id`, via
   `SyncService.beforeFirstSync`); sign-out also clears `weight_target_kg`,
-  `health_import_last` and `sleep_bedtime_*`; export pages
+  `health_import_last`, `sleep_bedtime_*` and
+  `screen_time_days_v1`; export pages
   `daily_reports` and `notifications` and gives points 60 s; food scan
   says "This can take up to a minute" and asks before leaving mid-scan
   (`confirmLeaveFoodScan`, dashboard via `FoodScannerPage.busy`); label

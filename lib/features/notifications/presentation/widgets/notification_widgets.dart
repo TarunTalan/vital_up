@@ -205,6 +205,7 @@ class NotificationTile extends StatelessWidget {
       padding: AppDimens.cardPaddingCompact,
       highlighted: unread,
       onTap: onTap,
+      showChevron: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

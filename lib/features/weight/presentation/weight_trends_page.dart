@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -160,16 +161,17 @@ class WeightTrendsPage extends StatelessWidget {
                 onLog: () async {
                   if (await showWeightEntrySheet(context)) cubit.load();
                 },
-                logBuilder: (context, log) => TrackerLogTile(
-                  id: log.id,
-                  icon: log.source == 'health'
-                      ? Icons.watch_rounded
-                      : _metric.icon,
+                logBuilder: (context, log) => LogHistoryCard(
+                  icon: Icon(
+                    log.source == 'health' ? Icons.watch_rounded : _metric.icon,
+                  ),
                   color: _metric.color,
-                  title: unit.format(log.weightKg),
+                  title: 'Weight',
                   subtitle:
-                      '${DateFormat('EEE d MMM · h:mm a').format(log.timestamp)}'
-                      ' · ${log.source == 'health' ? 'Synced' : 'Manual'}',
+                      '${DateFormat.jm().format(log.timestamp)} · '
+                      '${log.source == 'health' ? 'Health Connect' : 'Logged by you'}',
+                  value: unit.format(log.weightKg),
+                  deleteNoun: 'weigh-in',
                   onDelete: () => deleteTrackerLog(
                     context,
                     context.read<TrendCubit<WeightLogCache>>(),
