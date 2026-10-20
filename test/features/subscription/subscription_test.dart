@@ -78,6 +78,9 @@ class _FakeRepository implements SubscriptionRepository {
 
   @override
   Future<int> remainingFreeScans() async => 5;
+
+  @override
+  Stream<void> get remainingScansChanges => const Stream.empty();
 }
 
 void main() {

@@ -30,6 +30,7 @@ import 'package:vital_up/core/error/failures.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_ocr_parser.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/nutrition_manual_entry_dialog.dart';
 import 'package:vital_up/features/food_scanner/presentation/widgets/accuracy_info_dialog.dart';
+import 'package:vital_up/features/food_scanner/presentation/widgets/scans_left_hint.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -928,6 +929,11 @@ class _FoodScannerViewState extends State<FoodScannerView> with WidgetsBindingOb
                           onAdd: () => _analyzeImage((_croppedImage ?? _selectedImage)!.path),
                         ),
                         const SizedBox(height: AppDimens.space16),
+                      ],
+                      // Barcodes and labels don't use a photo scan.
+                      if (!isRecognizing && !_isScanningNutritionLabel) ...[
+                        const ScansLeftHint(),
+                        const SizedBox(height: AppDimens.space12),
                       ],
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,

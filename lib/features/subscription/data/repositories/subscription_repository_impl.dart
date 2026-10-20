@@ -122,6 +122,14 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   }
 
   @override
+  Stream<void> get remainingScansChanges => _cache.changes
+      .where((key) {
+        final userId = _userId;
+        return userId != null && key == FoodCacheKeys.remainingScans(userId);
+      })
+      .map((_) {});
+
+  @override
   Future<int> remainingFreeScans() async {
     final userId = _userId;
     if (userId == null) return 0;

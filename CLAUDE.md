@@ -492,6 +492,9 @@ Route names are GoRouter `name`s.
   overlay and photo crop); gallery photos are checked for a barcode before
   going to the AI; the camera is let go in the background. Photo scans: 5 a day free, 100 with
   Pro (`get_remaining_scans`); a 429 opens the Pro sheet (`offerProForLimit`).
+  Free users see `ScansLeftHint` above Capture ("3 photo scans left today";
+  follows `SubscriptionRepository.remainingScansChanges`; at zero a tap
+  offers Pro; hidden with Pro or while unknown).
 - **diet_plan:** `diet-plan-prefs`, `diet-plan-mode`, `diet-plan-goal`,
   `diet-plan-manual`, `diet-plan-edit`, `diet-plan-result`. `DietPlanCubit`,
   Isar `MealPlanModel` by `dateKey`, prefs `active_plan`,
@@ -785,8 +788,7 @@ Route names are GoRouter `name`s.
   Services, `device_preview` only in debug; arm64 download ~29 MB est.).
 - Decide: 10 iOS gaps (no Crashlytics, push or widgets).
 - Known leftovers: AI keys are one per function for every user (no
-  Pro routing; free-tier Gemini may use prompts); the scanner doesn't show
-  scans left yet (`remainingFreeScans` is ready); backup conflicts
+  Pro routing; free-tier Gemini may use prompts); backup conflicts
   use device clocks; widgets redraw after midnight only on their 30 min
   update or a tap; reminders don't see
   widget logs; other offline GETs take ~7 s to fail where no connectivity
@@ -809,7 +811,9 @@ food scan has no long-wait hint or cancel; label-scan loader
    `REVENUECAT_GOOGLE_API_KEY` in `.env` and in the workflows' `ENV_CONTENT` secret;
    server side is done (Oct 19: `20261026` applied; scan-food, vita-chat,
    generate-diet-plan, revenuecat-webhook, sync-subscription and
-   delete-account deployed). Data safety form: add "Purchase history".
+   delete-account deployed); Oct 20: the RevenueCat secrets
+   aren't set yet, so the webhook refuses every event; `.env` has no
+   `REVENUECAT_GOOGLE_API_KEY`, so the app shows no paywall). Data safety form: add "Purchase history".
 4. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
