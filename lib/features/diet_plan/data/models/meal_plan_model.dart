@@ -27,12 +27,22 @@ class MealModel {
   factory MealModel.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
     return MealModel()
-      ..name = sanitizeOptional(json['name']?.toString(), maxLength: InputLimits.shortText)
+      ..name = sanitizeOptional(
+        json['name']?.toString(),
+        maxLength: InputLimits.shortText,
+      )
       ..items = rawItems is List
           ? [
               for (final e in rawItems)
-                if (e != null && sanitizeText(e.toString(), maxLength: InputLimits.shortText * 2).isNotEmpty)
-                  sanitizeText(e.toString(), maxLength: InputLimits.shortText * 2),
+                if (e != null &&
+                    sanitizeText(
+                      e.toString(),
+                      maxLength: InputLimits.shortText * 2,
+                    ).isNotEmpty)
+                  sanitizeText(
+                    e.toString(),
+                    maxLength: InputLimits.shortText * 2,
+                  ),
             ].take(maxItems).toList()
           : null
       ..calories = saneInt(json['calories'], maxCalories)
@@ -44,7 +54,9 @@ class MealModel {
   /// A whole number in [0, max] from untrusted JSON (num or numeric
   /// string); null when missing or not a finite number.
   static int? saneInt(Object? raw, int max) {
-    final value = raw is num ? raw.toDouble() : double.tryParse(raw?.toString() ?? '');
+    final value = raw is num
+        ? raw.toDouble()
+        : double.tryParse(raw?.toString() ?? '');
     if (value == null || !value.isFinite) return null;
     if (value <= 0) return 0;
     return value > max ? max : value.round();
@@ -109,11 +121,15 @@ class MealPlanModel {
     final rawMeals = json['meals'];
     final meals = rawMeals is List
         ? rawMeals
-            .whereType<Map<dynamic, dynamic>>()
-            .map((e) => MealModel.fromJson(Map<String, dynamic>.from(e)))
-            .where((m) => (m.name ?? '').isNotEmpty || (m.items ?? const []).isNotEmpty)
-            .take(maxMeals)
-            .toList()
+              .whereType<Map<dynamic, dynamic>>()
+              .map((e) => MealModel.fromJson(Map<String, dynamic>.from(e)))
+              .where(
+                (m) =>
+                    (m.name ?? '').isNotEmpty ||
+                    (m.items ?? const []).isNotEmpty,
+              )
+              .take(maxMeals)
+              .toList()
         : null;
     int? total(String key, int Function(MealModel m) pick, int max) {
       final given = MealModel.saneInt(json[key], max);
@@ -126,7 +142,11 @@ class MealPlanModel {
     return MealPlanModel()
       ..dateKey = dateKey
       ..meals = meals
-      ..totalCalories = total('totalCalories', (m) => m.calories ?? 0, InputLimits.caloriesMax)
+      ..totalCalories = total(
+        'totalCalories',
+        (m) => m.calories ?? 0,
+        InputLimits.caloriesMax,
+      )
       ..totalProtein = total('totalProtein', (m) => m.protein ?? 0, 2000)
       ..totalCarbs = total('totalCarbs', (m) => m.carbs ?? 0, 2000)
       ..totalFat = total('totalFat', (m) => m.fat ?? 0, 2000);

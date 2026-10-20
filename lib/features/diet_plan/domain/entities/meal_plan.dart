@@ -38,10 +38,10 @@ class MealPlan extends Equatable {
 
   @override
   List<Object?> get props => [
-        meals,
-        totalCalories,
-        totalProtein,
-        totalCarbs,
-        totalFat,
-      ];
+    meals,
+    totalCalories,
+    totalProtein,
+    totalCarbs,
+    totalFat,
+  ];
 }

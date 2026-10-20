@@ -63,14 +63,20 @@ class _DietPlanEditPageState extends State<DietPlanEditPage> {
     }
   }
 
-  void _addMeal() => setState(() => _meals!.add(_MealDraft(const Meal(
-        name: 'Snack',
-        items: [],
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-      ))));
+  void _addMeal() => setState(
+    () => _meals!.add(
+      _MealDraft(
+        const Meal(
+          name: 'Snack',
+          items: [],
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        ),
+      ),
+    ),
+  );
 
   Future<void> _removeMeal(_MealDraft meal) async {
     setState(() => _meals!.remove(meal));
@@ -144,33 +150,28 @@ class _DietPlanEditPageState extends State<DietPlanEditPage> {
       body: _failed
           ? LoadErrorView(onRetry: _load)
           : meals == null
-              ? const Center(child: VitalUpLoader())
-              : meals.isEmpty
-                  ? const AppInfoNote(
-                      message: 'No active plan to edit. Create one first.',
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _TotalsCard(plan: _buildPlan()),
-                        const SizedBox(height: AppDimens.cardGap),
-                        for (final meal in meals) ...[
-                          _MealEditor(
-                            key: ObjectKey(meal),
-                            draft: meal,
-                            onChanged: () => setState(() {}),
-                            onRemove: meals.length > 1
-                                ? () => _removeMeal(meal)
-                                : null,
-                          ),
-                          const SizedBox(height: AppDimens.cardGap),
-                        ],
-                        AppSecondaryButton(
-                          label: 'Add meal',
-                          onTap: _addMeal,
-                        ),
-                      ],
-                    ),
+          ? const Center(child: VitalUpLoader())
+          : meals.isEmpty
+          ? const AppInfoNote(
+              message: 'No active plan to edit. Create one first.',
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TotalsCard(plan: _buildPlan()),
+                const SizedBox(height: AppDimens.cardGap),
+                for (final meal in meals) ...[
+                  _MealEditor(
+                    key: ObjectKey(meal),
+                    draft: meal,
+                    onChanged: () => setState(() {}),
+                    onRemove: meals.length > 1 ? () => _removeMeal(meal) : null,
+                  ),
+                  const SizedBox(height: AppDimens.cardGap),
+                ],
+                AppSecondaryButton(label: 'Add meal', onTap: _addMeal),
+              ],
+            ),
     );
   }
 }
@@ -188,12 +189,12 @@ class _MealDraft {
   String? nameError;
 
   _MealDraft(Meal meal)
-      : name = TextEditingController(text: meal.name),
-        items = [for (final i in meal.items) TextEditingController(text: i)],
-        calories = TextEditingController(text: '${meal.calories}'),
-        protein = TextEditingController(text: '${meal.protein}'),
-        carbs = TextEditingController(text: '${meal.carbs}'),
-        fat = TextEditingController(text: '${meal.fat}');
+    : name = TextEditingController(text: meal.name),
+      items = [for (final i in meal.items) TextEditingController(text: i)],
+      calories = TextEditingController(text: '${meal.calories}'),
+      protein = TextEditingController(text: '${meal.protein}'),
+      carbs = TextEditingController(text: '${meal.carbs}'),
+      fat = TextEditingController(text: '${meal.fat}');
 
   static int _int(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
@@ -209,16 +210,16 @@ class _MealDraft {
       _inRange(fat, MealModel.maxGrams);
 
   Meal toMeal() => Meal(
-        name: name.text.trim(),
-        items: [
-          for (final i in items)
-            if (i.text.trim().isNotEmpty) i.text.trim(),
-        ],
-        calories: _int(calories),
-        protein: _int(protein),
-        carbs: _int(carbs),
-        fat: _int(fat),
-      );
+    name: name.text.trim(),
+    items: [
+      for (final i in items)
+        if (i.text.trim().isNotEmpty) i.text.trim(),
+    ],
+    calories: _int(calories),
+    protein: _int(protein),
+    carbs: _int(carbs),
+    fat: _int(fat),
+  );
 
   void dispose() {
     for (final c in [name, calories, protein, carbs, fat, ...items]) {
@@ -322,8 +323,9 @@ class _MealEditor extends StatelessWidget {
                   onPressed: () {
                     draft.items.remove(item);
                     onChanged();
-                    WidgetsBinding.instance
-                        .addPostFrameCallback((_) => item.dispose());
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => item.dispose(),
+                    );
                   },
                 ),
               ],

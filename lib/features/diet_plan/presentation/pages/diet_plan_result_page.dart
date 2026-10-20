@@ -215,10 +215,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   /// Today's plans are used up: free users can start Pro, then the plan
   /// is made.
   Future<void> _offerPro() async {
-    final started = await showProPaywall(
-      context,
-      reason: ProReason.dietPlans,
-    );
+    final started = await showProPaywall(context, reason: ProReason.dietPlans);
     if (started && mounted && _target != null) _retry();
   }
 

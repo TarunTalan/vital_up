@@ -47,7 +47,10 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
   }) async {
     try {
       if (Supabase.instance.client.auth.currentSession == null) {
-        return const ApiError(message: 'Please sign in to create a plan.', code: 401);
+        return const ApiError(
+          message: 'Please sign in to create a plan.',
+          code: 401,
+        );
       }
       if (_consent != null && !_consent.accepted) {
         return const ApiError(
@@ -59,9 +62,9 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
       // rejected by the function; refresh it first.
       if (Supabase.instance.client.auth.currentSession?.isExpired ?? false) {
         try {
-          await Supabase.instance.client.auth
-              .refreshSession()
-              .timeout(const Duration(seconds: 15));
+          await Supabase.instance.client.auth.refreshSession().timeout(
+            const Duration(seconds: 15),
+          );
         } catch (e) {
           debugPrint('generate-diet-plan: session refresh failed: $e');
           return ApiError(
@@ -86,29 +89,42 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
 
       final targetModel = NutritionTargetModel.fromEntity(target);
       // functions.invoke attaches the signed-in user's access token itself.
-      final response = await Supabase.instance.client.functions.invoke(
-        'generate-diet-plan',
-        body: {
-          'target': targetModel.toJson(),
-          'preferences': cleanPreferences,
-          'instructions': ?cleanInstructions,
-          if (cleanInstructions != null && basePlan != null)
-            'basePlan': {
-              'meals': [
-                for (final m in basePlan.meals)
-                  {'name': m.name, 'items': m.items, 'calories': m.calories},
-              ],
+      final response = await Supabase.instance.client.functions
+          .invoke(
+            'generate-diet-plan',
+            body: {
+              'target': targetModel.toJson(),
+              'preferences': cleanPreferences,
+              'instructions': ?cleanInstructions,
+              if (cleanInstructions != null && basePlan != null)
+                'basePlan': {
+                  'meals': [
+                    for (final m in basePlan.meals)
+                      {
+                        'name': m.name,
+                        'items': m.items,
+                        'calories': m.calories,
+                      },
+                  ],
+                },
             },
-        },
-      ).timeout(_timeout);
+          )
+          .timeout(_timeout);
 
-      final data = response.data is String ? jsonDecode(response.data as String) : response.data;
+      final data = response.data is String
+          ? jsonDecode(response.data as String)
+          : response.data;
       if (data is! Map) {
-        debugPrint('generate-diet-plan: unexpected response ${data.runtimeType}');
+        debugPrint(
+          'generate-diet-plan: unexpected response ${data.runtimeType}',
+        );
         return const ApiError(message: _badPlanMessage, code: 502);
       }
       final dateKey = DateTime.now().toIso8601String().split('T')[0];
-      final plan = MealPlanModel.fromJson(Map<String, dynamic>.from(data), dateKey);
+      final plan = MealPlanModel.fromJson(
+        Map<String, dynamic>.from(data),
+        dateKey,
+      );
       // An empty or meal-less answer is a failed generation, not a plan.
       if ((plan.meals ?? const []).isEmpty || (plan.totalCalories ?? 0) <= 0) {
         debugPrint('generate-diet-plan: empty plan in response');
@@ -116,7 +132,9 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
       }
       return ApiSuccess(plan);
     } on FunctionException catch (e) {
-      debugPrint('generate-diet-plan failed: status=${e.status} details=${e.details}');
+      debugPrint(
+        'generate-diet-plan failed: status=${e.status} details=${e.details}',
+      );
       return ApiError(message: _messageForStatus(e.status), code: e.status);
     } on TimeoutException {
       return const ApiError(
@@ -126,7 +144,10 @@ class DietPlanRemoteDataSourceImpl implements DietPlanRemoteDataSource {
     } catch (e) {
       // Never show exception text (FormatException etc.) to the user.
       debugPrint('Unexpected error [generateDietPlan]: $e');
-      return ApiError(message: userMessage(e, fallback: _badPlanMessage), code: -1);
+      return ApiError(
+        message: userMessage(e, fallback: _badPlanMessage),
+        code: -1,
+      );
     }
   }
 

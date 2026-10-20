@@ -21,7 +21,9 @@ class GoalSetupPage extends StatefulWidget {
 
 class _GoalSetupPageState extends State<GoalSetupPage> {
   final _weightController = TextEditingController();
-  final _timeframeController = TextEditingController(text: '4'); // default 4 weeks
+  final _timeframeController = TextEditingController(
+    text: '4',
+  ); // default 4 weeks
   String? _weightError;
   String? _timeframeError;
 
@@ -54,11 +56,17 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
       _weightController.text,
       _unit,
     );
-    final timeframe = parseNumberInRange(_timeframeController.text, min: 1, max: _maxWeeks)?.round();
+    final timeframe = parseNumberInRange(
+      _timeframeController.text,
+      min: 1,
+      max: _maxWeeks,
+    )?.round();
 
     setState(() {
       _weightError = weightError;
-      _timeframeError = timeframe == null ? 'Enter 1 to $_maxWeeks weeks' : null;
+      _timeframeError = timeframe == null
+          ? 'Enter 1 to $_maxWeeks weeks'
+          : null;
     });
     if (weight == null || timeframe == null) return;
 

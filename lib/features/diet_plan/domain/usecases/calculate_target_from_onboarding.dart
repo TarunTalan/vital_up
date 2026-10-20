@@ -63,7 +63,8 @@ class CalculateTargetFromOnboarding {
     return kg < 20 || kg > 350 ? 70.0 : kg;
   }
 
-  double _parseWeight(String weight, String unit) => parseWeightKg(weight, unit);
+  double _parseWeight(String weight, String unit) =>
+      parseWeightKg(weight, unit);
 
   double _parseHeight(String height, String unit) {
     final h = double.tryParse(height.trim().replaceAll(',', '.'));
@@ -72,8 +73,8 @@ class CalculateTargetFromOnboarding {
     final cm = u == 'ft'
         ? h * 30.48
         : u == 'in'
-            ? h * 2.54
-            : h;
+        ? h * 2.54
+        : h;
     return cm < 50 || cm > 272 ? 170.0 : cm;
   }
 
@@ -87,7 +88,10 @@ class CalculateTargetFromOnboarding {
       }
       List<String> parts = dob.contains('/') ? dob.split('/') : dob.split('-');
       if (parts.length == 3) {
-        final yearPart = parts.firstWhere((p) => p.length == 4, orElse: () => '');
+        final yearPart = parts.firstWhere(
+          (p) => p.length == 4,
+          orElse: () => '',
+        );
         if (yearPart.isNotEmpty) {
           final year = int.parse(yearPart);
           int age = DateTime.now().year - year;
