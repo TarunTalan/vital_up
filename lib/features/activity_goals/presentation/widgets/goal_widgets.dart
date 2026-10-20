@@ -23,6 +23,7 @@ extension GoalMetricStyle on GoalMetric {
   String? get svgAsset => switch (this) {
     GoalMetric.steps => 'assets/icons/trackers/step.svg',
     GoalMetric.workouts => 'assets/icons/trackers/barbell.svg',
+    GoalMetric.calories => 'assets/icons/gamification/streak_flame.svg',
     _ => null,
   };
 
@@ -53,19 +54,26 @@ class GoalMetricIcon extends StatelessWidget {
   final GoalMetric metric;
   final double size;
 
-  const GoalMetricIcon(this.metric, {super.key, this.size = AppDimens.iconSm});
+  /// Overrides the readable-on-card tint (e.g. inside a badge).
+  final Color? color;
+
+  const GoalMetricIcon(
+    this.metric, {
+    super.key,
+    this.size = AppDimens.iconSm,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final asset = metric.svgAsset;
-    if (asset == null) {
-      return Icon(metric.icon, size: size, color: metric.color);
-    }
+    final tint = color ?? context.iconTint(metric.color);
+    if (asset == null) return Icon(metric.icon, size: size, color: tint);
     return SvgPicture.asset(
       asset,
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(metric.color, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
     );
   }
 }
@@ -96,14 +104,10 @@ class GoalProgressRow extends StatelessWidget {
       children: [
         AppIconBadge(
           color: metric.color,
-          icon: metric.svgAsset != null
-              ? SvgPicture.asset(
-                  metric.svgAsset!,
-                  width: AppDimens.iconSm,
-                  height: AppDimens.iconSm,
-                  colorFilter: ColorFilter.mode(metric.color, BlendMode.srcIn),
-                )
-              : Icon(metric.icon),
+          icon: GoalMetricIcon(
+            metric,
+            color: AppIconBadge.glyphColor(context, metric.color),
+          ),
         ),
         const SizedBox(width: AppDimens.space12),
         Expanded(

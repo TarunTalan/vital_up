@@ -13,8 +13,11 @@ import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widge
 
 const _metric = TrackerMetric.activity;
 
-/// Home card: the headline goal (today's steps if set) as a ring with its
-/// figure, up to two more goals as slim lines, and a one-tap workout start.
+/// Home card: a ring with today's overall progress (one goal: its
+/// percentage; several: how many are met, the ring averaging them), the
+/// headline goal's figure (today's steps if set) beside it, up to two more
+/// goals as lines, and a one-tap workout start. A met workout goal never
+/// leaves the ring at 0% just because no steps were counted.
 class ActivityGoalsCard extends StatelessWidget {
   const ActivityGoalsCard({super.key});
 
@@ -48,6 +51,14 @@ class ActivityGoalsCard extends StatelessWidget {
               ? TrackerStatus.noGoal
               : done == goals.length
               ? TrackerStatus.done
+              // Like the ring: several goals count together, so a met
+              // workout goal isn't "Not logged" while steps are at 0.
+              : goals.length > 1
+              ? TrackerStatus.of(
+                  value: goals.fold<double>(0, (sum, g) => sum + g.fraction),
+                  goal: goals.length.toDouble(),
+                  paceFraction: TrackerStatus.dayPace(),
+                )
               : TrackerStatus.of(
                   value: headline.current,
                   goal: headline.goal.target,
@@ -66,6 +77,7 @@ class ActivityGoalsCard extends StatelessWidget {
               TrackerQuickAction(
                 label: 'Set a goal',
                 icon: Icons.flag_rounded,
+                svgAsset: TrackerIcons.goal,
                 color: _metric.color,
                 onTap: () => _push(context, _metric.route),
               ),
@@ -80,7 +92,7 @@ class ActivityGoalsCard extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _Headline(headline),
+                    _Headline(headline, goals: goals),
                     for (final g
                         in goals
                             .where((g) => g != headline)
@@ -106,23 +118,18 @@ String _goalName(ActivityGoal goal) => goal.period == GoalPeriod.daily
 class _Headline extends StatelessWidget {
   final GoalProgress progress;
 
-  const _Headline(this.progress);
+  /// Every goal: the ring sums them up when there are several.
+  final List<GoalProgress> goals;
+
+  const _Headline(this.progress, {required this.goals});
 
   @override
   Widget build(BuildContext context) {
     final goal = progress.goal;
     final metric = goal.metric;
     final grey = context.vColors.grayText;
-    final percent = goal.target > 0
-        ? (progress.current / goal.target * 100).round()
-        : 0;
     return TrackerHeroLayout(
-      ring: TrackerHeroRing(
-        fraction: progress.fraction,
-        color: metric.color,
-        value: '$percent%',
-        caption: progress.achieved ? 'goal met' : 'of goal',
-      ),
+      ring: _ring(),
       details: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -155,6 +162,33 @@ class _Headline extends StatelessWidget {
   }
 }
 
+extension on _Headline {
+  TrackerHeroRing _ring() {
+    final color = progress.goal.metric.color;
+    if (goals.length > 1) {
+      final met = goals.where((g) => g.achieved).length;
+      final average =
+          goals.fold(0.0, (sum, g) => sum + g.fraction) / goals.length;
+      return TrackerHeroRing(
+        fraction: average,
+        color: color,
+        value: '$met of ${goals.length}',
+        caption: 'goals met',
+      );
+    }
+    final goal = progress.goal;
+    final percent = goal.target > 0
+        ? (progress.current / goal.target * 100).round()
+        : 0;
+    return TrackerHeroRing(
+      fraction: progress.fraction,
+      color: color,
+      value: '$percent%',
+      caption: progress.achieved ? 'goal met' : 'of goal',
+    );
+  }
+}
+
 /// A secondary goal: its icon badge and a [TrackerBarRow].
 class _GoalLine extends StatelessWidget {
   final GoalProgress progress;
@@ -170,7 +204,11 @@ class _GoalLine extends StatelessWidget {
         AppIconBadge(
           color: metric.color,
           size: AppDimens.iconBadgeSmall,
-          icon: GoalMetricIcon(metric, size: AppDimens.iconXs),
+          icon: GoalMetricIcon(
+            metric,
+            size: AppDimens.iconXs,
+            color: AppIconBadge.glyphColor(context, metric.color),
+          ),
         ),
         const SizedBox(width: AppDimens.space12),
         Expanded(
@@ -181,6 +219,7 @@ class _GoalLine extends StatelessWidget {
                 '${metric.formatWithUnit(goal.target)}',
             fraction: progress.fraction,
             color: metric.color,
+            done: progress.achieved,
           ),
         ),
       ],

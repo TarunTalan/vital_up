@@ -91,9 +91,7 @@ class LocalWorkoutTimerNotifier implements WorkoutTimerNotifier {
             // without the app running.
             showWhen: running,
             usesChronometer: running,
-            when: running
-                ? now.subtract(elapsed).millisecondsSinceEpoch
-                : null,
+            when: running ? now.subtract(elapsed).millisecondsSinceEpoch : null,
             // The plugin removes a notification when one of its buttons is
             // tapped unless told not to; the action shows it again instead.
             actions: [
@@ -154,7 +152,9 @@ Future<void> handleWorkoutTimerAction(
 }) async {
   final background = prefs == null;
   if (background) DartPluginRegistrant.ensureInitialized();
-  final store = WorkoutTimerStore(prefs ?? await SharedPreferences.getInstance());
+  final store = WorkoutTimerStore(
+    prefs ?? await SharedPreferences.getInstance(),
+  );
   // Another isolate (the app or an earlier action) may have written since.
   await store.prefs.reload();
 

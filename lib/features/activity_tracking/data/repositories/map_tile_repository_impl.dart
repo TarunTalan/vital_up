@@ -33,10 +33,12 @@ class MapTileRepositoryImpl implements MapTileRepository {
 
       final offlineManager = await OfflineManager.create();
       final packs = await offlineManager.allStylePacks();
-      return packs.any((p) =>
-          p.styleURI == _styleUri &&
-          p.requiredResourceCount > 0 &&
-          p.completedResourceCount >= p.requiredResourceCount);
+      return packs.any(
+        (p) =>
+            p.styleURI == _styleUri &&
+            p.requiredResourceCount > 0 &&
+            p.completedResourceCount >= p.requiredResourceCount,
+      );
     } catch (e) {
       return false;
     }
@@ -92,9 +94,11 @@ class MapTileRepositoryImpl implements MapTileRepository {
           ),
           (progress) {
             if (progress.requiredResourceCount > 0) {
-              emit(_styleShare *
-                  progress.completedResourceCount /
-                  progress.requiredResourceCount);
+              emit(
+                _styleShare *
+                    progress.completedResourceCount /
+                    progress.requiredResourceCount,
+              );
             }
           },
         );
@@ -107,8 +111,10 @@ class MapTileRepositoryImpl implements MapTileRepository {
         // with cos(latitude), so a fixed factor skews the box away from
         // the mid-latitudes.
         const kmPerDegreeLat = 111.0;
-        final kmPerDegreeLng =
-            max(1.0, kmPerDegreeLat * cos(latitude * pi / 180.0));
+        final kmPerDegreeLng = max(
+          1.0,
+          kmPerDegreeLat * cos(latitude * pi / 180.0),
+        );
         final latDelta = radiusKm / kmPerDegreeLat;
         final lngDelta = radiusKm / kmPerDegreeLng;
 
@@ -128,24 +134,24 @@ class MapTileRepositoryImpl implements MapTileRepository {
               styleURI: _styleUri,
               minZoom: 10,
               maxZoom: 16,
-            )
+            ),
           ],
           acceptExpired: true,
           networkRestriction: NetworkRestriction.NONE,
         );
 
-        await tileStore.loadTileRegion(
-          regionId,
-          tileRegionLoadOptions,
-          (progress) {
-            if (progress.requiredResourceCount > 0) {
-              emit(_styleShare +
+        await tileStore.loadTileRegion(regionId, tileRegionLoadOptions, (
+          progress,
+        ) {
+          if (progress.requiredResourceCount > 0) {
+            emit(
+              _styleShare +
                   (1 - _styleShare) *
                       progress.completedResourceCount /
-                      progress.requiredResourceCount);
-            }
-          },
-        );
+                      progress.requiredResourceCount,
+            );
+          }
+        });
 
         emit(1.0);
         await _notifier?.done();
@@ -162,11 +168,17 @@ class MapTileRepositoryImpl implements MapTileRepository {
     return controller.stream;
   }
 
-  static double _distanceKm(double lat1, double lng1, double lat2, double lng2) {
+  static double _distanceKm(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
     const earthRadiusKm = 6371.0;
     final dLat = (lat2 - lat1) * pi / 180.0;
     final dLng = (lng2 - lng1) * pi / 180.0;
-    final h = sin(dLat / 2) * sin(dLat / 2) +
+    final h =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(lat1 * pi / 180.0) *
             cos(lat2 * pi / 180.0) *
             sin(dLng / 2) *

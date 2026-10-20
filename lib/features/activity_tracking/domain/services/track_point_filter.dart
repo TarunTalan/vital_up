@@ -93,7 +93,8 @@ class TrackPointFilter {
     if (last != null) {
       final seconds =
           point.timestamp.difference(last.timestamp).inMilliseconds / 1000.0;
-      final consistent = seconds > 0 &&
+      final consistent =
+          seconds > 0 &&
           haversineMeters(last, point) / seconds <=
               activityType.maxReasonableSpeedMetersPerSecond * 2;
       if (!consistent) _jumped.clear();

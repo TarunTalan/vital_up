@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:background_downloader/background_downloader.dart' show TaskStatus;
+import 'package:background_downloader/background_downloader.dart'
+    show TaskStatus;
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:isar_community/isar.dart';
@@ -74,19 +75,16 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     final active = await _downloader.activeDownloads();
     if (!mounted) return;
     setState(() => _downloadProgress.addAll(active));
-    _downloadChanges = _downloader.changes.listen(
-      (change) {
-        if (!mounted) return;
-        final progress = change.progress;
-        if (progress == null) {
-          setState(() => _downloadProgress.remove(change.trackId));
-          _loadFavoritesAndDownloads();
-        } else if (_downloadProgress.containsKey(change.trackId)) {
-          setState(() => _downloadProgress[change.trackId] = progress);
-        }
-      },
-      onError: (Object e) => debugPrint('Download updates failed: $e'),
-    );
+    _downloadChanges = _downloader.changes.listen((change) {
+      if (!mounted) return;
+      final progress = change.progress;
+      if (progress == null) {
+        setState(() => _downloadProgress.remove(change.trackId));
+        _loadFavoritesAndDownloads();
+      } else if (_downloadProgress.containsKey(change.trackId)) {
+        setState(() => _downloadProgress[change.trackId] = progress);
+      }
+    }, onError: (Object e) => debugPrint('Download updates failed: $e'));
     _loadFavoritesAndDownloads();
   }
 

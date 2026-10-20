@@ -132,9 +132,7 @@ class ForegroundServiceManager {
     FlutterForegroundTask.initCommunicationPort();
     _lastStatsText = null;
     _lastPaused = paused;
-    final text = paused
-        ? 'Paused'
-        : 'Tracking your $activityName...';
+    final text = paused ? 'Paused' : 'Tracking your $activityName...';
 
     // Request notification permission for Android 13+
     final reqResult = await FlutterForegroundTask.checkNotificationPermission();

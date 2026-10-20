@@ -119,9 +119,10 @@ class VoiceCoachService {
     final mins = elapsedSeconds ~/ 60;
     final secs = elapsedSeconds % 60;
     await _speak(
-        'Activity complete. '
-        'Distance: ${distance.toStringAsFixed(2)} ${miles ? 'miles' : 'kilometres'}. '
-        'Duration: $mins minutes and $secs seconds.');
+      'Activity complete. '
+      'Distance: ${distance.toStringAsFixed(2)} ${miles ? 'miles' : 'kilometres'}. '
+      'Duration: $mins minutes and $secs seconds.',
+    );
   }
 
   /// Should be called on every new track point. Fires a milestone cue when
@@ -134,8 +135,7 @@ class VoiceCoachService {
     required WorkoutPrefs prefs,
   }) async {
     final intervalKm = unit == DistanceUnit.km ? 1.0 : 1.60934; // 1 mi in km
-    final threshold =
-        (_lastAnnouncedDistanceKm ~/ intervalKm + 1) * intervalKm;
+    final threshold = (_lastAnnouncedDistanceKm ~/ intervalKm + 1) * intervalKm;
     final distanceKm = distanceMeters / 1000.0;
 
     if (distanceKm >= threshold) {
@@ -164,15 +164,18 @@ class VoiceCoachService {
         if (remainingKm > 0) {
           if (unit == DistanceUnit.miles) {
             final remainingMi = remainingKm / 1.60934;
-            targetStr = '. ${remainingMi.toStringAsFixed(1)} miles remaining to target';
+            targetStr =
+                '. ${remainingMi.toStringAsFixed(1)} miles remaining to target';
           } else {
-            targetStr = '. ${remainingKm.toStringAsFixed(1)} kilometres remaining to target';
+            targetStr =
+                '. ${remainingKm.toStringAsFixed(1)} kilometres remaining to target';
           }
         }
       } else if (prefs.targetType == WorkoutTargetType.calories) {
         final remainingCals = prefs.targetValue - calories;
         if (remainingCals > 0) {
-          targetStr = '. ${remainingCals.toStringAsFixed(0)} calories remaining to target';
+          targetStr =
+              '. ${remainingCals.toStringAsFixed(0)} calories remaining to target';
         }
       }
 
@@ -192,7 +195,9 @@ class VoiceCoachService {
     double progressPct = 0.0;
     if (prefs.targetType == WorkoutTargetType.distance) {
       final distanceKm = distanceMeters / 1000.0;
-      progressPct = prefs.targetValue > 0 ? distanceKm / prefs.targetValue : 0.0;
+      progressPct = prefs.targetValue > 0
+          ? distanceKm / prefs.targetValue
+          : 0.0;
     } else if (prefs.targetType == WorkoutTargetType.calories) {
       progressPct = prefs.targetValue > 0 ? calories / prefs.targetValue : 0.0;
     }
@@ -250,7 +255,9 @@ class VoiceCoachService {
             : targetKm;
         final unitLabel = unit == DistanceUnit.km ? 'kilometre' : 'mile';
         final pluralLabel = displayVal == 1.0 ? unitLabel : '${unitLabel}s';
-        await announceTargetReached('${displayVal.toStringAsFixed(1)} $pluralLabel');
+        await announceTargetReached(
+          '${displayVal.toStringAsFixed(1)} $pluralLabel',
+        );
       }
     } else if (prefs.targetType == WorkoutTargetType.calories) {
       final targetCals = prefs.targetValue;
@@ -259,7 +266,9 @@ class VoiceCoachService {
         _announced50 = true;
         _announced75 = true;
         _announced90 = true;
-        await announceTargetReached('${targetCals.toStringAsFixed(0)} calories');
+        await announceTargetReached(
+          '${targetCals.toStringAsFixed(0)} calories',
+        );
       }
     }
   }

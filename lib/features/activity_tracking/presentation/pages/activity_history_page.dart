@@ -69,9 +69,9 @@ class _ActivityHistoryView extends StatelessWidget {
           child: RefreshIndicator(
             onRefresh: () async {
               final done = Completer<void>();
-              context
-                  .read<ActivityHistoryBloc>()
-                  .add(LoadActivityHistory(done: done));
+              context.read<ActivityHistoryBloc>().add(
+                LoadActivityHistory(done: done),
+              );
               // The spinner stays until the list has reloaded.
               await done.future.timeout(kLoadTimeout, onTimeout: () {});
             },

@@ -27,10 +27,12 @@ class GetActivityHistory {
     final annotations = await repository.getAllAnnotations();
 
     final entries = sessions
-        .map((session) => HistoryEntry(
-      session: session,
-      annotation: annotations[session.id],
-    ))
+        .map(
+          (session) => HistoryEntry(
+            session: session,
+            annotation: annotations[session.id],
+          ),
+        )
         .toList();
 
     entries.sort((a, b) => b.session.startTime.compareTo(a.session.startTime));

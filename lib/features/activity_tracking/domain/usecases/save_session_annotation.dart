@@ -8,11 +8,7 @@ class SaveSessionAnnotation {
 
   SaveSessionAnnotation(this.repository);
 
-  Future<void> call({
-    required String sessionId,
-    String? tag,
-    String? note,
-  }) {
+  Future<void> call({required String sessionId, String? tag, String? note}) {
     return repository.saveAnnotation(
       SessionAnnotation(
         sessionId: sessionId,

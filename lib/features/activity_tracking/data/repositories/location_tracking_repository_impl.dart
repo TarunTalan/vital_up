@@ -64,16 +64,18 @@ class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
     final filter = TrackPointFilter(activityType);
 
     return Geolocator.getPositionStream(locationSettings: workoutSettings())
-        .map((position) => TrackPoint(
-              latitude: position.latitude,
-              longitude: position.longitude,
-              timestamp: position.timestamp,
-              accuracy: position.accuracy,
-              speed: position.speed.isFinite && position.speed >= 0
-                  ? position.speed
-                  : 0.0,
-              altitude: position.altitude.isFinite ? position.altitude : 0.0,
-            ))
+        .map(
+          (position) => TrackPoint(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            timestamp: position.timestamp,
+            accuracy: position.accuracy,
+            speed: position.speed.isFinite && position.speed >= 0
+                ? position.speed
+                : 0.0,
+            altitude: position.altitude.isFinite ? position.altitude : 0.0,
+          ),
+        )
         .map(filter.process)
         .where((point) => point != null)
         .cast<TrackPoint>();

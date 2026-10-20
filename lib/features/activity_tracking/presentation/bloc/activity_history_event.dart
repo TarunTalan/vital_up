@@ -58,11 +58,7 @@ class UpdateSessionAnnotation extends ActivityHistoryEvent {
   final String? tag;
   final String? note;
 
-  const UpdateSessionAnnotation({
-    required this.sessionId,
-    this.tag,
-    this.note,
-  });
+  const UpdateSessionAnnotation({required this.sessionId, this.tag, this.note});
 
   @override
   List<Object?> get props => [sessionId, tag, note];

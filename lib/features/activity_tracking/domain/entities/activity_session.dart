@@ -29,8 +29,7 @@ class ActivitySession {
 
   /// Whether distance and pace mean anything: GPS activities, and workouts
   /// that came with a distance (a watch's swim).
-  bool get hasDistance =>
-      activityType.isGpsBased || totalDistanceMeters > 0;
+  bool get hasDistance => activityType.isGpsBased || totalDistanceMeters > 0;
 
   const ActivitySession({
     required this.id,

@@ -18,23 +18,34 @@ class WorkoutAudioService {
   Future<void> _configureAudioSession() async {
     try {
       final session = await AudioSession.instance;
-      await session.configure(AudioSessionConfiguration(
-        avAudioSessionCategory: AVAudioSessionCategory.playback,
-        avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.mixWithOthers | AVAudioSessionCategoryOptions.duckOthers,
-        avAudioSessionMode: AVAudioSessionMode.defaultMode,
-        avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
-        androidAudioAttributes: const AndroidAudioAttributes(
-          contentType: AndroidAudioContentType.music,
-          usage: AndroidAudioUsage.media,
+      await session.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.mixWithOthers |
+              AVAudioSessionCategoryOptions.duckOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          avAudioSessionRouteSharingPolicy:
+              AVAudioSessionRouteSharingPolicy.defaultPolicy,
+          androidAudioAttributes: const AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.music,
+            usage: AndroidAudioUsage.media,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
         ),
-        androidAudioFocusGainType: AndroidAudioFocusGainType.gainTransientMayDuck,
-      ));
+      );
     } catch (e) {
       // Fail-safe
     }
   }
 
-  Future<void> playTrack(String trackName, {String? source, String? localPath, bool play = true}) async {
+  Future<void> playTrack(
+    String trackName, {
+    String? source,
+    String? localPath,
+    bool play = true,
+  }) async {
     if (trackName == 'None') {
       await stop();
       return;
@@ -74,22 +85,32 @@ class WorkoutAudioService {
         try {
           if (resolvedLocalPath != null) {
             if (resolvedLocalPath.startsWith('content://')) {
-              await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(resolvedLocalPath)));
+              await _audioPlayer.setAudioSource(
+                AudioSource.uri(Uri.parse(resolvedLocalPath)),
+              );
             } else {
-              await _audioPlayer.setAudioSource(AudioSource.file(resolvedLocalPath));
+              await _audioPlayer.setAudioSource(
+                AudioSource.file(resolvedLocalPath),
+              );
             }
           } else if (trackName.startsWith('Local:')) {
             final songId = trackName.split(':').last;
             final contentUri = 'content://media/external/audio/media/$songId';
-            await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(contentUri)));
+            await _audioPlayer.setAudioSource(
+              AudioSource.uri(Uri.parse(contentUri)),
+            );
           } else {
-            throw Exception('Local path was null and track name does not start with Local:');
+            throw Exception(
+              'Local path was null and track name does not start with Local:',
+            );
           }
         } catch (e) {
           if (trackName.startsWith('Local:')) {
             final songId = trackName.split(':').last;
             final contentUri = 'content://media/external/audio/media/$songId';
-            await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(contentUri)));
+            await _audioPlayer.setAudioSource(
+              AudioSource.uri(Uri.parse(contentUri)),
+            );
           } else {
             rethrow;
           }
@@ -104,21 +125,28 @@ class WorkoutAudioService {
         String? fallbackUrl;
 
         if (trackName.contains("It's Possible")) {
-          fallbackUrl = 'https://archive.org/download/DontMakeExcuses/3%20Its%20Possible.mp3';
+          fallbackUrl =
+              'https://archive.org/download/DontMakeExcuses/3%20Its%20Possible.mp3';
         } else if (trackName.contains('Goals')) {
-          fallbackUrl = 'https://archive.org/download/DontMakeExcuses/8%20Goals%20%28Its%20Possible%29.mp3';
+          fallbackUrl =
+              'https://archive.org/download/DontMakeExcuses/8%20Goals%20%28Its%20Possible%29.mp3';
         } else if (trackName.contains('Light Up the Darkness')) {
-          fallbackUrl = 'https://archive.org/download/DontMakeExcuses/LIGHT%20UP%20THE%20DARKNESS.mp3';
+          fallbackUrl =
+              'https://archive.org/download/DontMakeExcuses/LIGHT%20UP%20THE%20DARKNESS.mp3';
         } else if (trackName.contains('Without Limits')) {
-          fallbackUrl = 'https://archive.org/download/DontMakeExcuses/Living%20A%20Life%20Without%20Limits.mp3';
+          fallbackUrl =
+              'https://archive.org/download/DontMakeExcuses/Living%20A%20Life%20Without%20Limits.mp3';
         } else if (trackName.contains('Best Speeches')) {
-          fallbackUrl = 'https://archive.org/download/DontMakeExcuses/One%20of%20The%20Best%20Motivational%20Speeches%20Ever.mp3';
+          fallbackUrl =
+              'https://archive.org/download/DontMakeExcuses/One%20of%20The%20Best%20Motivational%20Speeches%20Ever.mp3';
         } else if (trackName.contains('Synthwave Cardio Energy')) {
           assetPath = 'assets/audio/synthwave_cardio.mp3';
-          fallbackUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
+          fallbackUrl =
+              'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3';
         } else if (trackName.contains('Lo-Fi Jogging Beats')) {
           assetPath = 'assets/audio/lofi_jogging.mp3';
-          fallbackUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3';
+          fallbackUrl =
+              'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3';
         }
 
         if (assetPath != null) {
@@ -127,14 +155,18 @@ class WorkoutAudioService {
             await _audioPlayer.setAudioSource(AudioSource.asset(assetPath));
           } catch (_) {
             if (fallbackUrl != null) {
-              await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(fallbackUrl)));
+              await _audioPlayer.setAudioSource(
+                AudioSource.uri(Uri.parse(fallbackUrl)),
+              );
             } else {
               await stop();
               return;
             }
           }
         } else if (fallbackUrl != null) {
-          await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(fallbackUrl)));
+          await _audioPlayer.setAudioSource(
+            AudioSource.uri(Uri.parse(fallbackUrl)),
+          );
         } else {
           await stop();
           return;
@@ -181,7 +213,8 @@ class WorkoutAudioService {
   Stream<bool> get playingStream => _audioPlayer.playingStream;
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
-  Stream<ProcessingState> get processingStateStream => _audioPlayer.processingStateStream;
+  Stream<ProcessingState> get processingStateStream =>
+      _audioPlayer.processingStateStream;
   ProcessingState get processingState => _audioPlayer.processingState;
 
   Duration? get duration => _audioPlayer.duration;

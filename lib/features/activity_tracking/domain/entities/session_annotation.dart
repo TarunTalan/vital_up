@@ -25,11 +25,7 @@ class SessionAnnotation extends Equatable {
     required this.updatedAt,
   });
 
-  SessionAnnotation copyWith({
-    String? tag,
-    String? note,
-    DateTime? updatedAt,
-  }) {
+  SessionAnnotation copyWith({String? tag, String? note, DateTime? updatedAt}) {
     return SessionAnnotation(
       sessionId: sessionId,
       tag: tag ?? this.tag,

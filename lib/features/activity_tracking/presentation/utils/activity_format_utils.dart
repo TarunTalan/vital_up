@@ -22,7 +22,10 @@ String formatPace(int secondsPerKm, {DistanceUnit unit = DistanceUnit.km}) {
 
 /// Formats distance in meters, converting based on [unit].
 /// Returns a display string (e.g. "3.24" km or "2.01" mi).
-String formatDistance(double distanceMeters, {DistanceUnit unit = DistanceUnit.km}) {
+String formatDistance(
+  double distanceMeters, {
+  DistanceUnit unit = DistanceUnit.km,
+}) {
   if (unit == DistanceUnit.miles) {
     return (distanceMeters / 1609.344).toStringAsFixed(2);
   }
@@ -37,8 +40,18 @@ String formatDistanceKm(double distanceMeters) {
 /// Formats a [DateTime] as a short date, e.g. "12 Jul 2026".
 String formatShortDate(DateTime date) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
@@ -48,4 +61,4 @@ String formatTimeOfDay(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
-}
+}

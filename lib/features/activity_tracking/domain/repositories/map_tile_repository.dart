@@ -10,6 +10,11 @@ abstract class MapTileRepository {
     double marginKm,
   });
 
-  Stream<double> downloadRegion(String regionId, double latitude, double longitude, double radiusKm);
+  Stream<double> downloadRegion(
+    String regionId,
+    double latitude,
+    double longitude,
+    double radiusKm,
+  );
   Future<void> deleteRegion(String regionId);
 }

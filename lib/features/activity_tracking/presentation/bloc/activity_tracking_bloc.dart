@@ -18,7 +18,8 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_t
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_tracking_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 
-class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingState> {
+class ActivityTrackingBloc
+    extends Bloc<ActivityTrackingEvent, ActivityTrackingState> {
   final GetLiveLocationStream getLiveLocationStream;
   final GetLiveStepsStream getLiveStepsStream;
   final StopAndSaveSession stopAndSaveSession;
@@ -114,12 +115,18 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
   bool get _isTracking =>
       state is TrackingInProgress || state is TrackingPaused;
 
-  void _onSelectActivityType(SelectActivityType event, Emitter<ActivityTrackingState> emit) {
+  void _onSelectActivityType(
+    SelectActivityType event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     if (state is! TrackingIdle || _isStarting) return;
     emit(TrackingIdle(activityType: event.activityType));
   }
 
-  Future<void> _onStartTracking(StartTracking event, Emitter<ActivityTrackingState> emit) async {
+  Future<void> _onStartTracking(
+    StartTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) async {
     // Handlers run concurrently, and the awaits below leave the state Idle
     // for a while — without this a double tap starts two sessions.
     if (state is! TrackingIdle || _isStarting) return;
@@ -130,10 +137,12 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
 
       final hasPermission = await getLiveLocationStream.ensurePermission();
       if (!hasPermission) {
-        emit(TrackingPermissionDenied(
-          'Turn on location and allow access to track.',
-          activityType: activityType,
-        ));
+        emit(
+          TrackingPermissionDenied(
+            'Turn on location and allow access to track.',
+            activityType: activityType,
+          ),
+        );
         // Back to Idle straight away so the user can retry or leave the
         // screen (the page only allows popping while Idle).
         emit(TrackingIdle(activityType: activityType));
@@ -174,19 +183,24 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       _elevationReference = null;
       _lastCheckpointAt = Duration.zero;
 
-      emit(TrackingInProgress(
-        activityType: activityType,
-        elapsed: Duration.zero,
-        distanceMeters: 0.0,
-        avgPaceSecondsPerKm: 0,
-        calories: 0,
-        steps: 0,
-        stepCountReliable: _stepCountReliable,
-        routePoints: const [],
-      ));
+      emit(
+        TrackingInProgress(
+          activityType: activityType,
+          elapsed: Duration.zero,
+          distanceMeters: 0.0,
+          avgPaceSecondsPerKm: 0,
+          calories: 0,
+          steps: 0,
+          stepCountReliable: _stepCountReliable,
+          routePoints: const [],
+        ),
+      );
 
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
+      _timer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => add(TickTimer()),
+      );
 
       _subscribeToLocation(activityType);
       await _subscribeToSteps(hasStepPermission);
@@ -238,10 +252,12 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       final hasPermission = await getLiveLocationStream.ensurePermission();
       if (!hasPermission) {
         // The checkpoint stays, so the user can try again.
-        emit(TrackingPermissionDenied(
-          'Turn on location and allow access to track.',
-          activityType: activityType,
-        ));
+        emit(
+          TrackingPermissionDenied(
+            'Turn on location and allow access to track.',
+            activityType: activityType,
+          ),
+        );
         emit(TrackingIdle(activityType: activityType));
         return;
       }
@@ -284,31 +300,38 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       final calories = _calculateCalories(activityType, elapsed, distance);
 
       if (checkpoint.paused) {
-        emit(TrackingPaused(
-          activityType: activityType,
-          elapsed: elapsed,
-          distanceMeters: distance,
-          avgPaceSecondsPerKm: pace,
-          calories: calories,
-          steps: session.steps,
-          stepCountReliable: _stepCountReliable,
-          routePoints: session.points,
-          elevationGainMeters: _elevationGain,
-        ));
+        emit(
+          TrackingPaused(
+            activityType: activityType,
+            elapsed: elapsed,
+            distanceMeters: distance,
+            avgPaceSecondsPerKm: pace,
+            calories: calories,
+            steps: session.steps,
+            stepCountReliable: _stepCountReliable,
+            routePoints: session.points,
+            elevationGainMeters: _elevationGain,
+          ),
+        );
       } else {
-        emit(TrackingInProgress(
-          activityType: activityType,
-          elapsed: elapsed,
-          distanceMeters: distance,
-          avgPaceSecondsPerKm: pace,
-          calories: calories,
-          steps: session.steps,
-          stepCountReliable: _stepCountReliable,
-          routePoints: session.points,
-          elevationGainMeters: _elevationGain,
-        ));
+        emit(
+          TrackingInProgress(
+            activityType: activityType,
+            elapsed: elapsed,
+            distanceMeters: distance,
+            avgPaceSecondsPerKm: pace,
+            calories: calories,
+            steps: session.steps,
+            stepCountReliable: _stepCountReliable,
+            routePoints: session.points,
+            elevationGainMeters: _elevationGain,
+          ),
+        );
         _timer?.cancel();
-        _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
+        _timer = Timer.periodic(
+          const Duration(seconds: 1),
+          (_) => add(TickTimer()),
+        );
       }
 
       _subscribeToLocation(activityType);
@@ -345,7 +368,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     });
   }
 
-  void _onPauseTracking(PauseTracking event, Emitter<ActivityTrackingState> emit) {
+  void _onPauseTracking(
+    PauseTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     final s = state;
     if (s is! TrackingInProgress || _isStopping) return;
 
@@ -375,7 +401,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _checkpoint(paused);
   }
 
-  void _onResumeTracking(ResumeTracking event, Emitter<ActivityTrackingState> emit) {
+  void _onResumeTracking(
+    ResumeTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     final s = state;
     if (s is! TrackingPaused || _isStopping) return;
 
@@ -388,29 +417,38 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     _skipDistanceForNextPoint = true;
     _stationarySince = null;
 
-    emit(TrackingInProgress(
-      activityType: s.activityType,
-      elapsed: s.elapsed,
-      distanceMeters: s.distanceMeters,
-      avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
-      calories: s.calories,
-      steps: s.steps,
-      stepCountReliable: s.stepCountReliable,
-      routePoints: s.routePoints,
-      elevationGainMeters: s.elevationGainMeters,
-    ));
+    emit(
+      TrackingInProgress(
+        activityType: s.activityType,
+        elapsed: s.elapsed,
+        distanceMeters: s.distanceMeters,
+        avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
+        calories: s.calories,
+        steps: s.steps,
+        stepCountReliable: s.stepCountReliable,
+        routePoints: s.routePoints,
+        elevationGainMeters: s.elevationGainMeters,
+      ),
+    );
     // Swap the notification's Resume for Pause now, not on the next tick.
     ForegroundServiceManager.update(
       'Distance: ${(s.distanceMeters / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(s.elapsed)}',
     );
 
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => add(TickTimer()));
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => add(TickTimer()),
+    );
   }
 
-  Future<void> _onStopAndSaveTracking(StopAndSaveTracking event, Emitter<ActivityTrackingState> emit) async {
+  Future<void> _onStopAndSaveTracking(
+    StopAndSaveTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) async {
     final s = state;
-    if ((s is! TrackingInProgress && s is! TrackingPaused) || _isStopping) return;
+    if ((s is! TrackingInProgress && s is! TrackingPaused) || _isStopping)
+      return;
     _isStopping = true;
 
     try {
@@ -448,12 +486,14 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
         } catch (e) {
           debugPrint('Discarding short activity session failed: $e');
         }
-        emit(TrackingCompleted(
-          activityType: s.activityType,
-          session: session,
-          saved: false,
-          discarded: true,
-        ));
+        emit(
+          TrackingCompleted(
+            activityType: s.activityType,
+            session: session,
+            saved: false,
+            discarded: true,
+          ),
+        );
         return;
       }
 
@@ -465,12 +505,14 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
         debugPrint('Saving activity session failed: $e');
       }
 
-      emit(TrackingCompleted(
-        activityType: s.activityType,
-        session: session,
-        elevationGainMeters: _elevationGain,
-        saved: saved,
-      ));
+      emit(
+        TrackingCompleted(
+          activityType: s.activityType,
+          session: session,
+          elevationGainMeters: _elevationGain,
+          saved: saved,
+        ),
+      );
     } finally {
       _isStopping = false;
     }
@@ -481,7 +523,11 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     if (s is! TrackingInProgress || _isStopping) return;
 
     final elapsed = _activeElapsed;
-    final calories = _calculateCalories(s.activityType, elapsed, s.distanceMeters);
+    final calories = _calculateCalories(
+      s.activityType,
+      elapsed,
+      s.distanceMeters,
+    );
     final pace = _calculateOverallPace(elapsed, s.distanceMeters);
 
     final lastFixAt = _lastFixAt;
@@ -513,7 +559,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     }
   }
 
-  void _onUpdateTrackPoint(UpdateTrackPoint event, Emitter<ActivityTrackingState> emit) {
+  void _onUpdateTrackPoint(
+    UpdateTrackPoint event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     final s = state;
     if (s is! TrackingInProgress || _isStopping) return;
 
@@ -527,9 +576,11 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
       return;
     }
 
-    final segmentDistance =
-        previous != null ? haversineMeters(previous, point) : 0.0;
-    final plausible = previous != null &&
+    final segmentDistance = previous != null
+        ? haversineMeters(previous, point)
+        : 0.0;
+    final plausible =
+        previous != null &&
         _isPlausibleSegment(s.activityType, previous, point, segmentDistance);
     if (plausible && !_skipDistanceForNextPoint) {
       distance += segmentDistance;
@@ -550,18 +601,20 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     final pace = _calculateOverallPace(elapsed, distance);
     final calories = _calculateCalories(s.activityType, elapsed, distance);
 
-    emit(TrackingInProgress(
-      activityType: s.activityType,
-      elapsed: elapsed,
-      distanceMeters: distance,
-      avgPaceSecondsPerKm: pace,
-      calories: calories,
-      steps: s.steps,
-      stepCountReliable: s.stepCountReliable,
-      routePoints: points,
-      elevationGainMeters: _elevationGain,
-      currentSpeedMps: point.speed,
-    ));
+    emit(
+      TrackingInProgress(
+        activityType: s.activityType,
+        elapsed: elapsed,
+        distanceMeters: distance,
+        avgPaceSecondsPerKm: pace,
+        calories: calories,
+        steps: s.steps,
+        stepCountReliable: s.stepCountReliable,
+        routePoints: points,
+        elevationGainMeters: _elevationGain,
+        currentSpeedMps: point.speed,
+      ),
+    );
 
     ForegroundServiceManager.update(
       'Distance: ${(distance / 1000).toStringAsFixed(2)} km\nDuration: ${_formatDuration(elapsed)}',
@@ -578,7 +631,8 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     TrackPoint to,
     double meters,
   ) {
-    final seconds = to.timestamp.difference(from.timestamp).inMilliseconds / 1000.0;
+    final seconds =
+        to.timestamp.difference(from.timestamp).inMilliseconds / 1000.0;
     if (seconds <= 0) return false;
     return meters / seconds <= type.maxReasonableSpeedMetersPerSecond * 2;
   }
@@ -590,30 +644,38 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     if (s is! TrackingInProgress || _isStopping) return;
 
     final previousSteps = _currentSteps;
-    _currentSteps = (event.steps - _ignoredPausedSteps).clamp(0, 1 << 31).toInt();
-    _stepCountReliable = s.stepCountReliable &&
+    _currentSteps = (event.steps - _ignoredPausedSteps)
+        .clamp(0, 1 << 31)
+        .toInt();
+    _stepCountReliable =
+        s.stepCountReliable &&
         _isStepCountStillReliable(
           state: s,
           previousSteps: previousSteps,
           currentSteps: _currentSteps,
         );
 
-    emit(TrackingInProgress(
-      activityType: s.activityType,
-      elapsed: s.elapsed,
-      distanceMeters: s.distanceMeters,
-      avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
-      calories: s.calories,
-      steps: _currentSteps,
-      stepCountReliable: _stepCountReliable,
-      routePoints: s.routePoints,
-      elevationGainMeters: s.elevationGainMeters,
-      currentSpeedMps: s.currentSpeedMps,
-      gpsSignalLost: s.gpsSignalLost,
-    ));
+    emit(
+      TrackingInProgress(
+        activityType: s.activityType,
+        elapsed: s.elapsed,
+        distanceMeters: s.distanceMeters,
+        avgPaceSecondsPerKm: s.avgPaceSecondsPerKm,
+        calories: s.calories,
+        steps: _currentSteps,
+        stepCountReliable: _stepCountReliable,
+        routePoints: s.routePoints,
+        elevationGainMeters: s.elevationGainMeters,
+        currentSpeedMps: s.currentSpeedMps,
+        gpsSignalLost: s.gpsSignalLost,
+      ),
+    );
   }
 
-  void _onPersistProgress(PersistProgress event, Emitter<ActivityTrackingState> emit) {
+  void _onPersistProgress(
+    PersistProgress event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     final s = state;
     if (s is TrackingInProgress || s is TrackingPaused) _checkpoint(s);
   }
@@ -676,17 +738,17 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     ActivityType type,
     Duration elapsed,
     double distanceMeters,
-  ) =>
-      estimateGpsCalories(
-        type,
-        elapsed: elapsed,
-        distanceMeters: distanceMeters,
-        elevationGainMeters: _elevationGain,
-        weightKg: _cachedWeightKg,
-      );
+  ) => estimateGpsCalories(
+    type,
+    elapsed: elapsed,
+    distanceMeters: distanceMeters,
+    elevationGainMeters: _elevationGain,
+    weightKg: _cachedWeightKg,
+  );
 
   int _calculateOverallPace(Duration elapsed, double distanceMeters) {
-    if (elapsed.inSeconds <= 0 || distanceMeters < _minDistanceForPaceMeters) return 0;
+    if (elapsed.inSeconds <= 0 || distanceMeters < _minDistanceForPaceMeters)
+      return 0;
 
     final distanceKm = distanceMeters / 1000.0;
     return (elapsed.inSeconds / distanceKm).round();
@@ -779,7 +841,10 @@ class ActivityTrackingBloc extends Bloc<ActivityTrackingEvent, ActivityTrackingS
     return '$hours:$minutes:$seconds';
   }
 
-  void _onResetTracking(ResetTracking event, Emitter<ActivityTrackingState> emit) {
+  void _onResetTracking(
+    ResetTracking event,
+    Emitter<ActivityTrackingState> emit,
+  ) {
     if (_isTracking || _isStopping) return;
     final activityType = state.activityType;
     _currentSessionId = null;

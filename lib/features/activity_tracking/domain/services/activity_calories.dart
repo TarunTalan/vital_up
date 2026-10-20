@@ -35,7 +35,8 @@ int estimateGpsCalories(
 
   final double perKg;
   if (type.kcalPerKgPerKm > 0) {
-    perKg = kcalPerKgPerRestingHour * hours +
+    perKg =
+        kcalPerKgPerRestingHour * hours +
         type.kcalPerKgPerKm * km +
         type.kcalPerKgPerClimbMeter * climb;
   } else {

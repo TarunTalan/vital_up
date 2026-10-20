@@ -37,6 +37,7 @@ class _CountdownOverlayState extends State<CountdownOverlay>
   late Animation<double> _scaleAnim;
   late Animation<double> _opacityAnim;
   Timer? _ticker;
+
   /// The shared coach: a second FlutterTts would take over the plugin's
   /// callbacks (the coach's music ducking) and bind the engine again.
   final VoiceCoachService _voice = sl<VoiceCoachService>();

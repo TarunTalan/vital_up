@@ -50,18 +50,18 @@ class TrackingInProgress extends ActivityTrackingState {
 
   @override
   List<Object?> get props => [
-        activityType,
-        elapsed,
-        distanceMeters,
-        avgPaceSecondsPerKm,
-        calories,
-        steps,
-        stepCountReliable,
-        routePoints,
-        elevationGainMeters,
-        currentSpeedMps,
-        gpsSignalLost,
-      ];
+    activityType,
+    elapsed,
+    distanceMeters,
+    avgPaceSecondsPerKm,
+    calories,
+    steps,
+    stepCountReliable,
+    routePoints,
+    elevationGainMeters,
+    currentSpeedMps,
+    gpsSignalLost,
+  ];
 }
 
 class TrackingPaused extends ActivityTrackingState {
@@ -94,17 +94,17 @@ class TrackingPaused extends ActivityTrackingState {
 
   @override
   List<Object?> get props => [
-        activityType,
-        elapsed,
-        distanceMeters,
-        avgPaceSecondsPerKm,
-        calories,
-        steps,
-        stepCountReliable,
-        routePoints,
-        elevationGainMeters,
-        currentSpeedMps,
-      ];
+    activityType,
+    elapsed,
+    distanceMeters,
+    avgPaceSecondsPerKm,
+    calories,
+    steps,
+    stepCountReliable,
+    routePoints,
+    elevationGainMeters,
+    currentSpeedMps,
+  ];
 }
 
 class TrackingCompleted extends ActivityTrackingState {
@@ -126,14 +126,22 @@ class TrackingCompleted extends ActivityTrackingState {
   });
 
   @override
-  List<Object?> get props =>
-      [activityType, session, elevationGainMeters, saved, discarded];
+  List<Object?> get props => [
+    activityType,
+    session,
+    elevationGainMeters,
+    saved,
+    discarded,
+  ];
 }
 
 class TrackingPermissionDenied extends ActivityTrackingState {
   final String message;
 
-  const TrackingPermissionDenied(this.message, {super.activityType = ActivityType.walk});
+  const TrackingPermissionDenied(
+    this.message, {
+    super.activityType = ActivityType.walk,
+  });
 
   @override
   List<Object?> get props => [activityType, message];
