@@ -26,19 +26,23 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
   List<ActivityGoal> getGoals() => [..._local.read()]
     ..sort((a, b) {
       final byPeriod = a.period.index.compareTo(b.period.index);
-      return byPeriod != 0 ? byPeriod : a.metric.index.compareTo(b.metric.index);
+      return byPeriod != 0
+          ? byPeriod
+          : a.metric.index.compareTo(b.metric.index);
     });
 
   @override
   Future<void> saveGoal(ActivityGoal goal) => _local.write([
-        for (final g in _local.read())
-          if (g.id != goal.id) g,
-        goal,
-      ]);
+    for (final g in _local.read())
+      if (g.id != goal.id) g,
+    goal,
+  ]);
 
   @override
-  Future<void> deleteGoal(ActivityGoal goal) =>
-      _local.write([for (final g in _local.read()) if (g.id != goal.id) g]);
+  Future<void> deleteGoal(ActivityGoal goal) => _local.write([
+    for (final g in _local.read())
+      if (g.id != goal.id) g,
+  ]);
 
   @override
   Future<ActivityGoalsSnapshot> getProgress(TrendRange range) async {
@@ -67,8 +71,10 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     final byDay = bucketByDay<ActivitySession>(sessions, (s) => s.startTime);
 
     double valueOn(GoalMetric metric, DateTime day) {
-      final tracked = (byDay[day] ?? const <ActivitySession>[])
-          .fold(0.0, (sum, s) => sum + metric.fromSession(s));
+      final tracked = (byDay[day] ?? const <ActivitySession>[]).fold(
+        0.0,
+        (sum, s) => sum + metric.fromSession(s),
+      );
       if (metric == GoalMetric.steps && healthSteps != null) {
         return dailySteps(
           health: healthSteps[day],
@@ -86,12 +92,11 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
           current: goal.period == GoalPeriod.daily
               ? valueOn(goal.metric, today)
               : days
-                  .where((d) => !d.isBefore(weekStart))
-                  .fold(0.0, (sum, d) => sum + valueOn(goal.metric, d)),
-          series: TrendSeries(
-            [for (final d in chartDays) DailyPoint(d, valueOn(goal.metric, d))],
-            goal: goal.period == GoalPeriod.daily ? goal.target : null,
-          ),
+                    .where((d) => !d.isBefore(weekStart))
+                    .fold(0.0, (sum, d) => sum + valueOn(goal.metric, d)),
+          series: TrendSeries([
+            for (final d in chartDays) DailyPoint(d, valueOn(goal.metric, d)),
+          ], goal: goal.period == GoalPeriod.daily ? goal.target : null),
         ),
     ];
 

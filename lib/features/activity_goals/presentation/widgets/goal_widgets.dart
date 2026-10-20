@@ -22,6 +22,7 @@ extension GoalMetricStyle on GoalMetric {
   /// SVG asset when available (e.g. step.svg for steps).
   String? get svgAsset => switch (this) {
     GoalMetric.steps => 'assets/icons/trackers/step.svg',
+    GoalMetric.workouts => 'assets/icons/trackers/barbell.svg',
     _ => null,
   };
 
@@ -44,6 +45,29 @@ extension GoalMetricStyle on GoalMetric {
     GoalMetric.distance => formatWithUnit(value),
     _ => '${formatCompactCount(value)} $unit',
   };
+}
+
+/// The metric's icon in the activity accent: its SVG when there is one,
+/// else the Material icon.
+class GoalMetricIcon extends StatelessWidget {
+  final GoalMetric metric;
+  final double size;
+
+  const GoalMetricIcon(this.metric, {super.key, this.size = AppDimens.iconSm});
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = metric.svgAsset;
+    if (asset == null) {
+      return Icon(metric.icon, size: size, color: metric.color);
+    }
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(metric.color, BlendMode.srcIn),
+    );
+  }
 }
 
 /// Icon badge, name + window, progress bar and "current / target".

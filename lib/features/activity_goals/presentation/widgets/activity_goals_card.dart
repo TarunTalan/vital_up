@@ -2,20 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
+import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
 
 const _metric = TrackerMetric.activity;
 
-/// Home card: up to three activity goals with progress, and a one-tap
-/// workout start.
+/// Home card: the headline goal (today's steps if set) as a ring with its
+/// figure, up to two more goals as slim lines, and a one-tap workout start.
 class ActivityGoalsCard extends StatelessWidget {
   const ActivityGoalsCard({super.key});
 
-  static const _maxRows = 3;
+  /// Goals shown besides the headline one; the rest are a tap away.
+  static const _maxOthers = 2;
 
   Future<void> _push(BuildContext context, String route) async {
     final cubit = context.read<ActivityGoalsCubit>();
@@ -36,21 +40,19 @@ class ActivityGoalsCard extends StatelessWidget {
           );
         }
         final goals = state.goals;
-        final done = goals.where((g) => g.fraction >= 1).length;
+        final headline = state.headline;
+        final done = goals.where((g) => g.achieved).length;
         return TrackerCard(
           metric: _metric,
-          status: goals.isEmpty
+          status: headline == null
               ? TrackerStatus.noGoal
               : done == goals.length
               ? TrackerStatus.done
               : TrackerStatus.of(
-                  value: goals.first.current,
-                  goal: goals.first.goal.target,
+                  value: headline.current,
+                  goal: headline.goal.target,
                   paceFraction: TrackerStatus.dayPace(),
                 ),
-          statusLabel: goals.length > 1 && done < goals.length
-              ? '$done/${goals.length} done'
-              : null,
           onOpen: () => _push(context, _metric.route),
           actions: [
             TrackerQuickAction(
@@ -60,7 +62,7 @@ class ActivityGoalsCard extends StatelessWidget {
               filled: true,
               onTap: () => _push(context, 'activity-tracking'),
             ),
-            if (goals.isEmpty)
+            if (headline == null)
               TrackerQuickAction(
                 label: 'Set a goal',
                 icon: Icons.flag_rounded,
@@ -68,10 +70,9 @@ class ActivityGoalsCard extends StatelessWidget {
                 onTap: () => _push(context, _metric.route),
               ),
           ],
-          child: goals.isEmpty
+          child: headline == null
               ? Text(
-                  'Set a daily or weekly target for steps, distance, '
-                  'calories, active minutes or workouts.',
+                  'Set a step or workout goal to see your progress here.',
                   style: context.text.bodyMedium?.copyWith(
                     color: context.vColors.grayText,
                   ),
@@ -79,19 +80,110 @@ class ActivityGoalsCard extends StatelessWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final g in goals.take(_maxRows)) ...[
-                      GoalProgressRow(
-                        goal: g.goal,
-                        current: g.current,
-                        fraction: g.fraction,
-                      ),
-                      if (g != goals.take(_maxRows).last)
-                        const SizedBox(height: AppDimens.space12),
+                    _Headline(headline),
+                    for (final g
+                        in goals
+                            .where((g) => g != headline)
+                            .take(_maxOthers)) ...[
+                      const SizedBox(height: AppDimens.space12),
+                      _GoalLine(g),
                     ],
                   ],
                 ),
         );
       },
+    );
+  }
+}
+
+/// "Steps", or "Steps · this week" for a weekly goal.
+String _goalName(ActivityGoal goal) => goal.period == GoalPeriod.daily
+    ? goal.metric.label
+    : '${goal.metric.label} · ${goal.period.windowLabel.toLowerCase()}';
+
+/// The headline goal: a ring with the percentage, and beside it the
+/// metric, the figure so far and the target.
+class _Headline extends StatelessWidget {
+  final GoalProgress progress;
+
+  const _Headline(this.progress);
+
+  @override
+  Widget build(BuildContext context) {
+    final goal = progress.goal;
+    final metric = goal.metric;
+    final grey = context.vColors.grayText;
+    final percent = goal.target > 0
+        ? (progress.current / goal.target * 100).round()
+        : 0;
+    return TrackerHeroLayout(
+      ring: TrackerHeroRing(
+        fraction: progress.fraction,
+        color: metric.color,
+        value: '$percent%',
+        caption: progress.achieved ? 'goal met' : 'of goal',
+      ),
+      details: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              GoalMetricIcon(metric, size: AppDimens.iconXs),
+              const SizedBox(width: AppDimens.space6),
+              Expanded(
+                child: FitText(
+                  _goalName(goal),
+                  style: context.text.bodySmall?.copyWith(color: grey),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space4),
+          FitText(
+            metric.format(progress.current),
+            style: AppTextStyles.metric.copyWith(
+              color: context.colors.onSurface,
+            ),
+          ),
+          FitText(
+            'of ${metric.formatWithUnit(goal.target)}',
+            style: context.text.bodyMedium?.copyWith(color: grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A secondary goal: its icon badge and a [TrackerBarRow].
+class _GoalLine extends StatelessWidget {
+  final GoalProgress progress;
+
+  const _GoalLine(this.progress);
+
+  @override
+  Widget build(BuildContext context) {
+    final goal = progress.goal;
+    final metric = goal.metric;
+    return Row(
+      children: [
+        AppIconBadge(
+          color: metric.color,
+          size: AppDimens.iconBadgeSmall,
+          icon: GoalMetricIcon(metric, size: AppDimens.iconXs),
+        ),
+        const SizedBox(width: AppDimens.space12),
+        Expanded(
+          child: TrackerBarRow(
+            name: _goalName(goal),
+            figure:
+                '${metric.format(progress.current)} / '
+                '${metric.formatWithUnit(goal.target)}',
+            fraction: progress.fraction,
+            color: metric.color,
+          ),
+        ),
+      ],
     );
   }
 }

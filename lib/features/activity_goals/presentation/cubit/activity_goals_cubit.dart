@@ -27,6 +27,17 @@ class ActivityGoalsState extends Equatable {
 
   List<GoalProgress> get goals => snapshot?.goals ?? const [];
 
+  /// The goal Home leads with: today's steps if set, else the first goal.
+  GoalProgress? get headline =>
+      goals
+          .where(
+            (g) =>
+                g.goal.metric == GoalMetric.steps &&
+                g.goal.period == GoalPeriod.daily,
+          )
+          .firstOrNull ??
+      goals.firstOrNull;
+
   GoalProgress? get selected =>
       goals.where((g) => g.goal.id == selectedId).firstOrNull ??
       goals.firstOrNull;
@@ -37,14 +48,13 @@ class ActivityGoalsState extends Equatable {
     ActivityGoalsSnapshot? snapshot,
     String? selectedId,
     bool? failed,
-  }) =>
-      ActivityGoalsState(
-        loading: loading ?? this.loading,
-        range: range ?? this.range,
-        snapshot: snapshot ?? this.snapshot,
-        selectedId: selectedId ?? this.selectedId,
-        failed: failed ?? this.failed,
-      );
+  }) => ActivityGoalsState(
+    loading: loading ?? this.loading,
+    range: range ?? this.range,
+    snapshot: snapshot ?? this.snapshot,
+    selectedId: selectedId ?? this.selectedId,
+    failed: failed ?? this.failed,
+  );
 
   @override
   List<Object?> get props => [loading, range, snapshot, selectedId, failed];
