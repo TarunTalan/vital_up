@@ -17,8 +17,8 @@ class SupportBotMessage {
     this.actionLabel,
     this.actionRoute,
     this.quickReplies = const [],
-  })  : id = id ?? const Uuid().v4(),
-        timestamp = timestamp ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       timestamp = timestamp ?? DateTime.now();
 }
 
 class SupportBotService {
@@ -71,7 +71,10 @@ class SupportBotService {
     }
 
     // 2. Sleep Tracking & Score
-    if (query.contains('sleep') || query.contains('bedtime') || query.contains('wake') || query.contains('dial')) {
+    if (query.contains('sleep') ||
+        query.contains('bedtime') ||
+        query.contains('wake') ||
+        query.contains('dial')) {
       return SupportBotMessage(
         isUser: false,
         text:
@@ -90,7 +93,10 @@ class SupportBotService {
     }
 
     // 3. Water Intake & Hydration
-    if (query.contains('water') || query.contains('hydration') || query.contains('drink') || query.contains('ml')) {
+    if (query.contains('water') ||
+        query.contains('hydration') ||
+        query.contains('drink') ||
+        query.contains('ml')) {
       return SupportBotMessage(
         isUser: false,
         text:
@@ -160,7 +166,10 @@ class SupportBotService {
     }
 
     // 6. Screen Time & Digital Wellness
-    if (query.contains('screen') || query.contains('usage') || query.contains('phone') || query.contains('app time')) {
+    if (query.contains('screen') ||
+        query.contains('usage') ||
+        query.contains('phone') ||
+        query.contains('app time')) {
       return SupportBotMessage(
         isUser: false,
         text:

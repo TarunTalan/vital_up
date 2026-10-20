@@ -286,8 +286,10 @@ class DataExportService {
   ) async {
     final rows = <Map<String, dynamic>>[];
     while (true) {
-      final batch = await page(rows.length, rows.length + _page - 1)
-          .timeout(const Duration(seconds: 15));
+      final batch = await page(
+        rows.length,
+        rows.length + _page - 1,
+      ).timeout(const Duration(seconds: 15));
       rows.addAll(batch);
       if (batch.length < _page) return rows;
     }

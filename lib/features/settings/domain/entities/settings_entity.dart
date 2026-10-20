@@ -39,11 +39,11 @@ class SettingsEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        themeMode,
-        notificationsEnabled,
-        healthSyncEnabled,
-        weightUnit,
-        heightUnit,
-        analyticsEnabled,
-      ];
+    themeMode,
+    notificationsEnabled,
+    healthSyncEnabled,
+    weightUnit,
+    heightUnit,
+    analyticsEnabled,
+  ];
 }

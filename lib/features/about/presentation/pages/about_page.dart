@@ -57,7 +57,9 @@ class _AboutPageState extends State<AboutPage> {
     final Uri url;
     final Uri? webFallback;
     if (Platform.isIOS) {
-      url = Uri.parse('https://apps.apple.com/app/id123456789?action=write-review');
+      url = Uri.parse(
+        'https://apps.apple.com/app/id123456789?action=write-review',
+      );
       webFallback = null;
     } else {
       String appId;
@@ -68,8 +70,9 @@ class _AboutPageState extends State<AboutPage> {
         appId = _fallbackPackage;
       }
       url = Uri.parse('market://details?id=$appId');
-      webFallback =
-          Uri.parse('https://play.google.com/store/apps/details?id=$appId');
+      webFallback = Uri.parse(
+        'https://play.google.com/store/apps/details?id=$appId',
+      );
     }
 
     var opened = false;
@@ -141,7 +144,10 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
     _sendingFeedback = false;
     if (!mounted) return;
     if (launched) {
-      showSuccessSnackBar(context, 'Your email app is open. Send it from there.');
+      showSuccessSnackBar(
+        context,
+        'Your email app is open. Send it from there.',
+      );
       _feedbackController.clear();
       return;
     }
@@ -150,11 +156,15 @@ Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
         ClipboardData(text: 'To: $kSupportEmail\nSubject: $subject\n\n$body'),
       );
       if (mounted) {
-        showSuccessSnackBar(context, 'Feedback copied. Paste it into an email to us.');
+        showSuccessSnackBar(
+          context,
+          'Feedback copied. Paste it into an email to us.',
+        );
       }
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
+      if (mounted)
+        showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
     }
   }
 

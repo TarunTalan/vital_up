@@ -136,10 +136,11 @@ class AccountService {
     await _step('other per-user values', () async {
       await _prefs.remove(WeightService.legacyTargetKey);
       await _prefs.remove(HealthImportService.lastImportKey);
-      for (final key in _prefs
-          .getKeys()
-          .where((k) => k.startsWith(bedtimeKey('')))
-          .toList()) {
+      for (final key
+          in _prefs
+              .getKeys()
+              .where((k) => k.startsWith(bedtimeKey('')))
+              .toList()) {
         await _prefs.remove(key);
       }
     });

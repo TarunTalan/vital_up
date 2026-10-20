@@ -150,6 +150,7 @@ class SleepCard extends StatelessWidget {
     return TrackerQuickAction(
       label: _metric.logLabel,
       icon: _metric.logIcon,
+      svgAsset: _metric.logIconAsset,
       color: _metric.color,
       filled: filled,
       onTap: () async {
@@ -364,6 +365,7 @@ class SleepCard extends StatelessWidget {
           : TrackerQuickAction(
               label: 'Edit',
               icon: Icons.edit_rounded,
+              svgAsset: TrackerIcons.edit,
               color: _metric.color,
               onTap: () => _log(context, initial: session),
             ),

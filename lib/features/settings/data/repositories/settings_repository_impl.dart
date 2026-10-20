@@ -17,7 +17,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
       return Right(settings);
     } catch (e) {
       debugPrint('Settings load failed: $e');
-      return const Left(CacheFailure("Couldn't load your settings. Try again."));
+      return const Left(
+        CacheFailure("Couldn't load your settings. Try again."),
+      );
     }
   }
 
@@ -28,7 +30,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
       return const Right(null);
     } catch (e) {
       debugPrint('Settings save failed: $e');
-      return const Left(CacheFailure("Couldn't save your settings. Try again."));
+      return const Left(
+        CacheFailure("Couldn't save your settings. Try again."),
+      );
     }
   }
 }

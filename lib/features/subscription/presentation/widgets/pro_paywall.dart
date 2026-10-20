@@ -217,10 +217,7 @@ class _ProHeader extends StatelessWidget {
           color: context.colors.primary,
         ),
         const SizedBox(height: AppDimens.space12),
-        Text(
-          reason?.title ?? 'VitalUp Pro',
-          style: context.text.headlineSmall,
-        ),
+        Text(reason?.title ?? 'VitalUp Pro', style: context.text.headlineSmall),
         const SizedBox(height: AppDimens.space4),
         Text(
           reason == null
@@ -452,7 +449,9 @@ class ProStatusCard extends StatelessWidget {
     if (end == null) return plan;
     final date = DateFormat('d MMM y').format(end);
     if (status.isTrial) {
-      return status.willRenew ? '$plan, paid plan starts $date' : '$plan, ends $date';
+      return status.willRenew
+          ? '$plan, paid plan starts $date'
+          : '$plan, ends $date';
     }
     return status.willRenew ? '$plan, renews $date' : '$plan, ends $date';
   }

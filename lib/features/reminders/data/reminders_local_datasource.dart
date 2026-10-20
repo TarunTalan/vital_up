@@ -43,7 +43,9 @@ class RemindersLocalDataSource {
     final reminders = <Reminder>[];
     for (final item in list) {
       try {
-        reminders.add(Reminder.fromJson(Map<String, dynamic>.from(item as Map)));
+        reminders.add(
+          Reminder.fromJson(Map<String, dynamic>.from(item as Map)),
+        );
       } catch (e) {
         debugPrint('Skipped an unreadable reminder: $e');
       }

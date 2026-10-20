@@ -45,18 +45,21 @@ class _CustomWidgetBuilderPageState extends State<CustomWidgetBuilderPage> {
   void initState() {
     super.initState();
     _title.addListener(() => setState(() {}));
-    WidgetPreviewData.load().then((data) {
-      if (!mounted) return;
-      setState(() {
-        _data = data;
-        _saved = data.custom;
-        _metrics = [...data.custom.metrics];
-        _title.text = data.custom.title;
-      });
-    }).catchError((Object e) {
-      debugPrint('Widget data unreadable: $e');
-      if (mounted) showErrorSnackBar(context, "Couldn't load the widget. Try again.");
-    });
+    WidgetPreviewData.load()
+        .then((data) {
+          if (!mounted) return;
+          setState(() {
+            _data = data;
+            _saved = data.custom;
+            _metrics = [...data.custom.metrics];
+            _title.text = data.custom.title;
+          });
+        })
+        .catchError((Object e) {
+          debugPrint('Widget data unreadable: $e');
+          if (mounted)
+            showErrorSnackBar(context, "Couldn't load the widget. Try again.");
+        });
   }
 
   @override

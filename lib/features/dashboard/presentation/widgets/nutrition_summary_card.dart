@@ -110,13 +110,14 @@ class NutritionSummaryCard extends StatelessWidget {
         TrackerQuickAction(
           label: _metric.logLabel,
           icon: _metric.logIcon,
+          svgAsset: _metric.logIconAsset,
           color: _metric.color,
           filled: true,
           onTap: onScanMeal,
         ),
         TrackerQuickAction(
           label: plan != null ? 'Diet plan' : 'Get a plan',
-          svgAsset: 'assets/icons/nav/vita.svg',
+          svgAsset: TrackerIcons.plan,
           color: _metric.color,
           onTap: plan != null
               ? (onOpenDietPlan ?? onOpenProgress)

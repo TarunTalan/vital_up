@@ -466,6 +466,7 @@ class CustomWidgetConfig {
     final title = sanitizeText(raw ?? '', maxLength: titleMax);
     return title.isEmpty ? defaultTitle : title;
   }
+
   static const defaults = [WidgetMetric.water, WidgetMetric.activity];
 
   final String title;

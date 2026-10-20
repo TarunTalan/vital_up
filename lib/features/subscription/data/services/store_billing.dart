@@ -64,7 +64,9 @@ class RevenueCatBilling implements StoreBilling {
       if (!_configured) {
         // Signed out: nothing to buy, so don't create an anonymous customer.
         if (userId == null) return;
-        await Purchases.setLogLevel(kDebugMode ? LogLevel.info : LogLevel.error);
+        await Purchases.setLogLevel(
+          kDebugMode ? LogLevel.info : LogLevel.error,
+        );
         await Purchases.configure(
           PurchasesConfiguration(apiKey!)..appUserID = userId,
         );
@@ -114,7 +116,9 @@ class RevenueCatBilling implements StoreBilling {
     if (offering == null) return const [];
     _packages
       ..clear()
-      ..addEntries(offering.availablePackages.map((p) => MapEntry(p.identifier, p)));
+      ..addEntries(
+        offering.availablePackages.map((p) => MapEntry(p.identifier, p)),
+      );
     final monthly = offering.monthly?.storeProduct;
     final plans = offering.availablePackages.map((p) {
       final product = p.storeProduct;

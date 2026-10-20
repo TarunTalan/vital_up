@@ -53,10 +53,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
 
   /// Offered gaps, plus a stored one that isn't in the list (a dropdown
   /// whose value isn't among its items throws).
-  List<int> get _intervals => {
-    ...ReminderRules.intervals,
-    ?_interval,
-  }.toList()..sort();
+  List<int> get _intervals =>
+      {...ReminderRules.intervals, ?_interval}.toList()..sort();
 
   late final _title = TextEditingController(text: widget.reminder.title);
   late List<ReminderTime> _times = [...widget.reminder.times];

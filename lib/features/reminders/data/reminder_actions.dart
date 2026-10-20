@@ -68,7 +68,11 @@ Future<void> reminderActionBackground(NotificationResponse response) async {
         await saveWakeInBackground(userId);
     }
   } catch (e, stack) {
-    CrashReporter.report(e, stack, reason: 'Reminder action ${response.actionId}');
+    CrashReporter.report(
+      e,
+      stack,
+      reason: 'Reminder action ${response.actionId}',
+    );
     return;
   }
   // The home screen widgets would keep the old water / sleep figures until
@@ -253,17 +257,23 @@ Future<int> saveMoodInBackground(
   final checkIns = readStoredCheckIns(prefs, userId);
 
   final now = DateTime.now();
-  final checkIn =
-      StressCheckIn(date: now, level: level.clamp(1, 5), tags: tags);
+  final checkIn = StressCheckIn(
+    date: now,
+    level: level.clamp(1, 5),
+    tags: tags,
+  );
   final cutoff = historyCutoff(checkIns.map((c) => c.date), now);
-  final updated = checkIns
-      .where((c) =>
-          c.date.isAfter(cutoff) &&
-          !(c.date.year == now.year &&
-              c.date.month == now.month &&
-              c.date.day == now.day))
-      .toList()
-    ..add(checkIn);
+  final updated =
+      checkIns
+          .where(
+            (c) =>
+                c.date.isAfter(cutoff) &&
+                !(c.date.year == now.year &&
+                    c.date.month == now.month &&
+                    c.date.day == now.day),
+          )
+          .toList()
+        ..add(checkIn);
 
   await prefs.setString(
     key,
@@ -284,10 +294,12 @@ Future<int> resetMoodInBackground(String userId) async {
 
   final now = DateTime.now();
   final updated = checkIns
-      .where((c) =>
-          !(c.date.year == now.year &&
-              c.date.month == now.month &&
-              c.date.day == now.day))
+      .where(
+        (c) =>
+            !(c.date.year == now.year &&
+                c.date.month == now.month &&
+                c.date.day == now.day),
+      )
       .toList();
 
   await prefs.setString(
@@ -304,10 +316,12 @@ Future<StressCheckIn?> getTodayMoodInBackground(String userId) async {
   await prefs.reload();
   final now = DateTime.now();
   return readStoredCheckIns(prefs, userId)
-      .where((c) =>
-          c.date.year == now.year &&
-          c.date.month == now.month &&
-          c.date.day == now.day)
+      .where(
+        (c) =>
+            c.date.year == now.year &&
+            c.date.month == now.month &&
+            c.date.day == now.day,
+      )
       .lastOrNull;
 }
 
@@ -329,7 +343,8 @@ List<StressCheckIn> readStoredCheckIns(SharedPreferences prefs, String userId) {
   }
   if (list is! List) return [];
   return [
-    for (final item in list.whereType<Map<String, dynamic>>()) ?_tryCheckIn(item),
+    for (final item in list.whereType<Map<String, dynamic>>())
+      ?_tryCheckIn(item),
   ];
 }
 

@@ -44,6 +44,9 @@ class MoodCard extends StatelessWidget {
             TrackerQuickAction(
               label: today == null ? _metric.logLabel : 'Edit',
               icon: today == null ? _metric.logIcon : Icons.edit_rounded,
+              svgAsset: today == null
+                  ? _metric.logIconAsset
+                  : TrackerIcons.edit,
               color: _metric.color,
               filled: true,
               onTap: () => _log(context),
@@ -74,7 +77,7 @@ class MoodCard extends StatelessWidget {
                           child: Icon(
                             moodIcon(today.level),
                             size: AppDimens.iconXl,
-                            color: stressColor(today.level),
+                            color: context.iconTint(stressColor(today.level)),
                           ),
                         ),
                       ),

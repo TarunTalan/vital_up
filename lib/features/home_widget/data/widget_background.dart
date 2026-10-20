@@ -130,11 +130,7 @@ Future<void> refreshFromDevice(String userId) async {
   final start = DateTime(now.year, now.month, now.day);
   final meals = await isar.mealLogCaches
       .where()
-      .capturedAtBetween(
-        start,
-        nextDay(start),
-        includeUpper: false,
-      )
+      .capturedAtBetween(start, nextDay(start), includeUpper: false)
       .findAll();
   final calories = meals.fold<double>(0, (sum, m) => sum + m.totalCalories);
   final weight = await isar.weightLogCaches

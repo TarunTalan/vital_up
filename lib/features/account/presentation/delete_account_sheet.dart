@@ -73,74 +73,74 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
     return PopScope(
       canPop: !_deleting,
       child: SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          context.gutter,
-          0,
-          context.gutter,
-          AppDimens.space16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Delete account',
-                    style: context.text.headlineSmall,
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            context.gutter,
+            0,
+            context.gutter,
+            AppDimens.space16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Delete account',
+                      style: context.text.headlineSmall,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  tooltip: 'Close',
-                  onPressed: _deleting ? null : () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimens.space8),
-            Divider(
-              height: AppDimens.borderThin,
-              color: context.vColors.divider,
-            ),
-            const SizedBox(height: AppDimens.sectionGap),
-            Text(
-              'This permanently deletes your account and everything in it: '
-              'your profile, logs, workouts, points, badges, friends and '
-              'notifications. It can\'t be undone.',
-              style: context.text.bodyMedium,
-            ),
-            const SizedBox(height: AppDimens.space12),
-            const AppInfoNote(
-              message:
-                  'Deleting your account does not cancel a subscription. '
-                  'Cancel it in your App Store or Google Play account first.',
-            ),
-            const SizedBox(height: AppDimens.sectionGap),
-            AppTextField(
-              label: 'Type $_confirmWord to confirm',
-              controller: _confirm,
-              hint: _confirmWord,
-              textCapitalization: TextCapitalization.characters,
-              maxLength: InputLimits.usernameMax,
-              enabled: !_deleting,
-              error: _error,
-              onChanged: (_) => setState(() => _error = null),
-            ),
-            const SizedBox(height: AppDimens.sectionGap),
-            AppPrimaryButton(
-              label: 'Delete my account',
-              isLoading: _deleting,
-              enabled: _confirmed && !_deleting,
-              containerColor: error,
-              borderColor: error,
-              onTap: _delete,
-            ),
-          ],
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Close',
+                    onPressed: _deleting ? null : () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.space8),
+              Divider(
+                height: AppDimens.borderThin,
+                color: context.vColors.divider,
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+              Text(
+                'This permanently deletes your account and everything in it: '
+                'your profile, logs, workouts, points, badges, friends and '
+                'notifications. It can\'t be undone.',
+                style: context.text.bodyMedium,
+              ),
+              const SizedBox(height: AppDimens.space12),
+              const AppInfoNote(
+                message:
+                    'Deleting your account does not cancel a subscription. '
+                    'Cancel it in your App Store or Google Play account first.',
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+              AppTextField(
+                label: 'Type $_confirmWord to confirm',
+                controller: _confirm,
+                hint: _confirmWord,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: InputLimits.usernameMax,
+                enabled: !_deleting,
+                error: _error,
+                onChanged: (_) => setState(() => _error = null),
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
+              AppPrimaryButton(
+                label: 'Delete my account',
+                isLoading: _deleting,
+                enabled: _confirmed && !_deleting,
+                containerColor: error,
+                borderColor: error,
+                onTap: _delete,
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

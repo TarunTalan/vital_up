@@ -64,8 +64,8 @@ class ChallengesPage extends StatelessWidget {
           ),
           body: challenges == null
               ? state.failed
-                  ? LoadErrorView(onRetry: cubit.load)
-                  : const Center(child: VitalUpLoader())
+                    ? LoadErrorView(onRetry: cubit.load)
+                    : const Center(child: VitalUpLoader())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

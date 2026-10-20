@@ -81,7 +81,7 @@ class ScreenTimeCard extends StatelessWidget {
       actions: [
         TrackerQuickAction(
           label: 'Edit goal',
-          svgAsset: 'assets/icons/ui/edit.svg',
+          svgAsset: TrackerIcons.edit,
           color: _metric.color,
           filled: true,
           onTap: () async {

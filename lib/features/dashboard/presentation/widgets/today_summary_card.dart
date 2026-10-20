@@ -369,7 +369,7 @@ class _SummaryItem extends StatelessWidget {
                       width: AppDimens.iconXs,
                       height: AppDimens.iconXs,
                       colorFilter: ColorFilter.mode(
-                        data.metric.color,
+                        context.iconTint(data.metric.color),
                         BlendMode.srcIn,
                       ),
                     )
@@ -419,6 +419,7 @@ typedef _Insight = ({
   TrackerMetric metric,
   String actionLabel,
   IconData actionIcon,
+  String? actionAsset,
 });
 
 _Insight? _insightFor(BuildContext context, DateTime now) {
@@ -435,6 +436,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.sleep,
       actionLabel: 'Review',
       actionIcon: Icons.edit_rounded,
+      actionAsset: TrackerIcons.edit,
     );
   }
   if (hour >= 4 && hour < 12 && sleep is SleepInBed) {
@@ -443,6 +445,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.sleep,
       actionLabel: TrackerMetric.sleep.logLabel,
       actionIcon: TrackerMetric.sleep.logIcon,
+      actionAsset: TrackerMetric.sleep.logIconAsset,
     );
   }
   if (hour < 12 && sleep is SleepNeedsManualEntry) {
@@ -451,6 +454,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.sleep,
       actionLabel: TrackerMetric.sleep.logLabel,
       actionIcon: TrackerMetric.sleep.logIcon,
+      actionAsset: TrackerMetric.sleep.logIconAsset,
     );
   }
 
@@ -472,7 +476,8 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
           'your water goal.',
       metric: TrackerMetric.water,
       actionLabel: '+$_quickWaterMl ml',
-      actionIcon: TrackerMetric.water.icon,
+      actionIcon: Icons.add_rounded,
+      actionAsset: TrackerIcons.add,
     );
   }
 
@@ -483,6 +488,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.mood,
       actionLabel: TrackerMetric.mood.logLabel,
       actionIcon: TrackerMetric.mood.icon,
+      actionAsset: TrackerMetric.mood.logIconAsset,
     );
   }
 
@@ -504,6 +510,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.activity,
       actionLabel: TrackerMetric.activity.logLabel,
       actionIcon: TrackerMetric.activity.logIcon,
+      actionAsset: TrackerMetric.activity.logIconAsset,
     );
   }
 
@@ -514,6 +521,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
       metric: TrackerMetric.nutrition,
       actionLabel: TrackerMetric.nutrition.logLabel,
       actionIcon: TrackerMetric.nutrition.logIcon,
+      actionAsset: TrackerMetric.nutrition.logIconAsset,
     );
   }
   return null;
@@ -560,6 +568,7 @@ class DashboardInsightCard extends StatelessWidget {
     final action = TrackerQuickAction(
       label: insight.actionLabel,
       icon: insight.actionIcon,
+      svgAsset: insight.actionAsset,
       color: insight.metric.color,
       filled: true,
       onTap: () => _act(context, insight.metric),

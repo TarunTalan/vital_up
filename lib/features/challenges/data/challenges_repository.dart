@@ -172,8 +172,8 @@ class ChallengeRequestIds {
     Iterable<String> friendIds,
   ) {
     final friends = friendIds.toSet().toList()..sort();
-    return _ids['${metric.code}|$days|${friends.join(',')}'] ??=
-        const Uuid().v4();
+    return _ids['${metric.code}|$days|${friends.join(',')}'] ??= const Uuid()
+        .v4();
   }
 }
 

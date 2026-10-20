@@ -184,8 +184,10 @@ class _SupportBubble extends StatelessWidget {
       DateFormat('h:mm a').format(message.timestamp).toLowerCase(),
       style: context.text.bodySmall?.copyWith(color: context.vColors.grayText),
     );
-    TextStyle? textStyle(Color color) => context.text.bodyLarge
-        ?.copyWith(color: color, height: VitaDimens.bubbleLineHeight);
+    TextStyle? textStyle(Color color) => context.text.bodyLarge?.copyWith(
+      color: color,
+      height: VitaDimens.bubbleLineHeight,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -195,7 +197,8 @@ class _SupportBubble extends StatelessWidget {
             children: [
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: constraints.maxWidth * VitaDimens.userBubbleFraction,
+                  maxWidth:
+                      constraints.maxWidth * VitaDimens.userBubbleFraction,
                 ),
                 child: Container(
                   padding: _bubblePadding,

@@ -75,7 +75,8 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     super.initState();
     final user = Supabase.instance.client.auth.currentUser;
     final initialEmail = user?.email ?? '';
-    final initialName = (user?.userMetadata?['full_name'] as String?) ??
+    final initialName =
+        (user?.userMetadata?['full_name'] as String?) ??
         (user?.userMetadata?['name'] as String?) ??
         (user?.userMetadata?['username'] as String?) ??
         '';
@@ -132,14 +133,19 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       return;
     }
 
-    final cleanSubject = SupportTicketRules.cleanSubject(_subjectController.text);
-    final subject =
-        cleanSubject.isNotEmpty ? cleanSubject : _selectedCategory.label;
-    final description =
-        SupportTicketRules.cleanDescription(_descriptionController.text);
+    final cleanSubject = SupportTicketRules.cleanSubject(
+      _subjectController.text,
+    );
+    final subject = cleanSubject.isNotEmpty
+        ? cleanSubject
+        : _selectedCategory.label;
+    final description = SupportTicketRules.cleanDescription(
+      _descriptionController.text,
+    );
 
-    final error =
-        SupportTicketRules.validateDescription(_descriptionController.text);
+    final error = SupportTicketRules.validateDescription(
+      _descriptionController.text,
+    );
     if (error != null) {
       setState(() => _descriptionError = error);
       return;
@@ -228,11 +234,15 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       await Clipboard.setData(ClipboardData(text: body));
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted) showErrorSnackBar(context, 'Unable to send. Email $kSupportEmail');
+      if (mounted)
+        showErrorSnackBar(context, 'Unable to send. Email $kSupportEmail');
       return;
     }
     if (mounted) {
-      showSuccessSnackBar(context, 'Ticket copied. Paste it into an email to support.');
+      showSuccessSnackBar(
+        context,
+        'Ticket copied. Paste it into an email to support.',
+      );
       context.pop();
     }
   }
@@ -250,7 +260,8 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     if (launched) return;
     try {
       await Clipboard.setData(const ClipboardData(text: kSupportEmail));
-      if (mounted) showSuccessSnackBar(context, 'Support email address copied.');
+      if (mounted)
+        showSuccessSnackBar(context, 'Support email address copied.');
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
     }
@@ -353,7 +364,9 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
             hint: 'e.g., GPS disconnects after 30 minutes',
             prefixIcon: Icons.title_rounded,
             maxLength: SupportTicketRules.subjectMax,
-            inputFormatters: InputFormatters.text(SupportTicketRules.subjectMax),
+            inputFormatters: InputFormatters.text(
+              SupportTicketRules.subjectMax,
+            ),
             showCounter: true,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.next,

@@ -83,7 +83,8 @@ class WaterIntakeCard extends StatelessWidget {
             actions: [
               TrackerQuickAction(
                 label: 'Log water',
-                icon: Icons.water_drop_rounded,
+                icon: _metric.logIcon,
+                svgAsset: _metric.logIconAsset,
                 color: _metric.color,
                 filled: true,
                 semanticLabel: 'Log water',

@@ -205,7 +205,13 @@ class _Badge extends StatelessWidget {
   final Color color;
   final double size;
   final double? iconSize;
-  const _Badge(this.icon, this.color, this.size, {this.svgAsset, this.iconSize});
+  const _Badge(
+    this.icon,
+    this.color,
+    this.size, {
+    this.svgAsset,
+    this.iconSize,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -791,7 +797,12 @@ class ShortcutsWidgetPreview extends StatelessWidget {
   static const _items = [
     (Icons.photo_camera_rounded, null, 'Scan', AppColors.primary),
     (Icons.water_drop_rounded, null, 'Water', AppColors.trackWater),
-    (null, 'assets/icons/trackers/activity.svg', 'Workout', AppColors.trackActivity),
+    (
+      null,
+      'assets/icons/trackers/activity.svg',
+      'Workout',
+      AppColors.trackActivity,
+    ),
     (null, 'assets/icons/nav/vita.svg', 'Vita', AppColors.trackMood),
   ];
 

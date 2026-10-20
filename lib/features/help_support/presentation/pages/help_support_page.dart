@@ -83,10 +83,12 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     if (launched) return;
     try {
       await Clipboard.setData(const ClipboardData(text: kSupportEmail));
-      if (mounted) showSuccessSnackBar(context, 'Support email address copied.');
+      if (mounted)
+        showSuccessSnackBar(context, 'Support email address copied.');
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted) showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
+      if (mounted)
+        showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
     }
   }
 
@@ -567,10 +569,7 @@ class _StillNeedHelpCard extends StatelessWidget {
   final VoidCallback onContact;
   final VoidCallback onEmail;
 
-  const _StillNeedHelpCard({
-    required this.onContact,
-    required this.onEmail,
-  });
+  const _StillNeedHelpCard({required this.onContact, required this.onEmail});
 
   @override
   Widget build(BuildContext context) {
@@ -645,4 +644,3 @@ class _StillNeedHelpCard extends StatelessWidget {
     );
   }
 }
-

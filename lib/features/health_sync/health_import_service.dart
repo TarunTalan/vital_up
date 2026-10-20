@@ -158,7 +158,9 @@ class HealthImportService {
   /// Weights outside the range VitalUp accepts when typed are bad readings
   /// (a bag on the scale, a unit mix-up) and are not imported.
   static bool isPlausibleWeightKg(double kg) =>
-      kg.isFinite && kg >= InputLimits.weightKgMin && kg <= InputLimits.weightKgMax;
+      kg.isFinite &&
+      kg >= InputLimits.weightKgMin &&
+      kg <= InputLimits.weightKgMax;
 
   /// The VitalUp workout type for a health-store workout without a route,
   /// or null for sessions that aren't exercise (breathing, cool-down).
@@ -243,10 +245,9 @@ class HealthImportService {
         : (w.totalDistance ?? 0).toDouble();
     // Faster than the activity allows on average means a bad distance.
     final maxMeters = seconds * type.maxReasonableSpeedMetersPerSecond;
-    final meters =
-        rawMeters.isFinite && rawMeters > 0 && rawMeters <= maxMeters
-            ? rawMeters
-            : 0.0;
+    final meters = rawMeters.isFinite && rawMeters > 0 && rawMeters <= maxMeters
+        ? rawMeters
+        : 0.0;
     final rawKcal = w.totalEnergyBurnedUnit == HealthDataUnit.SMALL_CALORIE
         ? (w.totalEnergyBurned ?? 0) ~/ 1000
         : w.totalEnergyBurned ?? 0;

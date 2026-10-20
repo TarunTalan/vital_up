@@ -115,8 +115,7 @@ class Reminder extends Equatable {
       if (end < start) end += 24 * 60;
       return {
         for (var m = start; m <= end; m += step) ReminderTime.fromMinutes(m),
-      }.toList()
-        ..sort();
+      }.toList()..sort();
     }
     return times.toSet().toList()..sort();
   }
@@ -168,20 +167,20 @@ class Reminder extends Equatable {
     if (id is! String || id.isEmpty) {
       throw const FormatException('Reminder without an id');
     }
-    ReminderTime? time(Object? v) => v is String ? ReminderTime.tryParse(v) : null;
+    ReminderTime? time(Object? v) =>
+        v is String ? ReminderTime.tryParse(v) : null;
     String text(Object? v) => v is String ? v : '';
     final times = json['times'];
     final days = json['weekdays'];
     final interval = json['interval_minutes'];
     return Reminder(
       id: id,
-      kind: ReminderKind.fromCode(json['kind'] is String ? json['kind'] as String : null),
+      kind: ReminderKind.fromCode(
+        json['kind'] is String ? json['kind'] as String : null,
+      ),
       title: text(json['title']),
       body: text(json['body']),
-      times: [
-        for (final t in (times is List ? times : const []))
-          ?time(t),
-      ],
+      times: [for (final t in (times is List ? times : const [])) ?time(t)],
       weekdays: {
         for (final d in (days is List ? days : allWeekdays))
           if (d is num && d >= DateTime.monday && d <= DateTime.sunday)
@@ -190,7 +189,9 @@ class Reminder extends Equatable {
       enabled: json['enabled'] == true,
       isPreset: json['is_preset'] == true,
       route: json['route'] is String ? json['route'] as String : null,
-      intervalMinutes: interval is num ? interval.toInt().clamp(30, 24 * 60) : null,
+      intervalMinutes: interval is num
+          ? interval.toInt().clamp(30, 24 * 60)
+          : null,
       windowStart: time(json['window_start']),
       windowEnd: time(json['window_end']),
     );

@@ -174,7 +174,9 @@ class ReminderScheduler {
     }
   }
 
-  static Future<void> cancelInBed(FlutterLocalNotificationsPlugin plugin) async {
+  static Future<void> cancelInBed(
+    FlutterLocalNotificationsPlugin plugin,
+  ) async {
     try {
       await plugin.cancel(id: inBedNotificationId);
     } catch (e) {
