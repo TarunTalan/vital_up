@@ -640,7 +640,7 @@ class _HomeTabState extends State<_HomeTab> {
         children: [
           AppPageHeader(
             showBack: false,
-            titleWidget: const _Greeting(),
+            titleWidget: const HomeGreeting(),
             action: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -744,8 +744,8 @@ class _HomeTabState extends State<_HomeTab> {
 }
 
 /// Header title: a time-of-day greeting with the first name.
-class _Greeting extends StatelessWidget {
-  const _Greeting();
+class HomeGreeting extends StatelessWidget {
+  const HomeGreeting({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -765,13 +765,30 @@ class _Greeting extends StatelessWidget {
             ? fullName.split(RegExp(r'\s+')).first
             : profile?.username ?? '';
         // Today's date sits beside the Today section label below.
-        return Text(
-          name.isEmpty ? greeting : '$greeting, $name',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.headlineSmall?.copyWith(
-            color: context.colors.onSurface,
-          ),
+        final title = context.text.headlineSmall?.copyWith(
+          color: context.colors.onSurface,
+        );
+        // Greeting as a quiet line above, the name as the title; same
+        // two lines before the profile loads, so the header doesn't jump.
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              greeting,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.bodyMedium?.copyWith(
+                color: context.vColors.grayText,
+              ),
+            ),
+            Text(
+              name.isEmpty ? 'Welcome' : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: title,
+            ),
+          ],
         );
       },
     );

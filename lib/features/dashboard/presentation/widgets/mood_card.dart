@@ -8,7 +8,6 @@ import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
 import 'mood_widgets.dart';
 import 'tracker_log_sheets.dart';
-import 'package:vital_up/core/widgets/fit_text.dart';
 
 const _metric = TrackerMetric.mood;
 
@@ -50,41 +49,47 @@ class MoodCard extends StatelessWidget {
               onTap: () => _log(context),
             ),
           ],
-          child: Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (today == null)
-                  TrackerPrompt(
-                    title: 'How are you feeling?',
-                    color: _metric.color,
-                  )
-                else ...[
-                  Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (today == null)
+                TrackerPrompt(
+                  title: 'How are you feeling?',
+                  color: _metric.color,
+                )
+              else ...[
+                // The face flows with the words, so a long mood ("Very
+                // stressed") wraps at the same size as the other tiles'
+                // figures instead of shrinking beside the icon.
+                Text.rich(
+                  TextSpan(
                     children: [
-                      Icon(
-                        moodIcon(today.level),
-                        size: AppDimens.iconXl,
-                        color: stressColor(today.level),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-                      Expanded(
-                        // Same size as other cards' figures: a long
-                        // mood ("Very stressed") wraps rather than shrinks.
-                        child: FitText(
-                          today.label,
-                          maxLines: 2,
-                          style: AppTextStyles.metric.copyWith(
-                            color: context.colors.onSurface,
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            right: AppDimens.space8,
+                          ),
+                          child: Icon(
+                            moodIcon(today.level),
+                            size: AppDimens.iconXl,
+                            color: stressColor(today.level),
                           ),
                         ),
                       ),
+                      TextSpan(text: today.label),
                     ],
                   ),
-                ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  semanticsLabel: today.label,
+                  style: AppTextStyles.metric.copyWith(
+                    color: context.colors.onSurface,
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
         );
       },

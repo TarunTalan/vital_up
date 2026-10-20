@@ -215,26 +215,21 @@ class WeightCard extends StatelessWidget {
                   },
                 ),
               ],
-              child: Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    latest == null
-                        ? TrackerPrompt(
-                            title: 'No weight logged',
-                            color: _metric.color,
-                          )
-                        : TrackerProgress(
-                            value: unit.format(latest.weightKg),
-                            goal: goal == null ? null : unit.format(goal),
-                            color: _metric.color,
-                            fraction: WeightTrendsPage._progress(
-                              data.logs,
-                              goal,
-                            ),
-                          ),
-                  ],
-                ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  latest == null
+                      ? TrackerPrompt(
+                          title: "What's your weight?",
+                          color: _metric.color,
+                        )
+                      : TrackerProgress(
+                          value: unit.format(latest.weightKg),
+                          goal: goal == null ? null : unit.format(goal),
+                          color: _metric.color,
+                          fraction: WeightTrendsPage._progress(data.logs, goal),
+                        ),
+                ],
               ),
             );
           },

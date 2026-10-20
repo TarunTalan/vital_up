@@ -90,18 +90,16 @@ class WaterIntakeCard extends StatelessWidget {
                 onTap: () => showWaterLogSheet(context, onAdd: cubit.addWater),
               ),
             ],
-            child: Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TrackerProgress(
-                    value: WaterTrendsPage.formatMl(current.toDouble()),
-                    goal: WaterTrendsPage.formatMl(goal.toDouble()),
-                    fraction: safeFraction(current, goal),
-                    color: _metric.color,
-                  ),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TrackerProgress(
+                  value: WaterTrendsPage.formatMl(current.toDouble()),
+                  goal: WaterTrendsPage.formatMl(goal.toDouble()),
+                  fraction: safeFraction(current, goal),
+                  color: _metric.color,
+                ),
+              ],
             ),
           );
         },

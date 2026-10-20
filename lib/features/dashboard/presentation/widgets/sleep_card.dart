@@ -130,12 +130,10 @@ class SleepCard extends StatelessWidget {
       status: status,
       onOpen: () => _open(context),
       actions: [action],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [TrackerPrompt(title: title, color: _metric.color)],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [TrackerPrompt(title: title, color: _metric.color)],
       ),
     );
   }
@@ -388,19 +386,17 @@ class SleepCard extends StatelessWidget {
       statusLabel: statusLabel,
       onOpen: () => _open(context),
       actions: [action],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TrackerProgress(
-              value: formatDashboardDuration(session.duration),
-              goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
-              fraction: safeFraction(minutes, goalMinutes),
-              color: _metric.color,
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TrackerProgress(
+            value: formatDashboardDuration(session.duration),
+            goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
+            fraction: safeFraction(minutes, goalMinutes),
+            color: _metric.color,
+          ),
+        ],
       ),
     );
   }

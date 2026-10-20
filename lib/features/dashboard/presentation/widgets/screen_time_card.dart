@@ -45,17 +45,15 @@ class ScreenTimeCard extends StatelessWidget {
                 onTap: cubit.openSettings,
               ),
             ],
-            child: Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  TrackerPrompt(
-                    title: 'Track screen time',
-                    color: AppColors.trackScreenTime,
-                  ),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                TrackerPrompt(
+                  title: 'Track screen time',
+                  color: AppColors.trackScreenTime,
+                ),
+              ],
             ),
           ),
           ScreenTimeError() => TrackerCardPlaceholder(
@@ -82,7 +80,7 @@ class ScreenTimeCard extends StatelessWidget {
       onOpen: () => _open(context),
       actions: [
         TrackerQuickAction(
-          label: 'Edit Goal',
+          label: 'Edit goal',
           svgAsset: 'assets/icons/ui/edit.svg',
           color: _metric.color,
           filled: true,
@@ -93,23 +91,20 @@ class ScreenTimeCard extends StatelessWidget {
           },
         ),
       ],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TrackerProgress(
-              value: formatDashboardDuration(state.totalDuration),
-              goal:
-                  '${formatDashboardDuration(Duration(minutes: limit))} limit',
-              fraction: limit > 0 ? minutes / limit : null,
-              color: left >= 0 ? _metric.color : context.colors.error,
-              caption: left >= 0
-                  ? '${formatDashboardDuration(Duration(minutes: left))} left today'
-                  : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TrackerProgress(
+            value: formatDashboardDuration(state.totalDuration),
+            goal: '${formatDashboardDuration(Duration(minutes: limit))} limit',
+            fraction: limit > 0 ? minutes / limit : null,
+            color: left >= 0 ? _metric.color : context.colors.error,
+            caption: left >= 0
+                ? '${formatDashboardDuration(Duration(minutes: left))} left today'
+                : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
+          ),
+        ],
       ),
     );
   }
@@ -154,45 +149,52 @@ class ScreenTimeSummaryRow extends StatelessWidget {
         return AppCard(
           width: double.infinity,
           onTap: onTap,
-          padding: AppDimens.cardPaddingCompact,
           child: Row(
             children: [
               const TrackerBadge(_metric),
               const SizedBox(width: AppDimens.space12),
+              // The figure sits at the end of the row, or under the title
+              // when both don't fit one line (narrow phone, large text).
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppDimens.space8,
+                  runSpacing: AppDimens.space2,
                   children: [
-                    Text(
-                      _metric.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.titleSmall?.copyWith(
-                        color: context.colors.onSurface,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _metric.label,
+                          style: context.text.titleSmall?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        if (caption != null) ...[
+                          const SizedBox(height: AppDimens.space2),
+                          Text(
+                            caption,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.bodySmall?.copyWith(
+                              color: grey,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (caption != null) ...[
-                      const SizedBox(height: AppDimens.space2),
+                    if (value != null)
                       Text(
-                        caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.bodySmall?.copyWith(color: grey),
+                        value,
+                        style: context.text.titleMedium?.copyWith(
+                          color: valueColor ?? context.colors.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ],
                   ],
                 ),
               ),
-              if (value != null) ...[
-                const SizedBox(width: AppDimens.space8),
-                Text(
-                  value,
-                  style: context.text.titleMedium?.copyWith(
-                    color: valueColor ?? context.colors.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
               const SizedBox(width: AppDimens.space4),
               Icon(
                 Icons.chevron_right_rounded,

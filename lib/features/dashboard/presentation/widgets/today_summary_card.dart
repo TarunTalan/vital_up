@@ -31,21 +31,11 @@ import 'dashboard_card_header.dart';
 import 'package:vital_up/core/utils/number_formats.dart';
 
 const _placeholder = '—';
-const _quickWaterMl = 250;
 
-/// The activity goal shown in the summary: today's steps if set, else the
-/// first goal.
-GoalProgress? _headlineGoal(ActivityGoalsState state) {
-  final goals = state.goals;
-  return goals
-          .where(
-            (g) =>
-                g.goal.metric == GoalMetric.steps &&
-                g.goal.period == GoalPeriod.daily,
-          )
-          .firstOrNull ??
-      goals.firstOrNull;
-}
+/// Goal line while a figure is loading or couldn't load: blank rather than
+/// claiming "Not logged" or "Set a goal" before we know.
+const _unknown = '';
+const _quickWaterMl = 250;
 
 double? _calorieGoal(BuildContext context, MealLogLoaded meals) {
   final plan = context.watch<DietPlanCubit>().state;
@@ -66,8 +56,9 @@ Duration? _lastNight(SleepState state) => switch (state) {
 /// Labels, values and goals each use one size across all four columns:
 /// when one of them doesn't fit, every column shrinks by the same amount so
 /// the row stays even, down to the [FitText] minimum. A figure that still
-/// doesn't fit switches to a shorter form ("12.3K", "of 10K") rather than
-/// ending in "...".
+/// doesn't fit switches to a shorter form ("12.3K", "of 10K"); only when
+/// even that would end in "..." does the card become a 2 x 2 grid with
+/// twice the width per figure.
 class TodaySummaryCard extends StatelessWidget {
   final ValueChanged<TrackerMetric> onOpen;
 
@@ -83,20 +74,27 @@ class TodaySummaryCard extends StatelessWidget {
     ];
     return AppCard(
       width: double.infinity,
-      padding: AppDimens.cardPaddingCompact,
+      // Each figure has its own tap padding: together they make the card's
+      // usual 16dp inset, so figures line up with the cards below.
+      padding: const EdgeInsets.all(AppDimens.space16 - _SummaryItem.padding),
       child: LayoutBuilder(
         builder: (context, constraints) {
           const gap = AppDimens.space4;
-          // Large text gets a 2 x 2 grid: twice the width per figure.
-          final perRow = context.isLargeText ? 2 : items.length;
-          final column =
+          double column(int perRow) =>
               (constraints.maxWidth - gap * (perRow - 1)) / perRow -
               _SummaryItem.padding * 2;
-          final layout = _SummaryLayout.fitting(context, items, column);
+          var perRow = items.length;
+          var layout = _SummaryLayout.fitting(context, items, column(perRow));
+          if (!layout.whole) {
+            perRow = 2;
+            layout = _SummaryLayout.fitting(context, items, column(perRow));
+          }
           return Column(
             children: [
               for (var row = 0; row < items.length; row += perRow) ...[
-                if (row > 0) const SizedBox(height: AppDimens.space8),
+                // With the figures' padding, rows sit 12dp apart like
+                // the columns.
+                if (row > 0) const SizedBox(height: gap),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -122,7 +120,8 @@ class TodaySummaryCard extends StatelessWidget {
   }
 
   _SummaryData _activityItem(BuildContext context) {
-    final goal = _headlineGoal(context.watch<ActivityGoalsCubit>().state);
+    final state = context.watch<ActivityGoalsCubit>().state;
+    final goal = state.headline;
     final metric = goal?.goal.metric;
     final isSteps = metric == null || metric == GoalMetric.steps;
     return (
@@ -136,7 +135,7 @@ class TodaySummaryCard extends StatelessWidget {
                 formatCompactCount(goal.current),
             ],
       goals: goal == null
-          ? [TrackerStatus.noGoal.label]
+          ? [state.snapshot == null ? _unknown : TrackerStatus.noGoal.label]
           : [
               'of ${metric!.formatWithUnit(goal.goal.target)}',
               'of ${metric.formatShortWithUnit(goal.goal.target)}',
@@ -162,7 +161,7 @@ class TodaySummaryCard extends StatelessWidget {
               formatCompactCount(meals.totalCalories),
             ],
       goals: goal == null
-          ? [TrackerStatus.noGoal.label]
+          ? [meals == null ? _unknown : TrackerStatus.noGoal.label]
           : [
               'of ${formatCount(goal)} kcal',
               'of ${formatCount(goal)}',
@@ -188,7 +187,7 @@ class TodaySummaryCard extends StatelessWidget {
       ],
       goals: [
         water == null
-            ? TrackerStatus.notLogged.label
+            ? _unknown
             : 'of ${WaterTrendsPage.formatMl(water.dailyGoalMl.toDouble())}',
       ],
       fraction: water == null || water.dailyGoalMl <= 0
@@ -199,14 +198,20 @@ class TodaySummaryCard extends StatelessWidget {
   }
 
   _SummaryData _sleepItem(BuildContext context) {
-    final slept = _lastNight(context.watch<SleepCubit>().state);
+    final state = context.watch<SleepCubit>().state;
+    final slept = _lastNight(state);
+    // Still loading, or couldn't load: nothing to say about last night yet.
+    final known =
+        state is! SleepInitial &&
+        state is! SleepLoading &&
+        state is! SleepError;
     final goalMinutes = sl<SleepService>().getGoalMinutes();
     return (
       metric: TrackerMetric.sleep,
       label: TrackerMetric.sleep.label,
       values: [slept == null ? _placeholder : formatDashboardDuration(slept)],
       goals: slept == null
-          ? [TrackerStatus.notLogged.label]
+          ? [known ? TrackerStatus.notLogged.label : _unknown]
           : [
               'of ${formatDashboardDuration(Duration(minutes: goalMinutes))}',
               if (goalMinutes % 60 == 0) 'of ${goalMinutes ~/ 60}h',
@@ -240,12 +245,16 @@ class _SummaryLayout {
   final List<String> values;
   final List<String> goals;
 
+  /// Every label and figure fits without an ellipsis.
+  final bool whole;
+
   const _SummaryLayout(
     this.label,
     this.value,
     this.goal,
     this.values,
     this.goals,
+    this.whole,
   );
 
   factory _SummaryLayout.fitting(
@@ -276,13 +285,14 @@ class _SummaryLayout {
       goals.style,
       values.texts,
       goals.texts,
+      labels.whole && values.whole && goals.whole,
     );
   }
 
   /// For each column, the longest of its [options] that fits [width] at
   /// the smallest allowed size, and one [style] size for all of them:
   /// shrunk just enough for the widest to fit, never below the minimum.
-  static ({TextStyle style, List<String> texts}) _fit(
+  static ({TextStyle style, List<String> texts, bool whole}) _fit(
     TextStyle style,
     TextScaler scaler,
     List<List<String>> options,
@@ -307,10 +317,16 @@ class _SummaryLayout {
         o.firstWhere((t) => measure(t) * floor <= width, orElse: () => o.last),
     ];
     final widest = texts.map(measure).fold(0.0, math.max);
-    if (width <= 0 || widest <= width) return (style: sized, texts: texts);
+    if (width > 0 && widest <= width) {
+      return (style: sized, texts: texts, whole: true);
+    }
     // Round down so the widest text never ends up a fraction too wide.
     final factor = math.max(floor, (width / widest * 100).floor() / 100);
-    return (style: sized.copyWith(fontSize: size * factor), texts: texts);
+    return (
+      style: sized.copyWith(fontSize: size * factor),
+      texts: texts,
+      whole: width > 0 && widest * factor <= width,
+    );
   }
 }
 
@@ -470,7 +486,7 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
     );
   }
 
-  final goal = _headlineGoal(context.watch<ActivityGoalsCubit>().state);
+  final goal = context.watch<ActivityGoalsCubit>().state.headline;
   if (hour >= 14 &&
       goal != null &&
       goal.goal.period == GoalPeriod.daily &&
@@ -529,7 +545,6 @@ class DashboardInsightCard extends StatelessWidget {
               child: AppCard(
                 width: double.infinity,
                 highlighted: true,
-                padding: AppDimens.cardPaddingCompact,
                 child: LayoutBuilder(
                   builder: (context, constraints) =>
                       _content(context, insight, constraints.maxWidth),
@@ -551,14 +566,16 @@ class DashboardInsightCard extends StatelessWidget {
     );
     final message = Text(
       insight.message,
-      style: context.text.bodyMedium?.copyWith(
-        color: context.colors.onSurface,
-      ),
+      style: context.text.bodyMedium?.copyWith(color: context.colors.onSurface),
+    );
+    // Never narrower than the label needs, so it shows whole.
+    final actionWidth = math.max(
+      AppDimens.quickActionWidth,
+      TrackerQuickAction.widthFor(context, insight.actionLabel),
     );
     final inline =
-        !context.isLargeText &&
-        width - badge - gap * 2 - AppDimens.quickActionWidth >=
-            context.textScaled(_minMessageWidth);
+        width - badge - gap * 2 - actionWidth >=
+        context.textScaled(_minMessageWidth);
     final lead = TrackerBadge(insight.metric, size: badge);
     if (inline) {
       return Row(
@@ -567,7 +584,7 @@ class DashboardInsightCard extends StatelessWidget {
           const SizedBox(width: gap),
           Expanded(child: message),
           const SizedBox(width: gap),
-          SizedBox(width: AppDimens.quickActionWidth, child: action),
+          SizedBox(width: actionWidth, child: action),
         ],
       );
     }
