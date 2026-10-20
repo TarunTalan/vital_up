@@ -28,6 +28,87 @@ void openSupportRoute(BuildContext context, String routeName) {
   }
 }
 
+/// Articles in [category] that match [query], best first. Each word of the
+/// query counts on its own (so "sleep not syncing" finds the sync article);
+/// a word matches a word in the question, answer or tags by its start.
+/// Every word must match when the query has one or two; otherwise the
+/// articles matching the most words are shown.
+List<FaqItem> searchFaqs(
+  List<FaqItem> faqs,
+  String query, {
+  FaqCategory category = FaqCategory.all,
+}) {
+  final inCategory = [
+    for (final f in faqs)
+      if (category == FaqCategory.all || f.category == category) f,
+  ];
+  final words = _searchWords(query).where((w) => !_stopWords.contains(w));
+  final terms = words.toSet().toList();
+  if (terms.isEmpty) return inCategory;
+
+  final scored = <(FaqItem, int)>[];
+  for (final faq in inCategory) {
+    final text = _searchWords(
+      '${faq.question} ${faq.tags.join(' ')} ${faq.answer}',
+    );
+    final hits = terms.where((t) => text.any((w) => _wordMatches(w, t))).length;
+    if (hits > 0) scored.add((faq, hits));
+  }
+  if (scored.isEmpty) return const [];
+  final best = scored.map((e) => e.$2).reduce((a, b) => a > b ? a : b);
+  final needed = terms.length <= 2 ? terms.length : best;
+  return [
+    for (final (faq, hits) in scored..sort((a, b) => b.$2.compareTo(a.$2)))
+      if (hits >= needed) faq,
+  ];
+}
+
+/// "sync" finds "syncing" and "syncing" finds "sync" (4+ letters, so
+/// "to" doesn't match "today").
+bool _wordMatches(String word, String term) =>
+    word.startsWith(term) || (word.length >= 4 && term.startsWith(word));
+
+final _searchWordRe = RegExp(r"[\p{L}\p{N}]+", unicode: true);
+
+List<String> _searchWords(String text) => [
+  for (final m in _searchWordRe.allMatches(text.toLowerCase())) m.group(0)!,
+];
+
+const _stopWords = {
+  'a',
+  'an',
+  'the',
+  'i',
+  'my',
+  'me',
+  'is',
+  'it',
+  'to',
+  'do',
+  'does',
+  'how',
+  'what',
+  'why',
+  'can',
+  'not',
+  'no',
+  'of',
+  'on',
+  'in',
+  'and',
+  'or',
+  'for',
+  'with',
+  'app',
+  'vitalup',
+  'working',
+  'work',
+  'doesn',
+  't',
+  'cant',
+  'won',
+};
+
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
 
@@ -48,25 +129,11 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     super.dispose();
   }
 
-  List<FaqItem> get _filteredFaqs {
-    final query = _searchController.text.trim().toLowerCase();
-    return kFaqDatabase.where((item) {
-      final matchesCategory =
-          _selectedCategory == FaqCategory.all ||
-          item.category == _selectedCategory;
-      if (!matchesCategory) return false;
-
-      if (query.isEmpty) return true;
-
-      final matchQuestion = item.question.toLowerCase().contains(query);
-      final matchAnswer = item.answer.toLowerCase().contains(query);
-      final matchTags = item.tags.any(
-        (tag) => tag.toLowerCase().contains(query),
-      );
-
-      return matchQuestion || matchAnswer || matchTags;
-    }).toList();
-  }
+  List<FaqItem> get _filteredFaqs => searchFaqs(
+    kFaqDatabase,
+    _searchController.text,
+    category: _selectedCategory,
+  );
 
   Future<void> _sendDirectEmail({
     String subject = 'Support Inquiry - VitalUp',
@@ -83,12 +150,14 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     if (launched) return;
     try {
       await Clipboard.setData(const ClipboardData(text: kSupportEmail));
-      if (mounted)
+      if (mounted) {
         showSuccessSnackBar(context, 'Support email address copied.');
+      }
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted)
+      if (mounted) {
         showErrorSnackBar(context, 'No email app found. Email $kSupportEmail');
+      }
     }
   }
 
@@ -100,7 +169,17 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     );
   }
 
-  void _openAssistant() => openSupportRoute(context, 'support-chat');
+  /// Vita answers app questions too; a search with no articles is sent
+  /// to it as the first message.
+  void _askVita({String question = ''}) {
+    final text = sanitizeText(question, maxLength: InputLimits.search);
+    try {
+      context.pushNamed('vita-chat', extra: text.isEmpty ? null : text);
+    } catch (e) {
+      debugPrint('Vita chat not opened: $e');
+      showErrorSnackBar(context, "That screen isn't available.");
+    }
+  }
 
   void _toggleFaq(FaqItem faq) {
     setState(() {
@@ -137,7 +216,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         children: [
           AppTextField(
             controller: _searchController,
-            hint: 'Search FAQs, topics, or errors...',
+            hint: 'Search help articles',
             prefixIcon: Icons.search_rounded,
             textInputAction: TextInputAction.search,
             inputFormatters: InputFormatters.text(InputLimits.search),
@@ -155,10 +234,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                   ),
           ),
           const SizedBox(height: AppDimens.space16),
-          _SupportActions(
-            onAssistant: _openAssistant,
-            onContact: _contactSupport,
-          ),
+          _AskVitaCard(onTap: _askVita),
           const SizedBox(height: AppDimens.sectionGap),
           const AppCaption('Topics & categories'),
           const SizedBox(height: AppDimens.space8),
@@ -182,7 +258,9 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
           ),
           const SizedBox(height: AppDimens.space8),
           if (faqs.isEmpty)
-            _EmptySearchResults(onAssistant: _openAssistant)
+            _EmptySearchResults(
+              onAskVita: () => _askVita(question: _searchController.text),
+            )
           else
             for (final faq in faqs)
               Padding(
@@ -209,100 +287,54 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   }
 }
 
-/// "Vital Assistant" + "Contact Team" entry cards — side by side, stacked on
-/// very narrow screens so the copy never gets squeezed.
-class _SupportActions extends StatelessWidget {
-  final VoidCallback onAssistant;
-  final VoidCallback onContact;
-
-  const _SupportActions({required this.onAssistant, required this.onContact});
-
-  @override
-  Widget build(BuildContext context) {
-    final assistant = _ActionCard(
-      svgAsset: 'assets/icons/nav/vita.svg',
-      title: 'Vital Assistant',
-      subtitle: 'Chat for instant AI guidance & diagnostics',
-      highlighted: true,
-      onTap: onAssistant,
-    );
-    final contact = _ActionCard(
-      icon: Icons.mail_outline_rounded,
-      title: 'Contact Team',
-      subtitle: 'Submit a ticket with category & description',
-      onTap: onContact,
-    );
-
-    if (context.isSmallPhone) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          assistant,
-          const SizedBox(height: AppDimens.cardGap),
-          contact,
-        ],
-      );
-    }
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: assistant),
-          const SizedBox(width: AppDimens.cardGap),
-          Expanded(child: contact),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData? icon;
-  final String? svgAsset;
-  final String title;
-  final String subtitle;
-  final bool highlighted;
+/// Opens Vita, which answers questions about the app as well as health.
+class _AskVitaCard extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _ActionCard({
-    this.icon,
-    this.svgAsset,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.highlighted = false,
-  }) : assert(icon != null || svgAsset != null);
+  const _AskVitaCard({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      highlighted: highlighted,
-      borderColor: highlighted ? context.vColors.primaryBorder : null,
+      highlighted: true,
+      borderColor: context.vColors.primaryBorder,
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      showChevron: true,
+      child: Row(
         children: [
           AppIconBadge(
-            icon: svgAsset != null
-                ? SvgPicture.asset(
-                    svgAsset!,
-                    width: AppDimens.iconSm,
-                    height: AppDimens.iconSm,
-                    colorFilter: ColorFilter.mode(
-                      highlighted ? VitaColors.accent : context.colors.primary,
-                      BlendMode.srcIn,
-                    ),
-                  )
-                : Icon(icon),
+            color: VitaColors.accent,
+            icon: SvgPicture.asset(
+              'assets/icons/nav/vita.svg',
+              width: AppDimens.iconSm,
+              height: AppDimens.iconSm,
+              colorFilter: ColorFilter.mode(
+                AppIconBadge.glyphColor(context, VitaColors.accent),
+                BlendMode.srcIn,
+              ),
+            ),
           ),
-          const SizedBox(height: AppDimens.space12),
-          Text(title, style: context.text.titleSmall),
-          const SizedBox(height: AppDimens.space4),
-          Text(
-            subtitle,
-            style: context.text.bodySmall?.copyWith(
-              color: context.vColors.grayText,
+          const SizedBox(width: AppDimens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Ask Vita',
+                  style: context.text.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppDimens.space2),
+                Text(
+                  'Questions about the app or your health',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.vColors.grayText,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -517,9 +549,9 @@ class _FaqAnswer extends StatelessWidget {
 }
 
 class _EmptySearchResults extends StatelessWidget {
-  final VoidCallback onAssistant;
+  final VoidCallback onAskVita;
 
-  const _EmptySearchResults({required this.onAssistant});
+  const _EmptySearchResults({required this.onAskVita});
 
   @override
   Widget build(BuildContext context) {
@@ -541,13 +573,13 @@ class _EmptySearchResults extends StatelessWidget {
           ),
           const SizedBox(height: AppDimens.space6),
           Text(
-            'Try different keywords or chat directly with Vital Assistant.',
+            'Try other words, or ask Vita your question.',
             textAlign: TextAlign.center,
             style: context.text.bodyMedium?.copyWith(color: v.grayText),
           ),
           const SizedBox(height: AppDimens.space16),
           AppPrimaryButton(
-            label: 'Ask Vital Assistant',
+            label: 'Ask Vita',
             leadingIcon: SvgPicture.asset(
               'assets/icons/nav/vita.svg',
               width: AppDimens.iconSm,
@@ -557,7 +589,7 @@ class _EmptySearchResults extends StatelessWidget {
                 BlendMode.srcIn,
               ),
             ),
-            onTap: onAssistant,
+            onTap: onAskVita,
           ),
         ],
       ),

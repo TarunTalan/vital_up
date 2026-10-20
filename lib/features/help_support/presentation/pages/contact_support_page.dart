@@ -9,6 +9,7 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/services/email_service.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -73,7 +74,10 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
   @override
   void initState() {
     super.initState();
-    final user = Supabase.instance.client.auth.currentUser;
+    User? user;
+    try {
+      user = Supabase.instance.client.auth.currentUser;
+    } catch (_) {}
     final initialEmail = user?.email ?? '';
     final initialName =
         (user?.userMetadata?['full_name'] as String?) ??
@@ -234,8 +238,9 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       await Clipboard.setData(ClipboardData(text: body));
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
-      if (mounted)
+      if (mounted) {
         showErrorSnackBar(context, 'Unable to send. Email $kSupportEmail');
+      }
       return;
     }
     if (mounted) {
@@ -260,8 +265,9 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
     if (launched) return;
     try {
       await Clipboard.setData(const ClipboardData(text: kSupportEmail));
-      if (mounted)
+      if (mounted) {
         showSuccessSnackBar(context, 'Support email address copied.');
+      }
     } catch (e) {
       debugPrint('Clipboard unavailable: $e');
     }
@@ -273,46 +279,6 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
       header: const AppPageHeader(
         title: 'Contact Support',
         subtitle: 'We typically respond within 24 hours',
-      ),
-      bottomBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppPrimaryButton(
-            label: 'Submit Support Ticket',
-            leadingIcon: const Icon(Icons.send_rounded),
-            isLoading: _isSubmitting,
-            onTap: _submitTicket,
-          ),
-          const SizedBox(height: AppDimens.space10),
-          InkWell(
-            onTap: _openDirectEmail,
-            borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.space12,
-                vertical: AppDimens.space4,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.mail_outline_rounded,
-                    size: AppDimens.iconSm,
-                    color: context.colors.primary,
-                  ),
-                  const SizedBox(width: AppDimens.space6),
-                  Text(
-                    'Direct contact: $kSupportEmail',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.colors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -413,6 +379,45 @@ class _ContactSupportPageState extends State<ContactSupportPage> {
               ),
             ),
           ),
+          const SizedBox(height: AppDimens.sectionGap),
+
+          AppPrimaryButton(
+            label: 'Submit Support Ticket',
+            leadingIcon: const Icon(Icons.send_rounded),
+            isLoading: _isSubmitting,
+            onTap: _submitTicket,
+          ),
+          const SizedBox(height: AppDimens.space12),
+
+          InkWell(
+            onTap: _openDirectEmail,
+            borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space12,
+                vertical: AppDimens.space6,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.mail_outline_rounded,
+                    size: AppDimens.iconSm,
+                    color: context.colors.primary,
+                  ),
+                  const SizedBox(width: AppDimens.space6),
+                  Text(
+                    'Direct contact: $kSupportEmail',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: context.safePadding.bottom + AppDimens.space16),
         ],
       ),
     );
