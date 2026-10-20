@@ -800,10 +800,9 @@ food scan has no long-wait hint or cancel; label-scan loader
   from many addresses still block username sign-in (email still works).
 
 ### Remaining:
-1. **Upload First Bundle to Play Console:** Manually upload first release AAB to Internal testing track in Google Play Console (required once before API access works).
-2. **Play Console Declarations:** Submit Health apps form & Health Connect read permissions, Usage Access permission video, Location foreground service video, and Data safety form.
-3. **VitalUp Pro setup:** Play Console subscription `vitalup_pro` with
-   base plans monthly + yearly (7-day free trial offer on yearly); a
+1. **Production Release Review:** Initial bundle and all required declarations (Health apps / Health Connect, Usage Access video, Location foreground service video, Data safety form) submitted to Google Play Console; currently under review.
+2. **VitalUp Pro setup:** Play Console subscription `vitalup_pro` with
+   base plans monthly + yearly (7-day free trial offer on yearly) — can now be created in Play Console since the bundle has been uploaded; a
    RevenueCat project (Google Play app + service account, entitlement
    `pro`, default offering with both packages, webhook to
    `revenuecat-webhook` with the `REVENUECAT_WEBHOOK_SECRET` header);
@@ -814,7 +813,7 @@ food scan has no long-wait hint or cancel; label-scan loader
    delete-account deployed); Oct 20: the RevenueCat secrets
    aren't set yet, so the webhook refuses every event; `.env` has no
    `REVENUECAT_GOOGLE_API_KEY`, so the app shows no paywall). Data safety form: add "Purchase history".
-4. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
+3. **Deploy Website to Production:** Re-upload the clean `website/` directory to Cloudflare Pages (or push to git).
 
 
 ## Native Android
