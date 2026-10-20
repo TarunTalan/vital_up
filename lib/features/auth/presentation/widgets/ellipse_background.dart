@@ -29,15 +29,15 @@ class _EllipsePainter extends CustomPainter {
 
     final path = Path();
     path.lineTo(0, size.height * 0.7);
-    
+
     // Draw a smooth quadratic curve to create the ellipse/arc effect at the bottom
     path.quadraticBezierTo(
-      size.width / 2, 
-      size.height * 1.1, 
-      size.width, 
+      size.width / 2,
+      size.height * 1.1,
+      size.width,
       size.height * 0.7,
     );
-    
+
     path.lineTo(size.width, 0);
     path.close();
 

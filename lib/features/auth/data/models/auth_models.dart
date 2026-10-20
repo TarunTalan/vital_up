@@ -4,10 +4,7 @@ class LoginRequest {
 
   LoginRequest({required this.username, required this.password});
 
-  Map<String, dynamic> toJson() => {
-        'username': username,
-        'password': password,
-      };
+  Map<String, dynamic> toJson() => {'username': username, 'password': password};
 }
 
 class LoginResponse {
@@ -45,9 +42,7 @@ class ForgotPasswordRequest {
 
   ForgotPasswordRequest({required this.email});
 
-  Map<String, dynamic> toJson() => {
-        'email': email,
-      };
+  Map<String, dynamic> toJson() => {'email': email};
 }
 
 class ForgotPasswordResponse {
@@ -55,7 +50,11 @@ class ForgotPasswordResponse {
   final String message;
   final int status;
 
-  ForgotPasswordResponse({this.data, required this.message, required this.status});
+  ForgotPasswordResponse({
+    this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory ForgotPasswordResponse.fromJson(Map<String, dynamic> json) {
     return ForgotPasswordResponse(
@@ -77,11 +76,7 @@ class VerifyForgotPasswordRequest {
     required this.token,
   });
 
-  Map<String, dynamic> toJson() => {
-        'email': email,
-        'otp': otp,
-        'token': token,
-      };
+  Map<String, dynamic> toJson() => {'email': email, 'otp': otp, 'token': token};
 }
 
 class VerifyForgotPasswordResponse {
@@ -89,11 +84,17 @@ class VerifyForgotPasswordResponse {
   final String message;
   final int status;
 
-  VerifyForgotPasswordResponse({this.data, required this.message, required this.status});
+  VerifyForgotPasswordResponse({
+    this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory VerifyForgotPasswordResponse.fromJson(Map<String, dynamic> json) {
     return VerifyForgotPasswordResponse(
-      data: json['data'] != null ? DataVerifyForgotPwd.fromJson(json['data']) : null,
+      data: json['data'] != null
+          ? DataVerifyForgotPwd.fromJson(json['data'])
+          : null,
       message: json['message'] as String? ?? '',
       status: json['status'] as int? ?? 0,
     );
@@ -106,9 +107,7 @@ class DataVerifyForgotPwd {
   DataVerifyForgotPwd({required this.token});
 
   factory DataVerifyForgotPwd.fromJson(Map<String, dynamic> json) {
-    return DataVerifyForgotPwd(
-      token: json['token'] as String? ?? '',
-    );
+    return DataVerifyForgotPwd(token: json['token'] as String? ?? '');
   }
 }
 
@@ -138,10 +137,10 @@ class RegistrationRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'email': email,
-        'username': username,
-        'password': password,
-      };
+    'email': email,
+    'username': username,
+    'password': password,
+  };
 }
 
 class RegistrationResponse {
@@ -149,7 +148,11 @@ class RegistrationResponse {
   final String message;
   final int status;
 
-  RegistrationResponse({this.data, required this.message, required this.status});
+  RegistrationResponse({
+    this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory RegistrationResponse.fromJson(Map<String, dynamic> json) {
     return RegistrationResponse(
@@ -174,11 +177,11 @@ class ValidateRegistrationRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'email': email,
-        'otp': otp,
-        'type': type,
-        'Token': token, // backend uses @SerializedName("Token")
-      };
+    'email': email,
+    'otp': otp,
+    'type': type,
+    'Token': token, // backend uses @SerializedName("Token")
+  };
 }
 
 class OTPValidationResponse {
@@ -186,7 +189,11 @@ class OTPValidationResponse {
   final String message;
   final int status;
 
-  OTPValidationResponse({this.data, required this.message, required this.status});
+  OTPValidationResponse({
+    this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory OTPValidationResponse.fromJson(Map<String, dynamic> json) {
     return OTPValidationResponse(
@@ -203,10 +210,7 @@ class ResendOTPRequest {
 
   ResendOTPRequest({required this.email, required this.token});
 
-  Map<String, dynamic> toJson() => {
-        'email': email,
-        'token': token,
-      };
+  Map<String, dynamic> toJson() => {'email': email, 'token': token};
 }
 
 class ResendOTPResponse {
@@ -230,9 +234,7 @@ class OAuthRequest {
 
   OAuthRequest({required this.idToken});
 
-  Map<String, dynamic> toJson() => {
-        'idToken': idToken,
-      };
+  Map<String, dynamic> toJson() => {'idToken': idToken};
 }
 
 class OAuthResponse {
@@ -271,10 +273,7 @@ class ResendForgotPwdRequest {
 
   ResendForgotPwdRequest({required this.email, required this.token});
 
-  Map<String, dynamic> toJson() => {
-        'email': email,
-        'token': token,
-      };
+  Map<String, dynamic> toJson() => {'email': email, 'token': token};
 }
 
 class ResendForgotPwdResponse {
@@ -282,7 +281,11 @@ class ResendForgotPwdResponse {
   final String message;
   final int status;
 
-  ResendForgotPwdResponse({required this.data, required this.message, required this.status});
+  ResendForgotPwdResponse({
+    required this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory ResendForgotPwdResponse.fromJson(Map<String, dynamic> json) {
     return ResendForgotPwdResponse(
@@ -300,9 +303,9 @@ class ResetPwdRequest {
   ResetPwdRequest({required this.newPassword, required this.token});
 
   Map<String, dynamic> toJson() => {
-        'newPassword': newPassword,
-        'Token': token, // Matches Token parameter in ResetPwdRequest
-      };
+    'newPassword': newPassword,
+    'Token': token, // Matches Token parameter in ResetPwdRequest
+  };
 }
 
 class ResetPwdResponse {
@@ -326,9 +329,7 @@ class RefreshTokenRequest {
 
   RefreshTokenRequest({required this.refreshToken});
 
-  Map<String, dynamic> toJson() => {
-        'refreshToken': refreshToken,
-      };
+  Map<String, dynamic> toJson() => {'refreshToken': refreshToken};
 }
 
 class RefreshTokenResponse {
@@ -336,11 +337,17 @@ class RefreshTokenResponse {
   final String message;
   final int status;
 
-  RefreshTokenResponse({this.data, required this.message, required this.status});
+  RefreshTokenResponse({
+    this.data,
+    required this.message,
+    required this.status,
+  });
 
   factory RefreshTokenResponse.fromJson(Map<String, dynamic> json) {
     return RefreshTokenResponse(
-      data: json['data'] != null ? DataRefreshToken.fromJson(json['data']) : null,
+      data: json['data'] != null
+          ? DataRefreshToken.fromJson(json['data'])
+          : null,
       message: json['message'] as String? ?? '',
       status: json['status'] as int? ?? 0,
     );

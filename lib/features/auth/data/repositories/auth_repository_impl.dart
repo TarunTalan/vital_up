@@ -30,7 +30,10 @@ class AuthRepositoryImpl implements AuthRepository {
   static const onboardingCheckTimeout = Duration(seconds: 5);
 
   @override
-  Future<Either<Failure, UserEntity>> signIn(String username, String password) async {
+  Future<Either<Failure, UserEntity>> signIn(
+    String username,
+    String password,
+  ) async {
     try {
       final response = await _remoteDataSource.login(
         LoginRequest(username: username, password: password),
@@ -48,12 +51,14 @@ class AuthRepositoryImpl implements AuthRepository {
         if (user == null) {
           return const Left(ServerFailure('Sign-in session missing'));
         }
-        await _localDataSource.saveUser(jsonEncode({
-          'id': user.id,
-          'email': user.email,
-          'displayName': user.displayName,
-          'weightKg': user.weightKg,
-        }));
+        await _localDataSource.saveUser(
+          jsonEncode({
+            'id': user.id,
+            'email': user.email,
+            'displayName': user.displayName,
+            'weightKg': user.weightKg,
+          }),
+        );
 
         return Right(user);
       } else {
@@ -67,10 +72,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, String>> signUp(String username, String email, String password) async {
+  Future<Either<Failure, String>> signUp(
+    String username,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await _remoteDataSource.register(
-        RegistrationRequest(email: email, username: username, password: password),
+        RegistrationRequest(
+          email: email,
+          username: username,
+          password: password,
+        ),
       );
 
       if (response.status == 200 && response.data != null) {
@@ -99,24 +112,27 @@ class AuthRepositoryImpl implements AuthRepository {
       if (response.status == 200) {
         final session = Supabase.instance.client.auth.currentSession;
         final currentUser = Supabase.instance.client.auth.currentUser;
-        
+
         if (session != null && currentUser != null) {
           await _localDataSource.saveAccessToken(session.accessToken);
           await _localDataSource.saveRefreshToken(session.refreshToken ?? '');
-          
+
           final user = UserEntity(
             id: currentUser.id,
             email: currentUser.email ?? email,
-            displayName: currentUser.userMetadata?['username'] ?? email.split('@')[0],
+            displayName:
+                currentUser.userMetadata?['username'] ?? email.split('@')[0],
             weightKg: currentUser.userMetadata?['weight_kg']?.toDouble(),
           );
-          
-          await _localDataSource.saveUser(jsonEncode({
-            'id': user.id,
-            'email': user.email,
-            'displayName': user.displayName,
-            'weightKg': user.weightKg,
-          }));
+
+          await _localDataSource.saveUser(
+            jsonEncode({
+              'id': user.id,
+              'email': user.email,
+              'displayName': user.displayName,
+              'weightKg': user.weightKg,
+            }),
+          );
         }
         return const Right(null);
       } else {
@@ -152,13 +168,17 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, String>> checkUsernameAvailability(String username) async {
+  Future<Either<Failure, String>> checkUsernameAvailability(
+    String username,
+  ) async {
     try {
       final response = await _remoteDataSource.checkUsername(username);
       if (response.available) {
         return Right(response.message ?? 'Username is available');
       } else {
-        return Left(ValidationFailure(response.message ?? 'Username is already taken'));
+        return Left(
+          ValidationFailure(response.message ?? 'Username is already taken'),
+        );
       }
     } on AuthException catch (e) {
       return Left(ServerFailure(e.message));
@@ -267,7 +287,7 @@ class AuthRepositoryImpl implements AuthRepository {
       try {
         await googleSignIn.signOut();
       } catch (_) {}
-      
+
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         return Left(ServerFailure('Google sign-in cancelled by user'));
@@ -277,7 +297,9 @@ class AuthRepositoryImpl implements AuthRepository {
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       if (idToken == null) {
-        return Left(ServerFailure('Google Authentication failed: Missing ID Token'));
+        return Left(
+          ServerFailure('Google Authentication failed: Missing ID Token'),
+        );
       }
 
       // 4. Authenticate session via remote data source (Supabase GoTrue)
@@ -293,24 +315,29 @@ class AuthRepositoryImpl implements AuthRepository {
         // 5. Get the actual authenticated user model from the Supabase client
         final currentUser = Supabase.instance.client.auth.currentUser;
         if (currentUser == null) {
-          return Left(ServerFailure('Failed to retrieve user profile after sign-in'));
+          return Left(
+            ServerFailure('Failed to retrieve user profile after sign-in'),
+          );
         }
 
         final user = UserEntity(
           id: currentUser.id,
           email: currentUser.email ?? '',
-          displayName: currentUser.userMetadata?['full_name'] ??
+          displayName:
+              currentUser.userMetadata?['full_name'] ??
               currentUser.userMetadata?['name'] ??
               'Google User',
           weightKg: currentUser.userMetadata?['weight_kg']?.toDouble(),
         );
 
-        await _localDataSource.saveUser(jsonEncode({
-          'id': user.id,
-          'email': user.email,
-          'displayName': user.displayName,
-          'weightKg': user.weightKg,
-        }));
+        await _localDataSource.saveUser(
+          jsonEncode({
+            'id': user.id,
+            'email': user.email,
+            'displayName': user.displayName,
+            'weightKg': user.weightKg,
+          }),
+        );
 
         return Right(user);
       } else {
@@ -343,13 +370,15 @@ class AuthRepositoryImpl implements AuthRepository {
       if (userJson != null) {
         final map = jsonDecode(userJson);
         if (map is Map && map['id'] is String) {
-          return Right(UserEntity(
-            id: map['id'] as String,
-            email: map['email'] as String? ?? '',
-            displayName: map['displayName'] as String? ?? '',
-            photoUrl: map['photoUrl'] as String?,
-            weightKg: (map['weightKg'] as num?)?.toDouble(),
-          ));
+          return Right(
+            UserEntity(
+              id: map['id'] as String,
+              email: map['email'] as String? ?? '',
+              displayName: map['displayName'] as String? ?? '',
+              photoUrl: map['photoUrl'] as String?,
+              weightKg: (map['weightKg'] as num?)?.toDouble(),
+            ),
+          );
         }
       }
       // Nothing stored locally (e.g. signed up through the OTP flow, which

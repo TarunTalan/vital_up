@@ -23,16 +23,14 @@ enum OnboardingItem {
   ),
   page4(
     icon: 'assets/images/onboarding4.png',
-    description: 'Join live sessions and learn directly from certified coaches.',
+    description:
+        'Join live sessions and learn directly from certified coaches.',
   );
 
   final String icon;
   final String description;
 
-  const OnboardingItem({
-    required this.icon,
-    required this.description,
-  });
+  const OnboardingItem({required this.icon, required this.description});
 }
 
 class OnboardingPage extends StatefulWidget {
@@ -111,7 +109,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 child: Icon(
                                   Icons.image_rounded,
                                   size: AppDimens.iconXxl,
-                                  color: colors.onSurface.withValues(alpha: 0.5),
+                                  color: colors.onSurface.withValues(
+                                    alpha: 0.5,
+                                  ),
                                 ),
                               ),
                             );
@@ -126,28 +126,29 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   // Page indicators — Figma: 16dp active, 12dp inactive.
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      OnboardingItem.values.length,
-                      (index) {
-                        final isActive = _currentPage == index;
-                        final size = isActive
-                            ? AppDimens.pageIndicatorActive
-                            : AppDimens.pageIndicatorInactive;
+                    children: List.generate(OnboardingItem.values.length, (
+                      index,
+                    ) {
+                      final isActive = _currentPage == index;
+                      final size = isActive
+                          ? AppDimens.pageIndicatorActive
+                          : AppDimens.pageIndicatorInactive;
 
-                        return AnimatedContainer(
-                          duration: AppDurations.medium,
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: AppDimens.space16,
-                          ),
-                          width: size,
-                          height: size,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isActive ? colors.primary : v.indicatorInactive,
-                          ),
-                        );
-                      },
-                    ),
+                      return AnimatedContainer(
+                        duration: AppDurations.medium,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: AppDimens.space16,
+                        ),
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isActive
+                              ? colors.primary
+                              : v.indicatorInactive,
+                        ),
+                      );
+                    }),
                   ),
 
                   SizedBox(height: context.h(AppDimens.space24)),
@@ -200,7 +201,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               color: v.preText,
                             ),
                           ),
-                          onTap: () => context.read<AuthCubit>().signInWithGoogle(
+                          onTap: () =>
+                              context.read<AuthCubit>().signInWithGoogle(
                                 // The AuthAuthenticated listener above
                                 // navigates; calling it here too would run
                                 // the post-sign-in navigation twice.

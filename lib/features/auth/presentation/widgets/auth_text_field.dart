@@ -145,7 +145,9 @@ class _AuthTextFieldState extends State<AuthTextField>
   }
 
   String _sanitizeInput(String input) {
-    final maxLen = widget.isPassword ? InputLimits.passwordMax : widget.maxLength;
+    final maxLen = widget.isPassword
+        ? InputLimits.passwordMax
+        : widget.maxLength;
     String filtered = input;
 
     if (widget.keyboardType == TextInputType.emailAddress) {
@@ -281,7 +283,8 @@ class _AuthTextFieldState extends State<AuthTextField>
                             : widget.maxLength,
                         multiline: !widget.singleLine,
                       ),
-                      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
                       style: context.text.bodyMedium?.copyWith(
                         color: textColor,
                       ),

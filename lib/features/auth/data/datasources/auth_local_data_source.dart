@@ -6,7 +6,11 @@ abstract class AuthLocalDataSource {
   Future<void> saveRegistrationToken(String token);
   Future<String?> getRegistrationToken();
   Future<void> clearRegistrationToken();
-  Future<void> saveTokens(String accessToken, String refreshToken, [String? username]);
+  Future<void> saveTokens(
+    String accessToken,
+    String refreshToken, [
+    String? username,
+  ]);
   Future<void> saveGoogleAuthToken(String accessToken, String refreshToken);
   Future<String?> getUsername();
   Future<bool> isLoggedIn();
@@ -15,6 +19,7 @@ abstract class AuthLocalDataSource {
   Future<void> saveUser(String userJson);
   Future<String?> getUser();
   Future<void> clearUser();
+
   /// Cached health-onboarding status for [userId]; null if never checked.
   Future<void> setOnboardingCompleted(String userId, bool completed);
   Future<bool?> hasCompletedOnboarding(String userId);

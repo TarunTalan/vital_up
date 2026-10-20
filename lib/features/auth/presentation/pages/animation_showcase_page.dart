@@ -18,9 +18,7 @@ class _AnimationShowcasePageState extends State<AnimationShowcasePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Animation Showcase Sandbox'),
-      ),
+      appBar: AppBar(title: const Text('Animation Showcase Sandbox')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

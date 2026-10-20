@@ -52,8 +52,9 @@ class _LoginPageState extends State<LoginPage>
     final colors = context.colors;
 
     // Figma: title changes per tab
-    final headerTitle =
-        _selectedTab == 0 ? 'Welcome Back' : 'Create an account';
+    final headerTitle = _selectedTab == 0
+        ? 'Welcome Back'
+        : 'Create an account';
 
     return PopScope(
       canPop: false,
@@ -69,9 +70,9 @@ class _LoginPageState extends State<LoginPage>
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-        body: AuthBackground(
-          style: AuthBackgroundStyle.ellipses,
-          child: ResponsiveCenter(
+          body: AuthBackground(
+            style: AuthBackgroundStyle.ellipses,
+            child: ResponsiveCenter(
               child: SafeArea(
                 top: false,
                 child: Column(
@@ -94,8 +95,9 @@ class _LoginPageState extends State<LoginPage>
                         padding: const EdgeInsets.all(AppDimens.space4),
                         decoration: BoxDecoration(
                           color: v.glassFill,
-                          borderRadius:
-                              BorderRadius.circular(AppDimens.radiusInput),
+                          borderRadius: BorderRadius.circular(
+                            AppDimens.radiusInput,
+                          ),
                           border: Border.all(
                             color: v.glassBorder!,
                             width: AppDimens.borderThin,
@@ -105,14 +107,17 @@ class _LoginPageState extends State<LoginPage>
                           controller: _tabController,
                           indicatorSize: TabBarIndicatorSize.tab,
                           dividerColor: Colors.transparent,
-                          overlayColor:
-                              const WidgetStatePropertyAll(Colors.transparent),
-                          splashBorderRadius:
-                              BorderRadius.circular(AppDimens.radiusTab),
+                          overlayColor: const WidgetStatePropertyAll(
+                            Colors.transparent,
+                          ),
+                          splashBorderRadius: BorderRadius.circular(
+                            AppDimens.radiusTab,
+                          ),
                           indicator: BoxDecoration(
                             color: colors.primary,
-                            borderRadius:
-                                BorderRadius.circular(AppDimens.radiusTab),
+                            borderRadius: BorderRadius.circular(
+                              AppDimens.radiusTab,
+                            ),
                           ),
                           labelColor: AppColors.lighter,
                           unselectedLabelColor: v.grayText,
@@ -120,7 +125,10 @@ class _LoginPageState extends State<LoginPage>
                           unselectedLabelStyle: context.text.bodyLarge,
                           tabs: const [
                             Tab(height: AppDimens.buttonHeight, text: 'Login'),
-                            Tab(height: AppDimens.buttonHeight, text: 'Sign up'),
+                            Tab(
+                              height: AppDimens.buttonHeight,
+                              text: 'Sign up',
+                            ),
                           ],
                         ),
                       ),
@@ -136,9 +144,8 @@ class _LoginPageState extends State<LoginPage>
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (_) => const Center(
-                                  child: VitalUpLoader(),
-                                ),
+                                builder: (_) =>
+                                    const Center(child: VitalUpLoader()),
                               );
                               final completed = await context
                                   .read<AuthCubit>()
@@ -172,8 +179,8 @@ class _LoginPageState extends State<LoginPage>
                   ],
                 ),
               ),
+            ),
           ),
-        ),
         ),
       ),
     );
