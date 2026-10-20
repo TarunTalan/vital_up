@@ -208,6 +208,9 @@ class WeightCard extends StatelessWidget {
                 TrackerQuickAction(
                   label: loggedToday ? 'Update' : _metric.logLabel,
                   icon: loggedToday ? Icons.edit_rounded : _metric.logIcon,
+                  svgAsset: loggedToday
+                      ? TrackerIcons.edit
+                      : _metric.logIconAsset,
                   color: _metric.color,
                   filled: true,
                   onTap: () async {

@@ -354,21 +354,24 @@ Future<bool> showSleepLogSheet(
 }) async {
   final saved = await showAppBottomSheet<bool>(
     context: context,
-    builder: (_) => _SleepLogSheet(initial: initial),
+    builder: (_) => SleepLogSheet(initial: initial),
   );
   return saved == true;
 }
 
-class _SleepLogSheet extends StatefulWidget {
+class SleepLogSheet extends StatefulWidget {
   final SleepSessionInfo? initial;
 
-  const _SleepLogSheet({this.initial});
+  /// Nightly goal in minutes (from [SleepService] when not given).
+  final int? goalMinutes;
+
+  const SleepLogSheet({super.key, this.initial, this.goalMinutes});
 
   @override
-  State<_SleepLogSheet> createState() => _SleepLogSheetState();
+  State<SleepLogSheet> createState() => _SleepLogSheetState();
 }
 
-class _SleepLogSheetState extends State<_SleepLogSheet> {
+class _SleepLogSheetState extends State<SleepLogSheet> {
   late TimeOfDay _bed;
   late TimeOfDay _wake;
 
@@ -455,7 +458,7 @@ class _SleepLogSheetState extends State<_SleepLogSheet> {
     return TrackerSheet(
       metric: TrackerMetric.sleep,
       title: 'Log sleep',
-      subtitle: 'Drag the moon and sun to your bed and wake times',
+      subtitle: 'Drag the moon and sun, or the arc to move the night',
       action: AppPrimaryButton(
         label: 'Save ${d.inHours}h ${d.inMinutes.remainder(60)}m',
         isLoading: _saving,
@@ -478,6 +481,10 @@ class _SleepLogSheetState extends State<_SleepLogSheet> {
           ),
           const SizedBox(height: AppDimens.space12),
           CircularSleepClockPicker(
+            goal: Duration(
+              minutes:
+                  widget.goalMinutes ?? sl<SleepService>().getGoalMinutes(),
+            ),
             initialBedTime: _bed,
             initialWakeTime: _wake,
             onChanged: (b, w) => setState(() {
