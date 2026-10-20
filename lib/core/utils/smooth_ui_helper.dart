@@ -39,6 +39,7 @@ Future<T?> showSmoothDialog<T>({
   bool barrierDismissible = true,
   Color? barrierColor,
   String? barrierLabel,
+  bool useSafeArea = true,
 }) {
   if (!context.mounted || _shouldIgnoreOpen(context)) {
     return Future<T?>.value();
@@ -51,7 +52,8 @@ Future<T?> showSmoothDialog<T>({
       barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.54),
       barrierLabel: barrierLabel ?? 'Dismiss',
       pageBuilder: (context, animation, secondaryAnimation) {
-        return builder(context);
+        final content = builder(context);
+        return useSafeArea ? SafeArea(child: content) : content;
       },
       transitionDuration: AppDurations.slow,
       transitionBuilder: (context, animation, secondaryAnimation, child) {

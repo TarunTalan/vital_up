@@ -10,11 +10,16 @@ class AccuracyInfoDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = context.colors.primary;
+    final mediaQuery = MediaQuery.of(context);
+    final topPadding = mediaQuery.padding.top;
+    final bottomPadding = mediaQuery.padding.bottom;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.gutter,
-        vertical: AppDimens.space24,
+      insetPadding: EdgeInsets.fromLTRB(
+        AppDimens.gutter,
+        topPadding > 0 ? topPadding + AppDimens.space24 : AppDimens.space24,
+        AppDimens.gutter,
+        bottomPadding > 0 ? bottomPadding + AppDimens.space24 : AppDimens.space24,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDimens.radiusDialog),
