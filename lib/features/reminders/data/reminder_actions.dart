@@ -10,11 +10,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/database/collections/sleep_log_cache.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/monitoring/crash_reporter.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
 import 'package:vital_up/features/home_widget/data/widget_background.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
+import 'package:vital_up/features/reminders/data/reminders_local_datasource.dart';
+import 'package:vital_up/features/reminders/data/reminders_service.dart';
+import 'package:vital_up/features/settings/data/datasources/settings_local_datasource_impl.dart';
+import 'package:vital_up/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:vital_up/core/events/habit_events.dart';
+import 'package:vital_up/features/dashboard/data/services/water_intake_service.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 
@@ -34,6 +41,8 @@ String? reminderUserId(NotificationResponse response) {
 /// the workout timer.
 @pragma('vm:entry-point')
 Future<void> reminderActionBackground(NotificationResponse response) async {
+  DartPluginRegistrant.ensureInitialized();
+  await CrashReporter.initBackground();
   // Pause / Resume on the workout timer: not tied to a user.
   final action = response.actionId;
   if (LocalWorkoutTimerNotifier.handles(action)) {
@@ -58,8 +67,8 @@ Future<void> reminderActionBackground(NotificationResponse response) async {
       case ReminderScheduler.wakeAction:
         await saveWakeInBackground(userId);
     }
-  } catch (e) {
-    debugPrint('Reminder action ${response.actionId} failed: $e');
+  } catch (e, stack) {
+    CrashReporter.report(e, stack, reason: 'Reminder action ${response.actionId}');
     return;
   }
   // The home screen widgets would keep the old water / sleep figures until
@@ -119,6 +128,7 @@ Future<bool> saveWakeInBackground(String userId) async {
         ..isSynced = false,
     ),
   );
+  await markRemindersDoneInBackground(userId, const HabitLogged(Habit.sleep));
   return true;
 }
 
@@ -156,7 +166,55 @@ Future<int> addWaterInBackground(String userId, int ml) async {
         includeUpper: false,
       )
       .findAll();
-  return today.fold<int>(0, (sum, l) => sum + l.amountMl);
+  final total = today.fold<int>(0, (sum, l) => sum + l.amountMl);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  if (total >= WaterIntakeService.dailyGoalFrom(prefs)) {
+    await markRemindersDoneInBackground(
+      userId,
+      const HabitLogged(Habit.water, goalReached: true),
+    );
+  }
+  return total;
+}
+
+/// What the app does on a [HabitLogged] event (smart skip: the rest of
+/// today's reminders for that habit are quieted), for logs made with the
+/// app closed: widget buttons and notification actions. The app's own
+/// listener never hears about those, so reminders kept firing all day.
+Future<void> markRemindersDoneInBackground(
+  String userId,
+  HabitLogged event,
+) async {
+  try {
+    DartPluginRegistrant.ensureInitialized();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final plugin = FlutterLocalNotificationsPlugin();
+    await plugin.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+      ),
+    );
+    final scheduler = ReminderScheduler(plugin);
+    await scheduler.init();
+    final service = RemindersService(
+      RemindersLocalDataSource(prefs),
+      scheduler,
+      SettingsRepositoryImpl(
+        localDataSource: SettingsLocalDataSourceImpl(sharedPreferences: prefs),
+      ),
+      userId: () => userId,
+    );
+    await service.markDone(event);
+  } catch (e) {
+    debugPrint('Quieting reminders in the background failed: $e');
+  }
 }
 
 /// Reads today's water total from Isar in a background isolate.
@@ -211,6 +269,7 @@ Future<int> saveMoodInBackground(
     key,
     jsonEncode(updated.map((c) => c.toJson()).toList()),
   );
+  await markRemindersDoneInBackground(userId, const HabitLogged(Habit.mood));
   return stressStreak(updated, now: now);
 }
 
