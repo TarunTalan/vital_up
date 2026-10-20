@@ -20,16 +20,16 @@ class HealthVitalsService {
   HealthVitalsService(this._prefs);
 
   static List<HealthDataType> get _vitalTypes => [
-        HealthDataType.HEART_RATE,
-        HealthDataType.RESTING_HEART_RATE,
-        Platform.isIOS
-            ? HealthDataType.HEART_RATE_VARIABILITY_SDNN
-            : HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
-        HealthDataType.BLOOD_OXYGEN,
-        HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
-        HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
-        HealthDataType.STEPS,
-      ];
+    HealthDataType.HEART_RATE,
+    HealthDataType.RESTING_HEART_RATE,
+    Platform.isIOS
+        ? HealthDataType.HEART_RATE_VARIABILITY_SDNN
+        : HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
+    HealthDataType.BLOOD_OXYGEN,
+    HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+    HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+    HealthDataType.STEPS,
+  ];
 
   static final _sleepTypes = [
     HealthDataType.SLEEP_ASLEEP,
@@ -137,7 +137,9 @@ class HealthVitalsService {
       hrvMs: hrvToday,
       hrvBaselineMs: hrvBaseline,
       // Some sources report SpO2 as a 0–1 fraction.
-      spo2Percent: spo2 == null ? null : (spo2 <= 1 ? spo2 * 100 : spo2).round(),
+      spo2Percent: spo2 == null
+          ? null
+          : (spo2 <= 1 ? spo2 * 100 : spo2).round(),
       systolic: systolic?.round(),
       diastolic: diastolic?.round(),
     );
@@ -148,7 +150,8 @@ class HealthVitalsService {
   Future<Map<DateTime, int>?> readDailySteps(List<DateTime> days) async {
     if (days.isEmpty || !await isAvailable()) return null;
     final connected = await isConnected();
-    if (!await _canRead(HealthDataType.STEPS, connected: connected)) return null;
+    if (!await _canRead(HealthDataType.STEPS, connected: connected))
+      return null;
     final now = DateTime.now();
     try {
       final totals = await Future.wait([
@@ -160,9 +163,7 @@ class HealthVitalsService {
                 : DateTime(day.year, day.month, day.day + 1),
           ),
       ]);
-      return {
-        for (var i = 0; i < days.length; i++) days[i]: totals[i] ?? 0,
-      };
+      return {for (var i = 0; i < days.length; i++) days[i]: totals[i] ?? 0};
     } catch (e) {
       debugPrint('Daily steps unavailable: $e');
       return null;
@@ -172,7 +173,8 @@ class HealthVitalsService {
   Future<int?> readStepsToday() async {
     if (!await isAvailable()) return null;
     final connected = await isConnected();
-    if (!await _canRead(HealthDataType.STEPS, connected: connected)) return null;
+    if (!await _canRead(HealthDataType.STEPS, connected: connected))
+      return null;
     final now = DateTime.now();
     try {
       final steps = await _health.getTotalStepsInInterval(
@@ -216,7 +218,8 @@ class HealthVitalsService {
 
   static double? _latest(List<HealthDataPoint> points) {
     if (points.isEmpty) return null;
-    final sorted = [...points]..sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
+    final sorted = [...points]
+      ..sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
     return _value(sorted.first);
   }
 

@@ -12,7 +12,7 @@ class VitaInsightCard extends StatelessWidget {
 
   /// Plain body-16 message.
   VitaInsightCard.message(String text, {super.key})
-      : child = _InsightText(text);
+    : child = _InsightText(text);
 
   @override
   Widget build(BuildContext context) {

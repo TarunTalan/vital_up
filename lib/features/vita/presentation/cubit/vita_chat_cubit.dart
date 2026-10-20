@@ -32,18 +32,22 @@ class VitaChatState extends Equatable {
     bool? isTyping,
     String? Function()? error,
     bool? limitReached,
-  }) =>
-      VitaChatState(
-        messages: messages ?? this.messages,
-        isLoading: isLoading ?? this.isLoading,
-        isTyping: isTyping ?? this.isTyping,
-        error: error == null ? this.error : error(),
-        limitReached: limitReached ?? this.limitReached,
-      );
+  }) => VitaChatState(
+    messages: messages ?? this.messages,
+    isLoading: isLoading ?? this.isLoading,
+    isTyping: isTyping ?? this.isTyping,
+    error: error == null ? this.error : error(),
+    limitReached: limitReached ?? this.limitReached,
+  );
 
   @override
-  List<Object?> get props =>
-      [messages, isLoading, isTyping, error, limitReached];
+  List<Object?> get props => [
+    messages,
+    isLoading,
+    isTyping,
+    error,
+    limitReached,
+  ];
 }
 
 /// Vita conversation; history is stored on device so it's readable offline.
@@ -71,11 +75,8 @@ class VitaChatCubit extends Cubit<VitaChatState> {
 
   /// Cleans a typed message: no invisible characters, at most
   /// [InputLimits.chatMessage] characters. Empty when nothing is left.
-  static String cleanMessage(String text) => sanitizeText(
-        text,
-        maxLength: InputLimits.chatMessage,
-        multiline: true,
-      );
+  static String cleanMessage(String text) =>
+      sanitizeText(text, maxLength: InputLimits.chatMessage, multiline: true);
 
   Future<void> send(String text) async {
     final trimmed = cleanMessage(text);
@@ -101,12 +102,14 @@ class VitaChatCubit extends Cubit<VitaChatState> {
   static const replyTimeout = Duration(seconds: 75);
 
   Future<void> _ask(List<VitaMessage> history) async {
-    emit(state.copyWith(
-      messages: history,
-      isTyping: true,
-      error: () => null,
-      limitReached: false,
-    ));
+    emit(
+      state.copyWith(
+        messages: history,
+        isTyping: true,
+        error: () => null,
+        limitReached: false,
+      ),
+    );
     await _save(history);
 
     try {
@@ -129,12 +132,14 @@ class VitaChatCubit extends Cubit<VitaChatState> {
         ...history.sublist(0, history.length - 1),
         history.last.copyWith(failed: true),
       ];
-      emit(state.copyWith(
-        messages: updated,
-        isTyping: false,
-        error: () => message,
-        limitReached: e is VitaException && e.dailyLimit,
-      ));
+      emit(
+        state.copyWith(
+          messages: updated,
+          isTyping: false,
+          error: () => message,
+          limitReached: e is VitaException && e.dailyLimit,
+        ),
+      );
       await _save(updated);
     }
   }

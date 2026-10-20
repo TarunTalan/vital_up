@@ -36,7 +36,10 @@ class VitaHomePage extends StatelessWidget {
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: (constraints.maxHeight - bottom).clamp(0, double.infinity),
+              minHeight: (constraints.maxHeight - bottom).clamp(
+                0,
+                double.infinity,
+              ),
             ),
             child: const Center(
               child: Column(
@@ -47,7 +50,8 @@ class VitaHomePage extends StatelessWidget {
                   _FeatureGrid(),
                   SizedBox(height: VitaDimens.homeGap),
                   AppInfoNote(
-                    message: "VitalUp's health coach is AI-powered and for "
+                    message:
+                        "VitalUp's health coach is AI-powered and for "
                         'informational purposes only. Always consult a '
                         'qualified healthcare professional for medical '
                         'decisions.',

@@ -29,8 +29,8 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   /// Caps the whole fetch so the loader can never spin forever.
   Future<StressReport> _load() =>
       _repository.getStressReport().timeout(const Duration(seconds: 60));
-  late final Future<VitaDailyInsights?> _insights =
-      _repository.getDailyInsights();
+  late final Future<VitaDailyInsights?> _insights = _repository
+      .getDailyInsights();
   bool _connecting = false;
 
   // Block body: an arrow body would hand setState the Future and throw.
@@ -45,7 +45,8 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
       await _repository.saveStressCheckIn(level);
     } catch (e) {
       debugPrint('Stress check-in not saved: $e');
-      if (mounted) showErrorSnackBar(context, "Couldn't save your check-in. Try again.");
+      if (mounted)
+        showErrorSnackBar(context, "Couldn't save your check-in. Try again.");
       return;
     }
     if (mounted) _reload();
@@ -65,7 +66,10 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
     if (granted) {
       _reload();
     } else {
-      showErrorSnackBar(context, 'No heart data access. Allow it in Health settings.');
+      showErrorSnackBar(
+        context,
+        'No heart data access. Allow it in Health settings.',
+      );
     }
   }
 
@@ -108,7 +112,8 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
             ],
             const SizedBox(height: AppDimens.space16),
             const AppInfoNote(
-              message: 'Stress scores are estimates for general wellbeing, '
+              message:
+                  'Stress scores are estimates for general wellbeing, '
                   'not a medical assessment.',
             ),
           ],
@@ -119,10 +124,10 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
 }
 
 Color _levelColor(StressLevel level) => switch (level) {
-      StressLevel.low => AppColors.gradeGood,
-      StressLevel.moderate => AppColors.gradeModerate,
-      StressLevel.high => AppColors.gradeBad,
-    };
+  StressLevel.low => AppColors.gradeGood,
+  StressLevel.moderate => AppColors.gradeModerate,
+  StressLevel.high => AppColors.gradeBad,
+};
 
 class _StressLevelCard extends StatelessWidget {
   final StressReport report;

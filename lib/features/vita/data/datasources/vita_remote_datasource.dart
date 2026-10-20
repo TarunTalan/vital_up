@@ -54,11 +54,14 @@ class VitaRemoteDataSource {
       sender: VitaSender.vita,
       text: text is String ? text.trim() : '',
       bullets: [
-        for (final b in (data['bullets'] is List ? data['bullets'] as List : const []))
+        for (final b
+            in (data['bullets'] is List ? data['bullets'] as List : const []))
           if (b is String && b.trim().isNotEmpty) b.trim(),
       ],
       action: VitaAction.fromWire(data['action']),
-      planInstructions: plan is String && plan.trim().isNotEmpty ? plan.trim() : null,
+      planInstructions: plan is String && plan.trim().isNotEmpty
+          ? plan.trim()
+          : null,
       sentAt: DateTime.now(),
     );
   }
@@ -117,10 +120,7 @@ class VitaRemoteDataSource {
       }
       throw switch (e.status) {
         401 => const VitaException(VitaException.sessionExpired),
-        429 => VitaException(
-            VitaException.dailyLimitReached,
-            dailyLimit: true,
-          ),
+        429 => VitaException(VitaException.dailyLimitReached, dailyLimit: true),
         _ => const VitaException(VitaException.couldNotReply),
       };
     } on TimeoutException {

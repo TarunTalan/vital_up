@@ -17,9 +17,9 @@ class StressEstimator {
     int? yesterdayScore,
   }) {
     final triggers = detectTriggers(snapshot);
-    final proxy = (baseline +
-            triggers.fold<int>(0, (sum, t) => sum + t.severity.weight))
-        .clamp(0, 100);
+    final proxy =
+        (baseline + triggers.fold<int>(0, (sum, t) => sum + t.severity.weight))
+            .clamp(0, 100);
     final physio = wearableScore(snapshot.vitals);
     final self = checkIn == null ? null : (checkIn.level - 1) * 25;
 
@@ -72,18 +72,24 @@ class StressEstimator {
 
     final sleep = s.sleepLastNightHours;
     if (sleep != null && sleep < 7) {
-      triggers.add(StressTrigger(
-        name: 'Sleep deficit',
-        severity: sleep < 6 ? TriggerSeverity.high : TriggerSeverity.medium,
-      ));
+      triggers.add(
+        StressTrigger(
+          name: 'Sleep deficit',
+          severity: sleep < 6 ? TriggerSeverity.high : TriggerSeverity.medium,
+        ),
+      );
     }
 
     final screen = s.screenTimeTodayMinutes;
     if (screen != null && screen >= 240) {
-      triggers.add(StressTrigger(
-        name: 'High screen time',
-        severity: screen >= 360 ? TriggerSeverity.high : TriggerSeverity.medium,
-      ));
+      triggers.add(
+        StressTrigger(
+          name: 'High screen time',
+          severity: screen >= 360
+              ? TriggerSeverity.high
+              : TriggerSeverity.medium,
+        ),
+      );
     }
 
     // Only judge hydration for users who actually log water, against the
@@ -92,52 +98,69 @@ class StressEstimator {
       final expected = s.waterGoalMl * ((hour - 7).clamp(0, 15) / 15);
       final ratio = expected <= 0 ? 1.0 : (s.waterTodayMl ?? 0) / expected;
       if (ratio < 0.75) {
-        triggers.add(StressTrigger(
-          name: 'Low hydration',
-          severity: ratio < 0.5 ? TriggerSeverity.medium : TriggerSeverity.low,
-        ));
+        triggers.add(
+          StressTrigger(
+            name: 'Low hydration',
+            severity: ratio < 0.5
+                ? TriggerSeverity.medium
+                : TriggerSeverity.low,
+          ),
+        );
       }
     }
 
     if (s.logsMeals) {
-      final missedMeals = (hour >= 14 && s.mealsToday == 0) ||
-          (hour >= 21 && s.mealsToday < 2);
-      final sparseWeek = s.daysWithMealsThisWeek >= 3 &&
+      final missedMeals =
+          (hour >= 14 && s.mealsToday == 0) || (hour >= 21 && s.mealsToday < 2);
+      final sparseWeek =
+          s.daysWithMealsThisWeek >= 3 &&
           s.mealsThisWeek / s.daysWithMealsThisWeek < 2;
       if (missedMeals || sparseWeek) {
-        triggers.add(StressTrigger(
-          name: 'Irregular meals',
-          severity: missedMeals ? TriggerSeverity.high : TriggerSeverity.medium,
-        ));
+        triggers.add(
+          StressTrigger(
+            name: 'Irregular meals',
+            severity: missedMeals
+                ? TriggerSeverity.high
+                : TriggerSeverity.medium,
+          ),
+        );
       }
     }
 
     // Without step data we can't tell "inactive" from "doesn't track".
     final steps = s.stepsToday;
     if (steps != null && hour >= 18 && steps < 3000) {
-      triggers.add(const StressTrigger(
-        name: 'Low activity',
-        severity: TriggerSeverity.low,
-      ));
+      triggers.add(
+        const StressTrigger(
+          name: 'Low activity',
+          severity: TriggerSeverity.low,
+        ),
+      );
     }
 
     final v = s.vitals;
     if (v.hrvMs != null && v.hrvBaselineMs != null && v.hrvBaselineMs! > 0) {
       final drop = 1 - v.hrvMs! / v.hrvBaselineMs!;
       if (drop >= 0.15) {
-        triggers.add(StressTrigger(
-          name: 'Lower heart-rate variability',
-          severity: drop >= 0.3 ? TriggerSeverity.high : TriggerSeverity.medium,
-        ));
+        triggers.add(
+          StressTrigger(
+            name: 'Lower heart-rate variability',
+            severity: drop >= 0.3
+                ? TriggerSeverity.high
+                : TriggerSeverity.medium,
+          ),
+        );
       }
     }
     if (v.restingHeartRate != null &&
         v.restingHeartRateBaseline != null &&
         v.restingHeartRate! - v.restingHeartRateBaseline! >= 5) {
-      triggers.add(const StressTrigger(
-        name: 'Raised resting heart rate',
-        severity: TriggerSeverity.medium,
-      ));
+      triggers.add(
+        const StressTrigger(
+          name: 'Raised resting heart rate',
+          severity: TriggerSeverity.medium,
+        ),
+      );
     }
 
     // Most severe first.

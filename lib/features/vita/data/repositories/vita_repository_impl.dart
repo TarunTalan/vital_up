@@ -46,12 +46,13 @@ class VitaRepositoryImpl implements VitaRepository {
   String get _userId => _supabase.auth.currentUser?.id ?? 'guest';
 
   VitaMessage _greeting() => VitaMessage(
-        sender: VitaSender.vita,
-        sentAt: DateTime.now(),
-        text: "Hi, I'm Vita, your health companion in VitalUp. I can see "
-            'your diet, sleep, stress, activity and more. '
-            "What's on your mind today?",
-      );
+    sender: VitaSender.vita,
+    sentAt: DateTime.now(),
+    text:
+        "Hi, I'm Vita, your health companion in VitalUp. I can see "
+        'your diet, sleep, stress, activity and more. '
+        "What's on your mind today?",
+  );
 
   // --- Chat -----------------------------------------------------------------
 
@@ -212,18 +213,21 @@ class VitaRepositoryImpl implements VitaRepository {
     );
   }
 
-  Map<String, dynamic> _payload(HealthSnapshot snapshot, StressReport stress) => {
-        ...snapshot.toJson(),
-        'stress': {
-          'score0to100': stress.score,
-          'level': stress.level.name,
-          'basedOn': stress.source.name,
-          if (stress.todayCheckIn != null) 'checkIn': stress.todayCheckIn!.label,
-          'triggers': [
-            for (final t in stress.triggers) '${t.name} (${t.severity.label})',
-          ],
-        },
-      };
+  Map<String, dynamic> _payload(
+    HealthSnapshot snapshot,
+    StressReport stress,
+  ) => {
+    ...snapshot.toJson(),
+    'stress': {
+      'score0to100': stress.score,
+      'level': stress.level.name,
+      'basedOn': stress.source.name,
+      if (stress.todayCheckIn != null) 'checkIn': stress.todayCheckIn!.label,
+      'triggers': [
+        for (final t in stress.triggers) '${t.name} (${t.severity.label})',
+      ],
+    },
+  };
 
   static bool _isToday(DateTime? date) =>
       date != null && _sameDay(date, DateTime.now());

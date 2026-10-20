@@ -27,11 +27,11 @@ class VitaIcons {
   static const String caretLeft = '$_dir/vita_caret_left.svg';
 
   static String forSignal(HealthSignalKind kind) => switch (kind) {
-        HealthSignalKind.diet => diet,
-        HealthSignalKind.metrics => metrics,
-        HealthSignalKind.sleep => sleep,
-        HealthSignalKind.stress => stress,
-        HealthSignalKind.activity => activity,
-        HealthSignalKind.medication => medication,
-      };
+    HealthSignalKind.diet => diet,
+    HealthSignalKind.metrics => metrics,
+    HealthSignalKind.sleep => sleep,
+    HealthSignalKind.stress => stress,
+    HealthSignalKind.activity => activity,
+    HealthSignalKind.medication => medication,
+  };
 }

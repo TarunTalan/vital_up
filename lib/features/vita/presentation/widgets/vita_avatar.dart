@@ -16,12 +16,12 @@ class VitaAvatar extends StatelessWidget {
   });
 
   const VitaAvatar.large({super.key, this.iconColor})
-      : size = VitaDimens.avatarLarge,
-        color = VitaColors.avatar;
+    : size = VitaDimens.avatarLarge,
+      color = VitaColors.avatar;
 
   const VitaAvatar.insight({super.key, this.iconColor})
-      : size = VitaDimens.avatarSmall,
-        color = VitaColors.avatarInsight;
+    : size = VitaDimens.avatarSmall,
+      color = VitaColors.avatarInsight;
 
   @override
   Widget build(BuildContext context) {

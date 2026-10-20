@@ -24,7 +24,8 @@ const _bubblePadding = EdgeInsets.symmetric(
 );
 
 TextStyle? _bubbleText(BuildContext context, Color color) => context
-    .text.bodyLarge
+    .text
+    .bodyLarge
     ?.copyWith(color: color, height: VitaDimens.bubbleLineHeight);
 
 /// One chat message — Figma `health coach/chat` bubbles. Vita's replies sit
@@ -114,8 +115,10 @@ class ChatBubble extends StatelessWidget {
               maxWidth: constraints.maxWidth * VitaDimens.botBubbleFraction,
               expand: action != null,
               children: [
-                Text(message.text,
-                    style: _bubbleText(context, VitaColors.botText)),
+                Text(
+                  message.text,
+                  style: _bubbleText(context, VitaColors.botText),
+                ),
                 for (final bullet in message.bullets) _Bullet(bullet),
                 if (action != null) ...[
                   const SizedBox(height: AppDimens.space24),
@@ -191,7 +194,10 @@ class _Bullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: AppDimens.space16, child: Text('•', style: style)),
+          SizedBox(
+            width: AppDimens.space16,
+            child: Text('•', style: style),
+          ),
           Expanded(child: Text(text, style: style)),
         ],
       ),
@@ -240,13 +246,22 @@ class _TypingBubbleState extends State<TypingBubble>
             for (var i = 0; i < 3; i++) ...[
               if (i > 0) const SizedBox(width: AppDimens.space6),
               FadeTransition(
-                opacity: TweenSequence<double>([
-                  TweenSequenceItem(tween: Tween(begin: 0.3, end: 1), weight: 1),
-                  TweenSequenceItem(tween: Tween(begin: 1, end: 0.3), weight: 1),
-                ]).animate(CurvedAnimation(
-                  parent: _controller,
-                  curve: Interval(i * 0.2, 0.6 + i * 0.2),
-                )),
+                opacity:
+                    TweenSequence<double>([
+                      TweenSequenceItem(
+                        tween: Tween(begin: 0.3, end: 1),
+                        weight: 1,
+                      ),
+                      TweenSequenceItem(
+                        tween: Tween(begin: 1, end: 0.3),
+                        weight: 1,
+                      ),
+                    ]).animate(
+                      CurvedAnimation(
+                        parent: _controller,
+                        curve: Interval(i * 0.2, 0.6 + i * 0.2),
+                      ),
+                    ),
                 child: Container(
                   width: AppDimens.bulletDot,
                   height: AppDimens.bulletDot,

@@ -101,10 +101,7 @@ class HealthSnapshotBuilder {
       screenTimeTodayMinutes: results[3] as int?,
       stepsToday: healthSteps == null && activity?.stepsToday == null
           ? null
-          : dailySteps(
-              health: healthSteps,
-              tracked: activity?.stepsToday ?? 0,
-            ),
+          : dailySteps(health: healthSteps, tracked: activity?.stepsToday ?? 0),
       stepsFromHealthConnect: healthSteps != null,
       workoutStepsToday: activity?.stepsToday,
       workoutsThisWeek: activity?.workouts ?? 0,
@@ -175,7 +172,9 @@ class HealthSnapshotBuilder {
     // Saved entries are manual or the phone's estimate, never Health Connect.
     final loggedLastNight =
         recent.isNotEmpty &&
-            recent.first.endTime.isAfter(now.subtract(const Duration(hours: 24)))
+            recent.first.endTime.isAfter(
+              now.subtract(const Duration(hours: 24)),
+            )
         ? recent.first.durationMinutes / 60
         : null;
     final logged = recent.map((l) => l.durationMinutes / 60).toList();

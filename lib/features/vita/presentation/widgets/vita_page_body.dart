@@ -8,11 +8,11 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 /// Body padding for Vita sub-pages: 16dp below the [AppTitleBar] (its own
 /// bottom spacing), gutter sides, section gap at the bottom.
 EdgeInsets vitaBodyPadding(BuildContext context) => EdgeInsets.fromLTRB(
-      context.gutter,
-      0,
-      context.gutter,
-      context.safePadding.bottom + AppDimens.sectionGap,
-    );
+  context.gutter,
+  0,
+  context.gutter,
+  context.safePadding.bottom + AppDimens.sectionGap,
+);
 
 /// Loading / error / data switch for a one-shot Vita insight fetch.
 class VitaFutureBody<T> extends StatelessWidget {

@@ -32,8 +32,8 @@ class VitaDietPlanPage extends StatefulWidget {
 }
 
 class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
-  late final Future<VitaDailyInsights?> _insights =
-      sl<VitaRepository>().getDailyInsights();
+  late final Future<VitaDailyInsights?> _insights = sl<VitaRepository>()
+      .getDailyInsights();
 
   void _askVita() {
     if (widget.fromChat) {
@@ -96,8 +96,9 @@ class _VitaDietPlanPageState extends State<VitaDietPlanPage> {
                         label: 'Edit plan',
                         onTap: () async {
                           final cubit = context.read<DietPlanCubit>();
-                          final saved =
-                              await context.pushNamed<bool>('diet-plan-edit');
+                          final saved = await context.pushNamed<bool>(
+                            'diet-plan-edit',
+                          );
                           if (saved == true) cubit.loadActiveMealPlan();
                         },
                       ),

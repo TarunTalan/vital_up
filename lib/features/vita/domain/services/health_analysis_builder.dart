@@ -14,12 +14,14 @@ class HealthAnalysisBuilder {
       if (s.avgCaloriesPerDay != null) {
         parts.add('Avg ${s.avgCaloriesPerDay} cal/day');
       }
-      rows.add(HealthSignal(
-        kind: HealthSignalKind.diet,
-        title: 'Diet & Nutrition',
-        summary: parts.join(' · '),
-        dataPoints: parts.length,
-      ));
+      rows.add(
+        HealthSignal(
+          kind: HealthSignalKind.diet,
+          title: 'Diet & Nutrition',
+          summary: parts.join(' · '),
+          dataPoints: parts.length,
+        ),
+      );
     }
 
     final metrics = _metrics(s);
@@ -32,22 +34,27 @@ class HealthAnalysisBuilder {
         if (s.sleepAvgHours != null && s.sleepNightsLogged > 1)
           '${_h(s.sleepAvgHours!)}h avg',
       ];
-      rows.add(HealthSignal(
-        kind: HealthSignalKind.sleep,
-        title: 'Sleep Analysis',
-        summary: parts.join(' · '),
-        dataPoints: parts.length,
-      ));
+      rows.add(
+        HealthSignal(
+          kind: HealthSignalKind.sleep,
+          title: 'Sleep Analysis',
+          summary: parts.join(' · '),
+          dataPoints: parts.length,
+        ),
+      );
     }
 
     final triggerCount = stress.triggers.length;
-    rows.add(HealthSignal(
-      kind: HealthSignalKind.stress,
-      title: 'Stress Detection',
-      summary: '${_level(stress.level)} · '
-          '${triggerCount == 0 ? 'No triggers' : '$triggerCount trigger${_s(triggerCount)}'} today',
-      dataPoints: 1 + triggerCount,
-    ));
+    rows.add(
+      HealthSignal(
+        kind: HealthSignalKind.stress,
+        title: 'Stress Detection',
+        summary:
+            '${_level(stress.level)} · '
+            '${triggerCount == 0 ? 'No triggers' : '$triggerCount trigger${_s(triggerCount)}'} today',
+        dataPoints: 1 + triggerCount,
+      ),
+    );
 
     final activity = <String>[
       if (s.stepsToday != null) '${_thousands(s.stepsToday!)} steps today',
@@ -57,20 +64,24 @@ class HealthAnalysisBuilder {
         '${s.distanceThisWeekKm.toStringAsFixed(1)} km',
     ];
     if (activity.isNotEmpty) {
-      rows.add(HealthSignal(
-        kind: HealthSignalKind.activity,
-        title: 'Activity',
-        summary: activity.take(2).join(' · '),
-        dataPoints: activity.length,
-      ));
+      rows.add(
+        HealthSignal(
+          kind: HealthSignalKind.activity,
+          title: 'Activity',
+          summary: activity.take(2).join(' · '),
+          dataPoints: activity.length,
+        ),
+      );
     }
 
     if (s.profile.hasMedicines) {
-      rows.add(HealthSignal(
-        kind: HealthSignalKind.medication,
-        title: 'Medication',
-        summary: 'From your profile: ${s.profile.medicines!.trim()}',
-      ));
+      rows.add(
+        HealthSignal(
+          kind: HealthSignalKind.medication,
+          title: 'Medication',
+          summary: 'From your profile: ${s.profile.medicines!.trim()}',
+        ),
+      );
     }
 
     return rows;
@@ -79,9 +90,12 @@ class HealthAnalysisBuilder {
   HealthSignal? _metrics(HealthSnapshot s) {
     final v = s.vitals;
     final parts = <String>[
-      if (v.avgHeartRate != null) 'HR avg ${v.avgHeartRate}bpm'
-      else if (v.restingHeartRate != null) 'Resting HR ${v.restingHeartRate}bpm',
-      if (v.systolic != null && v.diastolic != null) 'BP ${v.systolic}/${v.diastolic}',
+      if (v.avgHeartRate != null)
+        'HR avg ${v.avgHeartRate}bpm'
+      else if (v.restingHeartRate != null)
+        'Resting HR ${v.restingHeartRate}bpm',
+      if (v.systolic != null && v.diastolic != null)
+        'BP ${v.systolic}/${v.diastolic}',
       if (v.spo2Percent != null) 'SpO2 ${v.spo2Percent}%',
       if (v.hrvMs != null) 'HRV ${v.hrvMs!.round()}ms',
     ];
@@ -98,22 +112,23 @@ class HealthAnalysisBuilder {
       return HealthSignal(
         kind: HealthSignalKind.metrics,
         title: 'Health Metrics',
-        summary: 'From your profile: BP ${p.bloodPressureTop}/${p.bloodPressureBottom}',
+        summary:
+            'From your profile: BP ${p.bloodPressureTop}/${p.bloodPressureBottom}',
       );
     }
     return null;
   }
 
   static String _level(StressLevel level) => switch (level) {
-        StressLevel.low => 'Low stress',
-        StressLevel.moderate => 'Moderate stress',
-        StressLevel.high => 'High stress',
-      };
+    StressLevel.low => 'Low stress',
+    StressLevel.moderate => 'Moderate stress',
+    StressLevel.high => 'High stress',
+  };
 
   static String _s(int n) => n == 1 ? '' : 's';
   static String _h(double hours) => hours.toStringAsFixed(1);
   static String _thousands(int n) => n.toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+$)'),
-        (m) => '${m[1]},',
-      );
+    RegExp(r'(\d)(?=(\d{3})+$)'),
+    (m) => '${m[1]},',
+  );
 }

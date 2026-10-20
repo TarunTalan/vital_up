@@ -118,11 +118,18 @@ class HealthSnapshot {
       tracksWater: tracksWater,
       screenTimeTodayMinutes: screenTimeTodayMinutes,
       stepsToday: stepsFromHealthConnect ? workoutStepsToday : stepsToday,
-      workoutsThisWeek: math.max(0, workoutsThisWeek - importedWorkoutsThisWeek),
-      distanceThisWeekKm:
-          math.max(0, distanceThisWeekKm - importedDistanceThisWeekKm),
-      activeMinutesThisWeek:
-          math.max(0, activeMinutesThisWeek - importedActiveMinutesThisWeek),
+      workoutsThisWeek: math.max(
+        0,
+        workoutsThisWeek - importedWorkoutsThisWeek,
+      ),
+      distanceThisWeekKm: math.max(
+        0,
+        distanceThisWeekKm - importedDistanceThisWeekKm,
+      ),
+      activeMinutesThisWeek: math.max(
+        0,
+        activeMinutesThisWeek - importedActiveMinutesThisWeek,
+      ),
       dietPlanMeals: dietPlanMeals,
       workoutStepsToday: workoutStepsToday,
       loggedSleepLastNightHours: loggedSleepLastNightHours,
@@ -136,34 +143,36 @@ class HealthSnapshot {
   /// Compact JSON for the Vita edge function; nulls and empties are dropped
   /// so the model can't mistake "no data" for a real zero.
   Map<String, dynamic> toJson() => _compact({
-        'now': takenAt.toIso8601String(),
-        'profile': profile.toJson(),
-        'diet': {
-          'mealsToday': mealsToday,
-          'caloriesToday': caloriesToday,
-          'calorieGoal': calorieGoal,
-          'todayMeals': todayMealSummaries,
-          'mealsLoggedLast7Days': mealsThisWeek,
-          'daysWithMealsLast7Days': daysWithMealsThisWeek,
-          'avgCaloriesPerLoggedDay': avgCaloriesPerDay,
-        },
-        'sleep': {
-          'lastNightHours': sleepLastNightHours,
-          'avgHoursLast7Days': sleepAvgHours,
-          'nightsLogged': sleepNightsLogged,
-        },
-        if (tracksWater)
-          'hydration': {'todayMl': waterTodayMl, 'goalMl': waterGoalMl},
-        'screenTimeTodayMinutes': screenTimeTodayMinutes,
-        'activity': {
-          'stepsToday': stepsToday,
-          'workoutsLast7Days': workoutsThisWeek,
-          'distanceLast7DaysKm': double.parse(distanceThisWeekKm.toStringAsFixed(1)),
-          'activeMinutesLast7Days': activeMinutesThisWeek,
-        },
-        'vitals': vitals.toJson(),
-        'activeDietPlan': dietPlanMeals,
-      });
+    'now': takenAt.toIso8601String(),
+    'profile': profile.toJson(),
+    'diet': {
+      'mealsToday': mealsToday,
+      'caloriesToday': caloriesToday,
+      'calorieGoal': calorieGoal,
+      'todayMeals': todayMealSummaries,
+      'mealsLoggedLast7Days': mealsThisWeek,
+      'daysWithMealsLast7Days': daysWithMealsThisWeek,
+      'avgCaloriesPerLoggedDay': avgCaloriesPerDay,
+    },
+    'sleep': {
+      'lastNightHours': sleepLastNightHours,
+      'avgHoursLast7Days': sleepAvgHours,
+      'nightsLogged': sleepNightsLogged,
+    },
+    if (tracksWater)
+      'hydration': {'todayMl': waterTodayMl, 'goalMl': waterGoalMl},
+    'screenTimeTodayMinutes': screenTimeTodayMinutes,
+    'activity': {
+      'stepsToday': stepsToday,
+      'workoutsLast7Days': workoutsThisWeek,
+      'distanceLast7DaysKm': double.parse(
+        distanceThisWeekKm.toStringAsFixed(1),
+      ),
+      'activeMinutesLast7Days': activeMinutesThisWeek,
+    },
+    'vitals': vitals.toJson(),
+    'activeDietPlan': dietPlanMeals,
+  });
 }
 
 class ProfileSnapshot {
@@ -202,21 +211,21 @@ class ProfileSnapshot {
   bool get hasMedicines => _meaningful(medicines);
 
   Map<String, dynamic> toJson() => {
-        'age': age,
-        'gender': gender,
-        'weightKg': weightKg,
-        'heightCm': heightCm,
-        'goal': goalType,
-        'targetWeightKg': targetWeightKg,
-        'dietaryPreference': dietaryPreference,
-        'healthConditions': healthConditions,
-        'allergies': allergies,
-        'medicines': medicines,
-        'smokes': smokes,
-        'activityLevel': activityLevel,
-        if (bloodPressureTop != null && bloodPressureBottom != null)
-          'selfReportedBloodPressure': '$bloodPressureTop/$bloodPressureBottom',
-      };
+    'age': age,
+    'gender': gender,
+    'weightKg': weightKg,
+    'heightCm': heightCm,
+    'goal': goalType,
+    'targetWeightKg': targetWeightKg,
+    'dietaryPreference': dietaryPreference,
+    'healthConditions': healthConditions,
+    'allergies': allergies,
+    'medicines': medicines,
+    'smokes': smokes,
+    'activityLevel': activityLevel,
+    if (bloodPressureTop != null && bloodPressureBottom != null)
+      'selfReportedBloodPressure': '$bloodPressureTop/$bloodPressureBottom',
+  };
 }
 
 class VitalsSnapshot {
@@ -250,15 +259,15 @@ class VitalsSnapshot {
       systolic != null;
 
   Map<String, dynamic> toJson() => {
-        'avgHeartRateBpm': avgHeartRate,
-        'restingHeartRateBpm': restingHeartRate,
-        'restingHeartRateBaselineBpm': restingHeartRateBaseline,
-        'hrvMs': hrvMs?.round(),
-        'hrvBaselineMs': hrvBaselineMs?.round(),
-        'spo2Percent': spo2Percent,
-        if (systolic != null && diastolic != null)
-          'bloodPressure': '$systolic/$diastolic',
-      };
+    'avgHeartRateBpm': avgHeartRate,
+    'restingHeartRateBpm': restingHeartRate,
+    'restingHeartRateBaselineBpm': restingHeartRateBaseline,
+    'hrvMs': hrvMs?.round(),
+    'hrvBaselineMs': hrvBaselineMs?.round(),
+    'spo2Percent': spo2Percent,
+    if (systolic != null && diastolic != null)
+      'bloodPressure': '$systolic/$diastolic',
+  };
 }
 
 bool _meaningful(String? value) {

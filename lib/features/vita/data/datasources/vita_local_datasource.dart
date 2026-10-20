@@ -20,10 +20,8 @@ class VitaLocalDataSource {
 
   // --- Chat -----------------------------------------------------------------
 
-  List<VitaMessage> readChat(String userId) => _readList(
-        _key('chat', userId),
-        VitaMessage.fromJson,
-      );
+  List<VitaMessage> readChat(String userId) =>
+      _readList(_key('chat', userId), VitaMessage.fromJson);
 
   Future<void> writeChat(String userId, List<VitaMessage> messages) {
     final kept = messages.length > maxMessages
@@ -37,10 +35,8 @@ class VitaLocalDataSource {
 
   // --- Stress check-ins & daily scores -------------------------------------
 
-  List<StressCheckIn> readCheckIns(String userId) => _readList(
-        _key('checkins', userId),
-        StressCheckIn.fromJson,
-      );
+  List<StressCheckIn> readCheckIns(String userId) =>
+      _readList(_key('checkins', userId), StressCheckIn.fromJson);
 
   Future<void> addCheckIn(String userId, StressCheckIn checkIn) async {
     // The mood widget writes check-ins from another isolate; start from
@@ -49,10 +45,13 @@ class VitaLocalDataSource {
     final stored = readCheckIns(userId);
     // Check-ins and scores are kept for streaks and the 30-day stress trend.
     final cutoff = historyCutoff(stored.map((c) => c.date), DateTime.now());
-    final list = stored
-        .where((c) => c.date.isAfter(cutoff) && !_sameDay(c.date, checkIn.date))
-        .toList()
-      ..add(checkIn);
+    final list =
+        stored
+            .where(
+              (c) => c.date.isAfter(cutoff) && !_sameDay(c.date, checkIn.date),
+            )
+            .toList()
+          ..add(checkIn);
     await _prefs.setString(
       _key('checkins', userId),
       jsonEncode(list.map((c) => c.toJson()).toList()),
@@ -79,7 +78,10 @@ class VitaLocalDataSource {
   Future<void> writeScore(String userId, DateTime day, int score) {
     final scores = readScores(userId);
     final cutoff = dayKey(
-      historyCutoff(scores.keys.map(DateTime.tryParse).nonNulls, DateTime.now()),
+      historyCutoff(
+        scores.keys.map(DateTime.tryParse).nonNulls,
+        DateTime.now(),
+      ),
     );
     scores
       ..removeWhere((k, _) => k.compareTo(cutoff) < 0)
@@ -93,7 +95,9 @@ class VitaLocalDataSource {
     final raw = _prefs.getString(_key('insights', userId));
     if (raw == null) return null;
     try {
-      return VitaDailyInsights.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      return VitaDailyInsights.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
     } catch (_) {
       return null;
     }
