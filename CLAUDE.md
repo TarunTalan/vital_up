@@ -421,7 +421,9 @@ Route names are GoRouter `name`s.
   (`core/widgets/circular_sleep_clock.dart`: drag moon / sun, or the arc
   to move the whole night; handles stop at 30 min / 18 h (`clampSleepGap`,
   the save rules; pushed past each other they stick to the side they came
-  from), so dial, middle and Save always agree; a future wake-up shows its
+  from); the middle shows the sheet's figure (`duration:` = Save's real
+  elapsed time on the night's dates, so a daylight-saving night reads 7 or
+  9 h on both), so dial, middle and Save always agree; a future wake-up shows its
   error live and turns Save off; opened before 7 am it starts at wake =
   now, bed = goal earlier; a phone estimate keeps its time asleep (dial,
   Save, saved `asleep:` and source) until the times change; band shades night (sleep) to morning
@@ -1014,6 +1016,13 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
 `https://` imports as `any`.
 
 ## Gotchas
+
+- The app ships in every country: handle daylight saving and time zones.
+  Calendar steps use `DateTime(y, m, d ± n)` / `nextDay` / `previousDay`,
+  day counts `calendarDaysBetween` (never `Duration(days:)` on local
+  midnights or `difference().inDays`, which are an hour / a day off across
+  a clock change); durations are real elapsed time between dates. Server
+  "days" in IST (quotas, report fallback) are a known design.
 
 - The shell is Git Bash on Windows: for `adb shell` paths use
   `MSYS_NO_PATHCONV=1`; long inline heredocs with quotes can fail to parse,

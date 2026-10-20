@@ -56,7 +56,9 @@ String challengeSubtitle(Challenge c, DateTime now) {
 
 String challengeTitle(Challenge c) =>
     'Most ${c.metric.label.toLowerCase()} · '
-    '${c.endsAt.difference(c.startsAt).inDays} days';
+    // Nearest whole day: in local time a week across a clock change is
+    // 6 days 23 h, which inDays would call "6 days".
+    '${(c.endsAt.difference(c.startsAt).inHours / 24).round()} days';
 
 /// One challenge: metric, length, who started it and time left (or how it
 /// ended), with your rank and score once you've joined. An open invite

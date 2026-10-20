@@ -393,6 +393,64 @@ void main() {
       expect(find.text('Save ${span ~/ 60}h ${span % 60}m'), findsOneWidget);
     });
 
+    testWidgets('the dial always shows the same duration as Save', (
+      tester,
+    ) async {
+      await tester.runAsync(loadAllFonts);
+      // The dial takes Save's figure (real elapsed time on the night's
+      // dates), so they can't disagree, daylight-saving nights included.
+      for (final (bedHour, bedMinute, wakeHour, wakeMinute) in [
+        (23, 15, 6, 40),
+        (1, 0, 9, 0),
+        (22, 0, 16, 0),
+        (6, 0, 6, 30),
+      ]) {
+        final wake = DateTime(
+          now.year,
+          now.month,
+          now.day - 1,
+          wakeHour,
+          wakeMinute,
+        );
+        var bed = DateTime(wake.year, wake.month, wake.day, bedHour, bedMinute);
+        if (!bed.isBefore(wake)) {
+          bed = DateTime(bed.year, bed.month, bed.day - 1, bedHour, bedMinute);
+        }
+        await pumpPage(
+          tester,
+          _host(
+            SleepLogSheet(
+              goalMinutes: 8 * 60,
+              initial: SleepSessionInfo(
+                bedTime: bed,
+                wakeTime: wake,
+                duration: wake.difference(bed),
+                source: SleepDataSource.manual,
+              ),
+            ),
+          ),
+          size: const Size(412, 915),
+        );
+        await tester.pumpAndSettle();
+        // Each pass opens a new sheet on top: read the newest one.
+        final save = tester
+            .widget<AppPrimaryButton>(find.byType(AppPrimaryButton).last)
+            .label
+            .replaceFirst('Save ', '');
+        final dial = tester
+            .widgetList<RichText>(
+              find.descendant(
+                of: find.byType(CircularSleepClockPicker).last,
+                matching: find.byType(RichText),
+              ),
+            )
+            .map((t) => t.text.toPlainText())
+            .firstWhere((t) => RegExp(r'^\d+h( \d+m)?$').hasMatch(t));
+        // Save always spells out minutes ("8h 0m"); the dial drops "0m".
+        expect(save.replaceFirst(RegExp(r' 0m$'), ''), dial);
+      }
+    });
+
     testWidgets('a wake-up time in the future is flagged and Save is off', (
       tester,
     ) async {

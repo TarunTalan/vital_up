@@ -49,7 +49,9 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     final today = startOfDay(DateTime.now());
     final weekStart = startOfWeek(today);
     // Charts show the range; weekly goals also need every day since Monday.
-    final sinceMonday = today.difference(weekStart).inDays + 1;
+    // Calendar days: a week with a clock change has a 23 or 25 h day, so
+    // a Duration's inDays would come out one short.
+    final sinceMonday = calendarDaysBetween(weekStart, today) + 1;
     final days = lastNDays(range.days > sinceMonday ? range.days : sinceMonday);
     final from = days.first;
 

@@ -39,9 +39,12 @@ class CircularSleepClockPicker extends StatefulWidget {
   /// Nightly sleep goal: the middle says "Goal met" or how far short.
   final Duration? goal;
 
-  /// Time asleep to show instead of bed-to-wake (a phone estimate without
-  /// its screen-on check-ins), so the dial matches Save.
-  final Duration? asleep;
+  /// The night's length to show in the middle, from whoever knows the
+  /// dates: real elapsed time (a daylight-saving night from 23:00 to 07:00
+  /// is 7 or 9 hours, not the dial's 8) or a phone estimate's time asleep.
+  /// The dial alone only knows clock positions, so without it the middle
+  /// shows the wall-clock gap.
+  final Duration? duration;
 
   /// Shortest and longest night the handles allow (the save rules), so
   /// the dial never shows a night that can't be saved.
@@ -63,7 +66,7 @@ class CircularSleepClockPicker extends StatefulWidget {
     this.onWakeTimeChanged,
     this.onChanged,
     this.goal,
-    this.asleep,
+    this.duration,
     this.onClockSize,
     this.minDuration = const Duration(minutes: 30),
     this.maxDuration = const Duration(hours: 18),
@@ -275,7 +278,7 @@ class _CircularSleepClockPickerState extends State<CircularSleepClockPicker> {
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
-    final duration = widget.asleep ?? _getSleepDuration();
+    final duration = widget.duration ?? _getSleepDuration();
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final goal = widget.goal;

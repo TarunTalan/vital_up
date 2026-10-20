@@ -57,7 +57,9 @@ class HealthSnapshotBuilder {
   Future<HealthSnapshot> build() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(const Duration(days: 6));
+    // Calendar days back, not 6 x 24 h (wrong by an hour across a
+    // daylight-saving change).
+    final weekStart = DateTime(today.year, today.month, today.day - 6);
 
     final results = await Future.wait<Object?>([
       _safe('meals', () => _meals(today, weekStart)),

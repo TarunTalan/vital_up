@@ -567,7 +567,10 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
                   ),
                   initialBedTime: _bed,
                   initialWakeTime: _wake,
-                  asleep: _keptAsleep,
+                  // The same figure as Save: real elapsed time on the
+                  // night's dates (right on daylight-saving nights), or a
+                  // kept estimate's time asleep.
+                  duration: _duration,
                   minDuration: minSleepEntry,
                   maxDuration: maxSleepEntry,
                   onClockSize: (size) {
