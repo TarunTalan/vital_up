@@ -76,7 +76,10 @@ class TrackerCardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 200;
+        // Side-by-side Home tiles always use the compact header (no chip),
+        // so a pair's figures line up on every device, tablets included.
+        final isCompact =
+            constraints.maxWidth < 200 || _TileScope.inTile(context);
         final titleText = title ?? metric.label;
         final titleStyle = context.text.titleSmall?.copyWith(
           color: context.colors.onSurface,
@@ -1186,6 +1189,17 @@ class TrackerPrompt extends StatelessWidget {
   }
 }
 
+/// Marks tracker cards laid out as side-by-side Home tiles.
+class _TileScope extends InheritedWidget {
+  const _TileScope({required super.child});
+
+  static bool inTile(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_TileScope>() != null;
+
+  @override
+  bool updateShouldNotify(_TileScope old) => false;
+}
+
 /// How much the metric style (big card figures) has grown with the
 /// system text size: less than body text ([AppTextScaler]).
 double metricGrowth(BuildContext context) {
@@ -1230,15 +1244,17 @@ class TrackerTilePair extends StatelessWidget {
 
   Widget _row(BuildContext context) {
     final height = context.textScaled(AppDimens.dashboardTileHeight);
-    return SizedBox(
-      height: height,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: AppDimens.cardGap),
-          Expanded(child: right),
-        ],
+    return _TileScope(
+      child: SizedBox(
+        height: height,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: AppDimens.cardGap),
+            Expanded(child: right),
+          ],
+        ),
       ),
     );
   }
