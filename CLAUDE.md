@@ -466,6 +466,23 @@ Route names are GoRouter `name`s.
   tracking page updates the route/puck annotations in place and holds map
   calls while hidden. The activity calendar reads a month at once
   (`DailyMetricsCollector.collectDays`).
+  GPS calories: `estimateGpsCalories` (`domain/services/activity_calories.dart`,
+  ACSM: 1 MET of rest for the active time + `kcalPerKgPerKm` x km +
+  `kcalPerKgPerClimbMeter` x climb; climbing uses MET x time; never drops
+  as time passes). Weight for all workout calories comes from
+  `BodyWeightSource` (latest weight entry, else profile weight, else 70 kg;
+  auth metadata has no weight). `TrackPointFilter` re-anchors after 3
+  consistent fixes that all jump from the last accepted one (bad cold-start
+  fix); the bloc then moves the first route point instead of drawing a spike.
+  Offline map: `OfflineMapPrefetcher` (one download at a time) runs from
+  Home's deferred start (only if location is already allowed; last known
+  position) and again from the tracking screen's first fix; the map widget
+  loads `MAPBOX_STREETS` directly (the style in the offline pack).
+  Voice coach (`VoiceCoachService`, shared singleton): `init()` once (Home
+  deferred start and both workout screens), cues speak with no per-cue
+  setup, `stop()` cancels a cue still being prepared; music never silences
+  it; the countdown uses it too (a second `FlutterTts` steals the plugin's
+  callbacks). Screens stop it on dispose and when leaving the result page.
   Mapbox map with offline packs, pedometer with glitch filtering, BLE
   heart-rate straps (`flutter_blue_plus`), TTS voice coach, music/local
   audio. Gotcha: geolocator has one position stream; cancel the map preview
@@ -708,10 +725,17 @@ Route names are GoRouter `name`s.
   No deno locally: type-check with tsc + shims (see Tests).
 - Not in any migration (created in the dashboard): `profiles`,
   `user_health_data`, `proprietary_products`, `get_email_by_username`
-  (closed). Their policies can differ from the repo: after deploying, probe
-  the live API with the publishable key (curl `rest/v1/<table>`) rather than
-  trusting the repo. Signed-in access to `user_health_data` /
-  `proprietary_products` hasn't been verified yet.
+  (closed). `20261027_core_tables_rls.sql` (written Oct 20, NOT pushed
+  yet) enables RLS on the three tables with permissive + RESTRICTIVE
+  policies (restrictive ones cap any dashboard policy): profiles readable
+  by signed-in users, insert/update own row, no client delete;
+  `user_health_data` own row only; `proprietary_products` readable by all,
+  clients may only add new barcodes (`PendingWrite.insertIfMissing`, an
+  upsert with `ignoreDuplicates`: a plain upsert needs UPDATE rights).
+  `_protect_profile_columns` now also pins `id`, `city`, `country_code`
+  and `timezone` on client updates (set through `set_my_city` /
+  `set_my_timezone`). Tested on local Postgres. After pushing, probe the
+  live API with the publishable key (curl `rest/v1/<table>`).
 
 ## Website & Legal Suite (vitalup.live)
 
@@ -787,17 +811,35 @@ Route names are GoRouter `name`s.
   blurs, Nunito instead of SF Pro (0.4 MB vs 28 MB), ML Kit from Play
   Services, `device_preview` only in debug; arm64 download ~29 MB est.).
 - Decide: 10 iOS gaps (no Crashlytics, push or widgets).
+- Fixed Oct 20: widgets redraw just after midnight (`WidgetMidnight.kt`,
+  inexact alarm re-armed on every widget update, plus TIME_SET /
+  TIMEZONE_CHANGED); water / mood / sleep logged from widgets or
+  notification actions quiet that habit's reminders
+  (`markRemindersDoneInBackground`; `RemindersService` reloads prefs
+  before skipping or resyncing so it doesn't write over them); background
+  isolates report to Crashlytics (`CrashReporter.initBackground` in the
+  GPS service, widget callback and notification actions); sign-in wipes
+  another account's leftover data before the first sync
+  (`AccountService.claimDevice`, pref `local_data_owner_id`, via
+  `SyncService.beforeFirstSync`); sign-out also clears `weight_target_kg`,
+  `health_import_last` and `sleep_bedtime_*`; export pages
+  `daily_reports` and `notifications` and gives points 60 s; food scan
+  says "This can take up to a minute" and asks before leaving mid-scan
+  (`confirmLeaveFoodScan`, dashboard via `FoodScannerPage.busy`); label
+  OCR loader is an in-page overlay; meal / activity history pull spinners
+  wait for the load (`done` Completer on the event) and activity history
+  keeps the list and filters while reloading; leaderboard reload bar sits
+  in a fixed gap; points history keeps its data on refresh.
 - Known leftovers: AI keys are one per function for every user (no
   Pro routing; free-tier Gemini may use prompts); backup conflicts
-  use device clocks; widgets redraw after midnight only on their 30 min
-  update or a tap; reminders don't see
-  widget logs; other offline GETs take ~7 s to fail where no connectivity
-check comes first (postgrest retries 1+2+4 s);
-food scan has no long-wait hint or cancel; label-scan loader
-  is a dialog; leaderboard jumps on reload; activity history shows a
-  full-page loader on refresh; meal history pull spinner ends early;
-  meals/workouts not tied to a user id locally; 50 wrong guesses in 15 min
-  from many addresses still block username sign-in (email still works).
+  use device clocks; other offline GETs take ~7 s to fail where no
+  connectivity check comes first (postgrest retries 1+2+4 s); no skeleton
+  loaders (needs a Figma design); meals/workouts have no user id column
+  locally (the device-owner wipe covers it); iOS has no Firebase config
+  (no Crashlytics); Health Connect steps can't be read in the background
+  (needs READ_HEALTH_DATA_IN_BACKGROUND + a Play declaration); 50 wrong
+  guesses in 15 min from many addresses still block username sign-in
+  (email still works).
 
 ### Remaining:
 1. **Production Release Review:** Initial bundle and all required declarations (Health apps / Health Connect, Usage Access video, Location foreground service video, Data safety form) submitted to Google Play Console; currently under review.
