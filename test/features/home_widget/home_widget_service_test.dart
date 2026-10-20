@@ -60,7 +60,7 @@ void main() {
       expect(calories.progress, 71);
 
       final water = tiles[WidgetMetric.water]!;
-      expect(water.value, '1.3 L'); // Same rounding as Home.
+      expect(water.value, '1.25 L'); // Same rounding as Home.
       expect(water.detail, 'of 2.5 L');
       expect(water.progress, 50);
 
