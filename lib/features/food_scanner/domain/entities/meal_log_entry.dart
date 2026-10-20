@@ -2,12 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'food_item.dart';
 import 'nutrition_info.dart';
 
-enum MealType {
-  breakfast,
-  lunch,
-  dinner,
-  snack,
-}
+enum MealType { breakfast, lunch, dinner, snack }
 
 class MealLogEntry extends Equatable {
   final String id;
@@ -67,13 +62,13 @@ class MealLogEntry extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        capturedAt,
-        imagePath,
-        items,
-        nutrition,
-        totalCalories,
-        mealType,
-        userConfirmed,
-      ];
+    id,
+    capturedAt,
+    imagePath,
+    items,
+    nutrition,
+    totalCalories,
+    mealType,
+    userConfirmed,
+  ];
 }

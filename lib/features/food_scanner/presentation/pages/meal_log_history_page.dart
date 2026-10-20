@@ -39,10 +39,7 @@ class _MealLogHistoryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      header: AppPageHeader(
-        title: 'Meal history',
-        onBack: () => context.pop(),
-      ),
+      header: AppPageHeader(title: 'Meal history', onBack: () => context.pop()),
       scrollable: false,
       padBody: false,
       body: SafeArea(
@@ -55,7 +52,8 @@ class _MealLogHistoryView extends StatelessWidget {
             await done.future.timeout(kLoadTimeout, onTimeout: () {});
           },
           child: BlocConsumer<MealLogBloc, MealLogState>(
-            listenWhen: (_, state) => state is MealLogLoaded && state.notice != null,
+            listenWhen: (_, state) =>
+                state is MealLogLoaded && state.notice != null,
             listener: (context, state) {
               final notice = (state as MealLogLoaded).notice;
               if (notice != null) showErrorSnackBar(context, notice);
@@ -74,7 +72,9 @@ class _MealLogHistoryView extends StatelessWidget {
                     padding: context.pagePadding,
                     child: LoadErrorView(
                       message: state.message,
-                      onRetry: () => context.read<MealLogBloc>().add(const LoadAllMealLogs()),
+                      onRetry: () => context.read<MealLogBloc>().add(
+                        const LoadAllMealLogs(),
+                      ),
                     ),
                   ),
                 );

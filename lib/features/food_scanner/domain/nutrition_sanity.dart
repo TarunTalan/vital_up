@@ -73,7 +73,10 @@ double saneConfidence(Object? raw, {double fallback = 0}) {
 /// A safe scale factor for changing a portion from [oldQuantity] to
 /// [newQuantity]: 1 when either side is unusable.
 double safeScale(double oldQuantity, double newQuantity) {
-  if (!oldQuantity.isFinite || !newQuantity.isFinite || oldQuantity <= 0 || newQuantity <= 0) {
+  if (!oldQuantity.isFinite ||
+      !newQuantity.isFinite ||
+      oldQuantity <= 0 ||
+      newQuantity <= 0) {
     return 1;
   }
   final factor = newQuantity / oldQuantity;
@@ -84,7 +87,9 @@ double safeScale(double oldQuantity, double newQuantity) {
 /// Food names coming back from the server or typed by the user: no control
 /// characters, single line, at most [InputLimits.shortText] characters.
 String saneFoodName(Object? raw, {String fallback = ''}) {
-  final text = raw == null ? '' : sanitizeText(raw.toString(), maxLength: InputLimits.shortText);
+  final text = raw == null
+      ? ''
+      : sanitizeText(raw.toString(), maxLength: InputLimits.shortText);
   return text.isEmpty ? fallback : text;
 }
 
@@ -94,7 +99,8 @@ String saneFoodName(Object? raw, {String fallback = ''}) {
 double mealTotalCalories(Iterable<NutritionInfo> foods) {
   final sum = foods.fold<double>(
     0,
-    (total, n) => total + saneAmount(n.calories, max: NutritionLimits.caloriesMax),
+    (total, n) =>
+        total + saneAmount(n.calories, max: NutritionLimits.caloriesMax),
   );
   return sum > NutritionLimits.mealCaloriesMax
       ? NutritionLimits.mealCaloriesMax
@@ -158,7 +164,10 @@ FoodItem sanitizeFoodItem(FoodItem item) {
     id: item.id,
     name: saneFoodName(item.name, fallback: 'Food'),
     confidenceScore: saneConfidence(item.confidenceScore),
-    servingDescription: sanitizeText(item.servingDescription, maxLength: InputLimits.shortText),
+    servingDescription: sanitizeText(
+      item.servingDescription,
+      maxLength: InputLimits.shortText,
+    ),
     quantity: saneQuantity(item.quantity),
     unit: _saneUnit(item.unit),
   );
@@ -208,7 +217,11 @@ bool isValidGtin(String code) {
   final digits = code.codeUnits.map((c) => c - 48).toList();
   var sum = 0;
   // Weights 3, 1, 3... from the digit left of the check digit.
-  for (var i = digits.length - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+  for (
+    var i = digits.length - 2, weight = 3;
+    i >= 0;
+    i--, weight = 4 - weight
+  ) {
     sum += digits[i] * weight;
   }
   return (10 - sum % 10) % 10 == digits.last;
@@ -219,13 +232,17 @@ bool isValidGtin(String code) {
 /// text gives them. Falls back to 100 g.
 ({double quantity, String unit}) parseServingSize(String serving) {
   final text = serving.toLowerCase();
-  final grams = RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:g|gm|gms|grams?|ml)\b').firstMatch(text);
+  final grams = RegExp(
+    r'(\d+(?:[.,]\d+)?)\s*(?:g|gm|gms|grams?|ml)\b',
+  ).firstMatch(text);
   if (grams != null) {
     final value = saneQuantity(grams.group(1), fallback: 100);
     return (quantity: value, unit: 'g');
   }
   final count = RegExp(r'^\s*(\d+(?:[.,]\d+)?)').firstMatch(text);
-  final amount = count == null ? null : saneQuantity(count.group(1), fallback: 1);
+  final amount = count == null
+      ? null
+      : saneQuantity(count.group(1), fallback: 1);
   if (text.contains('piece') || RegExp(r'\bpcs?\b').hasMatch(text)) {
     return (quantity: amount ?? 1, unit: 'piece');
   }

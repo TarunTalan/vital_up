@@ -39,8 +39,11 @@ class NutritionOcrParser {
           match = numberRegExp.firstMatch(nextLine);
           if (match != null) {
             // Ensure next line is just a number/unit, not another nutrient name
-            final isNutrient = nextLine.toLowerCase().contains(RegExp(
-                r'energy|calor|protein|carb|fat|sugar|fiber|fibre|sodium|salt'));
+            final isNutrient = nextLine.toLowerCase().contains(
+              RegExp(
+                r'energy|calor|protein|carb|fat|sugar|fiber|fibre|sodium|salt',
+              ),
+            );
             if (!isNutrient) {
               return toNumber(match.group(1)!);
             }
@@ -73,7 +76,8 @@ class NutritionOcrParser {
         }
       }
       // 3. Carbohydrates
-      else if (lowerLine.contains('carbohydrate') || lowerLine.contains('carbs')) {
+      else if (lowerLine.contains('carbohydrate') ||
+          lowerLine.contains('carbs')) {
         final val = findNumber(i);
         if (val != null && values['carbs'] == 0.0) {
           values['carbs'] = val;
@@ -118,7 +122,8 @@ class NutritionOcrParser {
           } else {
             // If sodium is explicitly labeled in grams ("450mg" also ends
             // in "g", so milligrams are checked first).
-            if (!lowerLine.contains('mg') && (lowerLine.contains(' g') || lowerLine.endsWith('g'))) {
+            if (!lowerLine.contains('mg') &&
+                (lowerLine.contains(' g') || lowerLine.endsWith('g'))) {
               values['sodium'] = val * 1000.0;
             } else {
               values['sodium'] = val; // default is mg

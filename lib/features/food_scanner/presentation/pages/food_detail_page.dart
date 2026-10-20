@@ -1049,9 +1049,7 @@ class _DishInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: AppCaption('Dish Info', uppercase: false),
-              ),
+              const Expanded(child: AppCaption('Dish Info', uppercase: false)),
               _TextAction(
                 label: 'Add',
                 icon: Icons.add_rounded,

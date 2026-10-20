@@ -23,15 +23,16 @@ class ScanFoodImage {
   /// zeroed nutrition so the caller can estimate it rather than silently
   /// dropping a food the user can see on their plate.
   Future<Either<Failure, List<NutritionInfo>>> call(File image) async {
-    final recognitionResult = await foodRecognitionRepository.recognizeFood(image);
-
-    return recognitionResult.fold(
-      (failure) async => Left(failure),
-      (foods) async {
-        if (foods.isEmpty) return const Left(NoFoodDetectedFailure());
-        return Right(await Future.wait(foods.map(_resolveNutrition)));
-      },
+    final recognitionResult = await foodRecognitionRepository.recognizeFood(
+      image,
     );
+
+    return recognitionResult.fold((failure) async => Left(failure), (
+      foods,
+    ) async {
+      if (foods.isEmpty) return const Left(NoFoodDetectedFailure());
+      return Right(await Future.wait(foods.map(_resolveNutrition)));
+    });
   }
 
   Future<NutritionInfo> _resolveNutrition(RecognizedFood food) async {

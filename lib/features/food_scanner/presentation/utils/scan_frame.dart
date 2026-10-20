@@ -25,7 +25,12 @@ Rect scanFrameRect(Size screen) {
 /// delivers it) to the full-screen, cover-fitted preview. ML Kit reports
 /// points in the upright image (after the rotation it was given), so only
 /// the scale and the cover crop apply.
-Offset mapCameraPoint(Offset point, Size imageSize, int sensorOrientation, Size screen) {
+Offset mapCameraPoint(
+  Offset point,
+  Size imageSize,
+  int sensorOrientation,
+  Size screen,
+) {
   final sideways = sensorOrientation % 180 == 90;
   final previewW = sideways ? imageSize.height : imageSize.width;
   final previewH = sideways ? imageSize.width : imageSize.height;
@@ -42,7 +47,10 @@ typedef PlacedCode = ({String value, List<Offset> points});
 /// centre is inside [frame], else the first other code there (for the "not
 /// a food barcode" hint) with a null `product`. Codes outside the frame, such
 /// as one at the edge of the picture, are ignored: null when none is inside.
-({PlacedCode code, String? product})? pickCodeInFrame(List<PlacedCode> codes, Rect frame) {
+({PlacedCode code, String? product})? pickCodeInFrame(
+  List<PlacedCode> codes,
+  Rect frame,
+) {
   ({PlacedCode code, String? product})? other;
   for (final code in codes) {
     if (code.points.isEmpty || !frame.contains(_centre(code.points))) continue;

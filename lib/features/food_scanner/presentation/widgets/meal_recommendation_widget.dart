@@ -6,10 +6,7 @@ import 'package:vital_up/features/food_scanner/domain/entities/meal_recommendati
 class MealRecommendationWidget extends StatelessWidget {
   final MealRecommendation recommendation;
 
-  const MealRecommendationWidget({
-    super.key,
-    required this.recommendation,
-  });
+  const MealRecommendationWidget({super.key, required this.recommendation});
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +36,20 @@ class MealRecommendationWidget extends StatelessWidget {
               spacing: AppDimens.space8,
               runSpacing: AppDimens.space8,
               children: recommendation.reasonTags
-                  .map((tag) => Chip(
-                        label: Text(
-                          _formatTag(tag),
-                          style: context.text.bodySmall?.copyWith(
-                            color: context.colors.onSurface,
-                          ),
+                  .map(
+                    (tag) => Chip(
+                      label: Text(
+                        _formatTag(tag),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.colors.onSurface,
                         ),
-                        backgroundColor: v.successTint,
-                        side: BorderSide(
-                          color: v.success!.withValues(alpha: 0.27),
-                        ),
-                      ))
+                      ),
+                      backgroundColor: v.successTint,
+                      side: BorderSide(
+                        color: v.success!.withValues(alpha: 0.27),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
           ],

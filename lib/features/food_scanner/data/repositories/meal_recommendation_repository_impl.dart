@@ -44,7 +44,8 @@ class MealRecommendationRepositoryImpl implements MealRecommendationRepository {
     // Ordered by how much the user should act on it; the first tag drives the
     // headline message, all tags become suggestion bullets.
     final tags = <String>[
-      if (_isPostWorkout(recentActivity, now) && proteinShare >= 0.2) 'post_workout_window',
+      if (_isPostWorkout(recentActivity, now) && proteinShare >= 0.2)
+        'post_workout_window',
       if (sodium >= 900) 'high_sodium',
       if (sugar >= 25 || (sugar >= 10 && sugarShare > 0.25)) 'high_sugar',
       if (satFatShare > 0.12 && satFat >= 5) 'high_saturated_fat',
@@ -58,7 +59,9 @@ class MealRecommendationRepositoryImpl implements MealRecommendationRepository {
     ];
 
     return MealRecommendation(
-      message: tags.isEmpty ? _balancedMessage(entry.mealType) : _headline(tags.first, sodium: sodium),
+      message: tags.isEmpty
+          ? _balancedMessage(entry.mealType)
+          : _headline(tags.first, sodium: sodium),
       reasonTags: tags,
     );
   }

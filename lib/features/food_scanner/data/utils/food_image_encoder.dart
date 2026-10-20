@@ -34,8 +34,16 @@ Uint8List _encode(Uint8List bytes) {
   final longEdge = image.width > image.height ? image.width : image.height;
   if (longEdge > kFoodImageMaxEdge) {
     image = image.width >= image.height
-        ? img.copyResize(image, width: kFoodImageMaxEdge, interpolation: img.Interpolation.average)
-        : img.copyResize(image, height: kFoodImageMaxEdge, interpolation: img.Interpolation.average);
+        ? img.copyResize(
+            image,
+            width: kFoodImageMaxEdge,
+            interpolation: img.Interpolation.average,
+          )
+        : img.copyResize(
+            image,
+            height: kFoodImageMaxEdge,
+            interpolation: img.Interpolation.average,
+          );
   }
   return img.encodeJpg(image, quality: kFoodImageJpegQuality);
 }

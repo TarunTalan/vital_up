@@ -21,7 +21,8 @@ import 'package:vital_up/features/food_scanner/domain/repositories/food_recognit
 import 'package:vital_up/core/utils/quota_reset.dart';
 
 /// Top-level so the isolate closure captures only [bytes].
-Future<String> _hashInBackground(Uint8List bytes) => Isolate.run(() => hashBytes(bytes));
+Future<String> _hashInBackground(Uint8List bytes) =>
+    Isolate.run(() => hashBytes(bytes));
 
 class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   final Logger logger;
@@ -53,7 +54,9 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
   }
 
   @override
-  Future<Either<Failure, List<RecognizedFood>>> recognizeFood(File image) async {
+  Future<Either<Failure, List<RecognizedFood>>> recognizeFood(
+    File image,
+  ) async {
     logger.i('recognizeFood called with image: ${image.path}');
     try {
       // Keyed by content, not path: the capture flow overwrites one path with
@@ -61,8 +64,13 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       // path every time. Hashing a few MB is milliseconds, far cheaper than
       // the edge function call (and a scan from the daily quota) it saves.
       final original = await image.readAsBytes();
-      final cacheKey = FoodCacheKeys.recognition(await _hashInBackground(original));
-      final cached = await cacheStore.read<List<dynamic>>(cacheKey, decode: (json) => json as List<dynamic>);
+      final cacheKey = FoodCacheKeys.recognition(
+        await _hashInBackground(original),
+      );
+      final cached = await cacheStore.read<List<dynamic>>(
+        cacheKey,
+        decode: (json) => json as List<dynamic>,
+      );
       if (cached != null) {
         logger.d('Returning cached food recognition result');
         return Right(_toRecognizedFoods(cached.value));
@@ -70,7 +78,9 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
 
       // Photos aren't queued for later: the user is waiting on the result.
       if (!connectivity.hasNetwork) {
-        return const Left(NetworkFailure("You're offline. Search or scan a barcode instead."));
+        return const Left(
+          NetworkFailure("You're offline. Search or scan a barcode instead."),
+        );
       }
       if (supabaseClient.auth.currentSession?.accessToken == null) {
         logger.e('recognizeFood failed: No active session found.');
@@ -79,7 +89,9 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
 
       final stopwatch = Stopwatch()..start();
       final imageBytes = await encodeFoodImageBytesForUpload(original);
-      logger.d('Encoded image: ${imageBytes.length ~/ 1024} KB in ${stopwatch.elapsedMilliseconds} ms');
+      logger.d(
+        'Encoded image: ${imageBytes.length ~/ 1024} KB in ${stopwatch.elapsedMilliseconds} ms',
+      );
 
       final response = await supabaseClient.functions
           .invoke(
@@ -92,14 +104,18 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
           .timeout(_recognitionTimeout);
       connectivity.reportSuccess();
 
-      logger.d('scan-food responded ${response.status} in ${stopwatch.elapsedMilliseconds} ms');
+      logger.d(
+        'scan-food responded ${response.status} in ${stopwatch.elapsedMilliseconds} ms',
+      );
 
       final data = _decodeMap(response.data);
       final rawItems = data['items'];
       logger.d('Recognized items (${data['served_by']}): $rawItems');
 
       // Malformed or nameless items from the AI are dropped, not shown.
-      final itemsData = rawItems is List ? rawItems.where(_isUsableItem).toList() : const <dynamic>[];
+      final itemsData = rawItems is List
+          ? rawItems.where(_isUsableItem).toList()
+          : const <dynamic>[];
       if (itemsData.isEmpty) {
         return const Left(NoFoodDetectedFailure());
       }
@@ -110,10 +126,14 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
       return Right(_toRecognizedFoods(itemsData));
     } on FunctionException catch (e) {
       // Provider error details are for logs only; never show raw JSON to users.
-      logger.e('scan-food function error: status=${e.status} details=${e.details}');
+      logger.e(
+        'scan-food function error: status=${e.status} details=${e.details}',
+      );
       switch (e.status) {
         case 401:
-          return const Left(ServerFailure('Please sign in again to scan food.'));
+          return const Left(
+            ServerFailure('Please sign in again to scan food.'),
+          );
         case 402:
         case 403:
         case 429:
@@ -127,20 +147,30 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
         default:
           if (isOfflineError(e)) {
             connectivity.reportFailure();
-            return const Left(NetworkFailure("You're offline. Check your connection."));
+            return const Left(
+              NetworkFailure("You're offline. Check your connection."),
+            );
           }
-          return const Left(ServerFailure("Couldn't analyse the photo. Try again."));
+          return const Left(
+            ServerFailure("Couldn't analyse the photo. Try again."),
+          );
       }
     } on TimeoutException {
-      logger.e('recognizeFood timed out after ${_recognitionTimeout.inSeconds}s');
+      logger.e(
+        'recognizeFood timed out after ${_recognitionTimeout.inSeconds}s',
+      );
       return const Left(NetworkFailure('This is taking too long. Try again.'));
     } catch (e) {
       logger.e('Unexpected error in recognizeFood: $e');
       if (isOfflineError(e)) {
         connectivity.reportFailure();
-        return const Left(NetworkFailure("You're offline. Check your connection."));
+        return const Left(
+          NetworkFailure("You're offline. Check your connection."),
+        );
       }
-      return const Left(ServerFailure("Couldn't analyse the photo. Try again."));
+      return const Left(
+        ServerFailure("Couldn't analyse the photo. Try again."),
+      );
     }
   }
 
@@ -174,7 +204,12 @@ class FoodRecognitionRepositoryImpl implements FoodRecognitionRepository {
     return RecognizedFood(
       item: item,
       lookupKey: dto.fdcId ?? item.name,
-      nutrition: nutritionJson is Map ? parseNutritionResponse(Map<String, dynamic>.from(nutritionJson), item) : null,
+      nutrition: nutritionJson is Map
+          ? parseNutritionResponse(
+              Map<String, dynamic>.from(nutritionJson),
+              item,
+            )
+          : null,
     );
   }
 }

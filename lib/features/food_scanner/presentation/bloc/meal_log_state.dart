@@ -35,8 +35,7 @@ class MealLogLoaded extends MealLogState {
   });
 
   /// Convenience: meals grouped by MealType (for the dashboard slot row).
-  Set<MealType> get loggedMealTypes =>
-      entries.map((e) => e.mealType).toSet();
+  Set<MealType> get loggedMealTypes => entries.map((e) => e.mealType).toSet();
 
   /// Calorie progress 0.0–1.0. Returns null if no goal is set.
   double? get calorieProgress {
@@ -46,10 +45,14 @@ class MealLogLoaded extends MealLogState {
 
   @override
   List<Object?> get props => [
-        entries, totalCalories, totalProteinG, totalCarbsG, totalFatG,
-        dailyCalorieGoal,
-        notice,
-      ];
+    entries,
+    totalCalories,
+    totalProteinG,
+    totalCarbsG,
+    totalFatG,
+    dailyCalorieGoal,
+    notice,
+  ];
 }
 
 class MealLogError extends MealLogState {

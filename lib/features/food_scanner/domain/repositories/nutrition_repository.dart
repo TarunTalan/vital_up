@@ -6,9 +6,9 @@ import 'package:vital_up/features/food_scanner/domain/entities/nutrition_info.da
 
 abstract class NutritionRepository {
   Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item);
-  
+
   Future<Either<Failure, NutritionInfo>> lookupBarcode(String barcode);
-  
+
   Future<Either<Failure, List<FoodItem>>> searchByName(String query);
 
   Future<Either<Failure, void>> saveProprietaryProduct(
@@ -22,4 +22,3 @@ abstract class NutritionRepository {
   /// Returns matching [OfflineFood] entries sorted by best name match.
   Future<List<OfflineFood>> searchOfflineFoods(String query);
 }
-

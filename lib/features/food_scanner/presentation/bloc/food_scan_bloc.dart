@@ -82,15 +82,23 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   /// divides by zero and never explodes (see [safeScale]).
   static double _portionScale(FoodItem oldItem, double quantity, String unit) {
     if (oldItem.unit == unit) return safeScale(oldItem.quantity, quantity);
-    return safeScale(_gramsOf(oldItem.quantity, oldItem.unit), _gramsOf(quantity, unit));
+    return safeScale(
+      _gramsOf(oldItem.quantity, oldItem.unit),
+      _gramsOf(quantity, unit),
+    );
   }
 
   /// An item id not used by another item in this meal, so edit / remove
   /// always hit the row the user tapped (two servings of the same food, or
   /// AI items without ids, would otherwise share one).
   String _uniqueId(String preferred, {String? except}) {
-    final taken = _currentItems.where((i) => i.id != except).map((i) => i.id).toSet();
-    return preferred.isNotEmpty && !taken.contains(preferred) ? preferred : uuid.v4();
+    final taken = _currentItems
+        .where((i) => i.id != except)
+        .map((i) => i.id)
+        .toSet();
+    return preferred.isNotEmpty && !taken.contains(preferred)
+        ? preferred
+        : uuid.v4();
   }
 
   /// Pairs [item] with [nutrition] (clamped) under the same id.
@@ -98,12 +106,15 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       sanitizeNutrition(nutrition.copyWith(per: item)).copyWith(per: item);
 
   /// Typed name, clean and length-limited before it is used or sent.
-  static String _cleanName(String name) => sanitizeText(name, maxLength: InputLimits.shortText);
+  static String _cleanName(String name) =>
+      sanitizeText(name, maxLength: InputLimits.shortText);
 
   @override
   void onChange(Change<FoodScanState> change) {
     super.onChange(change);
-    logger.i('FoodScanBloc State Change: ${change.currentState.runtimeType} -> ${change.nextState.runtimeType}');
+    logger.i(
+      'FoodScanBloc State Change: ${change.currentState.runtimeType} -> ${change.nextState.runtimeType}',
+    );
   }
 
   Future<void> _onCaptureImageRequested(
@@ -128,9 +139,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     Emitter<FoodScanState> emit,
   ) async {
     if (_currentImage == null) {
-      emit(RecognitionFailed(
-        ValidationFailure('No image selected. Please capture or select an image first.'),
-      ));
+      emit(
+        RecognitionFailed(
+          ValidationFailure(
+            'No image selected. Please capture or select an image first.',
+          ),
+        ),
+      );
       return;
     }
 
@@ -158,7 +173,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
             ids.add(item.id);
           }
           if (_isZeroPlaceholder(nut)) {
-            logger.w('Scanned item "${item.name}" is all zeros (placeholder). Resolving offline.');
+            logger.w(
+              'Scanned item "${item.name}" is all zeros (placeholder). Resolving offline.',
+            );
             resolvedList.add(_attach(_estimateOfflineNutrition(item), item));
           } else {
             resolvedList.add(_attach(nut, item));
@@ -166,7 +183,12 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         }
 
         if (resolvedList.isEmpty) {
-          emit(RecognitionFailed(const NoFoodDetectedFailure(), image: _currentImage));
+          emit(
+            RecognitionFailed(
+              const NoFoodDetectedFailure(),
+              image: _currentImage,
+            ),
+          );
           return;
         }
 
@@ -176,22 +198,30 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         logger.d('Current items: $_currentItems');
         logger.d('Current nutrition: $_currentNutrition');
 
-        final hasLowConfidence = _currentItems.any((item) => item.confidenceScore < 0.7);
+        final hasLowConfidence = _currentItems.any(
+          (item) => item.confidenceScore < 0.7,
+        );
 
         if (hasLowConfidence) {
-          logger.w('Emitting RecognitionLowConfidence due to low confidence item(s)');
-          emit(RecognitionLowConfidence(
-            image: _currentImage!,
-            items: _currentItems,
-            nutrition: _currentNutrition,
-          ));
+          logger.w(
+            'Emitting RecognitionLowConfidence due to low confidence item(s)',
+          );
+          emit(
+            RecognitionLowConfidence(
+              image: _currentImage!,
+              items: _currentItems,
+              nutrition: _currentNutrition,
+            ),
+          );
         } else {
           logger.i('Emitting RecognitionSucceeded');
-          emit(RecognitionSucceeded(
-            image: _currentImage!,
-            items: _currentItems,
-            nutrition: _currentNutrition,
-          ));
+          emit(
+            RecognitionSucceeded(
+              image: _currentImage!,
+              items: _currentItems,
+              nutrition: _currentNutrition,
+            ),
+          );
         }
       },
     );
@@ -201,7 +231,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     AdjustPortionRequested event,
     Emitter<FoodScanState> emit,
   ) async {
-    final itemIndex = _currentItems.indexWhere((item) => item.id == event.itemId);
+    final itemIndex = _currentItems.indexWhere(
+      (item) => item.id == event.itemId,
+    );
     if (itemIndex == -1) return;
 
     if (itemIndex >= _currentNutrition.length) return;
@@ -218,26 +250,33 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
 
     // Re-assign new list instances to prevent mutating previous state's lists in-place
     _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = newItem;
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = newNutrition;
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+      ..[itemIndex] = newNutrition;
 
     if (state is RecognitionSucceeded) {
-      emit(RecognitionSucceeded(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        RecognitionSucceeded(
+          image: _currentImage!,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     } else if (state is RecognitionLowConfidence) {
-      emit(RecognitionLowConfidence(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        RecognitionLowConfidence(
+          image: _currentImage!,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     } else if (state is NutritionLoaded) {
-      emit(NutritionLoaded(
-        image: _currentImage,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        NutritionLoaded(
+          image: _currentImage,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     }
   }
 
@@ -245,41 +284,54 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     RemoveDetectedItemRequested event,
     Emitter<FoodScanState> emit,
   ) async {
-    final itemIndex = _currentItems.indexWhere((item) => item.id == event.itemId);
+    final itemIndex = _currentItems.indexWhere(
+      (item) => item.id == event.itemId,
+    );
     if (itemIndex == -1) return;
 
     // Re-assign new list instances to prevent mutating previous state's lists in-place
     _currentItems = List<FoodItem>.of(_currentItems)..removeAt(itemIndex);
     if (itemIndex < _currentNutrition.length) {
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..removeAt(itemIndex);
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+        ..removeAt(itemIndex);
     }
 
     if (_currentItems.isEmpty) {
-      emit(RecognitionFailed(
-        const NoFoodDetectedFailure('All items removed. Add a food or scan again.'),
-        image: _currentImage,
-      ));
+      emit(
+        RecognitionFailed(
+          const NoFoodDetectedFailure(
+            'All items removed. Add a food or scan again.',
+          ),
+          image: _currentImage,
+        ),
+      );
       return;
     }
 
     if (state is RecognitionSucceeded) {
-      emit(RecognitionSucceeded(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        RecognitionSucceeded(
+          image: _currentImage!,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     } else if (state is RecognitionLowConfidence) {
-      emit(RecognitionLowConfidence(
-        image: _currentImage!,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        RecognitionLowConfidence(
+          image: _currentImage!,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     } else if (state is NutritionLoaded) {
-      emit(NutritionLoaded(
-        image: _currentImage,
-        items: _currentItems,
-        nutrition: _currentNutrition,
-      ));
+      emit(
+        NutritionLoaded(
+          image: _currentImage,
+          items: _currentItems,
+          nutrition: _currentNutrition,
+        ),
+      );
     }
   }
 
@@ -294,15 +346,21 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       _fail(emit, const ValidationFailure('Enter a food name and amount.'));
       return;
     }
-    final event = AddManualItemRequested(name: name, quantity: quantity, unit: rawEvent.unit);
+    final event = AddManualItemRequested(
+      name: name,
+      quantity: quantity,
+      unit: rawEvent.unit,
+    );
     // Remember state before loading so we can return to it after fetch
     _preLoadingStateType = state.runtimeType;
     // Emit loading state
-    emit(LoadingNutrition(
-      image: _currentImage,
-      items: _currentItems,
-      nutrition: _currentNutrition,
-    ));
+    emit(
+      LoadingNutrition(
+        image: _currentImage,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ),
+    );
 
     // Search for the food name to get the correct fdc_id
     logger.d('Searching USDA for manual food name: "${event.name}"');
@@ -311,13 +369,12 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     Failure? searchFailure;
     List<FoodItem>? searchResultsList;
 
-    searchResult.fold(
-      (l) => searchFailure = l,
-      (r) => searchResultsList = r,
-    );
+    searchResult.fold((l) => searchFailure = l, (r) => searchResultsList = r);
 
     if (searchFailure != null || searchResultsList == null) {
-      logger.w('Failed to search for manual food: $searchFailure. Estimating offline.');
+      logger.w(
+        'Failed to search for manual food: $searchFailure. Estimating offline.',
+      );
       final newItem = FoodItem(
         id: uuid.v4(),
         name: event.name,
@@ -327,17 +384,23 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         unit: event.unit,
       );
 
-      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
+      final estimatedNutrition = _attach(
+        _estimateOfflineNutrition(newItem),
+        newItem,
+      );
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+        ..add(estimatedNutrition);
 
       _emitCurrentState(emit);
       return;
     }
 
     if (searchResultsList!.isEmpty) {
-      logger.w('No USDA search results found for: "${event.name}". Estimating offline.');
+      logger.w(
+        'No USDA search results found for: "${event.name}". Estimating offline.',
+      );
       final newItem = FoodItem(
         id: uuid.v4(),
         name: event.name,
@@ -347,10 +410,14 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         unit: event.unit,
       );
 
-      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
+      final estimatedNutrition = _attach(
+        _estimateOfflineNutrition(newItem),
+        newItem,
+      );
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+        ..add(estimatedNutrition);
 
       _emitCurrentState(emit);
       return;
@@ -371,9 +438,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     );
 
     // Fetch nutrition for the manual item
-    logger.d('Fetching nutrition for item ID: ${newItem.id}, servingDescription: "${newItem.servingDescription}"');
+    logger.d(
+      'Fetching nutrition for item ID: ${newItem.id}, servingDescription: "${newItem.servingDescription}"',
+    );
     // Look up by the search result's id; the row keeps its own unique id.
-    final nutritionResult = await nutritionRepository.getNutrition(newItem.copyWith(id: searchItem.id));
+    final nutritionResult = await nutritionRepository.getNutrition(
+      newItem.copyWith(id: searchItem.id),
+    );
 
     Failure? nutritionFailure;
     NutritionInfo? nutritionInfo;
@@ -385,28 +456,41 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       },
       (r) {
         nutritionInfo = r;
-        logger.d('getNutrition succeeded! Calories: ${r.calories}, Protein: ${r.proteinG}, Carbs: ${r.carbsG}, Fat: ${r.fatG}');
+        logger.d(
+          'getNutrition succeeded! Calories: ${r.calories}, Protein: ${r.proteinG}, Carbs: ${r.carbsG}, Fat: ${r.fatG}',
+        );
       },
     );
 
-    if (nutritionFailure != null || nutritionInfo == null || _isZeroPlaceholder(nutritionInfo!)) {
+    if (nutritionFailure != null ||
+        nutritionInfo == null ||
+        _isZeroPlaceholder(nutritionInfo!)) {
       if (nutritionInfo != null && _isZeroPlaceholder(nutritionInfo!)) {
-        logger.w('getNutrition returned all zeros (placeholder). Estimating offline.');
+        logger.w(
+          'getNutrition returned all zeros (placeholder). Estimating offline.',
+        );
       } else {
-        logger.e('Failed to fetch nutrition for manual item: $nutritionFailure. Estimating offline.');
+        logger.e(
+          'Failed to fetch nutrition for manual item: $nutritionFailure. Estimating offline.',
+        );
       }
 
-      final estimatedNutrition = _attach(_estimateOfflineNutrition(newItem), newItem);
+      final estimatedNutrition = _attach(
+        _estimateOfflineNutrition(newItem),
+        newItem,
+      );
 
       _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(estimatedNutrition);
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+        ..add(estimatedNutrition);
 
       _emitCurrentState(emit);
       return;
     }
 
     _currentItems = List<FoodItem>.of(_currentItems)..add(newItem);
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(_attach(nutritionInfo!, newItem));
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+      ..add(_attach(nutritionInfo!, newItem));
 
     _emitCurrentState(emit);
   }
@@ -416,7 +500,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     Emitter<FoodScanState> emit,
   ) async {
     if (state is LoadingNutrition || state is SavingMealLog) return;
-    final itemIndex = _currentItems.indexWhere((item) => item.id == rawEvent.itemId);
+    final itemIndex = _currentItems.indexWhere(
+      (item) => item.id == rawEvent.itemId,
+    );
     if (itemIndex == -1 || itemIndex >= _currentNutrition.length) return;
     final name = _cleanName(rawEvent.name);
     final quantity = saneQuantity(rawEvent.quantity, fallback: -1);
@@ -437,7 +523,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // entirely client-side without any network calls! This prevents DNS/connection
     // timeouts from turning values to 0.
     if (oldItem.name.trim().toLowerCase() == event.name.trim().toLowerCase()) {
-      logger.i('Editing food item portion for "${event.name}" without name change. Scaling locally.');
+      logger.i(
+        'Editing food item portion for "${event.name}" without name change. Scaling locally.',
+      );
       final oldNutrition = _currentNutrition[itemIndex];
 
       final updatedItem = oldItem.copyWith(
@@ -451,21 +539,37 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       // nutrition due to network timeout), estimate the offline nutrition now instead
       // of scaling zero.
       if (_isZeroPlaceholder(oldNutrition)) {
-        logger.i('Initial scanned nutrition was zero placeholder. Estimating offline nutrition.');
-        _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-        _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(_estimateOfflineNutrition(updatedItem), updatedItem);
+        logger.i(
+          'Initial scanned nutrition was zero placeholder. Estimating offline nutrition.',
+        );
+        _currentItems = List<FoodItem>.of(_currentItems)
+          ..[itemIndex] = updatedItem;
+        _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+          ..[itemIndex] = _attach(
+            _estimateOfflineNutrition(updatedItem),
+            updatedItem,
+          );
         _emitCurrentState(emit);
         return;
       }
 
       final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
-      logger.d('Scaling: oldQty=${oldItem.quantity} ${oldItem.unit}, newQty=${event.quantity} ${event.unit}, scaleFactor=$scaleFactor');
+      logger.d(
+        'Scaling: oldQty=${oldItem.quantity} ${oldItem.unit}, newQty=${event.quantity} ${event.unit}, scaleFactor=$scaleFactor',
+      );
 
-      final scaledNutrition = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
-      logger.d('Scaled calories: old=${oldNutrition.calories} -> new=${scaledNutrition.calories}');
+      final scaledNutrition = _attach(
+        oldNutrition.scaledBy(scaleFactor),
+        updatedItem,
+      );
+      logger.d(
+        'Scaled calories: old=${oldNutrition.calories} -> new=${scaledNutrition.calories}',
+      );
 
-      _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = scaledNutrition;
+      _currentItems = List<FoodItem>.of(_currentItems)
+        ..[itemIndex] = updatedItem;
+      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+        ..[itemIndex] = scaledNutrition;
 
       _emitCurrentState(emit);
       return;
@@ -474,11 +578,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // Remember state before loading so we can return to it after fetch
     _preLoadingStateType = state.runtimeType;
     // Emit loading state
-    emit(LoadingNutrition(
-      image: _currentImage,
-      items: _currentItems,
-      nutrition: _currentNutrition,
-    ));
+    emit(
+      LoadingNutrition(
+        image: _currentImage,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ),
+    );
 
     // Search for the new food name to get the correct fdc_id
     final searchResult = await nutritionRepository.searchByName(event.name);
@@ -486,10 +592,7 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     Failure? searchFailure;
     List<FoodItem>? searchResultsList;
 
-    searchResult.fold(
-      (l) => searchFailure = l,
-      (r) => searchResultsList = r,
-    );
+    searchResult.fold((l) => searchFailure = l, (r) => searchResultsList = r);
 
     if (searchFailure != null || searchResultsList == null) {
       logger.e('Failed to search for edited food: $searchFailure');
@@ -507,8 +610,11 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         unit: event.unit,
       );
 
-      _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+      _currentItems = List<FoodItem>.of(_currentItems)
+        ..[itemIndex] = updatedItem;
+      _currentNutrition = List<NutritionInfo>.of(
+        _currentNutrition,
+      )..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
 
       _emitCurrentState(emit);
       return;
@@ -530,8 +636,11 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         unit: event.unit,
       );
 
-      _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+      _currentItems = List<FoodItem>.of(_currentItems)
+        ..[itemIndex] = updatedItem;
+      _currentNutrition = List<NutritionInfo>.of(
+        _currentNutrition,
+      )..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
 
       _emitCurrentState(emit);
       return;
@@ -551,21 +660,26 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     );
 
     // Fetch nutrition for the updated item with new fdc_id
-    final nutritionResult = await nutritionRepository.getNutrition(updatedItem.copyWith(id: searchItem.id));
+    final nutritionResult = await nutritionRepository.getNutrition(
+      updatedItem.copyWith(id: searchItem.id),
+    );
 
     Failure? nutritionFailure;
     NutritionInfo? nutritionInfo;
 
-    nutritionResult.fold(
-      (l) => nutritionFailure = l,
-      (r) => nutritionInfo = r,
-    );
+    nutritionResult.fold((l) => nutritionFailure = l, (r) => nutritionInfo = r);
 
-    if (nutritionFailure != null || nutritionInfo == null || _isZeroPlaceholder(nutritionInfo!)) {
+    if (nutritionFailure != null ||
+        nutritionInfo == null ||
+        _isZeroPlaceholder(nutritionInfo!)) {
       if (nutritionInfo != null && _isZeroPlaceholder(nutritionInfo!)) {
-        logger.w('getNutrition returned all zeros (placeholder) for edit. Scaling existing nutrition.');
+        logger.w(
+          'getNutrition returned all zeros (placeholder) for edit. Scaling existing nutrition.',
+        );
       } else {
-        logger.e('Failed to fetch nutrition for edited item: $nutritionFailure. Scaling existing.');
+        logger.e(
+          'Failed to fetch nutrition for edited item: $nutritionFailure. Scaling existing.',
+        );
       }
 
       // Scale existing nutrition by portion size change
@@ -573,15 +687,19 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       final oldNutrition = _currentNutrition[itemIndex];
       final scaleFactor = _portionScale(oldItem, event.quantity, event.unit);
 
-      _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-      _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
+      _currentItems = List<FoodItem>.of(_currentItems)
+        ..[itemIndex] = updatedItem;
+      _currentNutrition = List<NutritionInfo>.of(
+        _currentNutrition,
+      )..[itemIndex] = _attach(oldNutrition.scaledBy(scaleFactor), updatedItem);
 
       _emitCurrentState(emit);
       return;
     }
 
     _currentItems = List<FoodItem>.of(_currentItems)..[itemIndex] = updatedItem;
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..[itemIndex] = _attach(nutritionInfo!, updatedItem);
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+      ..[itemIndex] = _attach(nutritionInfo!, updatedItem);
 
     _emitCurrentState(emit);
   }
@@ -590,7 +708,10 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     // Use the pre-loading state type when we are currently in LoadingNutrition,
     // because `state` was already overwritten to LoadingNutrition before the
     // async work ran. Fall back to the live state type for other cases.
-    final effectiveType = (state is LoadingNutrition || state is SavingMealLog || state is ScanActionFailed)
+    final effectiveType =
+        (state is LoadingNutrition ||
+            state is SavingMealLog ||
+            state is ScanActionFailed)
         ? _preLoadingStateType
         : state.runtimeType;
 
@@ -604,37 +725,42 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     final nutrition = List<NutritionInfo>.of(_currentNutrition);
 
     if (effectiveType == RecognitionSucceeded && _currentImage != null) {
-      emit(RecognitionSucceeded(
-        image: _currentImage!,
-        items: items,
-        nutrition: nutrition,
-      ));
-    } else if (effectiveType == RecognitionLowConfidence && _currentImage != null) {
-      emit(RecognitionLowConfidence(
-        image: _currentImage!,
-        items: items,
-        nutrition: nutrition,
-      ));
+      emit(
+        RecognitionSucceeded(
+          image: _currentImage!,
+          items: items,
+          nutrition: nutrition,
+        ),
+      );
+    } else if (effectiveType == RecognitionLowConfidence &&
+        _currentImage != null) {
+      emit(
+        RecognitionLowConfidence(
+          image: _currentImage!,
+          items: items,
+          nutrition: nutrition,
+        ),
+      );
     } else if (effectiveType == NutritionLoaded) {
-      emit(NutritionLoaded(
-        image: _currentImage,
-        items: items,
-        nutrition: nutrition,
-      ));
+      emit(
+        NutritionLoaded(
+          image: _currentImage,
+          items: items,
+          nutrition: nutrition,
+        ),
+      );
     } else if (_currentImage != null && _currentItems.isNotEmpty) {
       // Fallback with image: default to RecognitionSucceeded
-      emit(RecognitionSucceeded(
-        image: _currentImage!,
-        items: items,
-        nutrition: nutrition,
-      ));
+      emit(
+        RecognitionSucceeded(
+          image: _currentImage!,
+          items: items,
+          nutrition: nutrition,
+        ),
+      );
     } else if (_currentItems.isNotEmpty) {
       // No image (manual-only entry) — emit NutritionLoaded with null image
-      emit(NutritionLoaded(
-        image: null,
-        items: items,
-        nutrition: nutrition,
-      ));
+      emit(NutritionLoaded(image: null, items: items, nutrition: nutrition));
     }
 
     // Clear the remembered pre-loading state
@@ -647,20 +773,25 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   ) async {
     // A second tap while saving must not log the meal twice.
     if (state is SavingMealLog || state is LoadingNutrition) return;
-    if (_currentItems.isEmpty || _currentNutrition.length != _currentItems.length) {
+    if (_currentItems.isEmpty ||
+        _currentNutrition.length != _currentItems.length) {
       _fail(emit, const ValidationFailure('Add a food before saving.'));
       return;
     }
 
     _preLoadingStateType = state.runtimeType;
-    emit(SavingMealLog(
-      image: _currentImage,
-      items: List<FoodItem>.of(_currentItems),
-      nutrition: List<NutritionInfo>.of(_currentNutrition),
-    ));
+    emit(
+      SavingMealLog(
+        image: _currentImage,
+        items: List<FoodItem>.of(_currentItems),
+        nutrition: List<NutritionInfo>.of(_currentNutrition),
+      ),
+    );
 
     // Clamp once more right before saving: nothing absurd reaches the log.
-    _currentNutrition = [for (final n in _currentNutrition) sanitizeNutrition(n)];
+    _currentNutrition = [
+      for (final n in _currentNutrition) sanitizeNutrition(n),
+    ];
     final totalCalories = mealTotalCalories(_currentNutrition);
 
     final entry = MealLogEntry(
@@ -707,7 +838,9 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
       (nutritionInfo) {
         NutritionInfo resolvedInfo = nutritionInfo;
         if (_isZeroPlaceholder(nutritionInfo)) {
-          logger.w('Scanned barcode "${nutritionInfo.per.name}" is all zeros (placeholder). Resolving offline.');
+          logger.w(
+            'Scanned barcode "${nutritionInfo.per.name}" is all zeros (placeholder). Resolving offline.',
+          );
           resolvedInfo = _estimateOfflineNutrition(nutritionInfo.per);
         }
 
@@ -715,11 +848,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
         _currentItems = [resolvedInfo.per];
         _currentNutrition = [resolvedInfo];
         _currentImage = null;
-        emit(NutritionLoaded(
-          image: null,
-          items: _currentItems,
-          nutrition: _currentNutrition,
-        ));
+        emit(
+          NutritionLoaded(
+            image: null,
+            items: _currentItems,
+            nutrition: _currentNutrition,
+          ),
+        );
       },
     );
   }
@@ -753,11 +888,13 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     if (event.replaceCurrent) _reset();
     final barcode = normalizeProductBarcode(event.barcode);
     _preLoadingStateType = state.runtimeType;
-    emit(LoadingNutrition(
-      image: _currentImage,
-      items: _currentItems,
-      nutrition: _currentNutrition,
-    ));
+    emit(
+      LoadingNutrition(
+        image: _currentImage,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ),
+    );
 
     // Create FoodItem domain entity
     final quantity = saneQuantity(event.quantity);
@@ -771,33 +908,45 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     );
 
     // Create NutritionInfo domain entity (typed / OCR values, clamped)
-    final nutritionInfo = sanitizeNutrition(NutritionInfo(
-      calories: event.calories,
-      proteinG: event.proteinG,
-      carbsG: event.carbsG,
-      fatG: event.fatG,
-      fiberG: event.fiberG,
-      sugarG: event.sugarG,
-      sodiumMg: event.sodiumMg,
-      per: foodItem,
-    )).copyWith(per: foodItem);
+    final nutritionInfo = sanitizeNutrition(
+      NutritionInfo(
+        calories: event.calories,
+        proteinG: event.proteinG,
+        carbsG: event.carbsG,
+        fatG: event.fatG,
+        fiberG: event.fiberG,
+        sugarG: event.sugarG,
+        sodiumMg: event.sodiumMg,
+        per: foodItem,
+      ),
+    ).copyWith(per: foodItem);
 
     _currentItems = List<FoodItem>.of(_currentItems)..add(foodItem);
-    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)..add(nutritionInfo);
+    _currentNutrition = List<NutritionInfo>.of(_currentNutrition)
+      ..add(nutritionInfo);
 
     // Save to cache and remote database progressively in the background
     if (barcode != null) {
       nutritionRepository
           .saveProprietaryProduct(barcode, name, nutritionInfo, event.source)
-          .then((result) => result.fold((f) => logger.w('Saving product $barcode failed: $f'), (_) {}))
-          .catchError((Object e) => logger.e('Saving product $barcode failed: $e'));
+          .then(
+            (result) => result.fold(
+              (f) => logger.w('Saving product $barcode failed: $f'),
+              (_) {},
+            ),
+          )
+          .catchError(
+            (Object e) => logger.e('Saving product $barcode failed: $e'),
+          );
     }
 
-    emit(NutritionLoaded(
-      image: _currentImage,
-      items: _currentItems,
-      nutrition: _currentNutrition,
-    ));
+    emit(
+      NutritionLoaded(
+        image: _currentImage,
+        items: _currentItems,
+        nutrition: _currentNutrition,
+      ),
+    );
   }
 
   static String _formatQty(double q) =>
@@ -827,50 +976,402 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   // --- Offline Fallback Heuristics and Estimation ---
 
   static final Map<String, Map<String, double>> _offlineNutritionData = {
-    'apple': {'calories': 52, 'protein': 0.3, 'carbs': 13.8, 'fat': 0.2, 'fiber': 2.4, 'sugar': 10.4, 'sodium': 1},
-    'banana': {'calories': 89, 'protein': 1.1, 'carbs': 22.8, 'fat': 0.3, 'fiber': 2.6, 'sugar': 12.2, 'sodium': 1},
-    'chicken': {'calories': 165, 'protein': 31.0, 'carbs': 0.0, 'fat': 3.6, 'fiber': 0.0, 'sugar': 0.0, 'sodium': 74},
-    'egg': {'calories': 155, 'protein': 13.0, 'carbs': 1.1, 'fat': 11.0, 'fiber': 0.0, 'sugar': 1.1, 'sodium': 124},
-    'rice': {'calories': 130, 'protein': 2.7, 'carbs': 28.0, 'fat': 0.3, 'fiber': 0.4, 'sugar': 0.1, 'sodium': 1},
-    'milk': {'calories': 42, 'protein': 3.4, 'carbs': 5.0, 'fat': 1.0, 'fiber': 0.0, 'sugar': 5.0, 'sodium': 44},
-    'bread': {'calories': 265, 'protein': 9.0, 'carbs': 49.0, 'fat': 3.2, 'fiber': 2.7, 'sugar': 5.0, 'sodium': 491},
-    'potato': {'calories': 77, 'protein': 2.0, 'carbs': 17.0, 'fat': 0.1, 'fiber': 2.2, 'sugar': 0.8, 'sodium': 6},
-    'salmon': {'calories': 208, 'protein': 20.0, 'carbs': 0.0, 'fat': 13.0, 'fiber': 0.0, 'sugar': 0.0, 'sodium': 59},
-    'avocado': {'calories': 160, 'protein': 2.0, 'carbs': 8.5, 'fat': 15.0, 'fiber': 6.7, 'sugar': 0.7, 'sodium': 7},
-    'oats': {'calories': 389, 'protein': 16.9, 'carbs': 66.3, 'fat': 6.9, 'fiber': 10.6, 'sugar': 0.0, 'sodium': 2},
-    'samosa': {'calories': 262, 'protein': 4.5, 'carbs': 24.0, 'fat': 17.0, 'fiber': 1.5, 'sugar': 1.0, 'sodium': 380},
-    'french fries': {'calories': 312, 'protein': 3.4, 'carbs': 41.0, 'fat': 15.0, 'fiber': 3.8, 'sugar': 0.3, 'sodium': 210},
-    'fries': {'calories': 312, 'protein': 3.4, 'carbs': 41.0, 'fat': 15.0, 'fiber': 3.8, 'sugar': 0.3, 'sodium': 210},
-    'gulab jamun': {'calories': 320, 'protein': 4.0, 'carbs': 52.0, 'fat': 11.0, 'fiber': 0.8, 'sugar': 44.0, 'sodium': 110},
-    'ice cream': {'calories': 207, 'protein': 3.5, 'carbs': 24.0, 'fat': 11.0, 'fiber': 0.7, 'sugar': 21.0, 'sodium': 80},
-    'pizza': {'calories': 266, 'protein': 11.4, 'carbs': 33.0, 'fat': 10.0, 'fiber': 2.3, 'sugar': 3.6, 'sodium': 598},
-    'burger': {'calories': 295, 'protein': 17.0, 'carbs': 24.0, 'fat': 14.0, 'fiber': 1.5, 'sugar': 4.0, 'sodium': 500},
-    'cake': {'calories': 350, 'protein': 3.0, 'carbs': 55.0, 'fat': 14.0, 'fiber': 1.0, 'sugar': 38.0, 'sodium': 320},
-    'sweet': {'calories': 380, 'protein': 4.0, 'carbs': 60.0, 'fat': 14.0, 'fiber': 1.0, 'sugar': 50.0, 'sodium': 150},
-    'paneer tikka': {'calories': 180, 'protein': 12.0, 'carbs': 6.0, 'fat': 12.0, 'fiber': 1.0, 'sugar': 2.0, 'sodium': 400},
-    'paneer': {'calories': 265, 'protein': 18.0, 'carbs': 1.2, 'fat': 20.0, 'fiber': 0.0, 'sugar': 1.2, 'sodium': 18},
-    'roti': {'calories': 260, 'protein': 8.0, 'carbs': 45.0, 'fat': 3.0, 'fiber': 7.0, 'sugar': 0.5, 'sodium': 150},
-    'chapati': {'calories': 260, 'protein': 8.0, 'carbs': 45.0, 'fat': 3.0, 'fiber': 7.0, 'sugar': 0.5, 'sodium': 150},
-    'dal makhani': {'calories': 150, 'protein': 5.0, 'carbs': 16.0, 'fat': 7.0, 'fiber': 4.5, 'sugar': 1.0, 'sodium': 350},
-    'dal tadka': {'calories': 110, 'protein': 6.0, 'carbs': 15.0, 'fat': 3.5, 'fiber': 5.0, 'sugar': 0.5, 'sodium': 300},
-    'dal': {'calories': 110, 'protein': 6.0, 'carbs': 15.0, 'fat': 3.5, 'fiber': 5.0, 'sugar': 0.5, 'sodium': 300},
-    'biryani': {'calories': 160, 'protein': 8.0, 'carbs': 21.0, 'fat': 5.0, 'fiber': 1.8, 'sugar': 1.0, 'sodium': 300},
-    'pulav': {'calories': 130, 'protein': 3.0, 'carbs': 24.0, 'fat': 2.5, 'fiber': 1.5, 'sugar': 0.5, 'sodium': 250},
-    'idli': {'calories': 120, 'protein': 3.5, 'carbs': 25.0, 'fat': 0.5, 'fiber': 1.5, 'sugar': 0.2, 'sodium': 120},
-    'dosa': {'calories': 168, 'protein': 3.9, 'carbs': 29.0, 'fat': 3.7, 'fiber': 1.5, 'sugar': 0.5, 'sodium': 180},
-    'masala dosa': {'calories': 205, 'protein': 4.2, 'carbs': 32.0, 'fat': 6.5, 'fiber': 2.2, 'sugar': 1.0, 'sodium': 250},
-    'jalebi': {'calories': 400, 'protein': 2.0, 'carbs': 80.0, 'fat': 8.0, 'fiber': 0.5, 'sugar': 70.0, 'sodium': 50},
-    'aloo paratha': {'calories': 210, 'protein': 4.5, 'carbs': 35.0, 'fat': 6.0, 'fiber': 3.0, 'sugar': 1.0, 'sodium': 280},
-    'paratha': {'calories': 258, 'protein': 5.0, 'carbs': 40.0, 'fat': 9.0, 'fiber': 3.0, 'sugar': 1.0, 'sodium': 300},
-    'butter chicken': {'calories': 230, 'protein': 16.0, 'carbs': 8.0, 'fat': 15.0, 'fiber': 1.0, 'sugar': 4.0, 'sodium': 450},
-    'chole bhature': {'calories': 280, 'protein': 7.0, 'carbs': 35.0, 'fat': 12.0, 'fiber': 5.0, 'sugar': 2.0, 'sodium': 480},
-    'chole': {'calories': 140, 'protein': 6.0, 'carbs': 18.0, 'fat': 5.0, 'fiber': 6.0, 'sugar': 2.0, 'sodium': 380},
-    'khichdi': {'calories': 100, 'protein': 3.5, 'carbs': 18.0, 'fat': 1.5, 'fiber': 2.5, 'sugar': 0.5, 'sodium': 200},
-    'upma': {'calories': 130, 'protein': 3.0, 'carbs': 22.0, 'fat': 3.5, 'fiber': 2.0, 'sugar': 1.0, 'sodium': 250},
-    'poha': {'calories': 160, 'protein': 2.8, 'carbs': 30.0, 'fat': 3.0, 'fiber': 1.5, 'sugar': 1.0, 'sodium': 220},
-    'sambhar': {'calories': 60, 'protein': 2.0, 'carbs': 8.0, 'fat': 2.0, 'fiber': 2.5, 'sugar': 1.5, 'sodium': 320},
-    'pav bhaji': {'calories': 160, 'protein': 3.0, 'carbs': 20.0, 'fat': 8.0, 'fiber': 3.0, 'sugar': 2.5, 'sodium': 400},
-    'raita': {'calories': 60, 'protein': 3.0, 'carbs': 5.0, 'fat': 3.0, 'fiber': 0.5, 'sugar': 4.0, 'sodium': 120},
+    'apple': {
+      'calories': 52,
+      'protein': 0.3,
+      'carbs': 13.8,
+      'fat': 0.2,
+      'fiber': 2.4,
+      'sugar': 10.4,
+      'sodium': 1,
+    },
+    'banana': {
+      'calories': 89,
+      'protein': 1.1,
+      'carbs': 22.8,
+      'fat': 0.3,
+      'fiber': 2.6,
+      'sugar': 12.2,
+      'sodium': 1,
+    },
+    'chicken': {
+      'calories': 165,
+      'protein': 31.0,
+      'carbs': 0.0,
+      'fat': 3.6,
+      'fiber': 0.0,
+      'sugar': 0.0,
+      'sodium': 74,
+    },
+    'egg': {
+      'calories': 155,
+      'protein': 13.0,
+      'carbs': 1.1,
+      'fat': 11.0,
+      'fiber': 0.0,
+      'sugar': 1.1,
+      'sodium': 124,
+    },
+    'rice': {
+      'calories': 130,
+      'protein': 2.7,
+      'carbs': 28.0,
+      'fat': 0.3,
+      'fiber': 0.4,
+      'sugar': 0.1,
+      'sodium': 1,
+    },
+    'milk': {
+      'calories': 42,
+      'protein': 3.4,
+      'carbs': 5.0,
+      'fat': 1.0,
+      'fiber': 0.0,
+      'sugar': 5.0,
+      'sodium': 44,
+    },
+    'bread': {
+      'calories': 265,
+      'protein': 9.0,
+      'carbs': 49.0,
+      'fat': 3.2,
+      'fiber': 2.7,
+      'sugar': 5.0,
+      'sodium': 491,
+    },
+    'potato': {
+      'calories': 77,
+      'protein': 2.0,
+      'carbs': 17.0,
+      'fat': 0.1,
+      'fiber': 2.2,
+      'sugar': 0.8,
+      'sodium': 6,
+    },
+    'salmon': {
+      'calories': 208,
+      'protein': 20.0,
+      'carbs': 0.0,
+      'fat': 13.0,
+      'fiber': 0.0,
+      'sugar': 0.0,
+      'sodium': 59,
+    },
+    'avocado': {
+      'calories': 160,
+      'protein': 2.0,
+      'carbs': 8.5,
+      'fat': 15.0,
+      'fiber': 6.7,
+      'sugar': 0.7,
+      'sodium': 7,
+    },
+    'oats': {
+      'calories': 389,
+      'protein': 16.9,
+      'carbs': 66.3,
+      'fat': 6.9,
+      'fiber': 10.6,
+      'sugar': 0.0,
+      'sodium': 2,
+    },
+    'samosa': {
+      'calories': 262,
+      'protein': 4.5,
+      'carbs': 24.0,
+      'fat': 17.0,
+      'fiber': 1.5,
+      'sugar': 1.0,
+      'sodium': 380,
+    },
+    'french fries': {
+      'calories': 312,
+      'protein': 3.4,
+      'carbs': 41.0,
+      'fat': 15.0,
+      'fiber': 3.8,
+      'sugar': 0.3,
+      'sodium': 210,
+    },
+    'fries': {
+      'calories': 312,
+      'protein': 3.4,
+      'carbs': 41.0,
+      'fat': 15.0,
+      'fiber': 3.8,
+      'sugar': 0.3,
+      'sodium': 210,
+    },
+    'gulab jamun': {
+      'calories': 320,
+      'protein': 4.0,
+      'carbs': 52.0,
+      'fat': 11.0,
+      'fiber': 0.8,
+      'sugar': 44.0,
+      'sodium': 110,
+    },
+    'ice cream': {
+      'calories': 207,
+      'protein': 3.5,
+      'carbs': 24.0,
+      'fat': 11.0,
+      'fiber': 0.7,
+      'sugar': 21.0,
+      'sodium': 80,
+    },
+    'pizza': {
+      'calories': 266,
+      'protein': 11.4,
+      'carbs': 33.0,
+      'fat': 10.0,
+      'fiber': 2.3,
+      'sugar': 3.6,
+      'sodium': 598,
+    },
+    'burger': {
+      'calories': 295,
+      'protein': 17.0,
+      'carbs': 24.0,
+      'fat': 14.0,
+      'fiber': 1.5,
+      'sugar': 4.0,
+      'sodium': 500,
+    },
+    'cake': {
+      'calories': 350,
+      'protein': 3.0,
+      'carbs': 55.0,
+      'fat': 14.0,
+      'fiber': 1.0,
+      'sugar': 38.0,
+      'sodium': 320,
+    },
+    'sweet': {
+      'calories': 380,
+      'protein': 4.0,
+      'carbs': 60.0,
+      'fat': 14.0,
+      'fiber': 1.0,
+      'sugar': 50.0,
+      'sodium': 150,
+    },
+    'paneer tikka': {
+      'calories': 180,
+      'protein': 12.0,
+      'carbs': 6.0,
+      'fat': 12.0,
+      'fiber': 1.0,
+      'sugar': 2.0,
+      'sodium': 400,
+    },
+    'paneer': {
+      'calories': 265,
+      'protein': 18.0,
+      'carbs': 1.2,
+      'fat': 20.0,
+      'fiber': 0.0,
+      'sugar': 1.2,
+      'sodium': 18,
+    },
+    'roti': {
+      'calories': 260,
+      'protein': 8.0,
+      'carbs': 45.0,
+      'fat': 3.0,
+      'fiber': 7.0,
+      'sugar': 0.5,
+      'sodium': 150,
+    },
+    'chapati': {
+      'calories': 260,
+      'protein': 8.0,
+      'carbs': 45.0,
+      'fat': 3.0,
+      'fiber': 7.0,
+      'sugar': 0.5,
+      'sodium': 150,
+    },
+    'dal makhani': {
+      'calories': 150,
+      'protein': 5.0,
+      'carbs': 16.0,
+      'fat': 7.0,
+      'fiber': 4.5,
+      'sugar': 1.0,
+      'sodium': 350,
+    },
+    'dal tadka': {
+      'calories': 110,
+      'protein': 6.0,
+      'carbs': 15.0,
+      'fat': 3.5,
+      'fiber': 5.0,
+      'sugar': 0.5,
+      'sodium': 300,
+    },
+    'dal': {
+      'calories': 110,
+      'protein': 6.0,
+      'carbs': 15.0,
+      'fat': 3.5,
+      'fiber': 5.0,
+      'sugar': 0.5,
+      'sodium': 300,
+    },
+    'biryani': {
+      'calories': 160,
+      'protein': 8.0,
+      'carbs': 21.0,
+      'fat': 5.0,
+      'fiber': 1.8,
+      'sugar': 1.0,
+      'sodium': 300,
+    },
+    'pulav': {
+      'calories': 130,
+      'protein': 3.0,
+      'carbs': 24.0,
+      'fat': 2.5,
+      'fiber': 1.5,
+      'sugar': 0.5,
+      'sodium': 250,
+    },
+    'idli': {
+      'calories': 120,
+      'protein': 3.5,
+      'carbs': 25.0,
+      'fat': 0.5,
+      'fiber': 1.5,
+      'sugar': 0.2,
+      'sodium': 120,
+    },
+    'dosa': {
+      'calories': 168,
+      'protein': 3.9,
+      'carbs': 29.0,
+      'fat': 3.7,
+      'fiber': 1.5,
+      'sugar': 0.5,
+      'sodium': 180,
+    },
+    'masala dosa': {
+      'calories': 205,
+      'protein': 4.2,
+      'carbs': 32.0,
+      'fat': 6.5,
+      'fiber': 2.2,
+      'sugar': 1.0,
+      'sodium': 250,
+    },
+    'jalebi': {
+      'calories': 400,
+      'protein': 2.0,
+      'carbs': 80.0,
+      'fat': 8.0,
+      'fiber': 0.5,
+      'sugar': 70.0,
+      'sodium': 50,
+    },
+    'aloo paratha': {
+      'calories': 210,
+      'protein': 4.5,
+      'carbs': 35.0,
+      'fat': 6.0,
+      'fiber': 3.0,
+      'sugar': 1.0,
+      'sodium': 280,
+    },
+    'paratha': {
+      'calories': 258,
+      'protein': 5.0,
+      'carbs': 40.0,
+      'fat': 9.0,
+      'fiber': 3.0,
+      'sugar': 1.0,
+      'sodium': 300,
+    },
+    'butter chicken': {
+      'calories': 230,
+      'protein': 16.0,
+      'carbs': 8.0,
+      'fat': 15.0,
+      'fiber': 1.0,
+      'sugar': 4.0,
+      'sodium': 450,
+    },
+    'chole bhature': {
+      'calories': 280,
+      'protein': 7.0,
+      'carbs': 35.0,
+      'fat': 12.0,
+      'fiber': 5.0,
+      'sugar': 2.0,
+      'sodium': 480,
+    },
+    'chole': {
+      'calories': 140,
+      'protein': 6.0,
+      'carbs': 18.0,
+      'fat': 5.0,
+      'fiber': 6.0,
+      'sugar': 2.0,
+      'sodium': 380,
+    },
+    'khichdi': {
+      'calories': 100,
+      'protein': 3.5,
+      'carbs': 18.0,
+      'fat': 1.5,
+      'fiber': 2.5,
+      'sugar': 0.5,
+      'sodium': 200,
+    },
+    'upma': {
+      'calories': 130,
+      'protein': 3.0,
+      'carbs': 22.0,
+      'fat': 3.5,
+      'fiber': 2.0,
+      'sugar': 1.0,
+      'sodium': 250,
+    },
+    'poha': {
+      'calories': 160,
+      'protein': 2.8,
+      'carbs': 30.0,
+      'fat': 3.0,
+      'fiber': 1.5,
+      'sugar': 1.0,
+      'sodium': 220,
+    },
+    'sambhar': {
+      'calories': 60,
+      'protein': 2.0,
+      'carbs': 8.0,
+      'fat': 2.0,
+      'fiber': 2.5,
+      'sugar': 1.5,
+      'sodium': 320,
+    },
+    'pav bhaji': {
+      'calories': 160,
+      'protein': 3.0,
+      'carbs': 20.0,
+      'fat': 8.0,
+      'fiber': 3.0,
+      'sugar': 2.5,
+      'sodium': 400,
+    },
+    'raita': {
+      'calories': 60,
+      'protein': 3.0,
+      'carbs': 5.0,
+      'fat': 3.0,
+      'fiber': 0.5,
+      'sugar': 4.0,
+      'sodium': 120,
+    },
   };
 
   NutritionInfo _estimateOfflineNutrition(FoodItem item) {
@@ -900,12 +1401,18 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     }
 
     // Dynamic heuristic adjustments based on description/name
-    if (nameLower.contains('fried') || nameLower.contains('deep-fried') || nameLower.contains('crispy')) {
+    if (nameLower.contains('fried') ||
+        nameLower.contains('deep-fried') ||
+        nameLower.contains('crispy')) {
       // Deep fried food has much higher fat and calories
       fat = (fat * 3.5).clamp(12.0, 30.0);
       cal = (cal + fat * 9).clamp(250.0, 600.0);
     }
-    if (nameLower.contains('sweet') || nameLower.contains('chocolate') || nameLower.contains('candy') || nameLower.contains('dessert') || nameLower.contains('syrup')) {
+    if (nameLower.contains('sweet') ||
+        nameLower.contains('chocolate') ||
+        nameLower.contains('candy') ||
+        nameLower.contains('dessert') ||
+        nameLower.contains('syrup')) {
       // Sweets have much higher sugar and carbs
       sugar = (sugar * 8.0).clamp(20.0, 60.0);
       carbs = (carbs + sugar).clamp(35.0, 80.0);
@@ -942,9 +1449,15 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
     double cholesterol = 0.0;
     if (nameLower.contains('egg')) {
       cholesterol = 373.0; // mg per 100g
-    } else if (nameLower.contains('chicken') || nameLower.contains('salmon') || nameLower.contains('meat')) {
+    } else if (nameLower.contains('chicken') ||
+        nameLower.contains('salmon') ||
+        nameLower.contains('meat')) {
       cholesterol = 80.0;
-    } else if (nameLower.contains('milk') || nameLower.contains('cheese') || nameLower.contains('cream') || nameLower.contains('ice cream') || nameLower.contains('butter')) {
+    } else if (nameLower.contains('milk') ||
+        nameLower.contains('cheese') ||
+        nameLower.contains('cream') ||
+        nameLower.contains('ice cream') ||
+        nameLower.contains('butter')) {
       cholesterol = 30.0;
     }
 
@@ -984,9 +1497,15 @@ class FoodScanBloc extends Bloc<FoodScanEvent, FoodScanState> {
   }
 
   bool _isZeroPlaceholder(NutritionInfo info) {
-    if (info.calories == 0 && info.proteinG == 0 && info.carbsG == 0 && info.fatG == 0) {
+    if (info.calories == 0 &&
+        info.proteinG == 0 &&
+        info.carbsG == 0 &&
+        info.fatG == 0) {
       final name = info.per.name.toLowerCase();
-      if (name.contains('water') || name.contains('tea') || name.contains('diet') || name.contains('zero')) {
+      if (name.contains('water') ||
+          name.contains('tea') ||
+          name.contains('diet') ||
+          name.contains('zero')) {
         return false;
       }
       return true;

@@ -9,10 +9,7 @@ class MealLogRepositoryImpl implements MealLogRepository {
   final MealLogLocalDataSource localDataSource;
   final Logger logger;
 
-  MealLogRepositoryImpl({
-    required this.localDataSource,
-    required this.logger,
-  });
+  MealLogRepositoryImpl({required this.localDataSource, required this.logger});
 
   @override
   Future<Either<Failure, MealLogEntry>> saveMealLog(MealLogEntry entry) async {
@@ -26,13 +23,17 @@ class MealLogRepositoryImpl implements MealLogRepository {
   }
 
   @override
-  Future<Either<Failure, List<MealLogEntry>>> getMealLogsForDate(DateTime date) async {
+  Future<Either<Failure, List<MealLogEntry>>> getMealLogsForDate(
+    DateTime date,
+  ) async {
     try {
       final logs = await localDataSource.getMealLogsForDate(date);
       return Right(logs);
     } catch (e) {
       logger.e('Error getting meal logs for date: $e');
-      return const Left(DatabaseFailure("Couldn't load your meals. Try again."));
+      return const Left(
+        DatabaseFailure("Couldn't load your meals. Try again."),
+      );
     }
   }
 
@@ -43,7 +44,9 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return Right(logs);
     } catch (e) {
       logger.e('Error getting all meal logs: $e');
-      return const Left(DatabaseFailure("Couldn't load your meals. Try again."));
+      return const Left(
+        DatabaseFailure("Couldn't load your meals. Try again."),
+      );
     }
   }
 
@@ -54,7 +57,9 @@ class MealLogRepositoryImpl implements MealLogRepository {
       return const Right(unit);
     } catch (e) {
       logger.e('Error deleting meal log: $e');
-      return const Left(DatabaseFailure("Couldn't delete this meal. Try again."));
+      return const Left(
+        DatabaseFailure("Couldn't delete this meal. Try again."),
+      );
     }
   }
 }
