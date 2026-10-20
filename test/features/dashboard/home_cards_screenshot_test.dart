@@ -511,28 +511,30 @@ _Scenario _states() {
     goals: ActivityGoalsState(
       loading: false,
       snapshot: ActivityGoalsSnapshot(
+        // The default goals with no steps counted but the workouts done:
+        // the ring must not read 0%.
         goals: [
           GoalProgress(
             goal: const ActivityGoal(
               metric: GoalMetric.steps,
               period: GoalPeriod.daily,
-              target: 10000,
+              target: 8000,
             ),
-            current: 11240,
-            series: TrendSeries([DailyPoint(today, 11240)], goal: 10000),
+            current: 0,
+            series: TrendSeries([DailyPoint(today, 0)], goal: 8000),
           ),
           GoalProgress(
             goal: const ActivityGoal(
-              metric: GoalMetric.distance,
+              metric: GoalMetric.workouts,
               period: GoalPeriod.weekly,
-              target: 15,
+              target: 3,
             ),
-            current: 16.4,
-            series: TrendSeries([DailyPoint(today, 16.4)], goal: 15),
+            current: 3,
+            series: TrendSeries([DailyPoint(today, 3)], goal: 3),
           ),
         ],
         sessions: const [],
-        stepsFromHealth: true,
+        stepsFromHealth: false,
       ),
     ),
     meals: MealLogLoaded(
