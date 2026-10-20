@@ -12,12 +12,16 @@ import 'package:vital_up/core/widgets/fit_text.dart';
 
 /// Layout of every tracker bottom sheet (log, goal, quick-log hub):
 /// metric badge + title + close, hairline, body, then a pinned action.
+/// The body scrolls when it's taller than the room; with [scrollable]
+/// false it gets the room left instead, for a body that sizes itself to
+/// fit (the sleep clock), so nothing ever hides behind the action.
 class TrackerSheet extends StatelessWidget {
   final TrackerMetric? metric;
   final String title;
   final String? subtitle;
   final Widget child;
   final Widget? action;
+  final bool scrollable;
 
   const TrackerSheet({
     super.key,
@@ -26,6 +30,7 @@ class TrackerSheet extends StatelessWidget {
     this.metric,
     this.subtitle,
     this.action,
+    this.scrollable = true,
   });
 
   @override
@@ -77,7 +82,9 @@ class TrackerSheet extends StatelessWidget {
               color: context.vColors.divider,
             ),
             const SizedBox(height: AppDimens.sectionGap),
-            Flexible(child: SingleChildScrollView(child: child)),
+            Flexible(
+              child: scrollable ? SingleChildScrollView(child: child) : child,
+            ),
             if (action != null) ...[
               const SizedBox(height: AppDimens.sectionGap),
               action!,

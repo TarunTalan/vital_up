@@ -1,13 +1,18 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:vital_up/core/services/ui_sounds.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 
 /// A sliding scale for picking a number: drag or fling the ruler under a
-/// fixed centre marker. It glides to a stop and snaps to [step], with a
-/// light haptic tick per step; tapping a mark glides to it. Screen readers
-/// get a slider that moves one [step] per swipe.
+/// fixed centre marker. It glides to a stop and snaps to [step]; tapping a
+/// mark glides to it. Like a physical dial, every step gives a soft haptic
+/// tick and a click ([UiSounds]: heard with the ringer on, quiet on silent
+/// or vibrate), and every labelled mark a firmer, deeper one, at most one per
+/// [_feedbackGap] so a fast fling doesn't buzz. Screen readers get a slider
+/// that moves one [step] per swipe.
 ///
 /// Ticks every [step], taller every [midEvery] steps and labelled every
 /// [majorEvery] steps (e.g. 0.1 / 0.5 / 1 kg). The ends fade out.
@@ -53,7 +58,17 @@ class _ValueRulerState extends State<ValueRuler>
   /// Last value reported to [ValueRuler.onChanged] (already snapped).
   late double _reported = _snap(widget.value);
 
+  @override
+  void initState() {
+    super.initState();
+    UiSounds.prepare();
+  }
+
   static const double _spacing = AppDimens.rulerTickSpacing;
+
+  /// Shortest time between two ticks of sound and vibration.
+  static const _feedbackGap = Duration(milliseconds: 35);
+  Duration? _lastFeedback;
 
   @override
   void didUpdateWidget(ValueRuler old) {
@@ -86,8 +101,25 @@ class _ValueRulerState extends State<ValueRuler>
     final snapped = _snap(_position.value);
     if (snapped == _reported) return;
     _reported = snapped;
-    HapticFeedback.selectionClick();
+    _tick(snapped);
     widget.onChanged(snapped);
+  }
+
+  /// Sound and vibration for passing [value]: firmer on labelled marks.
+  void _tick(double value) {
+    // Frame time: what the glide runs on (and what tests advance).
+    final now = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+    final last = _lastFeedback;
+    if (last != null && now - last < _feedbackGap) return;
+    _lastFeedback = now;
+    final step = ((value - widget.min) / widget.step).round();
+    final strong = step % widget.majorEvery == 0;
+    if (strong) {
+      HapticFeedback.lightImpact();
+    } else {
+      HapticFeedback.selectionClick();
+    }
+    UiSounds.tick(strong: strong);
   }
 
   /// Units per logical pixel of drag.

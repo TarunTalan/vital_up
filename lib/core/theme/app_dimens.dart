@@ -197,9 +197,10 @@ class AppDimens {
   static const double dashboardTileHeight = 216.0;
 
   /// Narrowest a half-width Home tile may be at normal text: room for the
-  /// longest tile figure ("229.9 lbs") at full size. Grown like the metric
-  /// style with the text size; narrower, the pair stacks.
-  static const double dashboardTileMinWidth = 130.0;
+  /// longest tile figure ("229.9 lbs") and goal line ("Goal 209.9 lbs") at
+  /// full size. Grown like the metric style with the text size; narrower,
+  /// the pair stacks (360dp keeps pairs to 1.3, 384dp to 1.4).
+  static const double dashboardTileMinWidth = 132.0;
 
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.

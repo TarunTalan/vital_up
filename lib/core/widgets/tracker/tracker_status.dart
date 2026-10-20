@@ -67,6 +67,14 @@ enum TrackerStatus {
     final hours = t.hour + t.minute / 60;
     return ((hours - 7) / 16).clamp(0.0, 1.0);
   }
+
+  /// Share of the week (Monday to Sunday) that has passed, counting today's
+  /// waking day: the pace for a weekly goal. Monday evening is ~1/7, not
+  /// "behind" a whole week's target.
+  static double weekPace([DateTime? now]) {
+    final t = now ?? DateTime.now();
+    return ((t.weekday - 1 + dayPace(t)) / 7).clamp(0.0, 1.0);
+  }
 }
 
 /// Pill with the status icon and label in the status colour.
