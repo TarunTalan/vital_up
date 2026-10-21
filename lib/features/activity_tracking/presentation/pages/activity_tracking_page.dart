@@ -20,7 +20,7 @@ import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/offline_map_note.dart';
 import 'package:vital_up/core/widgets/feature_tip_card.dart';
-import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/feature_tips/presentation/feature_tip_keys.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -216,6 +216,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     });
     _prefsNotifier.addListener(_onPrefsChanged);
     _voiceCoach.init();
+    // The offline maps tip needs the saved areas read; Home's startup check
+    // may not have run yet (opened from a shortcut or straight away).
+    sl<OfflineMapService>().refresh();
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
@@ -551,13 +554,13 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  static const _offlineMapsTipKey = 'offline_maps';
-
   /// Once, before a GPS workout, to users with no saved area: the moment
   /// someone plans a route is when offline maps make sense.
   Widget _offlineMapsTip() {
-    final tips = sl<FeatureTipsService>();
-    if (tips.isDismissed(_offlineMapsTipKey)) return const SizedBox.shrink();
+    final tips = featureTipsOrNull();
+    if (tips == null || tips.isDismissed(FeatureTipKeys.offlineMaps)) {
+      return const SizedBox.shrink();
+    }
     return ValueListenableBuilder<OfflineMapsState>(
       valueListenable: sl<OfflineMapService>().state,
       builder: (context, maps, _) {
@@ -565,7 +568,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
           return const SizedBox.shrink();
         }
         void answer() {
-          tips.dismiss(_offlineMapsTipKey);
+          tips.dismiss(FeatureTipKeys.offlineMaps);
           if (mounted) setState(() {});
         }
 
@@ -581,6 +584,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
               context.pushNamed('offline-maps');
             },
             onDismiss: answer,
+            overlay: true,
           ),
         );
       },

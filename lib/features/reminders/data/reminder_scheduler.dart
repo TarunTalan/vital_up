@@ -1,13 +1,17 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:vital_up/core/services/notification_icons.dart';
+import 'package:vital_up/core/theme/app_colors.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
 import 'package:vital_up/features/reminders/domain/entities/reminder.dart';
+import 'package:vital_up/features/reminders/domain/reminder_copy.dart';
 import 'package:vital_up/features/reminders/domain/reminder_schedule.dart';
 
 /// Puts reminders into the system notification schedule. The only code that
@@ -139,6 +143,10 @@ class ReminderScheduler {
     required String userId,
   }) async {
     final time = DateFormat.jm().format(since);
+    final icon = await NotificationIcons.largeIcon(
+      _iconAsset(ReminderKind.sleep),
+      background: _iconColor(ReminderKind.sleep),
+    );
     try {
       await plugin.show(
         id: inBedNotificationId,
@@ -151,6 +159,7 @@ class ReminderScheduler {
             _channel.name,
             channelDescription: _channel.description,
             category: AndroidNotificationCategory.reminder,
+            largeIcon: icon,
             silent: true,
             onlyAlertOnce: true,
             showWhen: true,
@@ -205,11 +214,22 @@ class ReminderScheduler {
       // reminder becomes a one-off for its next time; the next resync
       // (app start, any change) makes it repeating again.
       final repeat = !(skip && isIOS);
+      // A different variant per time of day and per day it was scheduled
+      // (every app start reschedules).
+      final (title, body) = reminderMessage(
+        r,
+        entry.id + now.month * 31 + now.day,
+        bedtimeAction: bedtime,
+      );
+      final icon = await NotificationIcons.largeIcon(
+        _iconAsset(r.kind),
+        background: _iconColor(r.kind),
+      );
       try {
         await _plugin.zonedSchedule(
           id: entry.id,
-          title: r.title,
-          body: r.body.isEmpty ? null : r.body,
+          title: title,
+          body: body.isEmpty ? null : body,
           // Just before midnight, so a 00:00 reminder still fires tomorrow.
           scheduledDate: _nextInstance(
             skip ? tomorrow.subtract(const Duration(microseconds: 1)) : now,
@@ -232,6 +252,7 @@ class ReminderScheduler {
               _channel.name,
               channelDescription: _channel.description,
               category: AndroidNotificationCategory.reminder,
+              largeIcon: icon,
               actions: [
                 if (water && userId != null)
                   const AndroidNotificationAction(
@@ -263,6 +284,27 @@ class ReminderScheduler {
     }
     return scheduled;
   }
+
+  /// The tracker's icon and accent, as in the app.
+  static String _iconAsset(ReminderKind kind) => switch (kind) {
+    ReminderKind.activity => 'assets/icons/trackers/step.svg',
+    ReminderKind.meal => 'assets/icons/trackers/fork_knife.svg',
+    ReminderKind.water => 'assets/icons/trackers/drop.svg',
+    ReminderKind.sleep => 'assets/icons/trackers/moon_stars.svg',
+    ReminderKind.mood => 'assets/icons/trackers/mood.svg',
+    ReminderKind.weight => 'assets/icons/trackers/weight.svg',
+    ReminderKind.custom => 'assets/icons/vita/vita_chat_dots.svg',
+  };
+
+  static Color _iconColor(ReminderKind kind) => switch (kind) {
+    ReminderKind.activity => AppColors.trackActivity,
+    ReminderKind.meal => AppColors.trackNutrition,
+    ReminderKind.water => AppColors.trackWater,
+    ReminderKind.sleep => AppColors.trackSleep,
+    ReminderKind.mood => AppColors.trackMood,
+    ReminderKind.weight => AppColors.trackWeight,
+    ReminderKind.custom => AppColors.primary,
+  };
 
   Future<void> cancel(Iterable<int> ids) async {
     for (final id in ids) {

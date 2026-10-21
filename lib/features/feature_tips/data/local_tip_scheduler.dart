@@ -1,12 +1,9 @@
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:vital_up/core/theme/app_colors.dart';
+import 'package:vital_up/core/services/notification_icons.dart';
 import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/features/feature_tips/domain/feature_tip.dart';
 import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
@@ -27,9 +24,6 @@ class LocalTipScheduler implements TipScheduler {
     enableVibration: false,
     showBadge: false,
   );
-
-  /// Large icon size in px (the system scales it down).
-  static const _iconPx = 192;
 
   final FlutterLocalNotificationsPlugin plugin;
 
@@ -54,7 +48,7 @@ class LocalTipScheduler implements TipScheduler {
           ?.createNotificationChannel(_channel);
       _channelReady = true;
     }
-    final icon = await _icon(tip.iconAsset);
+    final icon = await NotificationIcons.largeIcon(tip.iconAsset);
     await plugin.zonedSchedule(
       id: notificationId,
       title: tip.title,
@@ -71,7 +65,7 @@ class LocalTipScheduler implements TipScheduler {
           priority: Priority.low,
           category: AndroidNotificationCategory.recommendation,
           autoCancel: true,
-          largeIcon: icon == null ? null : ByteArrayAndroidBitmap(icon),
+          largeIcon: icon,
           styleInformation: BigTextStyleInformation(tip.body),
         ),
         iOS: const DarwinNotificationDetails(presentSound: false),
@@ -85,49 +79,6 @@ class LocalTipScheduler implements TipScheduler {
       await plugin.cancel(id: notificationId);
     } catch (e) {
       debugPrint('Feature tips: cancel failed: $e');
-    }
-  }
-
-  /// PNG bytes of [asset] in white on a brand-coloured circle; null if the
-  /// SVG can't be read (the notification then shows without it).
-  static Future<Uint8List?> _icon(String asset) async {
-    try {
-      final info = await vg.loadPicture(SvgAssetLoader(asset), null);
-      const size = _iconPx * 1.0;
-      final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder);
-      canvas.drawCircle(
-        const ui.Offset(size / 2, size / 2),
-        size / 2,
-        ui.Paint()..color = AppColors.primary,
-      );
-      const glyph = size * 0.5;
-      final scale = glyph / info.size.longestSide;
-      canvas.save();
-      canvas.translate(
-        (size - info.size.width * scale) / 2,
-        (size - info.size.height * scale) / 2,
-      );
-      canvas.scale(scale);
-      canvas.saveLayer(
-        ui.Offset.zero & info.size,
-        ui.Paint()
-          ..colorFilter = const ui.ColorFilter.mode(
-            AppColors.white,
-            BlendMode.srcIn,
-          ),
-      );
-      canvas.drawPicture(info.picture);
-      canvas.restore();
-      canvas.restore();
-      info.picture.dispose();
-      final image = await recorder.endRecording().toImage(_iconPx, _iconPx);
-      final png = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      return png?.buffer.asUint8List();
-    } catch (e) {
-      debugPrint('Feature tips: icon failed: $e');
-      return null;
     }
   }
 }

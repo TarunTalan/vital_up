@@ -837,6 +837,13 @@ Route names are GoRouter `name`s.
   with the app and the FAQ).
 - **reminders:** local notifications (`ReminderScheduler`, presets in
   `domain/reminder_presets.dart`, smart skip when the habit is done today).
+  Notification text: `reminderMessage` (`domain/reminder_copy.dart`, 2-5
+  short variants per preset picked by time slot and day, no "Going to
+  bed" wording without that button; custom reminders keep their words).
+  Large icons: `NotificationIcons.largeIcon` (`core/services/
+  notification_icons.dart`: an app SVG in white on the tracker accent,
+  cached, 3 s cap for engines that can't draw; also feature tips and the
+  in-bed notification). Test: `test/features/reminders/reminder_copy_test.dart`.
   `reminder_actions.dart` has background-isolate helpers (add water,
   save/reset mood, bedtime/wake, read today's water and mood) used by
   notifications and widgets (they also refresh the widgets afterwards).
@@ -859,9 +866,16 @@ Route names are GoRouter `name`s.
   (`attach(AppRouter.router)` in `main()`, listens to the router delegate).
   Settings > Notifications > Feature tips (pref `feature_tips_enabled_v1`).
   Keep copy short: hook title, one-line body, no emojis or "!".
-  In-app: `FeatureTipCard` (`core/widgets/feature_tip_card.dart`, shown
-  once, `isDismissed` / `dismiss(key)`), on the GPS workout screen while
-  idle ("Going somewhere without signal?", until an area is saved). The
+  In-app: `FeatureTipCard` (`core/widgets/feature_tip_card.dart`; full
+  card with action + "Not now", or "Got it" alone; `.compact` one row with
+  a close button; `overlay` = opaque over a map or camera), each shown
+  until answered once (keys in `presentation/feature_tip_keys.dart`,
+  `featureTipsOrNull()` = no tip in page tests without the service):
+  GPS workout screen while idle ("Going somewhere without signal?", until
+  an area is saved), sleep sheet (compact, "Drag the arc to move your
+  whole night", also gone after a save; fits 360x640 at 1.5), Scan tab
+  above the scans-left line ("Two ways to scan": barcodes exact and free,
+  fit the plate in good light). Test: `tip_placements_test.dart`. The
   "Offline map ready" notification and the tracking screen's
   `OfflineMapNote` (idle only) open `offline-maps`. Vita's `APP_GUIDE`
   covers offline maps, shortcuts and tips (redeploy vita-chat to ship).
@@ -1333,5 +1347,7 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
   launch in logcat. `ForegroundServiceManager.start` re-claims its port.
 - `UserAvatar` lives in `core/widgets/user_avatar.dart` (re-exported by
   `community_widgets.dart`).
-- Saved reminder presets keep their old text; changing a preset's copy only
-  reaches new users or reset presets.
+- Preset reminders' words come from the app (`mergeWithPresets` takes
+  title/body from `reminderPresets`; users set only times), and the
+  notification text is a rotating variant from `presetMessages`
+  (`reminder_copy.dart`): edit copy there, it reaches everyone.

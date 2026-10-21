@@ -8,6 +8,8 @@ import 'package:image/image.dart' as img;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/widgets/feature_tip_card.dart';
+import 'package:vital_up/features/feature_tips/presentation/feature_tip_keys.dart';
 import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -129,6 +131,10 @@ class _FoodScannerViewState extends State<FoodScannerView>
 
   /// Denied with "don't ask again": only the system settings can grant it.
   bool _permissionPermanentlyDenied = false;
+
+  /// Shown until answered once: what the hint under the frame can't say.
+  late bool _showScanTip =
+      featureTipsOrNull()?.isDismissed(FeatureTipKeys.scanTab) == false;
 
   /// Last scanned code that is not a product barcode (e.g. a website QR),
   /// so the hint shows once rather than on every frame.
@@ -1043,6 +1049,29 @@ class _FoodScannerViewState extends State<FoodScannerView>
                         ],
                         // Barcodes and labels don't use a photo scan; with
                         // no camera the permission card has the gallery.
+                        if (_showScanTip &&
+                            !isRecognizing &&
+                            !_isScanningNutritionLabel &&
+                            !_permissionDenied &&
+                            _croppedImage == null &&
+                            _selectedImage == null) ...[
+                          FeatureTipCard(
+                            icon: Icons.tips_and_updates_rounded,
+                            title: 'Two ways to scan',
+                            message:
+                                'Barcodes are exact and never use a photo '
+                                'scan. For meals, fit the whole plate in good '
+                                'light.',
+                            overlay: true,
+                            onDismiss: () {
+                              featureTipsOrNull()?.dismiss(
+                                FeatureTipKeys.scanTab,
+                              );
+                              setState(() => _showScanTip = false);
+                            },
+                          ),
+                          const SizedBox(height: AppDimens.space12),
+                        ],
                         if (!isRecognizing &&
                             !_isScanningNutritionLabel &&
                             !_permissionDenied) ...[

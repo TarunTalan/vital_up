@@ -7,7 +7,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_activity',
     kind: ReminderKind.activity,
     title: 'Time to move',
-    body: 'A short walk or workout keeps your streak going.',
+    body: 'A short walk counts. Your legs will thank you.',
     times: [ReminderTime(7, 30)],
     isPreset: true,
     route: 'activity-tracking',
@@ -16,7 +16,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_breakfast',
     kind: ReminderKind.meal,
     title: 'Log your breakfast',
-    body: 'Snap or search what you ate this morning.',
+    body: "What's on the plate? Snap it or search it.",
     times: [ReminderTime(8, 30)],
     isPreset: true,
     route: 'food-scan',
@@ -25,7 +25,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_lunch',
     kind: ReminderKind.meal,
     title: 'Log your lunch',
-    body: 'Keep your nutrition on track — log lunch now.',
+    body: 'Snap your plate before the first bite.',
     times: [ReminderTime(13, 0)],
     isPreset: true,
     route: 'food-scan',
@@ -34,7 +34,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_dinner',
     kind: ReminderKind.meal,
     title: 'Log your dinner',
-    body: 'Finish the day strong — log dinner.',
+    body: 'Log your plate and wrap up the day.',
     times: [ReminderTime(19, 30)],
     isPreset: true,
     route: 'food-scan',
@@ -43,7 +43,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_water',
     kind: ReminderKind.water,
     title: 'Drink some water',
-    body: 'Stay hydrated — log a glass.',
+    body: 'A glass of water, then back to it.',
     isPreset: true,
     route: 'water-trends',
     intervalMinutes: 120,
@@ -54,7 +54,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_mood',
     kind: ReminderKind.mood,
     title: 'How are you feeling?',
-    body: 'Take a moment for a quick mood check-in.',
+    body: 'Take ten seconds to check in.',
     times: [ReminderTime(20, 0)],
     isPreset: true,
     route: 'stress-trends',
@@ -63,7 +63,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_weight',
     kind: ReminderKind.weight,
     title: 'Weekly weigh-in',
-    body: 'Step on the scale and log it to see your trend.',
+    body: 'Step on, log it, watch your trend.',
     times: [ReminderTime(7, 15)],
     weekdays: {DateTime.monday},
     isPreset: true,
@@ -73,7 +73,7 @@ const reminderPresets = <Reminder>[
     id: 'preset_sleep',
     kind: ReminderKind.sleep,
     title: 'Time to wind down',
-    body: 'Put the screens away. Tap Going to bed when you turn in.',
+    body: 'Screens down soon. Tap Going to bed when you turn in.',
     times: [ReminderTime(22, 30)],
     isPreset: true,
     route: 'sleep-trends',
@@ -101,10 +101,14 @@ const starterPresetIds = {
 
 /// Saved reminders with any presets they're missing, presets first in their
 /// built-in order, then custom reminders in the order they were created.
+/// A preset's words always come from the app (users set only its times),
+/// so new copy reaches reminders saved before it.
 List<Reminder> mergeWithPresets(List<Reminder> saved) {
   final byId = {for (final r in saved) r.id: r};
   return [
-    for (final preset in reminderPresets) byId[preset.id] ?? preset,
+    for (final preset in reminderPresets)
+      byId[preset.id]?.copyWith(title: preset.title, body: preset.body) ??
+          preset,
     for (final r in saved)
       if (!r.isPreset) r,
   ];

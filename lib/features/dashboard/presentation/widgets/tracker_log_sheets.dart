@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:vital_up/core/widgets/feature_tip_card.dart';
+import 'package:vital_up/features/feature_tips/presentation/feature_tip_keys.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
@@ -385,6 +387,16 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
   /// (0 unless the screen is very short at large text).
   double _extraHeight = 0;
 
+  /// First sheets only: the arc moves the whole night (handles are easy to
+  /// find, the arc isn't). Gone after the close button or a save.
+  late bool _showDialTip =
+      featureTipsOrNull()?.isDismissed(FeatureTipKeys.sleepDial) == false;
+
+  void _dismissDialTip() {
+    featureTipsOrNull()?.dismiss(FeatureTipKeys.sleepDial);
+    if (mounted) setState(() => _showDialTip = false);
+  }
+
   /// Time asleep for the night as it was opened, when it's less than
   /// time in bed (a phone estimate leaves out screen-on check-ins). Shown
   /// and saved while the times stay as they were.
@@ -511,6 +523,7 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
       });
       return;
     }
+    if (_showDialTip) featureTipsOrNull()?.dismiss(FeatureTipKeys.sleepDial);
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -565,6 +578,14 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
                   visualDensity: VisualDensity.compact,
                 ),
               ),
+              if (_showDialTip) ...[
+                const SizedBox(height: AppDimens.space8),
+                FeatureTipCard.compact(
+                  icon: Icons.touch_app_rounded,
+                  message: 'Drag the arc to move your whole night.',
+                  onDismiss: _dismissDialTip,
+                ),
+              ],
               const SizedBox(height: AppDimens.space12),
               Flexible(
                 child: CircularSleepClockPicker(
