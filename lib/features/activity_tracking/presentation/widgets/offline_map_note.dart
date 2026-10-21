@@ -54,8 +54,9 @@ class OfflineMapNote extends StatelessWidget {
                 onTap: onTap,
                 radius: AppDimens.radiusToast,
                 blur: false,
-                shadow: AppShadows.shadowY,
+                shadow: AppShadows.elevated,
                 tint: context.vColors.surfaceElevated,
+                borderColor: context.vColors.hairline,
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppDimens.space12,
                   vertical: AppDimens.space8,

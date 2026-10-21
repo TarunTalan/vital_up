@@ -9,7 +9,8 @@ import 'package:vital_up/core/widgets/app_card.dart';
 ///
 /// [FeatureTipCard.compact] is one row (icon, message, close) for tight
 /// places such as a sheet. [overlay]: over a map or camera, an opaque
-/// card so the text stays readable.
+/// card with a hairline edge and an all-round shadow, so it stands out
+/// (a light card alone blends into a light map).
 class FeatureTipCard extends StatelessWidget {
   final IconData icon;
   final String? title;
@@ -46,12 +47,14 @@ class FeatureTipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
     final tint = overlay ? context.vColors.surfaceElevated : null;
-    final shadow = overlay ? AppShadows.shadowY : null;
+    final shadow = overlay ? AppShadows.elevated : null;
+    final border = overlay ? context.vColors.hairline : null;
     if (_compact) {
       return AppCard(
         width: double.infinity,
         tint: tint,
         shadow: shadow,
+        borderColor: border,
         padding: const EdgeInsetsDirectional.fromSTEB(
           AppDimens.space12,
           AppDimens.space4,
@@ -93,6 +96,7 @@ class FeatureTipCard extends StatelessWidget {
       width: double.infinity,
       tint: tint,
       shadow: shadow,
+      borderColor: border,
       padding: AppDimens.cardPaddingCompact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

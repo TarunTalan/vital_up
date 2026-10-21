@@ -232,6 +232,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       _selectActivityForGoals();
       _loadGoalTarget();
       _startLocationUpdates();
+      _askOnFirstOpen();
     });
     // Checkpoint the workout whenever the app leaves the foreground — the
     // OS may kill a backgrounded app without further notice.
@@ -349,7 +350,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
 
-      // Never asks on opening the screen: Start asks with the card.
+      // Only checks: the card asks (first open, then Start).
       permission = await Geolocator.checkPermission();
     } catch (e) {
       // e.g. a permission request already in progress from the workout.
@@ -401,22 +402,41 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   /// Location (needed), steps and notifications (asked with it when
   /// missing), with the permission card before the countdown starts.
+  /// Location for the route, steps and the workout notification, asked
+  /// with the permission card. [onceKey]: asked only once from there.
+  static PermissionAsk _trackingAsk({String? onceKey}) => PermissionAsk(
+    main: AppPermission.location,
+    also: const [AppPermission.activity, AppPermission.notifications],
+    alsoOnceKey: 'workout_extras',
+    onceKey: onceKey,
+    title: 'Map your workout',
+    message:
+        'VitalUp follows your route while you track, so your distance '
+        'and pace are right.',
+  );
+
   Future<bool> _allowTracking() async {
-    final allowed = await ensurePermission(
-      context,
-      const PermissionAsk(
-        main: AppPermission.location,
-        also: [AppPermission.activity, AppPermission.notifications],
-        alsoOnceKey: 'workout_extras',
-        title: 'Map your workout',
-        message:
-            'VitalUp follows your route while you track, so your distance '
-            'and pace are right.',
-      ),
-    );
+    final allowed = await ensurePermission(context, _trackingAsk());
     // Allowed just now: show where they are before the countdown ends.
     if (allowed && mounted) _startLocationUpdates();
     return allowed;
+  }
+
+  /// The first time the screen opens: the map is about where you are, so
+  /// the card asks then rather than only at Start. Once only (declined, it
+  /// waits for Start); after an interrupted workout's choice, which has
+  /// the screen first.
+  Future<void> _askOnFirstOpen() async {
+    if (!mounted ||
+        _workoutRequested ||
+        context.read<ActivityTrackingBloc>().state is! TrackingIdle) {
+      return;
+    }
+    final allowed = await ensurePermission(
+      context,
+      _trackingAsk(onceKey: 'workout_screen_open'),
+    );
+    if (allowed && mounted) _startLocationUpdates();
   }
 
   /// Starts the workout. Shared by the instant start and the countdown.

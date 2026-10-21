@@ -156,6 +156,28 @@ void main() {
     expect(_platform.requests, 1);
   });
 
+  testWidgets('extras shown on the card are not asked again alone', (
+    tester,
+  ) async {
+    await _setUp(0);
+    const ask = PermissionAsk(
+      main: AppPermission.location,
+      also: [AppPermission.notifications],
+      alsoOnceKey: 'extras',
+      onceKey: 'first_open',
+      title: 'Map your workout',
+      message: 'Your route while you track.',
+    );
+    await _host(tester, ask)();
+    expect(find.text('Map your workout'), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    final prefs = sl<SharedPreferences>();
+    expect(prefs.getBool('permission_card_asked_first_open'), isTrue);
+    // With location allowed later, the extras alone don't get a card.
+    expect(prefs.getBool('permission_card_asked_extras'), isTrue);
+  });
+
   // The card on the smallest phone at the largest text, and in dark mode:
   // nothing cut. `HOME_SHOTS=1` writes build/permission_shots/.
   for (final c in const [

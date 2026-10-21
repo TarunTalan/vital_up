@@ -1324,8 +1324,11 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
   it asked), Scan tab camera card (`CameraPermissionSheet`: drawn like a sheet along
   the bottom over the camera area, capture controls hidden, second button
   "Pick from gallery"), GPS
-  Start / resume (location + steps + notifications; repositories'
-  `hasPermission()` only check), timer Start and audio downloads
+  workout screen: on its first open (the one page that asks on open: its
+  map is about where you are; `onceKey` `workout_screen_open`, after an
+  interrupted workout's choice) and at Start / resume (location + steps +
+  notifications; extras offered on a card aren't asked again alone;
+  repositories' `hasPermission()` only check), timer Start and audio downloads
   (notifications, once). Explicit switches (Settings, reminders) still go
   straight to the system dialog. Health Connect and Usage Access open
   their own screens from explicit taps. Test:

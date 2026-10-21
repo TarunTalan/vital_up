@@ -179,6 +179,11 @@ Future<bool> ensurePermission(BuildContext context, PermissionAsk ask) async {
         _PermissionSheet(ask: ask, missing: missing, blocked: blocked),
   );
   if (onceKey != null) await prefs?.setBool('$_askedPrefix$onceKey', true);
+  // The extras were on this card too: they don't get a card of their own.
+  final alsoKey = ask.alsoOnceKey;
+  if (alsoKey != null && missing.any((p) => p != ask.main)) {
+    await prefs?.setBool('$_askedPrefix$alsoKey', true);
+  }
   if (allow != true) return false;
   if (blocked) {
     await openAppSettings();
