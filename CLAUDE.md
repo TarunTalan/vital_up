@@ -190,7 +190,18 @@ supabase functions deploy <name>
 `features/dashboard/presentation/pages/dashboard_page.dart` hosts the five
 tabs with the floating `AppBottomNav`: 0 Home (`_HomeTab`), 1 Scan
 (`FoodScannerPage`), 2 Vita (`VitaHomePage`), 3 Arena (`CommunityHubPage`),
-4 Profile (`ProfilePage(onOpenArena:)`). It owns the per-session cubits
+4 Profile (`ProfilePage(onOpenArena:)`). While a workout is under way,
+`ActiveWorkoutBar` (`activity_tracking/presentation/widgets/
+active_workout_bar.dart`) floats above the nav on every tab (in the
+Scaffold's `bottomNavigationBar` slot, so tabs' bottom padding clears it):
+the timer's type and live time / Paused (opens `openWorkoutTimer`), or
+"Workout stopped" for a GPS checkpoint left by a closed app (opens
+`activity-tracking`, which offers Resume / Save / Discard); test
+`test/features/activity_tracking/active_workout_bar_test.dart`. Launcher
+shortcuts (long-press the app icon: Start workout, Scan food, Water;
+`core/services/launcher_shortcuts.dart`, `quick_actions`, no icons yet so
+Android shows the app icon) open through
+`HomeWidgetService.openWhenReady`, like widget links. It owns the per-session cubits
 (water, sleep, trends, activity goals, gamification, notifications, stress,
 diet plan, profile), shows award snackbars, and prompts Google users to
 confirm a username. `_HomeTab` re-reads every card each time it is shown

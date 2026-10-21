@@ -109,6 +109,7 @@ dependencies:
   connectivity_plus: ^7.3.1
   background_downloader: ^9.5.9
   purchases_flutter: ^10.16.0
+  quick_actions: ^1.1.1
 
 
 dev_dependencies:

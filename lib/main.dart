@@ -27,6 +27,7 @@ import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/services/launcher_shortcuts.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
@@ -138,6 +139,9 @@ void main() async {
         ? const MyApp()
         : DevicePreview(builder: (context) => const MyApp()),
   );
+  // Long-press shortcuts on the app icon; one that launched the app opens
+  // once Home shows.
+  LauncherShortcuts.init();
 }
 
 class MyApp extends StatelessWidget {

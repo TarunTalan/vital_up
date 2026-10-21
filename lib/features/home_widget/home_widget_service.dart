@@ -288,6 +288,17 @@ class HomeWidgetService {
     return '/dashboard';
   }
 
+  /// Opens [route] above Home now, or once Home shows (start-up, sign-in).
+  /// For launcher shortcuts, which arrive outside the router.
+  static void openWhenReady(String route) {
+    if (!_ready) {
+      _pending = route;
+      _pendingAt = DateTime.now();
+      return;
+    }
+    open(route);
+  }
+
   /// Home is showing: open a route that arrived during start-up.
   static void markReady() {
     _ready = true;
