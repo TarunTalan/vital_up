@@ -28,6 +28,7 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
 import 'package:vital_up/core/services/launcher_shortcuts.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart' show clearStaleWorkoutNotifications;
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
@@ -112,6 +113,12 @@ void main() async {
 
     // Back up logs to the cloud and bring back ones from other devices.
     sl<SyncService>().start();
+
+    // Only at launch (not in the widget's background engine, which also
+    // runs initDependencies): nothing is recording yet, so workout
+    // notifications left by a closed app are stale. A GPS workout's comes
+    // back on Resume; the timer's stays while a timer is saved.
+    clearStaleWorkoutNotifications();
 
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();

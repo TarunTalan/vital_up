@@ -199,8 +199,10 @@ the timer's type and live time / Paused (opens `openWorkoutTimer`), or
 `activity-tracking`, which offers Resume / Save / Discard); test
 `test/features/activity_tracking/active_workout_bar_test.dart`. Launcher
 shortcuts (long-press the app icon: Start workout, Scan food, Water;
-`core/services/launcher_shortcuts.dart`, `quick_actions`, no icons yet so
-Android shows the app icon) open through
+`core/services/launcher_shortcuts.dart`, `quick_actions`; icons are
+adaptive drawables `res/drawable/shortcut_*.xml` = the widget glyph on the
+tracker accent, kept by `res/raw/keep.xml` from resource shrinking) open
+through
 `HomeWidgetService.openWhenReady`, like widget links. It owns the per-session cubits
 (water, sleep, trends, activity goals, gamification, notifications, stress,
 diet plan, profile), shows award snackbars, and prompts Google users to
@@ -650,7 +652,12 @@ Route names are GoRouter `name`s.
   `activity_in_progress_v1`; after an app kill the tracking page offers
   Resume / Save / Discard (`WorkoutRecoveryService`, pure rules in
   `domain/services/workout_checkpoint.dart`; older than 12 h is saved at
-  startup). GPS runs in a
+  startup; if reading it fails, startup closes nothing rather than the
+  workout to resume). At launch only (`main()`, never the widget engine,
+  which also runs `initDependencies`), `clearStaleWorkoutNotifications`
+  stops a GPS workout's leftover foreground service and cancels the timer
+  notification when no timer is saved; deleting a session from history
+  clears its resume point (`DeleteActivitySession.afterDelete`). GPS runs in a
   `flutter_foreground_task` location service (no battery exemption;
   `ForegroundServiceManager`). Its notification has Pause / Resume
   buttons: the task isolate forwards presses with `sendDataToMain`,
@@ -684,6 +691,14 @@ Route names are GoRouter `name`s.
   Home's deferred start (only if location is already allowed; last known
   position) and again from the tracking screen's first fix; the map widget
   loads `MAPBOX_STREETS` directly (the style in the offline pack).
+  Timed workouts speak through `TimerVoiceCoach`
+  (`services/timer_voice_coach.dart`, started at Home's deferred start and
+  by the timer page): app-wide, it follows `WorkoutTimerStore` (also the
+  notification's Pause / Resume and a timer left running) and every 5 s
+  picks a `timerCue` (`domain/services/timer_coach_rules.dart`: goal
+  reached > halfway > every 5 min time, calories, left of the goal); the
+  page says the finish summary and calls `skipNextChange` before Finish's
+  own pause. Test: `test/features/activity_tracking/timer_voice_coach_test.dart`.
   Voice coach (`VoiceCoachService`, shared singleton): `init()` once (Home
   deferred start and both workout screens), cues speak with no per-cue
   setup, `stop()` cancels a cue still being prepared; music never silences

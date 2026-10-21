@@ -61,6 +61,9 @@ class _SilentCoach implements VoiceCoachService {
   Future<void> announceCount(int count) async {}
 
   @override
+  Future<void> say(String text) async {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

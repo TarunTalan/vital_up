@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/permissions/permission_card.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -169,6 +170,8 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     _prefs.load().then((_) => _music.refreshFavorite());
     _loadGoalTarget();
     sl<VoiceCoachService>().init();
+    // Opened before Home (a notification or shortcut at launch).
+    if (sl.isRegistered<TimerVoiceCoach>()) sl<TimerVoiceCoach>().start();
     _bpmSubscription = _heartRate.bpmStream.listen((bpm) {
       if (mounted) setState(() => _bpm = bpm);
     });
@@ -268,7 +271,11 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
 
   Future<void> _finish(BuildContext context) async {
     final cubit = context.read<WorkoutTimerCubit>();
-    // Stop the clock while the user picks the intensity.
+    // Stop the clock while the user picks the intensity (not a pause the
+    // voice coach announces).
+    if (sl.isRegistered<TimerVoiceCoach>()) {
+      sl<TimerVoiceCoach>().skipNextChange();
+    }
     await cubit.pause();
     if (!context.mounted) return;
     final intensity = await showAppBottomSheet<WorkoutIntensity>(
@@ -277,7 +284,17 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     );
     if (intensity == null || !context.mounted) return;
     final outcome = await cubit.finish(intensity, target: _target);
-    if (outcome == WorkoutSaveOutcome.saved) _prefs.clearTimerTarget();
+    if (outcome == WorkoutSaveOutcome.saved) {
+      final saved = cubit.lastSaved;
+      if (saved != null && _prefs.value.voiceCoachEnabled) {
+        final minutes = saved.totalDurationSeconds ~/ 60;
+        sl<VoiceCoachService>().say(
+          'Workout complete. $minutes ${minutes == 1 ? 'minute' : 'minutes'}, '
+          'about ${saved.calories} calories.',
+        );
+      }
+      _prefs.clearTimerTarget();
+    }
     if (!context.mounted) return;
     switch (outcome) {
       case WorkoutSaveOutcome.saved:

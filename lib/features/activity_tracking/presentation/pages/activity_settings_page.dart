@@ -91,7 +91,7 @@ class ActivitySettingsPage extends StatelessWidget {
                       icon: Icons.mic_rounded,
                       title: 'Voice coach',
                       subtitle: timed
-                          ? 'Spoken countdown before you start'
+                          ? 'Time, calories and goal progress every 5 min'
                           : 'Audio cues at each km/mi milestone',
                       trailing: Switch(
                         value: prefs.voiceCoachEnabled,

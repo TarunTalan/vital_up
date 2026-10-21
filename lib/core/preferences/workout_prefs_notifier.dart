@@ -145,6 +145,18 @@ class WorkoutPrefs {
 class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
   WorkoutPrefsNotifier() : super(const WorkoutPrefs());
 
+  /// The saved settings once, for code without a screen (the timer's
+  /// voice coach).
+  static Future<WorkoutPrefs> read() async {
+    final notifier = WorkoutPrefsNotifier();
+    try {
+      await notifier.load();
+      return notifier.value;
+    } finally {
+      notifier.dispose();
+    }
+  }
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final targetTypeName =

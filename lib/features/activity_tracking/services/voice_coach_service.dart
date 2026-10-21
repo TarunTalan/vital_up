@@ -273,6 +273,9 @@ class VoiceCoachService {
     }
   }
 
+  /// Says [text] (timed workout cues, [TimerVoiceCoach]).
+  Future<void> say(String text) => _speak(text);
+
   Future<void> announceTargetReached(String targetLabel) async {
     await _speak('Target reached. $targetLabel. Great job.');
   }

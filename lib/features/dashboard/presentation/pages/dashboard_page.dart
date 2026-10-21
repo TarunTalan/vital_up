@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/active_workout_bar.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -133,6 +134,8 @@ class _DashboardPageState extends State<DashboardPage> {
       // Binding the speech engine takes a second or two: done now, the
       // first workout cue isn't late.
       sl<VoiceCoachService>().init();
+      // Timed workouts' cues, also with the timer screen left.
+      sl<TimerVoiceCoach>().start();
     });
   }
 

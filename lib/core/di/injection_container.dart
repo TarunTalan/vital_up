@@ -30,6 +30,7 @@ import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_
 import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
 import 'package:vital_up/features/onboarding/data/starting_goals_writer.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
 import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_datasource.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_repository.dart';
@@ -563,7 +564,13 @@ Future<void> initDependencies() async {
     () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
+    () => DeleteActivitySession(
+      sl<ActivityHistoryRepository>(),
+      afterDelete: (id) async {
+        final checkpoint = sl<WorkoutCheckpointStore>();
+        if (checkpoint.read()?.sessionId == id) await checkpoint.clear();
+      },
+    ),
   );
   sl.registerLazySingleton(
     () => LogWorkout(
@@ -614,6 +621,13 @@ Future<void> initDependencies() async {
     () => InAppAudioDownloader(sl<IsarService>()),
   );
   sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
+  sl.registerLazySingleton(
+    () => TimerVoiceCoach(
+      store: sl<WorkoutTimerStore>(),
+      voice: sl<VoiceCoachService>(),
+      weightKg: () => sl<BodyWeightSource>()(),
+    ),
+  );
   // 10. Dashboard / Screen Time / Sleep
   sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(
     () => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()),
