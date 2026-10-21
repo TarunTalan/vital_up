@@ -946,9 +946,10 @@ class _FoodScannerViewState extends State<FoodScannerView>
                 ),
                 if (_permissionDenied)
                   Positioned.fill(
-                    child: _CameraPermissionCard(
+                    child: CameraPermissionSheet(
                       blocked: _permissionPermanentlyDenied,
                       onAllow: _allowCamera,
+                      onGallery: _pickFromGallery,
                     ),
                   ),
                 // Scanner focused viewport overlay
@@ -1040,35 +1041,39 @@ class _FoodScannerViewState extends State<FoodScannerView>
                           ),
                           const SizedBox(height: AppDimens.space16),
                         ],
-                        // Barcodes and labels don't use a photo scan.
-                        if (!isRecognizing && !_isScanningNutritionLabel) ...[
+                        // Barcodes and labels don't use a photo scan; with
+                        // no camera the permission card has the gallery.
+                        if (!isRecognizing &&
+                            !_isScanningNutritionLabel &&
+                            !_permissionDenied) ...[
                           const ScansLeftHint(),
                           const SizedBox(height: AppDimens.space12),
                         ],
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _ScannerIconButton(
-                              iconAsset: 'assets/icons/ui/gallery_add.svg',
-                              onTap: isRecognizing ? () {} : _pickFromGallery,
-                            ),
-                            const Flexible(
-                              child: SizedBox(width: AppDimens.scanBarGap),
-                            ),
-                            _CaptureButton(
-                              isLoading: _isCapturing,
-                              onTap: _capturePhoto,
-                            ),
-                            const Flexible(
-                              child: SizedBox(width: AppDimens.scanBarGap),
-                            ),
-                            _ScannerIconButton(
-                              iconAsset: 'assets/icons/ui/flash.svg',
-                              active: _torchEnabled,
-                              onTap: _toggleFlash,
-                            ),
-                          ],
-                        ),
+                        if (!_permissionDenied)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _ScannerIconButton(
+                                iconAsset: 'assets/icons/ui/gallery_add.svg',
+                                onTap: isRecognizing ? () {} : _pickFromGallery,
+                              ),
+                              const Flexible(
+                                child: SizedBox(width: AppDimens.scanBarGap),
+                              ),
+                              _CaptureButton(
+                                isLoading: _isCapturing,
+                                onTap: _capturePhoto,
+                              ),
+                              const Flexible(
+                                child: SizedBox(width: AppDimens.scanBarGap),
+                              ),
+                              _ScannerIconButton(
+                                iconAsset: 'assets/icons/ui/flash.svg',
+                                active: _torchEnabled,
+                                onTap: _toggleFlash,
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -1266,40 +1271,88 @@ class _ScannerLoading extends StatelessWidget {
 
 /// The camera card in place of the viewfinder: what the camera is for,
 /// then the system dialog on Allow (or Settings once it won't ask).
-class _CameraPermissionCard extends StatelessWidget {
+/// Drawn like the other permission cards: a sheet along the bottom edge
+/// (same colour, corners and handle), scrolling when it can't fit.
+class CameraPermissionSheet extends StatelessWidget {
   final bool blocked;
   final VoidCallback onAllow;
+  final VoidCallback onGallery;
 
-  const _CameraPermissionCard({required this.blocked, required this.onAllow});
+  const CameraPermissionSheet({
+    required this.blocked,
+    required this.onAllow,
+    required this.onGallery,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final sheet = Theme.of(context).bottomSheetTheme;
     final padding = context.safePadding;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        context.gutter,
-        padding.top + AppDimens.sectionGap * 2,
-        context.gutter,
-        AppDimens.space24 + AppDimens.captureButtonSize + padding.bottom,
-      ),
-      child: ResponsiveCenter(
-        child: Container(
-          padding: AppDimens.cardPadding,
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(AppDimens.radiusSheet),
+    final handle = sheet.dragHandleSize;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: AppDimens.maxContentWidth,
+          // Clear of the back button at the top.
+          maxHeight:
+              MediaQuery.sizeOf(context).height -
+              padding.top -
+              AppDimens.sectionGap * 2,
+        ),
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
+            color: sheet.backgroundColor ?? context.colors.surface,
+            shape:
+                sheet.shape ??
+                const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(AppDimens.radiusSheet),
+                  ),
+                ),
           ),
-          child: PermissionPrompt(
-            ask: const PermissionAsk(
-              main: AppPermission.camera,
-              title: 'Scan your food',
-              message:
-                  'Point your camera at a meal, a barcode or a nutrition '
-                  'label and VitalUp fills in the details.',
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              context.gutter,
+              0,
+              context.gutter,
+              AppDimens.space16 + padding.bottom,
             ),
-            missing: const [AppPermission.camera],
-            blocked: blocked,
-            onAllow: onAllow,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (handle != null)
+                  SizedBox(
+                    height: kMinInteractiveDimension,
+                    child: Center(
+                      child: Container(
+                        width: handle.width,
+                        height: handle.height,
+                        decoration: BoxDecoration(
+                          color: sheet.dragHandleColor,
+                          borderRadius: BorderRadius.circular(handle.height),
+                        ),
+                      ),
+                    ),
+                  ),
+                PermissionPrompt(
+                  ask: const PermissionAsk(
+                    main: AppPermission.camera,
+                    title: 'Scan your food',
+                    message:
+                        'Point your camera at a meal, a barcode or a '
+                        'nutrition label and VitalUp fills in the details.',
+                  ),
+                  missing: const [AppPermission.camera],
+                  blocked: blocked,
+                  onAllow: onAllow,
+                  // Photos from the gallery work without the camera.
+                  onNotNow: onGallery,
+                  notNowLabel: 'Pick from gallery',
+                ),
+              ],
+            ),
           ),
         ),
       ),

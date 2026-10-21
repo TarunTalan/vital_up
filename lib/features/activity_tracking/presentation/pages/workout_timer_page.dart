@@ -63,11 +63,12 @@ void openWorkoutTimer(BuildContext context) {
 }
 
 /// Times a workout without a route (gym, yoga, a match). No map and no GPS:
-/// the timer runs off the clock, so closing the app doesn't stop it.
-/// Like a GPS workout, the screen can't be left until the workout is
-/// finished or discarded, and its controls start locked (slide to unlock)
-/// so a pocket tap can't pause or finish it. Opening this page again shows
-/// the workout being timed.
+/// the timer runs off the clock, so closing the app doesn't stop it, and
+/// neither does leaving this screen: Back (or the down arrow) leaves it
+/// running, with the tray notification and Home's `ActiveWorkoutBar` to
+/// come back. Its controls start locked (slide to unlock) so a pocket tap
+/// can't pause or finish it. Opening this page again shows the workout
+/// being timed.
 class WorkoutTimerPage extends StatelessWidget {
   /// Type to start with; ignored while a workout is already being timed.
   final ActivityType type;
@@ -151,6 +152,9 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
   /// The 3-2-1 before a workout starts, as on the GPS screen.
   bool _countingDown = false;
 
+  /// A workout is being timed: leaving keeps it (and its music) going.
+  bool _timing = false;
+
   late final WorkoutMusic _music = WorkoutMusic(
     _prefs,
     onError: (message) {
@@ -172,9 +176,12 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
 
   @override
   void dispose() {
-    // Music is for this workout only, as on the GPS screen.
-    _prefs.setBackgroundAudioTrack('None');
-    _music.stop();
+    // Music is for this workout only, as on the GPS screen; left running,
+    // the workout keeps it (the timer's end here stops it).
+    if (!_timing) {
+      _prefs.setBackgroundAudioTrack('None');
+      _music.stop();
+    }
     _music.dispose();
     sl<VoiceCoachService>().stop();
     _bpmSubscription?.cancel();
@@ -363,22 +370,35 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
       builder: (context, state) {
         final cubit = context.read<WorkoutTimerCubit>();
         final locked = _locked && state.isStarted;
+        _timing = state.isStarted;
         return PopScope(
-          canPop: !state.isStarted,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) {
-              showErrorSnackBar(context, 'Finish the workout before leaving.');
+            if (didPop && state.isStarted) {
+              showSuccessSnackBar(
+                context,
+                'Your ${state.type.label.toLowerCase()} timer keeps running',
+              );
             }
           },
           child: Stack(
             children: [
               AppScaffold(
-                // The GPS view's top: back and history while idle,
-                // nothing during a workout.
+                // The GPS view's top: back and history while idle; during
+                // a workout, a down arrow that leaves it running.
                 header: SafeArea(
                   bottom: false,
                   child: state.isStarted
-                      ? const SizedBox(height: AppDimens.space12)
+                      ? Padding(
+                          padding: EdgeInsets.all(context.gutter),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: RoundIconButton(
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              tooltip: 'Leave it running',
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        )
                       : Padding(
                           padding: EdgeInsets.all(context.gutter),
                           child: Row(

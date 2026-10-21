@@ -1249,7 +1249,9 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
   `AppPermission` = notifications, location, activity, camera. Uses: Home
   "Stay on track" notifications card once (`askForNotificationsOnce`,
   replaces the old automatic prompt; onboarding's reminders switch marks
-  it asked), Scan tab inline camera card (`_CameraPermissionCard`), GPS
+  it asked), Scan tab camera card (`CameraPermissionSheet`: drawn like a sheet along
+  the bottom over the camera area, capture controls hidden, second button
+  "Pick from gallery"), GPS
   Start / resume (location + steps + notifications; repositories'
   `hasPermission()` only check), timer Start and audio downloads
   (notifications, once). Explicit switches (Settings, reminders) still go

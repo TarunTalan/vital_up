@@ -236,6 +236,10 @@ class PermissionPrompt extends StatelessWidget {
   final VoidCallback onAllow;
   final VoidCallback? onNotNow;
 
+  /// The second button's words ("Pick from gallery" where there's another
+  /// way on without it).
+  final String notNowLabel;
+
   const PermissionPrompt({
     super.key,
     required this.ask,
@@ -243,6 +247,7 @@ class PermissionPrompt extends StatelessWidget {
     required this.blocked,
     required this.onAllow,
     this.onNotNow,
+    this.notNowLabel = 'Not now',
   });
 
   @override
@@ -310,7 +315,7 @@ class PermissionPrompt extends StatelessWidget {
           TextButton(
             onPressed: notNow,
             style: TextButton.styleFrom(foregroundColor: grey),
-            child: const Text('Not now'),
+            child: Text(notNowLabel),
           ),
         ],
       ],
