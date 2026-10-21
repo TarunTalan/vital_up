@@ -44,7 +44,7 @@ class TrendsService {
       items: logs,
       dateOf: (l) => l.timestamp,
       valueOf: (l) => l.amountMl.toDouble(),
-      goal: _water.getDailyGoal().toDouble(),
+      goal: _water.getDailyGoal()?.toDouble(),
       zeroWhenEmpty: true,
     );
     return TrendData(series, logs.reversed.toList());
@@ -59,7 +59,10 @@ class TrendsService {
       items: sessions,
       dateOf: (s) => s.wakeTime,
       valueOf: (s) => s.duration.inMinutes / 60,
-      goal: _sleep.getGoalMinutes() / 60,
+      goal: switch (_sleep.getGoalMinutes()) {
+        null => null,
+        final minutes => minutes / 60,
+      },
     );
     return TrendData(series, sessions);
   }

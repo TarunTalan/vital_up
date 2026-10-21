@@ -18,11 +18,23 @@ class ScreenTimeService {
   static const _limitKey = 'daily_screen_time_limit_min';
   static const defaultLimitMinutes = 240;
 
-  /// Daily screen time limit (the "goal" — less is better).
-  int getDailyLimitMinutes() => sanitizeScreenLimit(
-    _prefs?.getInt(_limitKey),
-    fallback: defaultLimitMinutes,
-  );
+  /// Saved in place of minutes when there's no limit. New accounts start
+  /// there (onboarding); installs that never saved one keep the 4 h
+  /// default they always had.
+  static const _noLimit = 0;
+
+  /// Daily screen time limit (the "goal" — less is better); null when the
+  /// user has none.
+  int? getDailyLimitMinutes() {
+    final raw = _prefs?.getInt(_limitKey);
+    if (raw == _noLimit) return null;
+    return sanitizeScreenLimit(raw, fallback: defaultLimitMinutes);
+  }
+
+  /// Whether a limit (or "no limit") was ever saved here.
+  bool get hasSavedLimit => _prefs?.containsKey(_limitKey) ?? false;
+
+  Future<void> clearDailyLimit() async => _prefs?.setInt(_limitKey, _noLimit);
 
   Future<void> setDailyLimitMinutes(int minutes) async => _prefs?.setInt(
     _limitKey,
@@ -347,7 +359,7 @@ class ScreenTimeService {
                 : d.duration.inMinutes.toDouble(),
           ),
       ],
-      goal: getDailyLimitMinutes().toDouble(),
+      goal: getDailyLimitMinutes()?.toDouble(),
       direction: GoalDirection.down,
     );
     return TrendData(series, history.reversed.toList());

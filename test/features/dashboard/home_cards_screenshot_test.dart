@@ -11,7 +11,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -222,8 +221,12 @@ class _FixedTrend<L> extends TrendCubit<L> {
 }
 
 class _FakeSleepService implements SleepService {
+  final int? goal;
+
+  _FakeSleepService(this.goal);
+
   @override
-  int getGoalMinutes() => 8 * 60;
+  int? getGoalMinutes() => goal;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -231,7 +234,7 @@ class _FakeSleepService implements SleepService {
 
 class _FakeScreenTimeService implements ScreenTimeService {
   @override
-  int getDailyLimitMinutes() => 4 * 60;
+  int? getDailyLimitMinutes() => 4 * 60;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -277,6 +280,9 @@ class _Scenario {
   final WeightUnit weightUnit;
   final ProfileState profile;
 
+  /// Null: the user removed their sleep goal.
+  final int? sleepGoalMinutes;
+
   const _Scenario({
     required this.name,
     required this.water,
@@ -289,6 +295,7 @@ class _Scenario {
     required this.weight,
     this.weightUnit = WeightUnit.kg,
     this.weightError,
+    this.sleepGoalMinutes = 8 * 60,
     this.profile = const ProfileLoaded(
       ProfileEntity(
         id: 'u1',
@@ -464,6 +471,28 @@ _Scenario _long() {
         fullName: 'Alexandriana Montgomery-Wells',
       ),
     ),
+  );
+}
+
+/// Water and sleep goals removed: figures with "today" / "last night",
+/// no bars, rings or "Behind".
+_Scenario _noGoals() {
+  final base = _typical();
+  return _Scenario(
+    name: 'nogoals',
+    water: const WaterIntakeLoaded(
+      currentIntakeMl: 1250,
+      dailyGoalMl: null,
+      todayLogs: [],
+    ),
+    sleepGoalMinutes: null,
+    sleep: base.sleep,
+    mood: base.mood,
+    goals: base.goals,
+    meals: base.meals,
+    plan: base.plan,
+    screenTime: base.screenTime,
+    weight: base.weight,
   );
 }
 
@@ -769,7 +798,6 @@ String _scaleName(double s) =>
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    sl.registerSingleton<SleepService>(_FakeSleepService());
     sl.registerSingleton<ScreenTimeService>(_FakeScreenTimeService());
   });
 
@@ -777,13 +805,24 @@ void main() {
     await sl.reset();
   });
 
-  for (final scenario in [_typical, _long, _empty, _states, _loading, _error]) {
+  for (final scenario in [
+    _typical,
+    _long,
+    _empty,
+    _states,
+    _loading,
+    _error,
+    _noGoals,
+  ]) {
     for (final c in _cases) {
       final s = scenario();
       final theme = c.dark ? 'dark' : 'light';
       final id = '${s.name}_${c.width.round()}_${_scaleName(c.scale)}_$theme';
 
       testWidgets('home cards: $id', (tester) async {
+        sl.registerSingleton<SleepService>(
+          _FakeSleepService(s.sleepGoalMinutes),
+        );
         sl.registerSingleton<WeightService>(
           _FakeWeightService(s.weightUnit, s.weight?.logs ?? const []),
         );

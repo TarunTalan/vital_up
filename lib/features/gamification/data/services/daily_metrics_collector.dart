@@ -141,7 +141,7 @@ class DailyMetricsCollector {
     required List<MealLogEntry> meals,
     required MealPlan? plan,
     required List<WaterLogCache> water,
-    required int waterGoal,
+    required int? waterGoal,
     required List<SleepSessionInfo> sleep,
     required StressCheckIn? checkIn,
     required Future<int?>? profileGoal,
@@ -194,7 +194,8 @@ class DailyMetricsCollector {
       weeklyGoalsAchieved: weekly,
       foodLogs: meals.length,
       waterLogs: water.length,
-      waterGoalMet: waterMl > 0 && waterMl >= waterGoal,
+      // No goal, no goal days: no Arena water points or water badge days.
+      waterGoalMet: waterGoal != null && waterMl > 0 && waterMl >= waterGoal,
       plannedMeals: planned.length,
       plannedMealsLogged: planned.where((p) => p.logged).length,
       calorieGoalMet:

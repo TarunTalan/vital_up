@@ -173,7 +173,8 @@ Future<int> addWaterInBackground(String userId, int ml) async {
   final total = today.fold<int>(0, (sum, l) => sum + l.amountMl);
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
-  if (total >= WaterIntakeService.dailyGoalFrom(prefs)) {
+  final goal = WaterIntakeService.dailyGoalFrom(prefs);
+  if (goal != null && total >= goal) {
     await markRemindersDoneInBackground(
       userId,
       const HabitLogged(Habit.water, goalReached: true),

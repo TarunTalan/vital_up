@@ -227,14 +227,16 @@ class _RecoveryCard extends StatelessWidget {
                     value: '${stats.consistencyScore}%',
                     icon: Icons.schedule_rounded,
                   ),
-                  TrackerFigure(
-                    label: 'Sleep debt',
-                    value: formatDashboardDuration(stats.totalSleepDebt),
-                    icon: Icons.battery_alert_rounded,
-                    color: stats.totalSleepDebt.inMinutes > 90
-                        ? context.vColors.warning
-                        : null,
-                  ),
+                  // Debt is time short of the goal: none without one.
+                  if (stats.totalSleepDebt case final debt?)
+                    TrackerFigure(
+                      label: 'Sleep debt',
+                      value: formatDashboardDuration(debt),
+                      icon: Icons.battery_alert_rounded,
+                      color: debt.inMinutes > 90
+                          ? context.vColors.warning
+                          : null,
+                    ),
                 ],
               ),
             ],

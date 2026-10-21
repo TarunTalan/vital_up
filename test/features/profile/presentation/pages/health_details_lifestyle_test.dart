@@ -100,7 +100,7 @@ void main() {
         username: 'testuser',
         email: 'test@example.com',
         smokes: 'Never',
-        sleep: '8h 0m',
+        sleep: '8h',
       ),
     );
 
@@ -144,7 +144,7 @@ void main() {
 
       final tile = tester.widget<AppListTile>(tileFinder);
       expect(tile.title, 'Sleep goal');
-      expect(tile.value, '8h 0m');
+      expect(tile.value, '8h');
       expect(tile.subtitle, isNull);
       expect(tile.onTap, isNull, reason: 'Tile must be non-clickable');
     },
@@ -179,7 +179,7 @@ void main() {
       expect(find.text('Recommended: 7–9 hrs'), findsOneWidget);
 
       // Current sleep goal displayed in sheet
-      expect(find.text('8h 0m'), findsWidgets);
+      expect(find.text('8h'), findsWidgets);
 
       // Tap decrease button
       final decreaseBtn = find.byTooltip('Decrease sleep goal');

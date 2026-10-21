@@ -68,13 +68,20 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
                 )
                 .join(' · '),
       TrackerMetric.mood: 'Check in once a day',
-      TrackerMetric.water:
-          '${formatWaterGoal(sl<WaterIntakeService>().getDailyGoal().toDouble())} a day',
-      TrackerMetric.sleep:
-          '${formatMinutesGoal(sl<SleepService>().getGoalMinutes().toDouble())} a night',
+      TrackerMetric.water: switch (sl<WaterIntakeService>().getDailyGoal()) {
+        null => null,
+        final ml => '${formatWaterGoal(ml.toDouble())} a day',
+      },
+      TrackerMetric.sleep: switch (sl<SleepService>().getGoalMinutes()) {
+        null => null,
+        final minutes => '${formatMinutesGoal(minutes.toDouble())} a night',
+      },
       TrackerMetric.weight: target == null ? null : unit.format(target),
-      TrackerMetric.screenTime:
-          'Under ${formatMinutesGoal(sl<ScreenTimeService>().getDailyLimitMinutes().toDouble())} a day',
+      TrackerMetric.screenTime: switch (sl<ScreenTimeService>()
+          .getDailyLimitMinutes()) {
+        null => null,
+        final limit => 'Under ${formatMinutesGoal(limit.toDouble())} a day',
+      },
     };
   }
 

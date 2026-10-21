@@ -296,6 +296,28 @@ class WeightService {
     }
   }
 
+  /// Removes the goal weight here and on the profile (queued offline).
+  Future<void> clearTarget() async {
+    await _prefs.remove(_keyTargetKg);
+    final userId = _userId;
+    if (userId == null) return;
+    await _cache.write(targetCacheKey(userId), null);
+    try {
+      await _pendingWrites.sendOrQueue(
+        _client,
+        PendingWrite.update(
+          'user_health_data',
+          values: {'target_weight': null},
+          match: {'id': userId},
+          userId: userId,
+          key: 'health:target_weight:$userId',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Goal weight removal not synced: $e');
+    }
+  }
+
   /// Last weight of each day over [range] days, vs the goal weight.
   Future<TrendData<WeightLogCache>> trend(TrendRange range) async {
     final days = lastNDays(range.days);

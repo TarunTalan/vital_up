@@ -31,6 +31,10 @@ class ValueRuler extends StatefulWidget {
   /// Spoken value, e.g. "72.4 kilograms".
   final String Function(double value) semanticValue;
 
+  /// Text under a labelled mark; the whole number by default ("5 ft" for
+  /// a scale in inches).
+  final String Function(double value)? labelFor;
+
   const ValueRuler({
     super.key,
     required this.value,
@@ -42,6 +46,7 @@ class ValueRuler extends StatefulWidget {
     this.step = 0.1,
     this.majorEvery = 10,
     this.midEvery = 5,
+    this.labelFor,
   });
 
   @override
@@ -216,6 +221,7 @@ class _ValueRulerState extends State<ValueRuler>
                         tickColor: grey,
                         labelStyle: labelStyle,
                         textScaler: scaler,
+                        labelFor: widget.labelFor,
                       ),
                     ),
                   ),
@@ -254,6 +260,7 @@ class _RulerPainter extends CustomPainter {
   final Color tickColor;
   final TextStyle labelStyle;
   final TextScaler textScaler;
+  final String Function(double value)? labelFor;
 
   _RulerPainter({
     required this.value,
@@ -265,6 +272,7 @@ class _RulerPainter extends CustomPainter {
     required this.tickColor,
     required this.labelStyle,
     required this.textScaler,
+    this.labelFor,
   });
 
   @override
@@ -297,7 +305,9 @@ class _RulerPainter extends CustomPainter {
       if (major) {
         final label = TextPainter(
           text: TextSpan(
-            text: (min + i * step).round().toString(),
+            text:
+                labelFor?.call(min + i * step) ??
+                (min + i * step).round().toString(),
             style: labelStyle,
           ),
           textDirection: TextDirection.ltr,

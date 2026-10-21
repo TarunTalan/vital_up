@@ -127,9 +127,10 @@ class _HealthBody extends StatelessWidget {
     final hasBp =
         profile.bloodPressureTop.isNotEmpty &&
         profile.bloodPressureBottom.isNotEmpty;
-    final sleepGoal = formatMinutesGoal(
-      sl<SleepService>().getGoalMinutes().toDouble(),
-    );
+    final sleepGoal = switch (sl<SleepService>().getGoalMinutes()) {
+      null => 'No goal',
+      final minutes => formatMinutesGoal(minutes.toDouble()),
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -632,9 +633,15 @@ class _LifestyleSheet extends StatefulWidget {
 
 class _LifestyleSheetState extends State<_LifestyleSheet> {
   late String _smokes = widget.profile.smokes;
-  late int _sleepMinutes = sl<SleepService>().getGoalMinutes();
+
+  /// Null when the user has no sleep goal; saving this sheet only sets
+  /// one if they moved it.
+  final int? _savedGoal = sl<SleepService>().getGoalMinutes();
+  late int _sleepMinutes = _savedGoal ?? SleepService.defaultGoalMinutes;
+  bool _goalChanged = false;
 
   void _setSleepGoal(int minutes) {
+    _goalChanged = true;
     final clamped = minutes.clamp(
       InputLimits.sleepGoalMinMin,
       InputLimits.sleepGoalMinMax,
@@ -723,7 +730,10 @@ class _LifestyleSheetState extends State<_LifestyleSheet> {
                 max: InputLimits.sleepGoalMinMax.toDouble(),
                 step: 30,
                 // The dial gives its own sound and vibration.
-                onChanged: (v) => setState(() => _sleepMinutes = v.round()),
+                onChanged: (v) => setState(() {
+                  _goalChanged = true;
+                  _sleepMinutes = v.round();
+                }),
               ),
             ],
           ),
@@ -731,6 +741,9 @@ class _LifestyleSheetState extends State<_LifestyleSheet> {
         _fieldGap,
       ],
       onSave: () {
+        if (_savedGoal == null && !_goalChanged) {
+          return widget.profile.copyWith(smokes: _smokes);
+        }
         unawaited(sl<SleepService>().setGoalMinutes(_sleepMinutes));
         return widget.profile.copyWith(
           smokes: _smokes,

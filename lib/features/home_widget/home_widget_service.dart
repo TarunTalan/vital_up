@@ -137,7 +137,7 @@ class HomeWidgetService {
         safe(_mealLogs(now)),
         safe(_calorieGoal()),
         safe(_water.getTodayLogs(user.id)),
-        safe(_sleep.getSleepDataForLastNight(requestPermission: false)),
+        safe(_sleep.getSleepDataForLastNight()),
         safe(_todayMood()),
         safe(_weight.latest()),
         safe(_weight.unit()),

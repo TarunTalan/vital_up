@@ -22,7 +22,12 @@ class WeekStats extends Equatable {
 
   /// Average night, or null when no sleep was recorded.
   final Duration? avgSleep;
-  final int waterGoalDays;
+
+  /// Days the water goal was met; null without a goal.
+  final int? waterGoalDays;
+
+  /// Days any water was logged.
+  final int waterDays;
   final int waterMl;
   final int meals;
   final int mealDays;
@@ -37,6 +42,7 @@ class WeekStats extends Equatable {
     this.distanceKm = 0,
     this.avgSleep,
     this.waterGoalDays = 0,
+    this.waterDays = 0,
     this.waterMl = 0,
     this.meals = 0,
     this.mealDays = 0,
@@ -54,6 +60,7 @@ class WeekStats extends Equatable {
     distanceKm,
     avgSleep,
     waterGoalDays,
+    waterDays,
     waterMl,
     meals,
     mealDays,
@@ -178,7 +185,7 @@ WeekStats weekStats({
   required DateTime from,
   required Iterable<ActivitySession> sessions,
   required Map<DateTime, int> waterByDay,
-  required int waterGoalMl,
+  required int? waterGoalMl,
   required List<Duration> sleep,
   required List<DateTime> mealTimes,
   required List<double> weights,
@@ -199,7 +206,10 @@ WeekStats weekStats({
                 sleep.fold<int>(0, (sum, d) => sum + d.inMinutes) ~/
                 sleep.length,
           ),
-    waterGoalDays: waterByDay.values.where((ml) => ml >= waterGoalMl).length,
+    waterGoalDays: waterGoalMl == null
+        ? null
+        : waterByDay.values.where((ml) => ml >= waterGoalMl).length,
+    waterDays: waterByDay.values.where((ml) => ml > 0).length,
     waterMl: waterByDay.values.fold(0, (sum, ml) => sum + ml),
     meals: mealTimes.length,
     mealDays: {for (final t in mealTimes) startOfDay(t)}.length,

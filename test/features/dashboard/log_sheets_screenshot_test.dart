@@ -7,7 +7,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -332,7 +331,7 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(find.text('6:10 AM'), findsOneWidget);
-      expect(find.text('Save 0h 30m'), findsOneWidget);
+      expect(find.text('Save 30m'), findsOneWidget);
     });
 
     testWidgets('a phone estimate keeps its time asleep until the times '
@@ -446,8 +445,8 @@ void main() {
             )
             .map((t) => t.text.toPlainText())
             .firstWhere((t) => RegExp(r'^\d+h( \d+m)?$').hasMatch(t));
-        // Save always spells out minutes ("8h 0m"); the dial drops "0m".
-        expect(save.replaceFirst(RegExp(r' 0m$'), ''), dial);
+        // Both read whole hours as "8h".
+        expect(save, dial);
       }
     });
 

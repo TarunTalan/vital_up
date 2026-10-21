@@ -575,7 +575,8 @@ class TrackerProgress extends StatelessWidget {
   final String value;
   final String? goal;
 
-  /// Word before the goal: "of 2.5 L", or "Goal 70.0 kg" for a target.
+  /// Word before the goal: "of 2.5 L", or "Goal 70.0 kg" for a target;
+  /// empty for a plain caption in the goal's place ("today" without one).
   final String goalPrefix;
   final double? fraction;
   final Color color;
@@ -600,7 +601,7 @@ class TrackerProgress extends StatelessWidget {
         FitText.rich(figureSpan(context, value), semanticsLabel: value),
         if (goal != null)
           FitText(
-            '$goalPrefix $goal',
+            goalPrefix.isEmpty ? goal! : '$goalPrefix $goal',
             style: context.text.bodyMedium?.copyWith(color: grey),
           ),
         if (fraction != null) ...[

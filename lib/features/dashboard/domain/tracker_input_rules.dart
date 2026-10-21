@@ -108,6 +108,11 @@ String? sleepEntryError(DateTime bed, DateTime wake, {required DateTime now}) {
   return null;
 }
 
+/// About 35 ml per kg of body weight, rounded to a 250 ml glass and kept
+/// between 1.5 and 4 L.
+int recommendedWaterGoalMl(double weightKg) =>
+    ((weightKg * 35 / 250).round() * 250).clamp(1500, 4000);
+
 // ---------------------------------------------------------------------------
 // Screen time
 // ---------------------------------------------------------------------------

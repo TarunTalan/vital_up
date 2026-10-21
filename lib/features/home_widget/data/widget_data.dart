@@ -154,11 +154,12 @@ class WidgetInputs {
   final int? caloriesEaten;
   final int? caloriesGoal;
 
+  /// Goals are null when the user removed them.
   final int? waterMl;
-  final int waterGoalMl;
+  final int? waterGoalMl;
 
   final int? sleepMinutes;
-  final int sleepGoalMinutes;
+  final int? sleepGoalMinutes;
 
   final int? moodLevel;
   final DateTime? moodAt;
@@ -249,9 +250,10 @@ class WidgetInputs {
       put('calories', caloriesEaten?.toString()),
       put('calories_goal', caloriesGoal?.toString()),
       put('water', waterMl?.toString()),
-      put('water_goal', waterGoalMl.toString()),
+      // 0 = no goal (a missing value is an older install: the default).
+      put('water_goal', (waterGoalMl ?? 0).toString()),
       put('sleep', sleepMinutes?.toString()),
-      put('sleep_goal', sleepGoalMinutes.toString()),
+      put('sleep_goal', (sleepGoalMinutes ?? 0).toString()),
       put('mood', moodLevel?.toString()),
       put('mood_at', moodAt?.toIso8601String()),
       put('weight', weightKg?.toString()),
@@ -267,6 +269,11 @@ class WidgetInputs {
     if (day == null) return null;
     final signedIn = await HomeWidget.getWidgetData<bool>('signed_in') ?? false;
     int? i(String? s) => s == null ? null : int.tryParse(s);
+    int? goal(String? s, int fallback) => switch (i(s)) {
+      null => fallback,
+      0 => null,
+      final v => v,
+    };
     double? d(String? s) => s == null ? null : double.tryParse(s);
     DateTime? t(String? s) => s == null ? null : DateTime.tryParse(s);
     return WidgetInputs(
@@ -278,9 +285,9 @@ class WidgetInputs {
       caloriesEaten: i(await get('calories')),
       caloriesGoal: i(await get('calories_goal')),
       waterMl: i(await get('water')),
-      waterGoalMl: i(await get('water_goal')) ?? 2500,
+      waterGoalMl: goal(await get('water_goal'), 2500),
       sleepMinutes: i(await get('sleep')),
-      sleepGoalMinutes: i(await get('sleep_goal')) ?? 480,
+      sleepGoalMinutes: goal(await get('sleep_goal'), 480),
       moodLevel: i(await get('mood')),
       moodAt: t(await get('mood_at')),
       weightKg: d(await get('weight')),
@@ -355,8 +362,14 @@ Map<WidgetMetric, MetricTile> buildTiles(WidgetInputs inputs) {
     WidgetMetric.water: tile(
       WidgetMetric.water,
       value: WaterTrendsPage.formatMl((inputs.waterMl ?? 0).toDouble()),
-      detail: 'of ${WaterTrendsPage.formatMl(inputs.waterGoalMl.toDouble())}',
-      progress: pct(inputs.waterMl ?? 0, inputs.waterGoalMl) ?? 0,
+      detail: switch (inputs.waterGoalMl) {
+        null => 'today',
+        final goal => 'of ${WaterTrendsPage.formatMl(goal.toDouble())}',
+      },
+      // No goal: no bar.
+      progress: inputs.waterGoalMl == null
+          ? null
+          : pct(inputs.waterMl ?? 0, inputs.waterGoalMl) ?? 0,
     ),
     WidgetMetric.sleep: tile(
       WidgetMetric.sleep,
@@ -364,10 +377,15 @@ Map<WidgetMetric, MetricTile> buildTiles(WidgetInputs inputs) {
       value: inputs.sleepMinutes == null
           ? '—'
           : formatDashboardDuration(Duration(minutes: inputs.sleepMinutes!)),
-      detail: inputs.sleepMinutes == null
-          ? 'Not logged'
-          : 'of ${formatDashboardDuration(Duration(minutes: inputs.sleepGoalMinutes))}',
-      progress: pct(inputs.sleepMinutes ?? 0, inputs.sleepGoalMinutes) ?? 0,
+      detail: switch ((inputs.sleepMinutes, inputs.sleepGoalMinutes)) {
+        (null, _) => 'Not logged',
+        (_, null) => 'last night',
+        (_, final goal?) =>
+          'of ${formatDashboardDuration(Duration(minutes: goal))}',
+      },
+      progress: inputs.sleepGoalMinutes == null
+          ? null
+          : pct(inputs.sleepMinutes ?? 0, inputs.sleepGoalMinutes) ?? 0,
     ),
     WidgetMetric.mood: mood == null
         ? tile(WidgetMetric.mood, value: '—', detail: 'Not checked in')

@@ -127,5 +127,7 @@ String formatDashboardDuration(Duration duration) {
   if (duration.isNegative) duration = Duration.zero;
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
-  return hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+  if (hours == 0) return '${minutes}m';
+  // Whole hours read "8h", not "8h 0m".
+  return minutes == 0 ? '${hours}h' : '${hours}h ${minutes}m';
 }

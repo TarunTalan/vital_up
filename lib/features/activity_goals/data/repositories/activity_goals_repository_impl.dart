@@ -32,6 +32,9 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     });
 
   @override
+  bool get hasSavedGoals => _local.hasSaved;
+
+  @override
   Future<void> saveGoal(ActivityGoal goal) => _local.write([
     for (final g in _local.read())
       if (g.id != goal.id) g,

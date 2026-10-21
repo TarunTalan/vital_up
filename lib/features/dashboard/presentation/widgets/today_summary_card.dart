@@ -17,6 +17,7 @@ import 'package:vital_up/features/activity_goals/domain/entities/activity_goal.d
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/activity_goals/presentation/widgets/goal_widgets.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
+import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_cubit.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/sleep_state.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/stress_checkin_cubit.dart';
@@ -157,6 +158,7 @@ class TodaySummaryCard extends StatelessWidget {
             ],
       fraction: goal?.fraction,
       iconAsset: isSteps ? 'assets/icons/trackers/step.svg' : null,
+      noGoal: false,
     );
   }
 
@@ -184,6 +186,7 @@ class TodaySummaryCard extends StatelessWidget {
           ? null
           : meals.totalCalories / goal,
       iconAsset: null,
+      noGoal: false,
     );
   }
 
@@ -199,14 +202,15 @@ class TodaySummaryCard extends StatelessWidget {
             : WaterTrendsPage.formatMl(water.currentIntakeMl.toDouble()),
       ],
       goals: [
-        water == null
-            ? _unknown
-            : 'of ${WaterTrendsPage.formatMl(water.dailyGoalMl.toDouble())}',
+        switch (water?.dailyGoalMl) {
+          _ when water == null => _unknown,
+          null => 'today',
+          final goal => 'of ${WaterTrendsPage.formatMl(goal.toDouble())}',
+        },
       ],
-      fraction: water == null || water.dailyGoalMl <= 0
-          ? null
-          : water.currentIntakeMl / water.dailyGoalMl,
+      fraction: safeFraction(water?.currentIntakeMl, water?.dailyGoalMl),
       iconAsset: null,
+      noGoal: water != null && water.dailyGoalMl == null,
     );
   }
 
@@ -226,13 +230,13 @@ class TodaySummaryCard extends StatelessWidget {
       goals: slept == null
           ? [known ? TrackerStatus.notLogged.label : _unknown]
           : [
-              'of ${formatDashboardDuration(Duration(minutes: goalMinutes))}',
-              if (goalMinutes % 60 == 0) 'of ${goalMinutes ~/ 60}h',
+              goalMinutes == null
+                  ? 'last night'
+                  : 'of ${formatDashboardDuration(Duration(minutes: goalMinutes))}',
             ],
-      fraction: slept == null || goalMinutes <= 0
-          ? null
-          : slept.inMinutes / goalMinutes,
+      fraction: safeFraction(slept?.inMinutes, goalMinutes),
       iconAsset: null,
+      noGoal: goalMinutes == null,
     );
   }
 }
@@ -246,6 +250,10 @@ typedef _SummaryData = ({
   List<String> goals,
   double? fraction,
   String? iconAsset,
+
+  /// The user removed this goal: no bar (its room is kept so the columns
+  /// still line up).
+  bool noGoal,
 });
 
 /// Text styles shared by every summary column, already sized for the
@@ -396,17 +404,20 @@ class _SummaryItem extends StatelessWidget {
               _line(layout.values[index], layout.value),
               _line(layout.goals[index], layout.goal),
               const SizedBox(height: AppDimens.space8),
-              TweenAnimationBuilder<double>(
-                tween: Tween(
-                  begin: 0,
-                  end: fraction != null && fraction.isFinite
-                      ? fraction.clamp(0.0, 1.0)
-                      : 0.0,
+              Visibility.maintain(
+                visible: !data.noGoal,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(
+                    begin: 0,
+                    end: fraction != null && fraction.isFinite
+                        ? fraction.clamp(0.0, 1.0)
+                        : 0.0,
+                  ),
+                  duration: AppDurations.slow,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) =>
+                      AppProgressBar(value: v, color: data.metric.color),
                 ),
-                duration: AppDurations.slow,
-                curve: Curves.easeOutCubic,
-                builder: (context, v, _) =>
-                    AppProgressBar(value: v, color: data.metric.color),
               ),
             ],
           ),
@@ -473,19 +484,22 @@ _Insight? _insightFor(BuildContext context, DateTime now) {
   }
 
   final water = context.watch<WaterIntakeCubit>().state;
-  final waterStatus = water is WaterIntakeLoaded
+  // No goal, no "short of your goal" nudge.
+  final waterGoal = water is WaterIntakeLoaded ? water.dailyGoalMl : null;
+  final waterStatus = water is WaterIntakeLoaded && waterGoal != null
       ? TrackerStatus.of(
           value: water.currentIntakeMl.toDouble(),
-          goal: water.dailyGoalMl.toDouble(),
+          goal: waterGoal.toDouble(),
           paceFraction: pace,
         )
       : null;
   // From 7 am, when the drinking day starts (not "2.5 L short" at 1 am).
   if (hour >= 7 &&
       water is WaterIntakeLoaded &&
+      waterGoal != null &&
       (waterStatus == TrackerStatus.behind ||
           waterStatus == TrackerStatus.notLogged)) {
-    final left = water.dailyGoalMl - water.currentIntakeMl;
+    final left = waterGoal - water.currentIntakeMl;
     return (
       message:
           "You're ${WaterTrendsPage.formatMl(left.toDouble())} short of "

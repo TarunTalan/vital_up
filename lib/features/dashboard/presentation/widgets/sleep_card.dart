@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -35,7 +37,7 @@ class SleepCard extends StatelessWidget {
   const SleepCard({super.key});
 
   Future<void> _refresh(BuildContext context) async {
-    context.read<SleepCubit>().loadSleepData();
+    context.read<SleepCubit>().loadSleepData(silent: true);
     await context.read<TrendCubit<SleepSessionInfo>>().load();
   }
 
@@ -69,13 +71,14 @@ class SleepCard extends StatelessWidget {
             estimate,
           ),
           SleepInBed(:final since) => _inBed(context, cubit, since),
-          SleepNeedsManualEntry(:final canDetect) => _prompt(
+          SleepNeedsManualEntry(:final canDetect, :final canConnect) => _prompt(
             context,
             title: 'How did you sleep?',
             action: _logAction(
               context,
               cubit,
               offerAutoDetect: !canDetect,
+              offerConnect: canConnect,
               filled: true,
             ),
           ),
@@ -145,6 +148,7 @@ class SleepCard extends StatelessWidget {
     SleepCubit cubit, {
     bool offerAutoDetect = false,
     bool offerHealthConnect = false,
+    bool offerConnect = false,
     bool filled = false,
   }) {
     return TrackerQuickAction(
@@ -155,7 +159,10 @@ class SleepCard extends StatelessWidget {
       filled: filled,
       onTap: () async {
         final evening = _isEvening;
-        if (!evening && !offerAutoDetect && !offerHealthConnect) {
+        if (!evening &&
+            !offerAutoDetect &&
+            !offerHealthConnect &&
+            !offerConnect) {
           return _log(context);
         }
         final choice = await _showChoices(
@@ -182,6 +189,15 @@ class SleepCard extends StatelessWidget {
                 'Turn on auto-detect',
                 'Estimate sleep from when your phone is idle',
               ),
+            if (offerConnect)
+              _SleepOption(
+                _SleepChoice.connect,
+                Icons.health_and_safety_rounded,
+                Platform.isIOS
+                    ? 'Connect Apple Health'
+                    : 'Connect Health Connect',
+                'Bring in sleep from your watch or other apps',
+              ),
             if (offerHealthConnect)
               const _SleepOption(
                 _SleepChoice.healthConnect,
@@ -206,6 +222,10 @@ class SleepCard extends StatelessWidget {
             await sl<ScreenTimeService>().openSettings();
           case _SleepChoice.healthConnect:
             await cubit.installHealthConnect();
+          case _SleepChoice.connect:
+            if (!await cubit.connectHealth() && context.mounted) {
+              showErrorSnackBar(context, 'Allow sleep access to bring it in.');
+            }
           case _SleepChoice.confirm || null:
         }
       },
@@ -351,7 +371,8 @@ class SleepCard extends StatelessWidget {
     SleepSessionInfo session,
   ) {
     final goalMinutes = sl<SleepService>().getGoalMinutes();
-    final goalMet = session.duration.inMinutes >= goalMinutes;
+    final goalMet =
+        goalMinutes != null && session.duration.inMinutes >= goalMinutes;
     // A saved night is finished, not "on track": logged like weight and
     // mood, with "Goal met" when it reached the goal.
     return _night(
@@ -400,7 +421,10 @@ class SleepCard extends StatelessWidget {
         children: [
           TrackerProgress(
             value: formatDashboardDuration(session.duration),
-            goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
+            goal: goalMinutes == null
+                ? 'last night'
+                : formatDashboardDuration(Duration(minutes: goalMinutes)),
+            goalPrefix: goalMinutes == null ? '' : 'of',
             fraction: safeFraction(minutes, goalMinutes),
             color: _metric.color,
           ),
@@ -440,7 +464,14 @@ class SleepCard extends StatelessWidget {
   }
 }
 
-enum _SleepChoice { enterTimes, goToBed, autoDetect, healthConnect, confirm }
+enum _SleepChoice {
+  enterTimes,
+  goToBed,
+  autoDetect,
+  connect,
+  healthConnect,
+  confirm,
+}
 
 /// One row in the sleep choices sheet.
 class _SleepOption {

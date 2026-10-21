@@ -50,7 +50,7 @@ class WaterIntakeCubit extends Cubit<WaterIntakeState> {
 
   WaterIntakeLoaded _loaded(
     List<WaterLogCache> logs,
-    int goal, {
+    int? goal, {
     String? notice,
     int? addedMl,
     int? addedLogId,

@@ -40,6 +40,9 @@ class ActivityGoalsLocalDataSource {
     }
   }
 
+  /// False until goals are first saved ([read] shows [defaults] then).
+  bool get hasSaved => _prefs.containsKey(_key);
+
   Future<void> write(List<ActivityGoal> goals) =>
       _prefs.setString(_key, jsonEncode([for (final g in goals) g.toJson()]));
 }

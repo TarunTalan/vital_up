@@ -14,7 +14,9 @@ class WaterIntakeLoading extends WaterIntakeState {}
 
 class WaterIntakeLoaded extends WaterIntakeState {
   final int currentIntakeMl;
-  final int dailyGoalMl;
+
+  /// Null when the user has no water goal.
+  final int? dailyGoalMl;
   final List<WaterLogCache> todayLogs;
 
   /// Set only on the state right after a drink was saved (for the Undo

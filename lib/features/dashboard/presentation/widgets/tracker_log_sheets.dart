@@ -13,6 +13,7 @@ import 'package:vital_up/core/widgets/tracker/tracker_sheet.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/sleep_session_info.dart';
 import 'package:vital_up/features/dashboard/domain/tracker_input_rules.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/dashboard_card_header.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/mood_widgets.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
@@ -417,7 +418,10 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
           now.minute - now.minute % 5,
         );
         final goal = Duration(
-          minutes: widget.goalMinutes ?? sl<SleepService>().getGoalMinutes(),
+          minutes:
+              widget.goalMinutes ??
+              sl<SleepService>().getGoalMinutes() ??
+              SleepService.defaultGoalMinutes,
         );
         final inBed = goal < minSleepEntry
             ? minSleepEntry
@@ -527,7 +531,7 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
       // scrolling and the time cards never sit behind Save.
       scrollable: false,
       action: AppPrimaryButton(
-        label: 'Save ${d.inHours}h ${d.inMinutes.remainder(60)}m',
+        label: 'Save ${formatDashboardDuration(d)}',
         isLoading: _saving,
         enabled: ruleError == null,
         onTap: _save,
@@ -564,11 +568,12 @@ class _SleepLogSheetState extends State<SleepLogSheet> {
               const SizedBox(height: AppDimens.space12),
               Flexible(
                 child: CircularSleepClockPicker(
-                  goal: Duration(
-                    minutes:
-                        widget.goalMinutes ??
-                        sl<SleepService>().getGoalMinutes(),
-                  ),
+                  // No goal: the dial shows the time only.
+                  goal: switch (widget.goalMinutes ??
+                      sl<SleepService>().getGoalMinutes()) {
+                    null => null,
+                    final minutes => Duration(minutes: minutes),
+                  },
                   initialBedTime: _bed,
                   initialWakeTime: _wake,
                   // The same figure as Save: real elapsed time on the

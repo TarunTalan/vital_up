@@ -25,7 +25,9 @@ class HealthSnapshot {
 
   // Hydration
   final int? waterTodayMl;
-  final int waterGoalMl;
+
+  /// Null when the user has no water goal.
+  final int? waterGoalMl;
   final bool tracksWater;
 
   // Screen time (today, Android only)

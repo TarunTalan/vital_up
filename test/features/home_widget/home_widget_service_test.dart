@@ -66,7 +66,7 @@ void main() {
 
       final sleep = tiles[WidgetMetric.sleep]!;
       expect(sleep.value, '7h 10m');
-      expect(sleep.detail, 'of 8h 0m');
+      expect(sleep.detail, 'of 8h');
     });
 
     test('says what is missing instead of showing zero', () {

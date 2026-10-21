@@ -77,7 +77,7 @@ class ScreenTimeTrendsPage extends StatelessWidget {
             allLogs: service.history,
             logBuilder: (context, day) {
               final limit = service.getDailyLimitMinutes();
-              final over = limit > 0 && day.duration.inMinutes > limit;
+              final over = limit != null && day.duration.inMinutes > limit;
               return LogHistoryCard(
                 icon: Icon(metric.icon),
                 color: over ? context.colors.error : metric.color,

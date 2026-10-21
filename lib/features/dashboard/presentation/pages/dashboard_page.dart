@@ -481,10 +481,7 @@ class _HomeTabState extends State<_HomeTab> {
       case 'activity_sessions':
         _reloadHabit(Habit.activity);
       case 'sleep_logs':
-        context.read<SleepCubit>().loadSleepData(
-          requestPermission: false,
-          silent: true,
-        );
+        context.read<SleepCubit>().loadSleepData(silent: true);
         context.read<TrendCubit<SleepSessionInfo>>().load();
       default:
         // Restored goals, mood check-ins or diet plan.
@@ -518,11 +515,8 @@ class _HomeTabState extends State<_HomeTab> {
   void _reloadAll() {
     _lastFullReload = DateTime.now();
     context.read<WaterIntakeCubit>().reload();
-    // Quiet and never prompting: the card keeps showing last night.
-    context.read<SleepCubit>().loadSleepData(
-      requestPermission: false,
-      silent: true,
-    );
+    // Quiet: the card keeps showing last night.
+    context.read<SleepCubit>().loadSleepData(silent: true);
     context.read<TrendCubit<SleepSessionInfo>>().load();
     context.read<ScreenTimeCubit>().loadStats();
     context.read<TrendCubit<WeightLogCache>>().load();

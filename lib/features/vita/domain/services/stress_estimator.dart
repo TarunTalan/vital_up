@@ -94,8 +94,9 @@ class StressEstimator {
 
     // Only judge hydration for users who actually log water, against the
     // share of the goal expected by now (07:00–22:00 drinking window).
-    if (s.tracksWater && hour >= 11) {
-      final expected = s.waterGoalMl * ((hour - 7).clamp(0, 15) / 15);
+    final waterGoal = s.waterGoalMl;
+    if (s.tracksWater && waterGoal != null && hour >= 11) {
+      final expected = waterGoal * ((hour - 7).clamp(0, 15) / 15);
       final ratio = expected <= 0 ? 1.0 : (s.waterTodayMl ?? 0) / expected;
       if (ratio < 0.75) {
         triggers.add(

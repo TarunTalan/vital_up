@@ -210,7 +210,9 @@ class TrackerPresetRow extends StatelessWidget {
 
 /// Opens the goal editor for [metric] and returns the saved value, or
 /// null if dismissed. Values move in [step]s between [min] and [max];
-/// [recommended] shows as a one-tap suggestion.
+/// [recommended] shows as a one-tap suggestion. With [onRemove] (the user
+/// has a goal) a "Remove goal" button asks first, saying [removeMessage]
+/// (what changes without the goal), runs it and closes with null.
 Future<double?> showTrackerGoalSheet({
   required BuildContext context,
   required TrackerMetric metric,
@@ -223,6 +225,8 @@ Future<double?> showTrackerGoalSheet({
   String? description,
   double? recommended,
   String? recommendedReason,
+  Future<void> Function()? onRemove,
+  String? removeMessage,
 }) {
   return showAppBottomSheet<double>(
     context: context,
@@ -237,6 +241,8 @@ Future<double?> showTrackerGoalSheet({
       description: description,
       recommended: recommended,
       recommendedReason: recommendedReason,
+      onRemove: onRemove,
+      removeMessage: removeMessage,
     ),
   );
 }
@@ -252,6 +258,8 @@ class _GoalSheet extends StatefulWidget {
   final String? description;
   final double? recommended;
   final String? recommendedReason;
+  final Future<void> Function()? onRemove;
+  final String? removeMessage;
 
   const _GoalSheet({
     required this.metric,
@@ -264,6 +272,8 @@ class _GoalSheet extends StatefulWidget {
     this.description,
     this.recommended,
     this.recommendedReason,
+    this.onRemove,
+    this.removeMessage,
   });
 
   @override
@@ -272,6 +282,46 @@ class _GoalSheet extends StatefulWidget {
 
 class _GoalSheetState extends State<_GoalSheet> {
   late double _value = widget.initial;
+  bool _removing = false;
+
+  Future<void> _remove(Future<void> Function() onRemove) async {
+    final metric = widget.metric.label.toLowerCase();
+    final confirmed = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove your $metric goal?'),
+        content: Text(
+          widget.removeMessage ??
+              'You can keep logging and set a goal again any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: dialogContext.colors.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _removing = true);
+    try {
+      await onRemove();
+    } catch (e) {
+      debugPrint('Goal not removed: $e');
+      if (!mounted) return;
+      setState(() => _removing = false);
+      showErrorSnackBar(context, "Couldn't remove your goal. Try again.");
+      return;
+    }
+    if (mounted) Navigator.pop(context);
+  }
 
   /// From the +/- buttons and presets: the same selection click the
   /// sliders and the ruler give per step.
@@ -309,9 +359,26 @@ class _GoalSheetState extends State<_GoalSheet> {
       metric: widget.metric,
       title: widget.title,
       subtitle: widget.description,
-      action: AppPrimaryButton(
-        label: 'Save goal',
-        onTap: () => Navigator.pop(context, _value),
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppPrimaryButton(
+            label: 'Save goal',
+            enabled: !_removing,
+            onTap: () => Navigator.pop(context, _value),
+          ),
+          if (widget.onRemove case final onRemove?) ...[
+            const SizedBox(height: AppDimens.space8),
+            TextButton(
+              onPressed: _removing ? null : () => _remove(onRemove),
+              style: TextButton.styleFrom(
+                foregroundColor: context.vColors.accentText,
+              ),
+              child: const Text('Remove goal'),
+            ),
+          ],
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

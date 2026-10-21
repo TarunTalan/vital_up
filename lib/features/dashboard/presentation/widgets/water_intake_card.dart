@@ -79,11 +79,16 @@ class WaterIntakeCard extends StatelessWidget {
           final goal = state.dailyGoalMl;
           return TrackerCard(
             metric: _metric,
-            status: TrackerStatus.of(
-              value: current.toDouble(),
-              goal: goal.toDouble(),
-              paceFraction: TrackerStatus.dayPace(),
-            ),
+            // No goal: nothing to be behind on, only whether water was
+            // logged today ("Logged" with the done check).
+            status: goal == null
+                ? (current > 0 ? TrackerStatus.done : TrackerStatus.notLogged)
+                : TrackerStatus.of(
+                    value: current.toDouble(),
+                    goal: goal.toDouble(),
+                    paceFraction: TrackerStatus.dayPace(),
+                  ),
+            statusLabel: goal == null && current > 0 ? 'Logged' : null,
             onOpen: () => _open(context),
             actions: [
               TrackerQuickAction(
@@ -101,7 +106,10 @@ class WaterIntakeCard extends StatelessWidget {
               children: [
                 TrackerProgress(
                   value: WaterTrendsPage.formatMl(current.toDouble()),
-                  goal: WaterTrendsPage.formatMl(goal.toDouble()),
+                  goal: goal == null
+                      ? 'today'
+                      : WaterTrendsPage.formatMl(goal.toDouble()),
+                  goalPrefix: goal == null ? '' : 'of',
                   fraction: safeFraction(current, goal),
                   color: _metric.color,
                 ),

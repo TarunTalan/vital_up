@@ -77,6 +77,8 @@ Widget _host(_Goal g, {ValueChanged<double?>? onSaved}) => Builder(
         format: g.format,
         recommended: g.recommended,
         recommendedReason: 'A reason for the suggestion',
+        // The user has a goal: "Remove goal" shows under Save.
+        onRemove: () async {},
       );
       onSaved?.call(v);
     });

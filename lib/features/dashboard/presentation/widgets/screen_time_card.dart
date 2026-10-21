@@ -69,19 +69,22 @@ class ScreenTimeCard extends StatelessWidget {
   Widget _loaded(BuildContext context, ScreenTimeLoaded state) {
     final limit = sl<ScreenTimeService>().getDailyLimitMinutes();
     final minutes = state.totalDuration.inMinutes;
-    final left = limit - minutes;
+    final left = limit == null ? null : limit - minutes;
     return TrackerCard(
       metric: _metric,
-      status: TrackerStatus.of(
-        value: minutes.toDouble(),
-        goal: limit.toDouble(),
-        direction: _metric.direction,
-      ),
+      // No limit: today's time only, with no status to meet.
+      status: limit == null
+          ? null
+          : TrackerStatus.of(
+              value: minutes.toDouble(),
+              goal: limit.toDouble(),
+              direction: _metric.direction,
+            ),
       onOpen: () => _open(context),
       actions: [
         TrackerQuickAction(
-          label: 'Edit goal',
-          svgAsset: TrackerIcons.edit,
+          label: limit == null ? 'Set a limit' : 'Edit goal',
+          svgAsset: limit == null ? TrackerIcons.goal : TrackerIcons.edit,
           color: _metric.color,
           filled: true,
           onTap: () async {
@@ -95,15 +98,23 @@ class ScreenTimeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          TrackerProgress(
-            value: formatDashboardDuration(state.totalDuration),
-            goal: '${formatDashboardDuration(Duration(minutes: limit))} limit',
-            fraction: limit > 0 ? minutes / limit : null,
-            color: left >= 0 ? _metric.color : context.colors.error,
-            caption: left >= 0
-                ? '${formatDashboardDuration(Duration(minutes: left))} left today'
-                : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
-          ),
+          if (limit == null || left == null)
+            TrackerProgress(
+              value: formatDashboardDuration(state.totalDuration),
+              color: _metric.color,
+              caption: 'Today · no daily limit',
+            )
+          else
+            TrackerProgress(
+              value: formatDashboardDuration(state.totalDuration),
+              goal:
+                  '${formatDashboardDuration(Duration(minutes: limit))} limit',
+              fraction: limit > 0 ? minutes / limit : null,
+              color: left >= 0 ? _metric.color : context.colors.error,
+              caption: left >= 0
+                  ? '${formatDashboardDuration(Duration(minutes: left))} left today'
+                  : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
+            ),
         ],
       ),
     );
@@ -134,9 +145,10 @@ class ScreenTimeSummaryRow extends StatelessWidget {
         switch (state) {
           case ScreenTimeLoaded():
             final limit = sl<ScreenTimeService>().getDailyLimitMinutes();
-            final left = limit - state.totalDuration.inMinutes;
             value = formatDashboardDuration(state.totalDuration);
-            valueColor = left >= 0 ? null : context.colors.error;
+            if (limit != null && state.totalDuration.inMinutes > limit) {
+              valueColor = context.colors.error;
+            }
           case ScreenTimePermissionDenied():
             caption = 'Allow usage access to track it';
             onTap = cubit.openSettings;
