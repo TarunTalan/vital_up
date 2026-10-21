@@ -126,8 +126,9 @@ void main() {
     expect(find.text('00:03:05'), findsOneWidget);
     expect(store.read()!.type, ActivityType.yoga);
 
-    // Locked like a GPS workout: no Pause until the slider is pulled, and
-    // the page can't be left mid-workout.
+    // Locked: no Pause until the slider is pulled. The page can be left
+    // with the workout still running.
+    expect(find.byTooltip('Leave it running'), findsOneWidget);
     expect(find.text('PAUSE'), findsNothing);
     expect(find.text('SLIDE TO UNLOCK'), findsOneWidget);
     await tester.drag(
@@ -153,6 +154,37 @@ void main() {
     // Leaving the page keeps the workout for next time.
     await tester.pumpWidget(const SizedBox());
     expect(store.read(), isNotNull);
+  });
+
+  testWidgets('leaving keeps the workout running', (tester) async {
+    await pumpPage(
+      tester,
+      Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    const WorkoutTimerPage(type: ActivityType.yoga),
+              ),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await settle(tester);
+    await tester.tap(find.text('Start Yoga'));
+    await settle(tester);
+
+    await tester.tap(find.byTooltip('Leave it running'));
+    await settle(tester);
+    expect(find.byType(WorkoutTimerPage), findsNothing);
+    expect(find.text('Your yoga timer keeps running'), findsOneWidget);
+    final timer = store.read();
+    expect(timer, isNotNull);
+    expect(timer!.isRunning, isTrue);
   });
 
   testWidgets('the log sheet saves a past workout', (tester) async {

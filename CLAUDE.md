@@ -625,10 +625,11 @@ Route names are GoRouter `name`s.
   repository, so sync, goals, challenges and badges count them):
   `workout-timer` (`WorkoutTimerPage` / `WorkoutTimerCubit`, extra
   `ActivityType`; wall-clock `WorkoutTimer` in pref `workout_timer_v1`, so
-  it survives app kills with no foreground service; caps at 6 h; locked
-  like a GPS workout: back is blocked until it's finished or discarded and
-  controls need a slide to unlock (`SlidingButton`); the
-  tracking page reopens it; ongoing tray notification with a system
+  it survives app kills with no foreground service; caps at 6 h; unlike a
+  GPS workout it can be left while running (Back or the down arrow "Leave
+  it running"; its music keeps playing; `ActiveWorkoutBar` on Home and the
+  tray bring it back); controls need a slide to unlock (`SlidingButton`);
+  the tracking page reopens it; ongoing tray notification with a system
   chronometer and Pause / Resume (`LocalWorkoutTimerNotifier`, channel
   `vitalup_workout_timer`; actions `workout_pause` / `workout_resume`
   handled by `handleWorkoutTimerAction` in both the foreground handler and
