@@ -28,7 +28,7 @@ supabase functions deploy <name>
   is logged in, so `supabase functions deploy` / `functions list` work here.
   Deploy migrations before edge functions that depend on them.
 - Migrations reach production through `supabase db push` or Supabase's
-  GitHub integration on `main` (all applied through `20261026`, Oct 19).
+  GitHub integration on `main` (all applied through `20261030`, Oct 22).
   Never paste a migration into the SQL editor: it isn't recorded in
   `supabase_migrations.schema_migrations`, so the next deploy runs it again
   (`20261021` renames a function and then fails with 42723). To fix the
@@ -878,7 +878,7 @@ Route names are GoRouter `name`s.
   fit the plate in good light). Test: `tip_placements_test.dart`. The
   "Offline map ready" notification and the tracking screen's
   `OfflineMapNote` (idle only) open `offline-maps`. Vita's `APP_GUIDE`
-  covers offline maps, shortcuts and tips (redeploy vita-chat to ship).
+  covers offline maps, shortcuts and tips (deployed Oct 22).
   Test: `test/features/feature_tips/feature_tips_test.dart`.
 - **gamification / community / challenges (Arena):** `friends`,
   `leaderboard` (`/community/:id`), `challenges`, `badges`,
@@ -1067,17 +1067,17 @@ Route names are GoRouter `name`s.
   = Pro unlimited for old functions; functions now pass Pro fair-use caps);
   `get_remaining_scans` free limit 5, -1 for Pro. Deploy it before the
   functions that pass `p_pro_limit`.
-  `20261028_ai_burst_limit.sql` (NOT pushed yet): `ai_burst_allowed`
+  `20261028_ai_burst_limit.sql` (applied): `ai_burst_allowed`
   per-minute window on `ai_usage_daily` (`window_start`, `window_count`;
   rows it creates have `use_count` 0); service role only.
-  `20261029_friend_request_expiry.sql` (NOT pushed yet): hourly cron
+  `20261029_friend_request_expiry.sql` (applied): hourly cron
   `expire-friend-requests` (:25) deletes pending requests older than 30
   days (the trigger removes their notification).
-  `20261030_vita_chat_refunds.sql` (NOT pushed yet): `refund_ai_quota(...,
+  `20261030_vita_chat_refunds.sql` (applied Oct 22): `refund_ai_quota(...,
   p_max_refunds DEFAULT 3)` returns whether it refunded; vita-chat passes
   the daily chat limit, so a chat only counts when it gets a real answer
-  (errors, off-topic and replaced replies are refunded). Push it before
-  redeploying vita-chat.
+  (errors, off-topic and replaced replies are refunded); vita-chat using
+  it is deployed (Oct 22).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -1106,8 +1106,8 @@ Route names are GoRouter `name`s.
   No deno locally: type-check with tsc + shims (see Tests).
 - Not in any migration (created in the dashboard): `profiles`,
   `user_health_data`, `proprietary_products`, `get_email_by_username`
-  (closed). `20261027_core_tables_rls.sql` (written Oct 20, NOT pushed
-  yet) enables RLS on the three tables with permissive + RESTRICTIVE
+  (closed). `20261027_core_tables_rls.sql` (written Oct 20, applied by
+  Oct 22: anon gets 42501 on profiles / user_health_data) enables RLS on the three tables with permissive + RESTRICTIVE
   policies (restrictive ones cap any dashboard policy): profiles readable
   by signed-in users, insert/update own row, no client delete;
   `user_health_data` own row only; `proprietary_products` readable by all,
