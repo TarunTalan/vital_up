@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -205,6 +206,21 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
         ? null
         : (type: p.timerTargetType, value: p.timerTargetValue);
   }
+
+  /// The first Start offers notifications with the card (the timer and its
+  /// Pause / Resume in the tray), before any countdown; the timer starts
+  /// either way.
+  Future<void> _offerNotifications() => ensurePermission(
+    context,
+    const PermissionAsk(
+      main: AppPermission.notifications,
+      title: 'Your timer, always at hand',
+      message:
+          'See the time and pause or resume from your notifications, '
+          'even with VitalUp closed.',
+      onceKey: 'workout_timer',
+    ),
+  );
 
   /// Starts the timer; today's goal becomes the target unless one is set.
   void _start(WorkoutTimerCubit cubit) {
@@ -416,8 +432,10 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
                             isLocked: locked,
                             onLockToggle: (value) =>
                                 setState(() => _locked = value),
-                            onStart: () {
+                            onStart: () async {
                               HapticFeedback.mediumImpact();
+                              await _offerNotifications();
+                              if (!mounted || cubit.state.isStarted) return;
                               setState(() => _locked = true);
                               if (_prefs.value.countdownDurationSeconds > 0) {
                                 setState(() => _countingDown = true);

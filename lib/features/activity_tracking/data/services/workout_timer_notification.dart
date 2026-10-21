@@ -12,9 +12,6 @@ import 'package:vital_up/features/activity_tracking/domain/entities/workout_time
 abstract class WorkoutTimerNotifier {
   Future<void> show(WorkoutTimer timer, DateTime now);
   Future<void> cancel();
-
-  /// Asks for notification permission (Android 13+) when starting a timer.
-  Future<void> requestPermission();
 }
 
 /// The timer as an ongoing notification: a live system chronometer while
@@ -123,19 +120,6 @@ class LocalWorkoutTimerNotifier implements WorkoutTimerNotifier {
       await plugin.cancel(id: notificationId);
     } catch (e) {
       debugPrint('Cancelling workout timer notification failed: $e');
-    }
-  }
-
-  @override
-  Future<void> requestPermission() async {
-    try {
-      await plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
-    } catch (e) {
-      debugPrint('Notification permission request failed: $e');
     }
   }
 }

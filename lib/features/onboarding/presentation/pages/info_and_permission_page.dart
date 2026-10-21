@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
@@ -63,6 +64,8 @@ class _PrivacyStepState extends State<PrivacyStep> with OnboardingStepState {
 
   /// Asks for notification access and turns on the starter reminders.
   Future<void> _enableReminders() async {
+    // The system asks now; Home's notification card mustn't ask again.
+    await markPermissionAsked(homeNotificationsKey);
     try {
       await sl<RemindersService>().enableStarterSet();
     } catch (e) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
@@ -341,10 +342,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
 
+      // Never asks on opening the screen: Start asks with the card.
       permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
     } catch (e) {
       // e.g. a permission request already in progress from the workout.
       debugPrint('Map preview location unavailable: $e');
@@ -391,6 +390,26 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _stopLocationUpdates() {
     _positionSubscription?.cancel();
     _positionSubscription = null;
+  }
+
+  /// Location (needed), steps and notifications (asked with it when
+  /// missing), with the permission card before the countdown starts.
+  Future<bool> _allowTracking() async {
+    final allowed = await ensurePermission(
+      context,
+      const PermissionAsk(
+        main: AppPermission.location,
+        also: [AppPermission.activity, AppPermission.notifications],
+        alsoOnceKey: 'workout_extras',
+        title: 'Map your workout',
+        message:
+            'VitalUp follows your route while you track, so your distance '
+            'and pace are right.',
+      ),
+    );
+    // Allowed just now: show where they are before the countdown ends.
+    if (allowed && mounted) _startLocationUpdates();
+    return allowed;
   }
 
   /// Starts the workout. Shared by the instant start and the countdown.
@@ -440,7 +459,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     if (!mounted || choice == null || _recoveryBusy) return;
     switch (choice) {
       case InterruptedWorkoutChoice.resume:
-        _resumeInterrupted(workout);
+        // Without location it can't go on; the checkpoint stays.
+        if (await _allowTracking() && mounted) _resumeInterrupted(workout);
       case InterruptedWorkoutChoice.save:
         await _finishInterrupted(workout);
       case InterruptedWorkoutChoice.discard:
@@ -1077,6 +1097,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                         });
                                       },
                                       onStart: () async {
+                                        if (!await _allowTracking() ||
+                                            !mounted) {
+                                          return;
+                                        }
                                         final duration = _prefsNotifier
                                             .value
                                             .countdownDurationSeconds;

@@ -9,15 +9,12 @@ import 'package:vital_up/features/activity_tracking/domain/services/track_point_
 
 class LocationTrackingRepositoryImpl implements LocationTrackingRepository {
   @override
-  Future<bool> ensurePermission() async {
+  /// Never asks: the tracking page asks first with the permission card.
+  Future<bool> hasPermission() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return false;
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
+    final permission = await Geolocator.checkPermission();
     return permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
   }

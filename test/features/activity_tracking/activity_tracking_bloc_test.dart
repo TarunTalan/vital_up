@@ -23,7 +23,7 @@ class _FakeLocation implements LocationTrackingRepository {
   int subscriptions = 0;
 
   @override
-  Future<bool> ensurePermission() async => granted;
+  Future<bool> hasPermission() async => granted;
 
   @override
   Stream<TrackPoint> watchTrackPoints(ActivityType activityType) {
@@ -36,7 +36,7 @@ class _FakeSteps implements StepCounterRepository {
   final controller = StreamController<int>.broadcast();
 
   @override
-  Future<bool> ensurePermission() async => true;
+  Future<bool> hasPermission() async => true;
 
   @override
   Stream<int> watchSteps() => controller.stream;

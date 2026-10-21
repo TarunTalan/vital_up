@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/point_goals_nudge.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -83,6 +84,8 @@ class _ArenaHubView extends StatelessWidget {
                   children: [
                     const ScoreStreakCard(),
                     const SizedBox(height: AppDimens.sectionGap),
+                    // Only while a goal that earns points is missing.
+                    const PointGoalsNudge(gapBelow: AppDimens.sectionGap),
 
                     ArenaChallengesSection(onRefresh: challengesCubit.load),
                     const SizedBox(height: AppDimens.sectionGap),

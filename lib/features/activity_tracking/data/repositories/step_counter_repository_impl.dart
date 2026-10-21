@@ -14,12 +14,13 @@ class StepCounterRepositoryImpl implements StepCounterRepository {
   static const Duration _minRateWindow = Duration(seconds: 2);
 
   @override
-  Future<bool> ensurePermission() async {
+  Future<bool> hasPermission() async {
     // Android 10+ gates the step sensor behind ACTIVITY_RECOGNITION. iOS
     // prompts for Motion & Fitness itself when the pedometer starts.
+    // Never asks here: the tracking page asks first with the card.
     if (!Platform.isAndroid) return true;
     try {
-      final status = await Permission.activityRecognition.request();
+      final status = await Permission.activityRecognition.status;
       return status.isGranted || status.isLimited;
     } catch (_) {
       return false;

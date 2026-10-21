@@ -6,6 +6,6 @@ class StartTrackingSession {
   StartTrackingSession(this.repository);
 
   Future<bool> call() {
-    return repository.ensurePermission();
+    return repository.hasPermission();
   }
 }

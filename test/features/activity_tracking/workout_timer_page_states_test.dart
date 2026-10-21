@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -69,6 +70,12 @@ void main() {
   late DateTime clock;
 
   setUp(() async {
+    // Notifications already allowed: Start shows no permission card.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('flutter.baseflow.com/permissions/methods'),
+          (call) async => 1,
+        );
     // No 3-2-1 before Start: the countdown has its own timers.
     SharedPreferences.setMockInitialValues({'workout_countdown_duration': 0});
     store = WorkoutTimerStore(await SharedPreferences.getInstance());

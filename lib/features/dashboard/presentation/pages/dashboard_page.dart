@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
+import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -119,7 +121,9 @@ class _DashboardPageState extends State<DashboardPage> {
       // Both only reach the server when something changed (time zone, push
       // token or account) since they last did.
       sl<WeeklySummaryService>().reportTimezone();
-      push.requestPermissionAndRegister();
+      // Registers only if notifications are allowed; the card below asks.
+      push.register();
+      _askForNotifications();
       sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
       // Track downloads that finished while the app was closed.
       sl<InAppAudioDownloader>().start();
@@ -148,6 +152,15 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       debugPrint('Username check failed: $e');
     }
+  }
+
+  /// Notifications off: the "Stay on track" card, once (never over another
+  /// sheet, e.g. the username prompt), then the system dialog on Allow.
+  Future<void> _askForNotifications() async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+    if (!await askForNotificationsOnce(context) || !mounted) return;
+    sl<PushService>().register();
+    sl<RemindersService>().resync();
   }
 
   /// A tapped push opens the screen its notification links to.

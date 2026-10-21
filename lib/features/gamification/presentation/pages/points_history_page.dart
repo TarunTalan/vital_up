@@ -12,6 +12,10 @@ import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
+import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
+import 'package:vital_up/features/gamification/domain/entities/point_goal.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/point_goals_nudge.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/point_event.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
@@ -35,6 +39,30 @@ class PointsHistoryPage extends StatefulWidget {
 
 class _PointsHistoryPageState extends State<PointsHistoryPage> {
   late Future<_HistoryData> _data = _load();
+
+  /// Goals some rules need that aren't set: those rules get a link.
+  Set<PointGoal> _missing = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMissing();
+  }
+
+  Future<void> _loadMissing() async {
+    try {
+      final missing = await sl<DailyMetricsCollector>().missingPointGoals();
+      if (mounted) setState(() => _missing = missing);
+    } catch (e) {
+      debugPrint('Point goals unavailable: $e');
+    }
+  }
+
+  Future<void> _setGoal(PointGoal goal) async {
+    if (await editTrackerGoal(context, goal.metric) && mounted) {
+      _loadMissing();
+    }
+  }
 
   Future<_HistoryData> _load() {
     final repo = sl<GamificationRepository>();
@@ -169,6 +197,8 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                       for (final r in rules)
                         if (r.category == c && r.points > 0) r,
                     ],
+                    missing: _missing,
+                    onSetGoal: _setGoal,
                   ),
                   const SizedBox(height: AppDimens.cardGap),
                 ],
@@ -265,8 +295,15 @@ class _DayCard extends StatelessWidget {
 class _RulesCard extends StatelessWidget {
   final ScoreCategory category;
   final List<PointRule> rules;
+  final Set<PointGoal> missing;
+  final ValueChanged<PointGoal> onSetGoal;
 
-  const _RulesCard({required this.category, required this.rules});
+  const _RulesCard({
+    required this.category,
+    required this.rules,
+    required this.missing,
+    required this.onSetGoal,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -314,10 +351,58 @@ class _RulesCard extends StatelessWidget {
                       color: context.vColors.grayText,
                     ),
                   ),
+                  // Out of reach until the goal it needs is set.
+                  if (PointGoal.forSource(r.source) case final goal?
+                      when missing.contains(goal))
+                    _GoalLink(goal: goal, onTap: () => onSetGoal(goal)),
                 ],
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Set a water goal ›": a text link under a rule that needs that goal,
+/// lined up with the rule's text.
+class _GoalLink extends StatelessWidget {
+  final PointGoal goal;
+  final VoidCallback onTap;
+
+  const _GoalLink({required this.goal, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.vColors.accentText;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Set ${goal == PointGoal.activity ? 'an' : 'a'} '
+                  '${goal.label} to earn these',
+                  style: context.text.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: AppDimens.iconSm,
+                color: color,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

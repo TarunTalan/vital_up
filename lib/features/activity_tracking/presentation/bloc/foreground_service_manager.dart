@@ -134,11 +134,8 @@ class ForegroundServiceManager {
     _lastPaused = paused;
     final text = paused ? 'Paused' : 'Tracking your $activityName...';
 
-    // Request notification permission for Android 13+
-    final reqResult = await FlutterForegroundTask.checkNotificationPermission();
-    if (reqResult != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
-    }
+    // Notification permission (Android 13+) is asked by the tracking
+    // page's card before Start; without it the service runs unseen.
 
     // No battery-optimisation exemption: a location foreground service
     // keeps GPS running under Doze, and Play restricts that permission.

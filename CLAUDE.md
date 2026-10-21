@@ -815,7 +815,11 @@ Route names are GoRouter `name`s.
   `get_badge_progress()` for locked badges. Challenges are online-only.
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
   - **Arena UI (Oct 21):** hub order = level card + shortcuts,
-    Challenges, Friends, Leaderboards, then Monthly champions only when
+    `PointGoalsNudge` (only while a goal that points need is missing:
+    `PointGoal` water / calories / activity, `DailyMetricsCollector
+    .missingPointGoals`; "Set goals" opens `my-goals`, "Not now" hides it
+    until a different set is missing; the Points page puts "Set a water
+    goal to earn these" under those rules), Challenges, Friends, Leaderboards, then Monthly champions only when
     there are winners (rules and countdown live on each leaderboard).
     `ChallengeTile`: running = brand icon badge + time bar ("Day 6 of 7 ·
     1 day left"); finished / left = grey badge + `TrackerStatusChip`
@@ -1226,6 +1230,22 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
   the sleep card's "Log sleep" sheet offers "Connect Health Connect"
   (`SleepNeedsManualEntry.canConnect`, `SleepCubit.connectHealth`).
   Closing a permission screen resumes the app and would loop.
+- System permission dialogs can't be styled: ask with the permission card
+  first (`core/permissions/permission_card.dart`: `ensurePermission(context,
+  PermissionAsk(main:, also:, title:, message:, onceKey:, alsoOnceKey:))`;
+  nothing when allowed, card then the system dialog on Allow, "Open
+  settings" when blocked; `onceKey` asks once for optional ones).
+  `AppPermission` = notifications, location, activity, camera. Uses: Home
+  "Stay on track" notifications card once (`askForNotificationsOnce`,
+  replaces the old automatic prompt; onboarding's reminders switch marks
+  it asked), Scan tab inline camera card (`_CameraPermissionCard`), GPS
+  Start / resume (location + steps + notifications; repositories'
+  `hasPermission()` only check), timer Start and audio downloads
+  (notifications, once). Explicit switches (Settings, reminders) still go
+  straight to the system dialog. Health Connect and Usage Access open
+  their own screens from explicit taps. Test:
+  `test/core/permissions/permission_card_test.dart` (`HOME_SHOTS=1` writes
+  `build/permission_shots/`).
 - `setState(() => future = load())` returns a Future and throws; use a block body
   (also never call setState in `didUpdateWidget`: a build follows anyway).
 - Never `select('*')` from `profiles` (column grant without `email`).

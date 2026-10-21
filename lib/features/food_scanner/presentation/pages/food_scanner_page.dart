@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -239,14 +240,17 @@ class _FoodScannerViewState extends State<FoodScannerView>
       _errorMessage = null;
     });
 
-    final permission = await Permission.camera.request();
+    // Never the system dialog on opening the tab: the camera card asks
+    // first ([_allowCamera]).
+    final granted = await AppPermission.camera.isGranted();
     if (!mounted || generation != _cameraGeneration) return;
 
-    if (!permission.isGranted) {
+    if (!granted) {
+      final blocked = await AppPermission.camera.isBlocked();
+      if (!mounted) return;
       setState(() {
         _permissionDenied = true;
-        _permissionPermanentlyDenied =
-            permission.isPermanentlyDenied || permission.isRestricted;
+        _permissionPermanentlyDenied = blocked;
       });
       return;
     }
@@ -940,6 +944,13 @@ class _FoodScannerViewState extends State<FoodScannerView>
                     ),
                   ),
                 ),
+                if (_permissionDenied)
+                  Positioned.fill(
+                    child: _CameraPermissionCard(
+                      blocked: _permissionPermanentlyDenied,
+                      onAllow: _allowCamera,
+                    ),
+                  ),
                 // Scanner focused viewport overlay
                 if (_cameraController != null &&
                     _cameraController!.value.isInitialized &&
@@ -1084,24 +1095,25 @@ class _FoodScannerViewState extends State<FoodScannerView>
     );
   }
 
+  /// Allow on the camera card: the system dialog, or Settings when it
+  /// won't ask again (the camera starts on return, see [_restoreCamera]).
+  Future<void> _allowCamera() async {
+    if (_permissionPermanentlyDenied) {
+      await openAppSettings();
+      return;
+    }
+    if (await AppPermission.camera.request()) {
+      if (mounted) _initializeCamera();
+      return;
+    }
+    final blocked = await AppPermission.camera.isBlocked();
+    if (mounted) setState(() => _permissionPermanentlyDenied = blocked);
+  }
+
   Widget _buildCameraLayer() {
+    // The camera card is drawn above the shading (see build).
     if (_permissionDenied) {
-      if (_permissionPermanentlyDenied) {
-        // The system won't ask again; send the user to settings.
-        return _ScannerMessage(
-          message: 'Allow camera access in Settings to scan food.',
-          buttonLabel: 'Open Settings',
-          onTap: () async {
-            await openAppSettings();
-            if (mounted) _initializeCamera();
-          },
-        );
-      }
-      return _ScannerMessage(
-        message: 'Allow camera access to scan food.',
-        buttonLabel: 'Grant Permission',
-        onTap: _initializeCamera,
-      );
+      return const ColoredBox(color: AppColors.cameraBackdrop);
     }
 
     if (_errorMessage != null) {
@@ -1248,6 +1260,49 @@ class _ScannerLoading extends StatelessWidget {
     return const ColoredBox(
       color: AppColors.cameraBackdrop,
       child: Center(child: VitalUpLoader()),
+    );
+  }
+}
+
+/// The camera card in place of the viewfinder: what the camera is for,
+/// then the system dialog on Allow (or Settings once it won't ask).
+class _CameraPermissionCard extends StatelessWidget {
+  final bool blocked;
+  final VoidCallback onAllow;
+
+  const _CameraPermissionCard({required this.blocked, required this.onAllow});
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = context.safePadding;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        context.gutter,
+        padding.top + AppDimens.sectionGap * 2,
+        context.gutter,
+        AppDimens.space24 + AppDimens.captureButtonSize + padding.bottom,
+      ),
+      child: ResponsiveCenter(
+        child: Container(
+          padding: AppDimens.cardPadding,
+          decoration: BoxDecoration(
+            color: context.colors.surface,
+            borderRadius: BorderRadius.circular(AppDimens.radiusSheet),
+          ),
+          child: PermissionPrompt(
+            ask: const PermissionAsk(
+              main: AppPermission.camera,
+              title: 'Scan your food',
+              message:
+                  'Point your camera at a meal, a barcode or a nutrition '
+                  'label and VitalUp fills in the details.',
+            ),
+            missing: const [AppPermission.camera],
+            blocked: blocked,
+            onAllow: onAllow,
+          ),
+        ),
+      ),
     );
   }
 }

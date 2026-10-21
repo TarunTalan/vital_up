@@ -135,7 +135,7 @@ class ActivityTrackingBloc
     try {
       final activityType = state.activityType;
 
-      final hasPermission = await getLiveLocationStream.ensurePermission();
+      final hasPermission = await getLiveLocationStream.hasPermission();
       if (!hasPermission) {
         emit(
           TrackingPermissionDenied(
@@ -149,7 +149,7 @@ class ActivityTrackingBloc
         return;
       }
 
-      final hasStepPermission = await getLiveStepsStream.ensurePermission();
+      final hasStepPermission = await getLiveStepsStream.hasPermission();
 
       // Read once per session: every tick recomputes calories.
       _cachedWeightKg = await _readWeightKg();
@@ -249,7 +249,7 @@ class ActivityTrackingBloc
       final checkpoint = event.checkpoint;
       final activityType = session.activityType;
 
-      final hasPermission = await getLiveLocationStream.ensurePermission();
+      final hasPermission = await getLiveLocationStream.hasPermission();
       if (!hasPermission) {
         // The checkpoint stays, so the user can try again.
         emit(
@@ -261,7 +261,7 @@ class ActivityTrackingBloc
         emit(TrackingIdle(activityType: activityType));
         return;
       }
-      final hasStepPermission = await getLiveStepsStream.ensurePermission();
+      final hasStepPermission = await getLiveStepsStream.hasPermission();
 
       try {
         await ForegroundServiceManager.start(

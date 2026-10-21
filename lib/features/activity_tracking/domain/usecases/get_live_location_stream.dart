@@ -7,8 +7,8 @@ class GetLiveLocationStream {
 
   const GetLiveLocationStream(this.repository);
 
-  Future<bool> ensurePermission() {
-    return repository.ensurePermission();
+  Future<bool> hasPermission() {
+    return repository.hasPermission();
   }
 
   Stream<TrackPoint> call(ActivityType activityType) {
