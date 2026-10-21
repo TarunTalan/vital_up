@@ -127,8 +127,8 @@ supabase functions deploy <name>
   `SecureSessionStorage` (`core/config/secure_session_storage.dart`,
   Keystore-backed; moves an old prefs session over; the widget engine uses
   it too). Mapbox telemetry is switched off in `MainActivity`
-  (reflection: the SDK isn't on the app's classpath).) `SleepCubit` is provided by the dashboard only (loading
-  it earlier would prompt for Health Connect before sign-in). Pages pushed
+  (reflection: the SDK isn't on the app's classpath).) `SleepCubit` is provided by the dashboard only (it reads
+  the signed-in user's nights; it never prompts for Health Connect). Pages pushed
   through the router can't see dashboard providers: pass cubits as `extra`
   or keep them global.
 
@@ -229,7 +229,7 @@ make one back press skip two tabs).
   reflows only when its own content stops fitting (so 1.15 and 1.25 look
   alike), see the Home notes below.
   Card figures use `AppTextStyles.metric` at one size everywhere:
-  `TrackerProgress` always puts the goal on its own line ("of 8h 0m"), so
+  `TrackerProgress` always puts the goal on its own line ("of 8h": `formatDashboardDuration` drops "0m" everywhere, "7h 12m", "30m"), so
   side-by-side tiles read alike; the mood label wraps to two lines.
   Half-width tiles show a met goal / today logged as a check on the
   badge corner (`_DoneMark`), never beside the title, so it shows at any
@@ -404,13 +404,37 @@ Route names are GoRouter `name`s.
   `AccountService.clearLocalUserData` (`SyncService.stop` first; logs,
   workouts (and a running workout timer), reminders, onboarding answers, backup markers and queued
   server writes, goals wiped; settings kept). Signup terms: `terms_dialog.dart` + legal links.
-- **onboarding:** `health-onboarding` then `health-personal-details`,
-  `health-height`, `health-weight`, `health-dietary-preference`,
-  `health-goals`, `health-activity`, `health-info-permission`.
-  `OnboardingCubit` keeps answers in prefs `onboarding_*` (device-wide,
-  cleared on sign-out), upserts
-  `user_health_data` via `PendingWrites` (works offline). Google users choose
-  a username here (`set_username`, `username_available`).
+- **onboarding:** one page, `OnboardingFlowPage(initialStep:)`
+  (`presentation/pages/onboarding_flow_page.dart`); every `health-*` step
+  route builds it at that step and `health-onboarding`
+  (`OnboardingEntryPoint`) calls `OnboardingCubit.reload()` (the cubit is
+  global: a new account must not see the last one's answers) and opens the
+  saved step (`OnboardingStep` enum in `domain/onboarding_step.dart`: ids
+  saved in `onboarding_current_step`, unknown ids start over). Steps (About
+  you, height, weight, diet, goal, activity, privacy) are widgets whose
+  state mixes in `OnboardingStepState.submit()` (check + save on Continue;
+  false stays). Shared-axis slide between steps, fixed header (back,
+  segmented `OnboardingProgress`, Skip on middle steps), pinned Continue,
+  staggered `OnboardingReveal`, `OnboardingChoiceTile` for single choices
+  (`presentation/widgets/onboarding_widgets.dart`); height / weight / target
+  use `ValueRuler` (`labelFor` gives "5 ft" marks); ends on a "You're all
+  set" screen listing the user's goals (calories + starting goals, Adjust
+  opens `my-goals`). Finish saves `StartingGoals`
+  (`domain/usecases/starting_goals.dart`: water 35 ml/kg in 250 ml steps,
+  1.5-4 L; steps / weekly workouts by activity level; sleep 8 h, 9 h under
+  18; skipped answers keep the defaults) through `StartingGoalsWriter`
+  (`data/starting_goals_writer.dart`), which never replaces a goal already
+  saved (by hand or a restored backup) and saves screen time as no limit.
+  Users who finished onboarding before keep the defaults. System back on a later step goes back
+  a step. Weight stays empty when skipped (no made-up 70 kg). The privacy
+  step's analytics and health sync switches are the real settings
+  (`SettingsCubit`, `HealthImportService.connect`); reminders turn on after
+  the save. `OnboardingCubit` keeps answers in prefs `onboarding_*`
+  (device-wide, cleared on sign-out), upserts `user_health_data` via
+  `PendingWrites` (works offline). Google users choose a username here
+  (`set_username`, `username_available`). Test:
+  `test/features/onboarding/onboarding_flow_test.dart` (`HOME_SHOTS=1`
+  writes `build/onboarding_shots/`).
 - **profile:** `ProfilePage` (identity card -> Account details, one-line Arena
   strip, `HealthSnapshotCard`, Health and Account groups, Sign out),
   `AccountDetailsPage` (`account-details`; name, `UsernameInput`
@@ -443,7 +467,17 @@ Route names are GoRouter `name`s.
 - **about:** rate (Play id from `PackageInfo.packageName`), feedback mailto
   `support@vitalup.live`, Legal links (`LegalLinks`).
 - **goals:** `my-goals` gathers every goal (plan, weight, activity, water,
-  sleep, screen time). Goal sheet `showTrackerGoalSheet` (`tracker_sheet.dart`):
+  sleep, screen time). Water, sleep, screen time and weight goals can be
+  removed: the goal sheet's "Remove goal" (`onRemove`, asks first with
+  `removeMessage`) saves 0 in the goal pref (`clearDailyGoal`, `clearGoal`,
+  `clearDailyLimit`; weight `clearTarget` nulls `target_weight`), so the
+  getters return null (a missing pref is still the default). Without a
+  goal: cards and widgets show the amount with "today" / "last night", no
+  bar or ring, "Logged" instead of Behind; no chart goal line, no sleep
+  debt, no water nudge; `waterGoalMet` is false (no Arena water points or
+  water badge days, the remove dialog says so); the weekly summary shows
+  "Water logged" days. Test: `test/features/dashboard/remove_goal_test.dart`
+  and the `nogoals` Home scenario. Goal sheet `showTrackerGoalSheet` (`tracker_sheet.dart`):
   weight uses `ValueRuler` (leave as is); water / screen time use
   `GoalSlider` and sleep `SleepGoalDial` (`core/widgets/tracker/goal_controls.dart`:
   grey track, metric accent the only colour, sheet-coloured knob with an
@@ -460,8 +494,11 @@ Route names are GoRouter `name`s.
 - **dashboard trackers:** routes `water-trends`, `sleep-trends`,
   `screen-time-trends`, `stress-trends`, `diet-progress`, `weight-trends`.
   `TrendsService` / `TrendCubit<T>` are shared by cards and trend pages.
-  Water: Isar `WaterLogCache`, goal pref `daily_water_goal`. Screen time:
-  pref `daily_screen_time_limit_min`, Usage Access permission, usage channel.
+  Water: Isar `WaterLogCache`, goal pref `daily_water_goal` (0 = no goal). Screen time:
+  pref `daily_screen_time_limit_min` (0 = no limit: new users start there,
+  `getDailyLimitMinutes()` is null, the card shows today's time with "Set
+  a limit"; never saved = the old 4 h default), Usage Access permission,
+  usage channel.
   Android keeps usage events ~10 days (`ScreenTimeService.systemDays`), so
   every finished day with usage is saved on read (pref
   `screen_time_days_v1`, 400 days, top 10 apps) and read from there after;
@@ -654,7 +691,9 @@ Route names are GoRouter `name`s.
 - **health_sync:** `HealthImportService` imports weight and workouts (every
   exercise type: `workoutTypeFor` maps gym/yoga/sports, others -> other) when
   Settings > Health Sync is on, at most hourly, on resume, idempotent (pref
-  `health_import_last`).
+  `health_import_last`). `connect()` also asks for sleep
+  (`SleepService.healthTypes`) in the same screen: Health Connect grants
+  per type, so Home's sleep card would otherwise prompt again.
 - **food_scanner:** Scan tab, `food-scan`, `meal-log-history`.
   `FoodScanBloc` (photo, barcode, search, edit, label OCR, custom food),
   `MealLogBloc`. Isar `MealLogCache`, `OfflineFood` (synced from
@@ -1182,9 +1221,11 @@ shims.d.ts <files>`, with shims declaring `Deno` (env, serve) and the
 - Android widgets (RemoteViews): no plain `<View>` (use `FrameLayout`), tint
   dynamically with `setColorFilter`, progress bars are `ImageView` +
   `wg_bar_fill` clip drawable + `setImageLevel`, text sizes are dp.
-- Never prompt for permissions from background work or app resume:
-  `SleepService.getSleepDataForLastNight(requestPermission: false)`; closing
-  a permission screen resumes the app and would loop.
+- Never prompt for permissions from background work, app resume or just
+  opening a page: `SleepService.getSleepDataForLastNight()` never asks;
+  the sleep card's "Log sleep" sheet offers "Connect Health Connect"
+  (`SleepNeedsManualEntry.canConnect`, `SleepCubit.connectHealth`).
+  Closing a permission screen resumes the app and would loop.
 - `setState(() => future = load())` returns a Future and throws; use a block body
   (also never call setState in `didUpdateWidget`: a build follows anyway).
 - Never `select('*')` from `profiles` (column grant without `email`).

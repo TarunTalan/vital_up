@@ -16,7 +16,6 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_error_fallback.dart';
@@ -151,8 +150,8 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
         // One app-wide copy: the Home card and the routed trends page share
-        // it. (SleepCubit lives on the dashboard: loading it here would ask
-        // for Health Connect access before sign-in.)
+        // it. (SleepCubit lives on the dashboard: it reads the signed-in
+        // user's nights.)
         BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
         BlocProvider(create: (context) => sl<SettingsCubit>()..loadSettings()),
         // VitalUp Pro, read by gates and the paywall anywhere in the app.
@@ -196,15 +195,6 @@ class MyApp extends StatelessWidget {
                       listener: (context, state) {
                         if (state is AuthError) {
                           showErrorSnackBar(context, state.message);
-                        }
-                      },
-                    ),
-                    BlocListener<OnboardingCubit, OnboardingData>(
-                      listenWhen: (previous, current) => previous.status != current.status,
-                      listener: (context, state) {
-                        // Errors are shown by the onboarding page itself.
-                        if (state.status == SubmissionStatus.success) {
-                          showSuccessSnackBar(context, 'Health profile saved.');
                         }
                       },
                     ),

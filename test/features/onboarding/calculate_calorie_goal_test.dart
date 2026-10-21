@@ -57,7 +57,10 @@ void main() {
   });
 
   test('converts imperial height and weight', () {
-    expect(CalculateCalorieGoal.heightInCm('5-11', 'ft'), closeTo(180.34, 0.01));
+    expect(
+      CalculateCalorieGoal.heightInCm('5-11', 'ft'),
+      closeTo(180.34, 0.01),
+    );
     expect(CalculateCalorieGoal.weightInKg('176', 'lb'), closeTo(79.83, 0.01));
   });
 

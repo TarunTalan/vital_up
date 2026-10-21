@@ -22,15 +22,10 @@ import 'package:vital_up/features/dashboard/presentation/pages/stress_trends_pag
 import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 
-import 'package:vital_up/features/onboarding/presentation/pages/dietary_preference_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/height_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/info_and_permission_page.dart';
+import 'package:vital_up/features/onboarding/domain/onboarding_step.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/onboarding_entry_point.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/goals.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/personal_details_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
+import 'package:vital_up/features/onboarding/presentation/pages/onboarding_flow_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_mode_select_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_preferences_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_edit_page.dart';
@@ -426,35 +421,37 @@ class AppRouter {
         pageBuilder: (context, state) =>
             AppPage(key: state.pageKey, child: const OnboardingEntryPoint()),
       ),
+      // Every step opens the same flow page at that step.
       GoRoute(
         path: '/health-onboarding/personal-details',
         name: 'health-personal-details',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const PersonalDetailsPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.about),
+        ),
       ),
       GoRoute(
         path: '/health-onboarding/height',
         name: 'health-height',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const HeightPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.height),
+        ),
       ),
       GoRoute(
         path: '/health-onboarding/weight',
         name: 'health-weight',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const WeightPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.weight),
+        ),
       ),
-
       GoRoute(
         path: '/health-onboarding/dietary-preference',
         name: 'health-dietary-preference',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: DietaryPreferencePage(
-            onNext: () => context.goNamed('health-goals'),
-            onBack: () => context.goNamed('health-weight'),
-            onSkip: () => context.goNamed('health-goals'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.diet),
         ),
       ),
       GoRoute(
@@ -462,11 +459,7 @@ class AppRouter {
         name: 'health-goals',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: GoalsPage(
-            onNext: () => context.goNamed('health-activity'),
-            onBack: () => context.goNamed('health-dietary-preference'),
-            onSkip: () => context.goNamed('health-activity'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.goal),
         ),
       ),
       GoRoute(
@@ -474,24 +467,15 @@ class AppRouter {
         name: 'health-activity',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: ActivityPage(
-            onNext: () => context.goNamed('health-info-permission'),
-            onBack: () => context.goNamed('health-goals'),
-            onSkip: () => context.goNamed('health-info-permission'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.activity),
         ),
       ),
-
       GoRoute(
         path: '/health-onboarding/info-permission',
         name: 'health-info-permission',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: InfoAndPermissionPage(
-            onNext: () => context.goNamed('dashboard'), // Complete flow
-            onBack: () => context.goNamed('health-activity'),
-            onSkip: () => context.goNamed('dashboard'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.privacy),
         ),
       ),
       GoRoute(

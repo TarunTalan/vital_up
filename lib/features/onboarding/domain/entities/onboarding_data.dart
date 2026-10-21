@@ -33,7 +33,7 @@ class OnboardingData extends Equatable {
     this.fullName = "",
     this.dob = "",
     this.gender = "",
-    this.weight = "70",
+    this.weight = "",
     this.weightUnit = "kg",
     this.height = "",
     this.heightUnit = "cm",

@@ -19,7 +19,7 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
 
   @override
   Future<String> getWeight() async =>
-      _prefs.getString('onboarding_weight') ?? '70';
+      _prefs.getString('onboarding_weight') ?? '';
 
   @override
   Future<String> getWeightUnit() async =>

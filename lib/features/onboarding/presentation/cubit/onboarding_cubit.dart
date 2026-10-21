@@ -13,10 +13,17 @@ class OnboardingCubit extends Cubit<OnboardingData> {
 
   OnboardingCubit(this._onboardingDataStore, this._onboardingRepository)
     : super(const OnboardingData()) {
-    _loadSavedData();
+    reload();
   }
 
-  Future<void> _loadSavedData() async {
+  /// Reads the saved answers again. The cubit lives as long as the app, so
+  /// the flow calls this on open: after a sign-out (which wipes the
+  /// answers) the next account must not see the previous one's in memory.
+  Future<void> reload() async {
+    if (state.currentStep != 'loading' ||
+        state.status != SubmissionStatus.initial) {
+      emit(const OnboardingData());
+    }
     final fullName = await _onboardingDataStore.getFullName();
     final dob = await _onboardingDataStore.getDob();
     final gender = await _onboardingDataStore.getGender();
@@ -48,7 +55,9 @@ class OnboardingCubit extends Cubit<OnboardingData> {
         fullName: fullName,
         dob: dob,
         gender: gender,
-        weight: weight.isEmpty ? "70" : weight,
+        // Empty until the user picks one: a skipped weight must not be
+        // saved as a made-up 70 kg.
+        weight: weight,
         weightUnit: weightUnit.isEmpty ? "kg" : weightUnit,
         height: height,
         heightUnit: heightUnit.isEmpty ? "cm" : heightUnit,

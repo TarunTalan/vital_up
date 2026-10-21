@@ -29,6 +29,7 @@ import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
 import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
+import 'package:vital_up/features/onboarding/data/starting_goals_writer.dart';
 import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_datasource.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_repository.dart';
@@ -700,6 +701,14 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(() => ActivityGoalsCubit(sl<ActivityGoalsRepository>()));
+  sl.registerLazySingleton(
+    () => StartingGoalsWriter(
+      water: sl<WaterIntakeService>(),
+      sleep: sl<SleepService>(),
+      screenTime: sl<vital_up_dashboard.ScreenTimeService>(),
+      activity: sl<ActivityGoalsRepository>(),
+    ),
+  );
 
   // 14. Gamification: points, levels, badges, streaks
   sl.registerLazySingleton<DailyMetricsCollector>(

@@ -65,7 +65,9 @@ void main() {
   test('queued (offline) submission succeeds and is kept locally', () async {
     await cache.write(
       ProfileCache.key('u1'),
-      ProfileCache.encode(const ProfileEntity(id: 'u1', username: 'u', email: 'e')),
+      ProfileCache.encode(
+        const ProfileEntity(id: 'u1', username: 'u', email: 'e'),
+      ),
     );
     remote.sent = false;
 
@@ -75,13 +77,14 @@ void main() {
     final profile = (await cache.read<ProfileEntity>(
       ProfileCache.key('u1'),
       decode: ProfileCache.decode,
-    ))!
-        .value;
+    ))!.value;
     expect(profile.fullName, 'Test User');
     expect(profile.weight, '80');
     expect(profile.dailyCalorieGoal, 1900);
 
-    final target = await cache.read<Object?>(WeightService.targetCacheKey('u1'));
+    final target = await cache.read<Object?>(
+      WeightService.targetCacheKey('u1'),
+    );
     expect(target!.value as double, closeTo(69.85, 0.01));
   });
 
