@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -6,7 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 /// as Android keeps the app's process), then a short "ready" note.
 ///
 /// No foreground service: if Android ends the app the download stops and
-/// the tracking screen picks it up again on its next visit.
+/// the next app start (or the tracking screen) picks it up again.
 class MapDownloadNotifier {
   static const notificationId = 7302;
 
@@ -27,13 +29,13 @@ class MapDownloadNotifier {
   MapDownloadNotifier(this.plugin);
 
   /// [fraction] 0-1. Only redrawn when the whole percent changes: the map
-  /// SDK reports many times a second.
-  Future<void> progress(double fraction) async {
+  /// SDK reports many times a second. [name]: an area the user picked.
+  Future<void> progress(double fraction, {String? name}) async {
     final percent = (fraction.clamp(0.0, 1.0) * 100).floor();
     if (percent == _lastPercent) return;
     _lastPercent = percent;
     await _show(
-      title: 'Downloading offline map',
+      title: name == null ? 'Downloading offline map' : 'Downloading $name',
       body: '$percent%',
       details: AndroidNotificationDetails(
         _channel.id,
@@ -55,12 +57,17 @@ class MapDownloadNotifier {
     );
   }
 
-  /// Replaces the progress with a note that dismisses itself.
-  Future<void> done() async {
+  /// Replaces the progress with a note; a tap opens Offline maps (where
+  /// more places can be saved: the first one is how most users hear of
+  /// it).
+  Future<void> done({String? name}) async {
     _lastPercent = -1;
     await _show(
-      title: 'Offline map ready',
-      body: 'Your area is saved for workouts without signal.',
+      title: name == null ? 'Offline map ready' : '$name is ready offline',
+      body: name == null
+          ? 'Your area works without signal. Tap to save more places.'
+          : 'The map works there without signal.',
+      payload: jsonEncode({'route': 'offline-maps'}),
       details: AndroidNotificationDetails(
         _channel.id,
         _channel.name,
@@ -69,12 +76,11 @@ class MapDownloadNotifier {
         priority: Priority.low,
         silent: true,
         autoCancel: true,
-        timeoutAfter: 10000,
       ),
     );
   }
 
-  /// A failed download is retried on the next visit; nothing to report.
+  /// A failed download is retried later; nothing to report.
   Future<void> cancel() async {
     _lastPercent = -1;
     try {
@@ -88,6 +94,7 @@ class MapDownloadNotifier {
     required String title,
     required String body,
     required AndroidNotificationDetails details,
+    String? payload,
   }) async {
     try {
       if (!_channelReady) {
@@ -102,6 +109,7 @@ class MapDownloadNotifier {
         id: notificationId,
         title: title,
         body: body,
+        payload: payload,
         notificationDetails: NotificationDetails(
           android: details,
           iOS: const DarwinNotificationDetails(presentSound: false),

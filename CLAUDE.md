@@ -687,10 +687,31 @@ Route names are GoRouter `name`s.
   auth metadata has no weight). `TrackPointFilter` re-anchors after 3
   consistent fixes that all jump from the last accepted one (bad cold-start
   fix); the bloc then moves the first route point instead of drawing a spike.
-  Offline map: `OfflineMapPrefetcher` (one download at a time) runs from
-  Home's deferred start (only if location is already allowed; last known
-  position) and again from the tracking screen's first fix; the map widget
-  loads `MAPBOX_STREETS` directly (the style in the offline pack).
+  Offline maps (Oct 22; GPS, timer and saving never need a network, only
+  the map): `OfflineMapService` (`data/services/offline_map_service.dart`,
+  state `OfflineMapsState` ValueNotifier; one queue, one download at a
+  time, any network incl. mobile data). "Around you" (id
+  `local_workout_region_10k`, 20 x 20 km, pref `offline_map_auto_v1`
+  switch) from Home's deferred start (`prefetchAtStartup`: only with
+  location already allowed, last known position; also resumes stopped
+  downloads) and the tracking screen's first fix (`ensureAround`, skipped
+  when any complete area `covers` the spot with 3 km to spare). Picked
+  areas (max 10): `offline-maps` (`OfflineMapsPage`, from Activity
+  settings > Offline maps; status, progress, Resume, delete asks first)
+  and `offline-map-picker` (`OfflineMapPickerPage`: the square in the
+  frame downloads, pan and zoom to choose; opens at zoom 13 on the last
+  known fix with the location dot, then eases to a fresh fix unless the
+  user has moved the map; 2-30 km a side
+  (`OfflineMapRules`), size from `estimateBytes`, needs a connection).
+  Downloads cut off resume when `ConnectivityService.onlineChanges` goes
+  online, or at the next start; the SDK can't cancel one, so a running
+  area has no delete. Areas are Mapbox tile regions with metadata (lat,
+  lng, radiusKm, kind auto/saved, name, savedAt), zoom 10-16, one shared
+  `MAPBOX_STREETS` style pack (deleted with the last area); the map
+  widgets load that style directly. Sign-out deletes every area
+  (`AccountService` `clearOfflineMaps`). Offline with no area here, the
+  tracking screen shows `OfflineMapNote` under the stats. Test:
+  `test/features/activity_tracking/offline_maps_test.dart`.
   Timed workouts speak through `TimerVoiceCoach`
   (`services/timer_voice_coach.dart`, started at Home's deferred start and
   by the timer page): app-wide, it follows `WorkoutTimerStore` (also the
@@ -824,6 +845,27 @@ Route names are GoRouter `name`s.
   `notifications` + realtime channel `notifications:<uid>`; mark-read/delete
   queued offline. `PushService` (FCM; `register_push_token`), no-op without
   Firebase config.
+- **feature_tips:** how users hear of features (Oct 22). Notifications:
+  `FeatureTipsService` (`data/feature_tips_service.dart`) +
+  `LocalTipScheduler` (channel `vitalup_feature_tips`, low importance,
+  large icon = the tip's SVG in white on a brand circle, payload `route`,
+  routes must be in `notificationLinkableRoutes`). Catalogue and rules in
+  `domain/feature_tip.dart` (`featureTips`, `FeatureTipRules.next`: not in
+  the first 3 days, at most one a week, each tip once, random time 11:00-
+  19:00 local, at least 30 min ahead). Scheduled ahead at Home's deferred
+  start (`reschedule`: a planned time that has passed counts as sent;
+  a planned tip whose feature got used, tips off, or notifications blocked
+  is cancelled). Visiting a tip's `usedRoutes` marks it used
+  (`attach(AppRouter.router)` in `main()`, listens to the router delegate).
+  Settings > Notifications > Feature tips (pref `feature_tips_enabled_v1`).
+  Keep copy short: hook title, one-line body, no emojis or "!".
+  In-app: `FeatureTipCard` (`core/widgets/feature_tip_card.dart`, shown
+  once, `isDismissed` / `dismiss(key)`), on the GPS workout screen while
+  idle ("Going somewhere without signal?", until an area is saved). The
+  "Offline map ready" notification and the tracking screen's
+  `OfflineMapNote` (idle only) open `offline-maps`. Vita's `APP_GUIDE`
+  covers offline maps, shortcuts and tips (redeploy vita-chat to ship).
+  Test: `test/features/feature_tips/feature_tips_test.dart`.
 - **gamification / community / challenges (Arena):** `friends`,
   `leaderboard` (`/community/:id`), `challenges`, `badges`,
   `points-history`, `activity-calendar`. `GamificationCubit` (stats,

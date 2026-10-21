@@ -16,7 +16,11 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
-import 'package:vital_up/features/activity_tracking/data/services/offline_map_prefetcher.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/offline_map_note.dart';
+import 'package:vital_up/core/widgets/feature_tip_card.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -547,12 +551,48 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  /// The app downloads the offline map at start; this only catches a user
-  /// who has moved out of it since. Once per visit.
+  static const _offlineMapsTipKey = 'offline_maps';
+
+  /// Once, before a GPS workout, to users with no saved area: the moment
+  /// someone plans a route is when offline maps make sense.
+  Widget _offlineMapsTip() {
+    final tips = sl<FeatureTipsService>();
+    if (tips.isDismissed(_offlineMapsTipKey)) return const SizedBox.shrink();
+    return ValueListenableBuilder<OfflineMapsState>(
+      valueListenable: sl<OfflineMapService>().state,
+      builder: (context, maps, _) {
+        if (!maps.loaded || maps.saved.isNotEmpty) {
+          return const SizedBox.shrink();
+        }
+        void answer() {
+          tips.dismiss(_offlineMapsTipKey);
+          if (mounted) setState(() {});
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimens.space8),
+          child: FeatureTipCard(
+            icon: Icons.download_for_offline_rounded,
+            title: 'Going somewhere without signal?',
+            message: 'Save the map before you go. Workouts record anywhere.',
+            actionLabel: 'Offline maps',
+            onAction: () {
+              answer();
+              context.pushNamed('offline-maps');
+            },
+            onDismiss: answer,
+          ),
+        );
+      },
+    );
+  }
+
+  /// The app downloads the offline map at start; this catches a user who
+  /// has just allowed location or moved out of it since. Once per visit.
   void _ensureOfflineMap(double latitude, double longitude) {
     if (_offlineMapChecked) return;
     _offlineMapChecked = true;
-    sl<OfflineMapPrefetcher>().ensureAround(latitude, longitude);
+    sl<OfflineMapService>().ensureAround(latitude, longitude);
   }
 
   void _openSettings() {
@@ -985,26 +1025,42 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                             ? AppDimens.backButtonSize + context.gutter * 2
                             : AppDimens.space12,
                       ),
-                      child: ValueListenableBuilder<DistanceUnit>(
-                        valueListenable: _unitNotifier,
-                        builder: (_, unit, __) {
-                          return ValueListenableBuilder<WorkoutPrefs>(
-                            valueListenable: _prefsNotifier,
-                            builder: (_, prefs, __) => TopStats(
-                              elapsed: elapsed,
-                              distanceMeters: distanceMeters,
-                              calories: calories,
-                              avgPace: avgPace,
-                              distanceUnit: unit,
-                              heartRateBpm: _liveHeartRate,
-                              workoutPrefs: prefs,
-                              steps: steps,
-                              currentSpeed: currentSpeed,
-                              elevationGain: elevationGain,
-                              activityType: state.activityType,
-                            ),
-                          );
-                        },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ValueListenableBuilder<DistanceUnit>(
+                            valueListenable: _unitNotifier,
+                            builder: (_, unit, __) {
+                              return ValueListenableBuilder<WorkoutPrefs>(
+                                valueListenable: _prefsNotifier,
+                                builder: (_, prefs, __) => TopStats(
+                                  elapsed: elapsed,
+                                  distanceMeters: distanceMeters,
+                                  calories: calories,
+                                  avgPace: avgPace,
+                                  distanceUnit: unit,
+                                  heartRateBpm: _liveHeartRate,
+                                  workoutPrefs: prefs,
+                                  steps: steps,
+                                  currentSpeed: currentSpeed,
+                                  elevationGain: elevationGain,
+                                  activityType: state.activityType,
+                                ),
+                              );
+                            },
+                          ),
+                          // No signal and no saved map here: the map may be
+                          // blank, the workout still records.
+                          OfflineMapNote(
+                            latitude: _currentPosition?.latitude,
+                            longitude: _currentPosition?.longitude,
+                            maps: sl<OfflineMapService>(),
+                            connectivity: sl<ConnectivityService>(),
+                            onTap: state is TrackingIdle
+                                ? () => context.pushNamed('offline-maps')
+                                : null,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1067,6 +1123,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                   children: [
                                     WorkoutMusicBar(music: _music),
                                     if (state is TrackingIdle) ...[
+                                      _offlineMapsTip(),
                                       ActivitySelector(
                                         selected: state.activityType,
                                         enabled: true,

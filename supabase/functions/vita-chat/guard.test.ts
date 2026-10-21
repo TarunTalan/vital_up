@@ -104,6 +104,9 @@ test('app how-to questions get the app guide, health questions do not', () => {
     'How do I cancel Pro?',
     'The app crashed when I scanned a barcode',
     'How do streaks and rest days work?',
+    'Does tracking work offline?',
+    'Can I record a hike with no signal?',
+    'Will the map show without internet?',
   ]) {
     assert.ok(asksAboutApp(text), text);
   }

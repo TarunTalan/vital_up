@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
@@ -149,6 +150,8 @@ void main() async {
   // Long-press shortcuts on the app icon; one that launched the app opens
   // once Home shows.
   LauncherShortcuts.init();
+  // Pages opened count as features found (no tip about them).
+  sl<FeatureTipsService>().attach(AppRouter.router);
 }
 
 class MyApp extends StatelessWidget {

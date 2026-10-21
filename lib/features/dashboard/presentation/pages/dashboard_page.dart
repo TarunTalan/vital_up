@@ -11,7 +11,8 @@ import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
-import 'package:vital_up/features/activity_tracking/data/services/offline_map_prefetcher.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
@@ -129,8 +130,12 @@ class _DashboardPageState extends State<DashboardPage> {
       sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
       // Track downloads that finished while the app was closed.
       sl<InAppAudioDownloader>().start();
-      // The workout map is ready (and works offline) before it's opened.
-      sl<OfflineMapPrefetcher>().prefetchAtStartup();
+      // The workout map is ready (and works offline) before it's opened;
+      // offline map downloads the app was closed in finish.
+      sl<OfflineMapService>().prefetchAtStartup();
+      // Records a feature tip that went out and plans the next (at most
+      // one a week, only for features not tried yet).
+      sl<FeatureTipsService>().reschedule();
       // Binding the speech engine takes a second or two: done now, the
       // first workout cue isn't late.
       sl<VoiceCoachService>().init();

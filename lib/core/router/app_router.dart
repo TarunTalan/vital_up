@@ -12,6 +12,8 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_tracking_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_history_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/offline_map_picker_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/offline_maps_page.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_goals/presentation/pages/activity_goals_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
@@ -389,6 +391,18 @@ class AppRouter {
         name: 'activity-history',
         pageBuilder: (context, state) =>
             AppPage(key: state.pageKey, child: const ActivityHistoryPage()),
+      ),
+      GoRoute(
+        path: '/offline-maps',
+        name: 'offline-maps',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const OfflineMapsPage()),
+      ),
+      GoRoute(
+        path: '/offline-maps/new',
+        name: 'offline-map-picker',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const OfflineMapPickerPage()),
       ),
       GoRoute(
         path: '/workout-timer',

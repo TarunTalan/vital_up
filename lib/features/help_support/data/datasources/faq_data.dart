@@ -92,6 +92,21 @@ const List<FaqItem> kFaqDatabase = [
     actionLabel: 'Activity history',
     actionRoute: 'activity-history',
   ),
+  FaqItem(
+    id: 'act_4',
+    category: FaqCategory.activity,
+    question: 'Does tracking work without internet?',
+    answer:
+        'Yes. GPS, the timer and saving workouts never need a connection; '
+        'they back up once you are online. The map needs a saved copy:\n'
+        '• The map around you is saved automatically, over Wi-Fi or mobile '
+        'data.\n'
+        '• For trips and trails, go to the workout screen > settings > '
+        'Offline maps > Download a new area before you go.',
+    tags: ['offline', 'no signal', 'no internet', 'map', 'download', 'trail'],
+    actionLabel: 'Offline maps',
+    actionRoute: 'offline-maps',
+  ),
 
   // Hydration
   FaqItem(

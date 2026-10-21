@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
@@ -179,6 +180,20 @@ class _SettingsPageState extends State<SettingsPage> {
                     title: 'Reminders',
                     subtitle: 'Meals, water, sleep, activity',
                     onTap: () => context.pushNamed('reminders'),
+                  ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: sl<FeatureTipsService>().enabled,
+                    builder: (context, on, _) => AppListTile(
+                      icon: Icons.lightbulb_outline_rounded,
+                      title: 'Feature tips',
+                      subtitle:
+                          'Now and then, something you may not have '
+                          'tried',
+                      trailing: Switch(
+                        value: on,
+                        onChanged: sl<FeatureTipsService>().setEnabled,
+                      ),
+                    ),
                   ),
                 ],
               ),

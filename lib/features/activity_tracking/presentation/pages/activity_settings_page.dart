@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
@@ -8,7 +10,9 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/offline_map_area.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/customize_layout_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/hr_device_sheet.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/target_picker_sheet.dart';
@@ -232,10 +236,7 @@ class ActivitySettingsPage extends StatelessWidget {
                       // ── Map ─────────────────────────────────────────────────
                       const _SectionHeader('Map'),
 
-                      _OfflineMapTile(
-                        unitNotifier: unitNotifier,
-                        prefsNotifier: prefsNotifier,
-                      ),
+                      const _OfflineMapTile(),
                     ],
                   ],
                 );
@@ -327,33 +328,35 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _OfflineMapTile extends StatefulWidget {
-  final DistanceUnitNotifier unitNotifier;
-  final WorkoutPrefsNotifier prefsNotifier;
+/// Opens Offline maps; says what's saved.
+class _OfflineMapTile extends StatelessWidget {
+  const _OfflineMapTile();
 
-  const _OfflineMapTile({
-    required this.unitNotifier,
-    required this.prefsNotifier,
-  });
-
-  @override
-  State<_OfflineMapTile> createState() => _OfflineMapTileState();
-}
-
-class _OfflineMapTileState extends State<_OfflineMapTile> {
-  // Offline map state is managed in the tracking page, so this tile
-  // is informational here — it directs the user back to the tracking page.
   @override
   Widget build(BuildContext context) {
-    return _SettingsTile(
-      icon: Icons.download_for_offline_rounded,
-      title: 'Download offline map',
-      subtitle: 'Available on the tracking screen via the settings button',
-      trailing: Icon(
-        Icons.info_outline_rounded,
-        color: context.vColors.grayText,
-        size: AppDimens.iconSm,
-      ),
+    final maps = sl<OfflineMapService>();
+    return ValueListenableBuilder<OfflineMapsState>(
+      valueListenable: maps.state,
+      builder: (context, state, _) {
+        final count = state.areas.where((a) => a.complete).length;
+        final String subtitle;
+        if (state.downloadingId != null) {
+          subtitle = 'Downloading · ${(state.downloadProgress * 100).floor()}%';
+        } else if (count == 0) {
+          subtitle = 'See the map on workouts without signal';
+        } else {
+          subtitle =
+              '${count == 1 ? '1 area' : '$count areas'} saved · '
+              '${OfflineMapRules.sizeLabel(state.totalBytes)}';
+        }
+        return _SettingsTile(
+          icon: Icons.download_for_offline_rounded,
+          title: 'Offline maps',
+          subtitle: subtitle,
+          trailing: const AppChevron(),
+          onTap: () => context.pushNamed('offline-maps'),
+        );
+      },
     );
   }
 }

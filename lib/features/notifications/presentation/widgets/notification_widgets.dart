@@ -31,6 +31,13 @@ const notificationLinkableRoutes = {
   'challenges',
   // Ongoing workout timer notification.
   'workout-timer',
+  // Offline map ready, feature tips.
+  'offline-maps',
+  'home-widgets',
+  'health-report',
+  'vita-diet-plan',
+  'vita-stress',
+  'activity-calendar',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.

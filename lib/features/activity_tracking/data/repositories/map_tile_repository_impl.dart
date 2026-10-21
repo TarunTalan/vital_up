@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
+import 'package:vital_up/features/activity_tracking/domain/entities/offline_map_area.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
 
 class MapTileRepositoryImpl implements MapTileRepository {
@@ -20,17 +22,41 @@ class MapTileRepositoryImpl implements MapTileRepository {
   static const double _styleShare = 0.1;
 
   @override
-  Future<bool> checkRegionDownloaded(String regionId) async {
+  Future<List<OfflineMapArea>> areas() async {
     try {
       final tileStore = await TileStore.createDefault();
       final regions = await tileStore.allTileRegions();
-      final region = regions.where((r) => r.id == regionId).firstOrNull;
-      if (region == null ||
-          region.requiredResourceCount == 0 ||
-          region.completedResourceCount < region.requiredResourceCount) {
-        return false;
+      if (regions.isEmpty) return const [];
+      final styleReady = await _styleReady();
+      final areas = <OfflineMapArea>[];
+      for (final region in regions) {
+        final Map<String, Object> meta;
+        try {
+          meta = await tileStore.tileRegionMetadata(region.id);
+        } catch (_) {
+          continue;
+        }
+        final area = _areaFrom(region.id, meta);
+        if (area == null) continue;
+        final required = region.requiredResourceCount;
+        final done = region.completedResourceCount;
+        areas.add(
+          area.copyWith(
+            complete: styleReady && required > 0 && done >= required,
+            progress: required > 0 ? (done / required).clamp(0.0, 1.0) : 0,
+            sizeBytes: region.completedResourceSize,
+          ),
+        );
       }
+      return areas;
+    } catch (e) {
+      debugPrint('Reading offline maps failed: $e');
+      return const [];
+    }
+  }
 
+  Future<bool> _styleReady() async {
+    try {
       final offlineManager = await OfflineManager.create();
       final packs = await offlineManager.allStylePacks();
       return packs.any(
@@ -39,51 +65,110 @@ class MapTileRepositoryImpl implements MapTileRepository {
             p.requiredResourceCount > 0 &&
             p.completedResourceCount >= p.requiredResourceCount,
       );
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
+  /// Regions saved before names were recorded have only the centre and
+  /// radius: they were the automatic area.
+  static OfflineMapArea? _areaFrom(String id, Map<String, Object> meta) {
+    final lat = (meta['lat'] as num?)?.toDouble();
+    final lng = (meta['lng'] as num?)?.toDouble();
+    final radiusKm = (meta['radiusKm'] as num?)?.toDouble();
+    if (lat == null || lng == null || radiusKm == null) return null;
+    final isAuto = meta['kind'] != 'saved';
+    final savedAt = (meta['savedAt'] as num?)?.toInt();
+    return OfflineMapArea(
+      id: id,
+      name: isAuto ? 'Around you' : (meta['name'] as String? ?? 'Map area'),
+      latitude: lat,
+      longitude: lng,
+      radiusKm: radiusKm,
+      isAuto: isAuto,
+      savedAt: savedAt == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(savedAt),
+    );
+  }
+
+  TileRegionLoadOptions _loadOptions(OfflineMapArea area) {
+    // 1° latitude ≈ 111 km everywhere; a degree of longitude shrinks
+    // with cos(latitude), so a fixed factor skews the box away from
+    // the mid-latitudes.
+    const kmPerDegreeLat = 111.0;
+    final kmPerDegreeLng = max(
+      1.0,
+      kmPerDegreeLat * cos(area.latitude * pi / 180.0),
+    );
+    final latDelta = area.radiusKm / kmPerDegreeLat;
+    final lngDelta = area.radiusKm / kmPerDegreeLng;
+    final lat = area.latitude;
+    final lng = area.longitude;
+    final ring = [
+      Position(lng - lngDelta, lat - latDelta),
+      Position(lng + lngDelta, lat - latDelta),
+      Position(lng + lngDelta, lat + latDelta),
+      Position(lng - lngDelta, lat + latDelta),
+      Position(lng - lngDelta, lat - latDelta),
+    ];
+    return TileRegionLoadOptions(
+      geometry: Polygon(coordinates: [ring]).toJson(),
+      metadata: {
+        'lat': lat,
+        'lng': lng,
+        'radiusKm': area.radiusKm,
+        'kind': area.isAuto ? 'auto' : 'saved',
+        'name': area.name,
+        if (area.savedAt case final savedAt?)
+          'savedAt': savedAt.millisecondsSinceEpoch,
+      },
+      descriptorsOptions: [
+        TilesetDescriptorOptions(
+          styleURI: _styleUri,
+          minZoom: OfflineMapRules.minZoom,
+          maxZoom: OfflineMapRules.maxZoom,
+        ),
+      ],
+      acceptExpired: true,
+      // Mobile data too: the map must be ready for a workout anywhere.
+      networkRestriction: NetworkRestriction.NONE,
+    );
+  }
+
   @override
-  Future<bool> regionCovers(
-    String regionId,
-    double latitude,
-    double longitude, {
-    double marginKm = 3.0,
-  }) async {
-    if (!await checkRegionDownloaded(regionId)) return false;
+  Future<int?> estimateBytes(OfflineMapArea area) async {
     try {
       final tileStore = await TileStore.createDefault();
-      final meta = await tileStore.tileRegionMetadata(regionId);
-      final lat = (meta['lat'] as num?)?.toDouble();
-      final lng = (meta['lng'] as num?)?.toDouble();
-      final radiusKm = (meta['radiusKm'] as num?)?.toDouble();
-      // Regions saved before the centre was recorded: assume they still fit.
-      if (lat == null || lng == null || radiusKm == null) return true;
-      return _distanceKm(lat, lng, latitude, longitude) <= radiusKm - marginKm;
-    } catch (_) {
-      return true;
+      final estimate = await tileStore
+          .estimateTileRegion(
+            // Its own id: an estimate must not reuse a saved area's shape.
+            'estimate_${area.id}',
+            _loadOptions(area),
+            null,
+            null,
+          )
+          .timeout(const Duration(seconds: 20));
+      return estimate.transferSize;
+    } catch (e) {
+      debugPrint('Offline map estimate failed: $e');
+      return null;
     }
   }
 
   @override
-  Stream<double> downloadRegion(
-    String regionId,
-    double latitude,
-    double longitude,
-    double radiusKm,
-  ) {
+  Stream<double> download(OfflineMapArea area) {
     final controller = StreamController<double>();
 
     void emit(double value) {
       final progress = value.clamp(0.0, 1.0);
-      _notifier?.progress(progress);
+      _notifier?.progress(progress, name: area.isAuto ? null : area.name);
       if (!controller.isClosed) controller.add(progress);
     }
 
     Future(() async {
       try {
-        // 1. Style pack (style JSON, sprites, glyphs).
+        // 1. Style pack (style JSON, sprites, glyphs), shared by every area.
         final offlineManager = await OfflineManager.create();
         await offlineManager.loadStylePack(
           _styleUri,
@@ -104,45 +189,10 @@ class MapTileRepositoryImpl implements MapTileRepository {
         );
         emit(_styleShare);
 
-        // 2. Tiles for a box of radiusKm around the user.
+        // 2. Tiles for the square. Loading an id again finishes it or
+        // brings it up to date.
         final tileStore = await TileStore.createDefault();
-
-        // 1° latitude ≈ 111 km everywhere; a degree of longitude shrinks
-        // with cos(latitude), so a fixed factor skews the box away from
-        // the mid-latitudes.
-        const kmPerDegreeLat = 111.0;
-        final kmPerDegreeLng = max(
-          1.0,
-          kmPerDegreeLat * cos(latitude * pi / 180.0),
-        );
-        final latDelta = radiusKm / kmPerDegreeLat;
-        final lngDelta = radiusKm / kmPerDegreeLng;
-
-        final ring = [
-          Position(longitude - lngDelta, latitude - latDelta),
-          Position(longitude + lngDelta, latitude - latDelta),
-          Position(longitude + lngDelta, latitude + latDelta),
-          Position(longitude - lngDelta, latitude + latDelta),
-          Position(longitude - lngDelta, latitude - latDelta),
-        ];
-
-        final tileRegionLoadOptions = TileRegionLoadOptions(
-          geometry: Polygon(coordinates: [ring]).toJson(),
-          metadata: {'lat': latitude, 'lng': longitude, 'radiusKm': radiusKm},
-          descriptorsOptions: [
-            TilesetDescriptorOptions(
-              styleURI: _styleUri,
-              minZoom: 10,
-              maxZoom: 16,
-            ),
-          ],
-          acceptExpired: true,
-          networkRestriction: NetworkRestriction.NONE,
-        );
-
-        await tileStore.loadTileRegion(regionId, tileRegionLoadOptions, (
-          progress,
-        ) {
+        await tileStore.loadTileRegion(area.id, _loadOptions(area), (progress) {
           if (progress.requiredResourceCount > 0) {
             emit(
               _styleShare +
@@ -154,7 +204,7 @@ class MapTileRepositoryImpl implements MapTileRepository {
         });
 
         emit(1.0);
-        await _notifier?.done();
+        await _notifier?.done(name: area.isAuto ? null : area.name);
         await controller.close();
       } catch (e) {
         await _notifier?.cancel();
@@ -168,31 +218,17 @@ class MapTileRepositoryImpl implements MapTileRepository {
     return controller.stream;
   }
 
-  static double _distanceKm(
-    double lat1,
-    double lng1,
-    double lat2,
-    double lng2,
-  ) {
-    const earthRadiusKm = 6371.0;
-    final dLat = (lat2 - lat1) * pi / 180.0;
-    final dLng = (lng2 - lng1) * pi / 180.0;
-    final h =
-        sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * pi / 180.0) *
-            cos(lat2 * pi / 180.0) *
-            sin(dLng / 2) *
-            sin(dLng / 2);
-    return earthRadiusKm * 2 * atan2(sqrt(h), sqrt(1 - h));
-  }
-
   @override
-  Future<void> deleteRegion(String regionId) async {
+  Future<void> delete(String id) async {
     try {
       final tileStore = await TileStore.createDefault();
-      await tileStore.removeRegion(regionId);
+      await tileStore.removeRegion(id);
+      // The style is shared: it goes with the last area only.
+      if ((await tileStore.allTileRegions()).isNotEmpty) return;
       final offlineManager = await OfflineManager.create();
       await offlineManager.removeStylePack(_styleUri);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Deleting offline map failed: $e');
+    }
   }
 }

@@ -130,7 +130,9 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/log_workout.
 import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
 import 'package:vital_up/features/activity_tracking/data/services/body_weight_source.dart';
-import 'package:vital_up/features/activity_tracking/data/services/offline_map_prefetcher.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/feature_tips/data/local_tip_scheduler.dart';
 import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
@@ -528,7 +530,13 @@ Future<void> initDependencies() async {
       MapDownloadNotifier(sl<FlutterLocalNotificationsPlugin>()),
     ),
   );
-  sl.registerLazySingleton(() => OfflineMapPrefetcher(sl<MapTileRepository>()));
+  sl.registerLazySingleton(
+    () => OfflineMapService(
+      sl<MapTileRepository>(),
+      sl<SharedPreferences>(),
+      onlineChanges: sl<ConnectivityService>().onlineChanges,
+    ),
+  );
   sl.registerLazySingleton(
     () => BodyWeightSource(
       weights: sl<WeightService>(),
@@ -819,6 +827,17 @@ Future<void> initDependencies() async {
     () => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()),
   );
 
+  // Feature tips: a rare notification about a feature not tried yet.
+  sl.registerLazySingleton(
+    () => FeatureTipsService(
+      sl<SharedPreferences>(),
+      LocalTipScheduler(
+        sl<FlutterLocalNotificationsPlugin>(),
+        sl<ReminderScheduler>(),
+      ),
+    ),
+  );
+
   sl.registerLazySingleton(
     () => RemindersService(
       RemindersLocalDataSource(sl<SharedPreferences>()),
@@ -919,6 +938,7 @@ Future<void> initDependencies() async {
       sl<CacheStore>(),
       sl<OnboardingDataStore>(),
       sl<WorkoutTimerNotifier>(),
+      () => sl<OfflineMapService>().clearAll(),
     ),
   );
 

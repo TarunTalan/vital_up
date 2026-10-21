@@ -88,13 +88,14 @@ export const APP_GUIDE = `APP GUIDE. Use these screen names and paths exactly; n
 - Sleep: Sleep card > Log sleep, drag the moon (bedtime) and sun (wake-up) on the dial. "Going to bed" / "I'm up" time the night. A screen-off estimate can be reviewed (Looks right / Adjust). Sleep score 0-100 mostly from duration (7-9 h best), plus deep and REM sleep when a watch records stages.
 - Food: Scan tab. Barcode inside the frame (no photo scan used), or a meal photo for an estimate (5 photo scans a day free, more with Pro); search, scan a nutrition label or add your own food.
 - Diet plan: from the Vita tab, or ask Vita in chat to change a meal. 3 AI plans a day free, 20 with Pro.
-- Workouts: Home > Start activity. Walk, run and cycle use GPS; other workouts use a timer. Past workout: activity history > +, up to 30 days back. The settings button on the workout screen: target, voice coach (every km or mile), heart rate strap, which stats show. A workout cut off by the app closing can be resumed or saved when the app reopens.
+- Workouts: Home > Start activity. Walk, run and cycle use GPS; other workouts use a timer. Past workout: activity history > +, up to 30 days back. The settings button on the workout screen: target, voice coach (every km or mile), heart rate strap, which stats show. A workout cut off by the app closing can be resumed or saved when the app reopens. Workouts record without internet or signal (GPS needs none) and back up later; the map needs a saved copy: the 20 x 20 km map around you saves automatically (Wi-Fi or mobile data), and more places via the workout screen's settings button > Offline maps > Download a new area (pan and zoom so the square covers it; up to 10 areas).
 - Goals: Profile > My goals. Reminders: Profile > Reminders (a reminder skips itself once that habit is logged today). Health report to share with a doctor: Profile > Health report.
 - Health Connect (Android): Settings > Connected > Health sync; VitalUp only reads weight, workouts and sleep, at most hourly when the app opens.
 - Screen time needs Usage Access (allow it when the Screen time card asks); daily limit on the screen time page.
 - Backup: logs are saved on the phone and backed up to the account when online; on a new phone sign in with the same account; pull down on Home to refresh; signing out uploads pending entries first.
 - Arena: points for logging and meeting goals, added once the day syncs; levels and streaks; rest days (one per 7 active days, up to 2) protect a streak; badges, challenges, friends, leaderboards. Leaderboard visibility: Settings > Privacy & security > Leaderboards.
-- Widgets (Android): Today, My metrics, Water, Mood, Shortcuts; add them from the phone's home screen; Settings > Home screen widgets.
+- Widgets (Android): Today, My metrics, Water, Mood, Shortcuts; add them from the phone's home screen; Settings > Home screen widgets. Long-press the VitalUp app icon for Start workout, Scan food and Water shortcuts.
+- Feature tips: an occasional notification about a feature not tried yet (at most one a week); turn off in Settings > Notifications > Feature tips.
 - Settings: Appearance (theme), Units (weight, height, distance), Privacy & security (app lock, AI coach data, analytics).
 - Account: Profile > Account details (name, username, Export my data, Delete account). Forgot password: on the sign-in screen. Sign in with email or username.
 - VitalUp Pro raises the daily AI limits only (photo scans, Vita chats, diet plans); manage, cancel or refund in Google Play > Payments & subscriptions; Restore purchases on the VitalUp Pro page.
@@ -102,7 +103,7 @@ export const APP_GUIDE = `APP GUIDE. Use these screen names and paths exactly; n
 
 // Words that make a question about using the app rather than about health.
 const APP_QUESTION =
-  /\b(app|vitalup|settings?|how (do|can|to) i|where (is|do|can)|can'?t find|not (working|showing|syncing|updating|saving)|doesn'?t (work|show|sync|update|save)|sync\w*|health connect|widgets?|reminders?|notifications?|streaks?|points?|badges?|arena|levels?|leaderboards?|challenges?|friends?|pro|premium|subscri\w*|refund|export|delete|account|password|sign(ed)? (in|out)|log ?in|log(ging)? (water|sleep|a meal|meals|food|weight|workouts?)|scan\w*|barcode|permissions?|usage access|backup|restore|bug|crash\w*|error)\b/i;
+  /\b(app|vitalup|settings?|how (do|can|to) i|where (is|do|can)|can'?t find|not (working|showing|syncing|updating|saving)|doesn'?t (work|show|sync|update|save)|sync\w*|health connect|widgets?|reminders?|notifications?|streaks?|points?|badges?|arena|levels?|leaderboards?|challenges?|friends?|pro|premium|subscri\w*|refund|export|delete|account|password|sign(ed)? (in|out)|log ?in|log(ging)? (water|sleep|a meal|meals|food|weight|workouts?)|scan\w*|barcode|permissions?|usage access|backup|restore|bug|crash\w*|error|offline|without (internet|signal|network|data)|no (internet|signal)|maps?)\b/i;
 
 /** Whether [text] asks how to use VitalUp, so [APP_GUIDE] is worth sending. */
 export function asksAboutApp(text: string): boolean {

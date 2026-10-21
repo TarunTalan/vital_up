@@ -39,6 +39,9 @@ class AccountService {
   final OnboardingDataStore? _onboarding;
   final WorkoutTimerNotifier? _workoutTimer;
 
+  /// Deletes the offline map areas (they can name places the user goes).
+  final Future<void> Function()? _clearOfflineMaps;
+
   AccountService(
     this._client,
     this._auth,
@@ -50,6 +53,7 @@ class AccountService {
     this._cache, [
     this._onboarding,
     this._workoutTimer,
+    this._clearOfflineMaps,
   ]);
 
   static const _deleteFailed = "Couldn't delete your account. Try again.";
@@ -145,6 +149,9 @@ class AccountService {
               .toList()) {
         await _prefs.remove(key);
       }
+    });
+    await _step('offline maps', () async {
+      await _clearOfflineMaps?.call();
     });
     // Camera / picker photos, exports and health reports shared from here.
     await _step('temporary files', _deleteTemporaryFiles);
