@@ -70,11 +70,13 @@ void main() {
 
     test('valid request passes', () {
       expect(check(ChallengeMetric.workouts, 7, ['a']), isNull);
+      expect(check(ChallengeMetric.points, 1, ['a']), isNull);
+      expect(check(ChallengeMetric.nutritionPoints, 14, ['a']), isNull);
     });
 
-    test('rejects unsupported metric, length and friend counts', () {
-      expect(check(ChallengeMetric.xp, 7, ['a']), isNotNull);
+    test('rejects unsupported length and friend counts', () {
       expect(check(ChallengeMetric.workouts, 0, ['a']), isNotNull);
+      expect(check(ChallengeMetric.workouts, 2, ['a']), isNotNull);
       expect(check(ChallengeMetric.workouts, 5, ['a']), isNotNull);
       expect(check(ChallengeMetric.workouts, 7, []), isNotNull);
       expect(

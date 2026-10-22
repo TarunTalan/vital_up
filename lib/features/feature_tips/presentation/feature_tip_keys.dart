@@ -8,9 +8,6 @@ abstract final class FeatureTipKeys {
 
   /// Sleep sheet: the arc moves the whole night.
   static const sleepDial = 'sleep_dial';
-
-  /// Scan tab: barcodes are exact and free, how to frame a meal.
-  static const scanTab = 'scan_tab';
 }
 
 /// The app's tips, or null where they aren't set up (widget tests that

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
@@ -21,7 +22,10 @@ IconData challengeMetricIcon(ChallengeMetric m) => switch (m) {
   ChallengeMetric.activeMinutes => Icons.timer_rounded,
   ChallengeMetric.distanceKm => Icons.route_rounded,
   ChallengeMetric.workouts => Icons.fitness_center_rounded,
-  ChallengeMetric.xp => Icons.star_rounded,
+  ChallengeMetric.points => Icons.star_rounded,
+  ChallengeMetric.nutritionPoints => Icons.restaurant_rounded,
+  ChallengeMetric.wellbeingPoints => Icons.self_improvement_rounded,
+  ChallengeMetric.steps => Icons.directions_walk_rounded,
 };
 
 String challengeTimeLeft(DateTime endsAt) {
@@ -64,13 +68,21 @@ String challengeSubtitle(
   ].join(' · ');
 }
 
-/// Whole days the challenge runs. Nearest whole day: in local time a week
-/// across a clock change is 6 days 23 h, which inDays would call "6 days".
+/// Whole days the challenge runs. A daily challenge starts now and ends at
+/// midnight after its last day, so part of its first day has gone: round
+/// up, less a little slack for a clock change (a week across one is 6 days
+/// 23 h or 7 days 1 h, which inDays would call 6 or 8).
 int challengeDays(Challenge c) =>
-    (c.endsAt.difference(c.startsAt).inHours / 24).round().clamp(1, 365);
+    (c.endsAt.difference(c.startsAt).inMinutes / (24 * 60) - 0.1).ceil().clamp(
+      1,
+      365,
+    );
 
-String challengeTitle(Challenge c) =>
-    'Most ${c.metric.label.toLowerCase()} · ${challengeDays(c)} days';
+String challengeTitle(Challenge c) {
+  final days = challengeDays(c);
+  return 'Most ${c.metric.label.toLowerCase()} · '
+      '$days ${days == 1 ? 'day' : 'days'}';
+}
 
 /// Share of a running challenge's time that has passed (0-1).
 double challengeElapsed(Challenge c, DateTime now) {
@@ -79,11 +91,14 @@ double challengeElapsed(Challenge c, DateTime now) {
   return (now.difference(c.startsAt).inSeconds / total).clamp(0.0, 1.0);
 }
 
-/// "Day 3 of 7" for a running challenge.
+/// "Day 3 of 7" for a running challenge. Daily challenges count calendar
+/// days, like their scores; workout ones 24 h from the start.
 String challengeDayLabel(Challenge c, DateTime now) {
   final days = challengeDays(c);
-  final day = (now.difference(c.startsAt).inHours ~/ 24 + 1).clamp(1, days);
-  return 'Day $day of $days';
+  final gone = c.metric.isDaily
+      ? calendarDaysBetween(c.startsAt, now)
+      : now.difference(c.startsAt).inHours ~/ 24;
+  return 'Day ${(gone + 1).clamp(1, days)} of $days';
 }
 
 Color _medalColor(int rank) => switch (rank) {

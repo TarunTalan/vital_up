@@ -40,7 +40,7 @@ class CustomChallengeWizard extends StatefulWidget {
 
 class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
   late Future<List<Friend>> _friends = _loadFriends();
-  var _metric = ChallengeMetric.activeMinutes;
+  var _metric = ChallengeMetric.points;
   var _days = 7;
   final _selected = <String>{};
   bool _sending = false;
@@ -114,6 +114,7 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
             ChallengeOptionTile(
               icon: challengeMetricIcon(m),
               title: 'Most ${m.label.toLowerCase()}',
+              subtitle: m.description,
               selected: m == _metric,
               onTap: () => setState(() => _metric = m),
             ),
@@ -127,11 +128,16 @@ class _CustomChallengeWizardState extends State<CustomChallengeWizard> {
             children: [
               for (final d in _durations)
                 ChoiceChip(
-                  label: Text('$d days'),
+                  label: Text('$d ${d == 1 ? 'day' : 'days'}'),
                   selected: d == _days,
                   onSelected: (_) => setState(() => _days = d),
                 ),
             ],
+          ),
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            challengeWindowNote(_metric, _days),
+            style: context.text.bodySmall?.copyWith(color: grey),
           ),
           const SizedBox(height: AppDimens.sectionGap),
 

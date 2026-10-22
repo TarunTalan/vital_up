@@ -886,9 +886,9 @@ Route names are GoRouter `name`s.
   `featureTipsOrNull()` = no tip in page tests without the service):
   GPS workout screen while idle ("Going somewhere without signal?", until
   an area is saved), sleep sheet (compact, "Drag the arc to move your
-  whole night", also gone after a save; fits 360x640 at 1.5), Scan tab
-  above the scans-left line ("Two ways to scan": barcodes exact and free,
-  fit the plate in good light). Test: `tip_placements_test.dart`. The
+  whole night", also gone after a save; fits 360x640 at 1.5). The Scan
+  tab has none (its hints under the frame cover barcodes). Test:
+  `tip_placements_test.dart`. The
   "Offline map ready" notification and the tracking screen's
   `OfflineMapNote` (idle only) open `offline-maps`. Vita's `APP_GUIDE`
   covers offline maps, shortcuts and tips (deployed Oct 22).
@@ -909,6 +909,13 @@ Route names are GoRouter `name`s.
   (`player_stats.streak_freezes`, one per 7 active days, max 2, spent by the
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
+  Challenges (`ChallengeMetric`, `challenges_repository.dart`): 1, 3, 7 or
+  14 days; points, healthy eating (nutrition) points, steps, active
+  minutes, workouts, distance, wellbeing (lifestyle) points. Workout
+  metrics roll from now to now + days; daily ones (`isDaily`) count
+  today and the next days - 1 in each person's own time zone and end at
+  the creator's midnight (`challengeDays` rounds up, `challengeDayLabel`
+  counts calendar days). Points exclude bonus (streaks, badges).
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
   - **Offline (Oct 22):** every Arena read has a saved copy (profiles
     too, 2 min); the hub draws `CommunityRepository.savedHub()` at once,
@@ -1146,6 +1153,11 @@ Route names are GoRouter `name`s.
   (global > local > interest, then place; once, `actor_id` + username /
   avatar in data; hidden winners not told). Push it with the app update
   (older apps show these as plain announcements).
+  `20261032_challenge_day_metrics.sql` (NOT pushed yet; tested on local
+  Postgres): `challenges.days`, new metrics and 1-day length in
+  `create_challenge` / `_challenge_score` (points from `point_events`,
+  steps from `daily_reports`). Push it with the app update (older apps
+  show new metrics as active minutes).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
