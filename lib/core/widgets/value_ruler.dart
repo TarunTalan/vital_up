@@ -15,7 +15,7 @@ import 'package:vital_up/core/theme/app_theme.dart';
 /// that moves one [step] per swipe.
 ///
 /// Ticks every [step], taller every [midEvery] steps and labelled every
-/// [majorEvery] steps (e.g. 0.1 / 0.5 / 1 kg). The ends fade out.
+/// [majorEvery] steps (e.g. 0.1 / 0.5 / 1 kg).
 class ValueRuler extends StatefulWidget {
   final double value;
   final double min;
@@ -195,18 +195,9 @@ class _ValueRulerState extends State<ValueRuler>
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                // The ends fade out so the scale reads as endless.
-                ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  shaderCallback: (rect) => LinearGradient(
-                    colors: [
-                      grey.withValues(alpha: 0),
-                      grey,
-                      grey,
-                      grey.withValues(alpha: 0),
-                    ],
-                    stops: const [0, 0.22, 0.78, 1],
-                  ).createShader(rect),
+                // Ends cleanly at its edges (the painter draws a tick past
+                // each side so none pops in while scrolling).
+                ClipRect(
                   child: AnimatedBuilder(
                     animation: _position,
                     builder: (context, _) => CustomPaint(

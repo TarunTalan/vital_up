@@ -8,23 +8,24 @@ import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/auth/presentation/widgets/primary_auth_button.dart';
 
+/// Intro slides: one real feature each, short enough for three lines at
+/// the largest text size.
 enum OnboardingItem {
   page1(
     icon: 'assets/images/onboarding1.png',
-    description: 'Track your nutrition effortlessly with our smart scanner.',
+    description: 'Snap a meal or scan a barcode to track what you eat.',
   ),
   page2(
     icon: 'assets/images/onboarding2.png',
-    description: 'Your AI health coach, guiding every step of your journey.',
+    description: 'Ask Vita, your AI coach, about your health and habits.',
   ),
   page3(
     icon: 'assets/images/onboarding3.png',
-    description: 'Understand your body with clearer health insights.',
+    description: 'Track workouts, steps, sleep and water in one place.',
   ),
   page4(
     icon: 'assets/images/onboarding4.png',
-    description:
-        'Join live sessions and learn directly from certified coaches.',
+    description: 'Earn points and badges, and challenge your friends.',
   );
 
   final String icon;
@@ -179,7 +180,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         PrimaryAuthButton(
-                          label: 'Get Started',
+                          label: 'Get started',
                           isLoading: false,
                           enabled: !isLoading,
                           onTap: widget.onFinish,
