@@ -1205,15 +1205,37 @@ Route names are GoRouter `name`s.
 
 ## Website & Legal Suite (vitalup.live)
 
-- **Static Pages:** `website/` hosted on Cloudflare Pages (or Vercel) at `https://vitalup.live`:
-  - `index.html`: Product landing page showcasing offline-first, Health Connect, and AI features.
-  - `privacy.html`: Comprehensive privacy policy compliant with Google Play Store & Google Health Connect developer requirements.
-  - `terms.html`: Terms of Service.
-  - `delete-account.html`: Google Play-compliant account deletion portal with in-app instructions and direct web deletion request form with AppCard glass modal confirmation.
+- **Static Pages:** `website/` hosted on Cloudflare Pages (or Vercel) at `https://vitalup.live`
+  (redesigned Oct 22 in the app's look: Nunito + JetBrains Mono self-hosted as
+  WOFF2 in `assets/fonts` (no Google Fonts call), app tokens, glass cards, blurred
+  ring backdrop, light / dark following the system with a toggle, pref
+  `vitalup-theme`). Shared `assets/site.css` + `site.js` (menu, reveal on scroll,
+  TOC highlight, carousel); `assets/icons.css` is generated (app SVGs from
+  `assets/icons` + Material paths as CSS masks; regenerate rather than edit).
+  Pages link each other as `*.html` (Cloudflare serves the clean URLs too).
+  - `index.html` (+ `assets/home.css`): hero with phones, stats, tracker bento,
+    feature rows, screenshot carousel, privacy band, reviews (hidden markup to fill
+    with real Play reviews; a "Rate on Google Play" card meanwhile), Free / Pro
+    limits (no prices: they're per country in Play), FAQ, CTA. Play link
+    `play.google.com/store/apps/details?id=com.vitalup.app`. Screens in
+    `assets/screens/*.webp` (600 wide; Home / Arena / water from the test
+    renders in `build/*_shots`, the rest from `assets/screenshots`), share image
+    `assets/og-image.png`.
+  - `privacy.html`: Play + Health Connect privacy policy (section ids kept for
+    links: `health-connect`, `ai-processing`, `arena`, `retention-deletion`...).
+  - `terms.html`: Terms of Service (last updated Oct 22: adds AI, Arena conduct,
+    ending your account, changes).
+  - `delete-account.html`: in-app steps (Profile > Account details > Delete
+    account) and the web request form (`send-email` `account_deletion_request`,
+    same body as before; 429 / 400 messages shown, mailto fallback otherwise).
+  - Keep `assets/vitalup_light_logo.png`: email templates load it from the site.
 - **Routing & Clean URLs:** Cloudflare Pages natively maps clean URLs (e.g., `/privacy` -> `privacy.html`). Do not use `_redirects` mapping to `.html` (causes a 307 redirect loop). `vercel.json` uses `"cleanUrls": true`.
-- **Assets & Favicons:**
-  - Header logo: `assets/vitalup_light_logo.png` with embedded SVG fallback and no glowing shadow.
-  - Favicon suite: `favicon.ico`, `favicon-32x32.png`, `favicon-16x16.png`, `apple-touch-icon.png`, and embedded inline base64 SVG data URI in `<head>` for instant rendering offline or in `file://`.
+- **Assets & Favicons:** the site logo and favicon are the `app_icon_black`
+  mark with no background (heart cut out): vector `website/assets/logo-mark.svg`
+  (from `assets/icons/app/app_icon.svg`, heart as a mask). `favicon.ico`
+  (16-64), `favicon-16x16.png`, `favicon-32x32.png`, `apple-touch-icon.png` and
+  `android-chrome-*.png` are transparent renders of it; re-render them if the
+  mark changes.
 
 ## Email & Support Infrastructure (Resend)
 
