@@ -76,6 +76,11 @@ supabase functions deploy <name>
 - **Routing:** go_router, `lib/core/router/app_router.dart` (`AppRouter.router`,
   routes by `name`, pages wrapped in `AppPage`). Initial location `/splash`.
   Deep links: `vitalup://` and `/open?route=` (widgets, notifications).
+  Read `extra` only through `routeExtra(state)` (`route_extras.dart`): go_router
+  rebuilds a pushed page without its `extra` when redirects run again
+  (switching light / dark with a leaderboard open showed "This page isn't
+  available"); it remembers the last `extra` per location (cleared on
+  sign-out). Test: `test/core/router/route_extras_test.dart`.
   Unauthenticated links to non-public pages redirect to `/login` via router guard.
   `test/widget_test.dart` checks every notification/reminder route exists.
 - **Layers per feature:** `lib/features/<f>/{data,domain,presentation}`
@@ -89,7 +94,11 @@ supabase functions deploy <name>
     and GPS track points.
   - SharedPreferences: goals, settings, per-user Vita data, reminders.
   - `core/cache/cache_store.dart`: cached server JSON with max ages; offline
-    reads return the last copy. `changes` / `watch(key)` announce every
+    reads return the last copy. Once a request found the server
+    unreachable (network up but DNS / server failing:
+    `ConnectivityService.isOnline` false), reads return the saved copy at
+    once and refresh quietly behind it; that refresh's success marks the
+    server reachable again. `changes` / `watch(key)` announce every
     write, update or remove, so any screen can follow a cached value.
   - `core/sync/sync_service.dart`: backs up logs to Supabase tables
     (`water_logs`, `sleep_logs`, `meal_logs`, `weight_logs`,
@@ -901,6 +910,14 @@ Route names are GoRouter `name`s.
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
+  - **Offline (Oct 22):** every Arena read has a saved copy (profiles
+    too, 2 min); the hub draws `CommunityRepository.savedHub()` at once,
+    then refreshes (a failed refresh keeps it). City and leaderboard
+    visibility queue offline; points reports wait for the connection;
+    join / leave, friend requests, cheers and challenges are online only
+    ("You're offline. Try again when connected."): they involve others or
+    must not replay out of order. Test:
+    `test/features/community/arena_offline_test.dart`.
   - **Who sees what (Oct 22):** every member opens one page,
     `PlayerProfilePage.open` (`community/presentation/pages/
     player_profile_page.dart`; replaced the two profile sheets) from

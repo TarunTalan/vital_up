@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/connectivity_service.dart';
 import 'package:vital_up/features/community/domain/repositories/community_repository.dart';
@@ -58,6 +59,9 @@ class _FakeRemote implements NotificationsRemoteDataSource {
 }
 
 class _FakeCommunity implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }

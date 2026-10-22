@@ -18,6 +18,9 @@ import 'package:vital_up/features/gamification/presentation/widgets/score_streak
 
 class _NoRepo implements GamificationRepository, CommunityRepository {
   @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

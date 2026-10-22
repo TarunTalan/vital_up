@@ -24,6 +24,9 @@ LeaderboardEntry _entry(int rank, {String? id, bool isMe = false}) =>
     );
 
 class _FakeRepo implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   final List<LeaderboardEntry> board;
   final List<LeaderboardEntry> friends;
   final List<AwardWinner> winners;

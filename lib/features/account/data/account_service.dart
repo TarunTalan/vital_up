@@ -5,6 +5,7 @@ import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/router/route_extras.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
@@ -150,6 +151,8 @@ class AccountService {
         await _prefs.remove(key);
       }
     });
+    // Pages remember what they were opened with (route_extras.dart).
+    await _step('open pages', () async => clearRouteExtras());
     await _step('offline maps', () async {
       await _clearOfflineMaps?.call();
     });

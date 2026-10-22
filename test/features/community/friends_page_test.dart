@@ -12,6 +12,9 @@ import 'package:vital_up/features/community/presentation/pages/friends_page.dart
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 
 class _FakeRepo implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   List<Friend> friends = [];
   List<LeaderboardEntry> board = [];
   FriendRequestException? sendError;

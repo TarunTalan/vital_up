@@ -24,6 +24,9 @@ Finder _semanticsLabel(String label) => find.byWidgetPredicate(
 );
 
 class _MockRepo implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   List<Friend> friendsList = [];
   PlayerProfile? profileToReturn;
   List<CommunityAward> awards = [];

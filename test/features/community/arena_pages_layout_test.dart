@@ -174,6 +174,9 @@ final _challenges = [
 
 class _Repo implements CommunityRepository, GamificationRepository {
   @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
+  @override
   Future<List<LeaderboardEntry>> getLeaderboard(
     Community community, {
     required LeaderboardPeriod period,

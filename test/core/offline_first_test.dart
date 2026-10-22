@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -93,6 +94,43 @@ void main() {
         maxAge: Duration.zero,
       );
       expect(value, 'saved');
+    });
+
+    test('server unreachable: later reads are instant, a quiet refresh '
+        'brings it back', () async {
+      final connectivity = ConnectivityService();
+      final store = CacheStore(connectivity, directory: dir);
+      await store.fetch('k', remote: () async => 'saved', maxAge: Duration.zero);
+      // DNS fails: the first read falls back and marks the server down.
+      expect(
+        await store.fetch<String>(
+          'k',
+          remote: () async => throw const SocketException('Failed host lookup'),
+          maxAge: Duration.zero,
+        ),
+        'saved',
+      );
+      expect(connectivity.isOnline, isFalse);
+
+      // The next read doesn't wait for the slow server: saved copy at once.
+      final reply = Completer<String>();
+      final value = await store
+          .fetch<String>('k', remote: () => reply.future, maxAge: Duration.zero)
+          .timeout(const Duration(milliseconds: 200));
+      expect(value, 'saved');
+
+      // The server answers behind it: online again, the new value saved.
+      reply.complete('fresh');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(connectivity.isOnline, isTrue);
+      expect(
+        await store.fetch<String>(
+          'k',
+          remote: () async => 'unused',
+          maxAge: const Duration(minutes: 5),
+        ),
+        'fresh',
+      );
     });
 
     test('offline with nothing cached rethrows; server errors always rethrow', () async {

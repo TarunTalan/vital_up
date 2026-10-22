@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
@@ -58,6 +59,9 @@ class _FakeGame implements GamificationRepository {
 }
 
 class _NoAwards implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   @override
   Future<List<CommunityAward>> getPlayerAwards([String? userId]) async =>
       const [];

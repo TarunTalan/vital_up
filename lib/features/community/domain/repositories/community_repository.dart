@@ -29,6 +29,12 @@ abstract class CommunityRepository {
   /// Global, the caller's local community and every interest community.
   Future<List<Community>> getCommunities();
 
+  /// The saved copy of the Arena's communities and settings, read without
+  /// the network; null when there's none yet. Shown at once while
+  /// [getCommunities] and [getSettings] refresh, so a slow or failing
+  /// connection never leaves the Arena on a spinner.
+  Future<(List<Community>, CommunitySettings)?> savedHub();
+
   Future<void> join(Community community);
 
   Future<void> leave(Community community);

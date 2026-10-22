@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +27,11 @@ class CommunityRepositoryImpl implements CommunityRepository {
 
   static const _listsMaxAge = Duration(minutes: 10);
   static const _friendsMaxAge = Duration(minutes: 5);
+
+  /// Profiles change as people log: refreshed after two minutes, the saved
+  /// copy shown offline.
+  static const _profileMaxAge = Duration(minutes: 2);
+  String _profileKey(String userId) => '${_key('profile')}:$userId';
   static const _boardMaxAge = Duration(minutes: 3);
 
   /// Awards are always asked for fresh (see [getCommunityWinners]); this
@@ -143,12 +149,37 @@ class CommunityRepositoryImpl implements CommunityRepository {
       maxAge: _listsMaxAge,
       decode: _decodeRow,
     );
-    return CommunitySettings(
-      username: row?['username'] as String?,
-      city: row?['city'] as String?,
-      countryCode: row?['country_code'] as String?,
-      leaderboardVisible: row?['leaderboard_visible'] as bool? ?? true,
-    );
+    return _settingsFrom(row);
+  }
+
+  static CommunitySettings _settingsFrom(Map<String, dynamic>? row) =>
+      CommunitySettings(
+        username: row?['username'] as String?,
+        city: row?['city'] as String?,
+        countryCode: row?['country_code'] as String?,
+        leaderboardVisible: row?['leaderboard_visible'] as bool? ?? true,
+      );
+
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async {
+    try {
+      final rows = await _cache.read<List<Map<String, dynamic>>>(
+        _communitiesKey,
+        decode: _decodeRows,
+      );
+      final settings = await _cache.read<Map<String, dynamic>?>(
+        _settingsKey,
+        decode: _decodeRow,
+      );
+      if (rows == null || settings == null) return null;
+      return (
+        [for (final r in rows.value) Community.fromJson(r)],
+        _settingsFrom(settings.value),
+      );
+    } catch (e) {
+      debugPrint('Saved Arena unavailable: $e');
+      return null;
+    }
   }
 
   Future<void> _patchSettings(Map<String, dynamic> values) =>
@@ -382,7 +413,13 @@ class CommunityRepositoryImpl implements CommunityRepository {
   @override
   Future<PlayerProfile> getPlayerProfile(String userId) => _profileCall(
     () async => PlayerProfile.fromJson(
-      await _remote.fetchPlayerProfile(userId).timeout(_requestTimeout),
+      (await _cache.fetch<Map<String, dynamic>?>(
+        _profileKey(userId),
+        remote: () =>
+            _remote.fetchPlayerProfile(userId).timeout(_requestTimeout),
+        maxAge: _profileMaxAge,
+        decode: _decodeRow,
+      ))!,
     ),
   );
 
@@ -401,6 +438,11 @@ class CommunityRepositoryImpl implements CommunityRepository {
       // the cheer is there, which is what the user wanted.
       if (e.message != PlayerProfileException.alreadyCheered) rethrow;
     }
+    // The saved profile shows "Cheered" too (offline, or reopened soon).
+    await _cache.update(
+      _profileKey(userId),
+      (data) => {...?_decodeRow(data), 'cheered_today': true},
+    );
   }
 
   /// Maps server and network failures to [PlayerProfileException].

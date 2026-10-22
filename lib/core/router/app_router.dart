@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/subscription/presentation/pages/pro_page.dart';
 import 'package:vital_up/core/router/app_page_transitions.dart';
+import 'package:vital_up/core/router/route_extras.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
 import 'package:vital_up/features/auth/presentation/utils/post_sign_in_navigation.dart';
 import 'package:vital_up/features/auth/presentation/pages/onboarding_page.dart';
@@ -308,11 +309,11 @@ class AppRouter {
         // Opened from the home bell, which passes its cubit so the unread
         // count stays in sync; without it fall back to the dashboard.
         redirect: (context, state) =>
-            state.extra is NotificationsCubit ? null : '/dashboard',
+            routeExtra(state) is NotificationsCubit ? null : '/dashboard',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: BlocProvider.value(
-            value: state.extra! as NotificationsCubit,
+            value: routeExtra(state)! as NotificationsCubit,
             child: const NotificationsPage(),
           ),
         ),
@@ -371,11 +372,11 @@ class AppRouter {
         // Opened from the community tab, which passes the Community; without
         // it (a stale deep link) fall back to the dashboard.
         redirect: (context, state) =>
-            state.extra is Community ? null : '/dashboard',
+            routeExtra(state) is Community ? null : '/dashboard',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: state.extra is Community
-              ? LeaderboardPage(community: state.extra! as Community)
+          child: routeExtra(state) is Community
+              ? LeaderboardPage(community: routeExtra(state)! as Community)
               : const _RouteUnavailable(),
         ),
       ),
@@ -411,8 +412,8 @@ class AppRouter {
           key: state.pageKey,
           // The activity screen, on its workout timer (notification taps).
           child: ActivityTrackingPage(
-            workout: state.extra is ActivityType
-                ? state.extra! as ActivityType
+            workout: routeExtra(state) is ActivityType
+                ? routeExtra(state)! as ActivityType
                 : ActivityType.strength,
           ),
         ),
@@ -619,7 +620,7 @@ class AppRouter {
         path: '/vita/chat',
         name: 'vita-chat',
         pageBuilder: (context, state) {
-          final extra = state.extra;
+          final extra = routeExtra(state);
           final args = extra is VitaChatArgs
               ? extra
               : VitaChatArgs(initialPrompt: extra is String ? extra : null);
@@ -643,7 +644,7 @@ class AppRouter {
         name: 'vita-diet-plan',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: VitaDietPlanPage(fromChat: state.extra == true),
+          child: VitaDietPlanPage(fromChat: routeExtra(state) == true),
         ),
       ),
       GoRoute(
@@ -672,13 +673,13 @@ class AppRouter {
 /// `extra` when it has the expected type, otherwise null (deep links and
 /// restored routes carry no `extra`, or a different one).
 T? _extraAs<T>(GoRouterState state) {
-  final extra = state.extra;
+  final extra = routeExtra(state);
   return extra is T ? extra : null;
 }
 
 /// `extra` as a JSON-like map; empty when missing or of another type.
 Map<String, dynamic> _extraMap(GoRouterState state) {
-  final extra = state.extra;
+  final extra = routeExtra(state);
   if (extra is! Map) return <String, dynamic>{};
   return {
     for (final e in extra.entries)
@@ -726,7 +727,7 @@ class _RouteUnavailable extends StatelessWidget {
 /// Pages under Profile get the Profile tab's cubit as `extra`, so edits show
 /// there on return; opened directly (deep link) they load their own.
 Widget _withProfileCubit(GoRouterState state, Widget child) {
-  final cubit = state.extra;
+  final cubit = routeExtra(state);
   if (cubit is ProfileCubit) {
     return BlocProvider<ProfileCubit>.value(value: cubit, child: child);
   }

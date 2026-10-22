@@ -121,6 +121,15 @@ class CommunityCubit extends Cubit<CommunityState> {
 
   Future<void> load() async {
     emit(state.copyWith(loading: true, failed: false));
+    // First open: the saved copy at once, so a slow connection shows the
+    // last Arena instead of a spinner (a failed refresh then keeps it).
+    if (state.communities == null) {
+      final saved = await _repository.savedHub();
+      if (isClosed) return;
+      if (saved != null && state.communities == null) {
+        emit(state.copyWith(communities: saved.$1, settings: saved.$2));
+      }
+    }
     try {
       // Friends and ranks are optional: the hub still works without them.
       final (

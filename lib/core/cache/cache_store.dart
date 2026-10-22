@@ -98,24 +98,16 @@ class CacheStore {
     }
     // Known offline: don't wait for a request to time out.
     if (cached != null && !_connectivity.hasNetwork) return cached.value;
+    // A network but no server lately (DNS failing, captive portal, server
+    // down): the saved copy now, a quiet refresh behind it. Its success
+    // marks the server reachable again and announces the new value.
+    if (cached != null && !_connectivity.isOnline) {
+      _request(key, remote, encode).ignore();
+      return cached.value;
+    }
 
     try {
-      final generation = _generation;
-      late final Future<Object?> request;
-      request = _inFlight[key] ??=
-          () async {
-            final value = await remote().timeout(fetchTimeout);
-            _connectivity.reportSuccess();
-            final data = encode == null ? value : encode(value);
-            if (generation == _generation) await write(key, data);
-            return data;
-          }().whenComplete(() {
-            // Block body on purpose: returning the removed future would make
-            // whenComplete wait on itself. Only drop our own entry: a clear()
-            // may have let a newer request take the slot.
-            if (identical(_inFlight[key], request)) _inFlight.remove(key);
-          });
-      final json = await request;
+      final json = await _request(key, remote, encode);
       return decode == null ? json as T : decode(json);
     } catch (e) {
       if (isOfflineError(e)) {
@@ -124,6 +116,36 @@ class CacheStore {
       }
       rethrow;
     }
+  }
+
+  /// Fetches [key] once at a time (callers share a request in flight),
+  /// saves it and reports whether the server answered.
+  Future<Object?> _request<T>(
+    String key,
+    Future<T> Function() remote,
+    Object? Function(T value)? encode,
+  ) {
+    final generation = _generation;
+    late final Future<Object?> request;
+    request = _inFlight[key] ??=
+        () async {
+          try {
+            final value = await remote().timeout(fetchTimeout);
+            _connectivity.reportSuccess();
+            final data = encode == null ? value : encode(value);
+            if (generation == _generation) await write(key, data);
+            return data;
+          } catch (e) {
+            if (isOfflineError(e)) _connectivity.reportFailure();
+            rethrow;
+          }
+        }().whenComplete(() {
+          // Block body on purpose: returning the removed future would make
+          // whenComplete wait on itself. Only drop our own entry: a clear()
+          // may have let a newer request take the slot.
+          if (identical(_inFlight[key], request)) _inFlight.remove(key);
+        });
+    return request;
   }
 
   /// The cached value for [key] regardless of age, or null.
