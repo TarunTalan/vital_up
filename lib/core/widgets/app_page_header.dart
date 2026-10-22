@@ -129,8 +129,9 @@ class AppPageHeader extends StatelessWidget {
   }
 }
 
-/// Circular cyan-glass action button used in headers — Figma 44dp
-/// calendar button (rgba(25,195,224,0.13) fill, 0.27 border).
+/// Circular cyan-glass action button used in headers (rgba(25,195,224,0.13)
+/// fill, 0.27 border): same 48dp circle as [BackIcon], which is its neutral
+/// twin, so a header's buttons read as one set.
 class AppHeaderAction extends StatelessWidget {
   final Widget? icon;
   final String? svgAsset;
@@ -145,8 +146,8 @@ class AppHeaderAction extends StatelessWidget {
     this.svgAsset,
     this.onTap,
     this.tooltip,
-    this.size = AppDimens.headerActionSize,
-    this.rounded = true,
+    this.size = AppDimens.backButtonSize,
+    this.rounded = false,
   }) : assert(
          icon != null || svgAsset != null,
          'Either icon or svgAsset must be provided',

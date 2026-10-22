@@ -330,6 +330,11 @@ make one back press skip two tabs).
   `assets/icons/communities/{global,local,strength,dieting,mindful}.svg`
   aren't supplied yet), Home is health-first
   and calm, gamification lives in Arena, rewards are quiet (snackbars).
+- Header buttons are one set: 48dp flat circles. `BackIcon` = neutral
+  (glass fill + hairline, arrow in `onSurface`), `AppHeaderAction` = cyan
+  tint + border with an `accentText` icon. Only over media (the scan
+  camera) is the back button `elevated` (translucent white + shadow);
+  `RoundIconButton` (solid, shadow) is for map / timer screens.
 - Core widgets (`lib/core/widgets`): `AppScaffold` (background, header,
   scroll, `onRefresh`, `bottomBar`), `AppPageHeader` + `AppHeaderAction`,
   `AppSectionHeader`, `AppCard` (glass card; `AppIconBadge`,
@@ -1213,6 +1218,14 @@ Route names are GoRouter `name`s.
 ## Email & Support Infrastructure (Resend)
 
 - **Service:** `EmailService` (`lib/core/services/email_service.dart`) calls `send-email` Edge Function. Registered in DI (`initDependencies`).
+- **Templates (Oct 22):** one layout for every email in `supabase/functions/_shared/email.ts`
+  (`renderEmail` + `block.code/button/note/details/quote/list`, app tokens, light with a
+  `prefers-color-scheme` dark version, 560px column that fills phones, MSO fallbacks, plain-text
+  twin; no emojis). Auth code copy per `email_action_type` in `renderAuthEmail` (`CODE_EXPIRY`
+  must match Auth > Email OTP expiry). Function emails in `send-email/templates.ts` and
+  `delete-account/templates.ts` (pure, previewable in Node). Dashboard templates
+  `supabase/email_templates/*.html` are generated: `node supabase/email_templates/build.ts`
+  (prints each subject), then paste into Auth > Emails.
 - **Provider:** Resend REST API (secret `RESEND_API_KEY` stored in Supabase secrets).
 - **Domains & Senders:**
   - `support@vitalup.live`: In-app support tickets (from `ContactSupportPage`) delivered to support desk with user diagnostics, and branded confirmation email sent to user.
@@ -1229,7 +1242,7 @@ Route names are GoRouter `name`s.
 1. **Autonomous Support Desk:** In-app ticket form with diagnostic attachment, direct Resend email delivery to `support@vitalup.live`, and user confirmation receipt.
 2. **End-to-End Account Deletion:** Mobile app database purge + avatar cleanup + dual audit email dispatch; web deletion portal with modal confirmation and API/mailto failover.
 3. **Legal Compliance Suite:** Published Privacy Policy, Terms of Service, and Account Deletion portal at `vitalup.live`.
-4. **Branded Email Suite:** Modern dark-glass HTML templates for Supabase Auth, support receipts, and deletion confirmations.
+4. **Branded Email Suite:** one shared app-themed layout (light + dark) for Supabase Auth codes, support tickets and receipts, and deletion requests and confirmations (`_shared/email.ts`).
 5. **Favicon & Asset Fixes:** Multi-resolution icons, embedded SVG data URI fallback, removed logo glow shadow, fixed Cloudflare Pages 307 redirect loops.
 6. **Security & Secrets:** Verified zero secrets or API keys in git history or client code; `RESEND_API_KEY` secured in Supabase server secrets.
 7. **App-Wide Loading States:** Centered loaders across all full pages in `AppScaffold` with modernized `VitalUpLoader` design.

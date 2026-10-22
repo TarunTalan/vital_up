@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vital_up/core/error/failures.dart';
@@ -781,67 +782,19 @@ class _DetailTopBar extends StatelessWidget {
         BackIcon(onClick: onBack),
         const Spacer(),
         if (onShare case final share?) ...[
-          _CircleIconButton(
-            asset: 'assets/icons/ui/share.svg',
+          AppHeaderAction(
+            svgAsset: 'assets/icons/ui/share.svg',
             tooltip: 'Share',
             onTap: share,
           ),
           const SizedBox(width: AppDimens.space12),
         ],
-        _CircleIconButton(
-          asset: 'assets/icons/ui/info_icon.svg',
+        AppHeaderAction(
+          svgAsset: 'assets/icons/ui/info_icon.svg',
           tooltip: 'How accurate is this?',
           onTap: onInfo,
         ),
       ],
-    );
-  }
-}
-
-/// Figma `button/ ArrowLeft` shell reused for header actions.
-class _CircleIconButton extends StatelessWidget {
-  final String asset;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _CircleIconButton({
-    required this.asset,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        width: AppDimens.backButtonSize,
-        height: AppDimens.backButtonSize,
-        decoration: BoxDecoration(
-          color: context.vColors.backButtonFill,
-          shape: BoxShape.circle,
-          boxShadow: AppShadows.shadowY,
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Center(
-              child: SvgPicture.asset(
-                asset,
-                width: AppDimens.iconLg,
-                height: AppDimens.iconLg,
-                colorFilter: ColorFilter.mode(
-                  context.colors.onSurface,
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

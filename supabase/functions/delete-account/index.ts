@@ -21,6 +21,12 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { bearerToken, errorResponse, jsonResponse, UUID_RE } from "../_shared/validate.ts";
 import { deleteRevenueCatCustomer } from "../_shared/revenuecat.ts";
+import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "../_shared/email.ts";
+import {
+  renderAdminDeletionNotice,
+  renderDeletionConfirmed,
+  type UserDeletionDetails,
+} from "./templates.ts";
 
 /** The request carries no meaningful body; anything bigger than this is refused. */
 const MAX_BODY_BYTES = 4 * 1024;
@@ -55,308 +61,40 @@ async function removeFolder(bucket: string, folder: string): Promise<void> {
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SENDER_EMAIL = "VitalUp Security <privacy@vitalup.live>";
-const SUPPORT_EMAIL = "support@vitalup.live";
-const PRIVACY_EMAIL = "privacy@vitalup.live";
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-interface UserDeletionDetails {
-  userId: string;
-  userEmail: string;
-  userName?: string;
-  username?: string;
-  provider?: string;
-  phone?: string;
-  createdAt?: string;
-  lastSignInAt?: string;
-}
-
-function renderAdminDeletionNoticeHtml(params: {
-  userId: string;
-  userEmail: string;
-  userName?: string;
-  username?: string;
-  provider?: string;
-  phone?: string;
-  createdAt?: string;
-  lastSignInAt?: string;
-  dateStr: string;
-}): string {
-  const logoUrl = "https://vitalup.live/assets/vitalup_light_logo.png";
-  const safeEmail = escapeHtml(params.userEmail);
-  const safeName = escapeHtml(params.userName || "None");
-  const safeUsername = escapeHtml(params.username || "None");
-  const safeUserId = escapeHtml(params.userId);
-  const safeProvider = escapeHtml(params.provider || "email");
-  const safePhone = escapeHtml(params.phone || "None");
-  const safeCreatedAt = escapeHtml(params.createdAt || "N/A");
-  const safeLastSignIn = escapeHtml(params.lastSignInAt || "N/A");
-
-  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Account Deleted Audit — VitalUp</title>
-</head>
-<body style="margin:0; padding:0; background-color:#0B0F19; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#F1F5F9; -webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#0B0F19; padding:32px 14px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width:580px; background-color:#111827; border:1px solid #1F293D; border-radius:16px; overflow:hidden; box-shadow:0 12px 36px rgba(0,0,0,0.5);">
-          
-          <!-- Header -->
-          <tr>
-            <td align="center" style="padding:32px 28px 22px; border-bottom:1px solid #1F293D; background-color:#111827;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <img src="${logoUrl}" alt="VitalUp Logo" width="52" height="52" style="display:block; border-radius:14px; border:1px solid rgba(255,255,255,0.12); box-shadow:0 4px 16px rgba(239,68,68,0.25); background:#FFFFFF;" />
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top:12px;">
-                    <span style="font-size:22px; font-weight:800; color:#FFFFFF; letter-spacing:-0.02em;">VitalUp Audit &amp; Privacy</span>
-                    <span style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#EF4444; margin-top:3px;">In-App Deletion Completed</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px 28px 24px;">
-              <div style="margin-bottom:18px;">
-                <span style="display:inline-block; padding:4px 12px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); border-radius:999px; font-size:11px; font-weight:700; color:#EF4444; text-transform:uppercase; letter-spacing:0.06em;">
-                  DATABASE PURGE EXECUTED
-                </span>
-                <h1 style="margin:12px 0 0; font-size:20px; font-weight:700; color:#FFFFFF; line-height:1.35;">
-                  User Account Purged from Database
-                </h1>
-                <p style="margin:8px 0 0; font-size:14px; color:#94A3B8;">
-                  A user has successfully deleted their account via the VitalUp mobile app. All database rows and storage files have been wiped.
-                </p>
-              </div>
-
-              <!-- User Detail Card -->
-              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#162032; border:1px solid rgba(186,186,186,0.16); border-radius:14px; margin-bottom:20px; padding:18px 20px;">
-                <tr>
-                  <td style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#19C3E0; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
-                    👤 Purged User Details
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding-top:12px; font-size:13px; line-height:1.8; color:#E2E8F0;">
-                    <div><strong>Email:</strong> <a href="mailto:${safeEmail}" style="color:#19C3E0; text-decoration:none; font-weight:600;">${safeEmail}</a></div>
-                    <div><strong>Name:</strong> ${safeName}</div>
-                    <div><strong>Username:</strong> ${safeUsername}</div>
-                    <div><strong>User ID (UUID):</strong> <code style="font-family:monospace; color:#94A3B8; font-size:12px;">${safeUserId}</code></div>
-                    <div><strong>Auth Provider:</strong> ${safeProvider}</div>
-                    <div><strong>Phone:</strong> ${safePhone}</div>
-                    <div><strong>Account Created:</strong> ${safeCreatedAt}</div>
-                    <div><strong>Last Sign-In:</strong> ${safeLastSignIn}</div>
-                    <div><strong>Deletion Timestamp:</strong> ${params.dateStr}</div>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Actions Completed Summary -->
-              <div style="background-color:#162032; border:1px solid rgba(16,185,129,0.3); border-radius:14px; padding:16px 18px; margin-bottom:20px;">
-                <div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#10B981; margin-bottom:8px;">
-                  ✅ Automated Actions Executed
-                </div>
-                <div style="font-size:13px; line-height:1.65; color:#94A3B8;">
-                  &bull; Removed from <code>auth.users</code><br>
-                  &bull; Cascaded wipe across tables (<code>profiles</code>, <code>user_health_data</code>, workouts, nutrition, chat logs)<br>
-                  &bull; Purged <code>avatars/${safeUserId}</code> storage folder<br>
-                  &bull; Confirmation email dispatched to <strong>${safeEmail}</strong>
-                </div>
-              </div>
-
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding:20px 24px; border-top:1px solid #1F293D; background-color:#0B0F19;">
-              <p style="margin:0; font-size:12px; color:#64748B;">
-                Automated Security Notification &bull; Delivered to <strong style="color:#94A3B8;">privacy@vitalup.live, support@vitalup.live</strong>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+async function sendResend(body: Record<string, unknown>): Promise<void> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}`);
 }
 
 async function sendDeletionConfirmedEmail(details: UserDeletionDetails): Promise<void> {
-  const { userEmail, userName, userId } = details;
+  const { userEmail, userName } = details;
   if (!RESEND_API_KEY || !userEmail) return;
+  const deletedAt = new Date();
 
-  const logoUrl = "https://vitalup.live/assets/vitalup_light_logo.png";
-  const safeName = escapeHtml(userName || "there");
-  const safeEmail = escapeHtml(userEmail);
-  const dateStr = new Date().toUTCString();
-
-  const userHtml = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Account Permanently Deleted — VitalUp</title>
-  <style type="text/css">
-    @media only screen and (max-width: 600px) {
-      .container-table { width: 100% !important; max-width: 100% !important; }
-      .content-padding { padding: 24px 18px !important; }
-      .header-padding { padding: 26px 18px 18px !important; }
-    }
-  </style>
-</head>
-<body style="margin:0; padding:0; background-color:#0B0F19; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#F1F5F9; -webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#0B0F19; padding:32px 14px;">
-    <tr>
-      <td align="center">
-        <!-- Main Card Container: AppCard Glass Theme -->
-        <table role="presentation" class="container-table" width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width:540px; background-color:#111827; border:1px solid #1F293D; border-radius:16px; overflow:hidden; box-shadow:0 12px 36px rgba(0,0,0,0.5);">
-          
-          <!-- Header with App Logo -->
-          <tr>
-            <td class="header-padding" align="center" style="padding:32px 28px 22px; border-bottom:1px solid #1F293D; background-color:#111827;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <img src="${logoUrl}" alt="VitalUp Logo" width="52" height="52" style="display:block; border-radius:14px; border:1px solid rgba(255,255,255,0.12); box-shadow:0 4px 16px rgba(239,68,68,0.25); background:#FFFFFF;" />
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top:12px;">
-                    <span style="font-size:22px; font-weight:800; color:#FFFFFF; letter-spacing:-0.02em;">VitalUp Account Security</span>
-                    <span style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#EF4444; margin-top:3px;">Account Permanently Deleted</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Body Content -->
-          <tr>
-            <td class="content-padding" style="padding:34px 28px 24px;">
-              <h1 style="margin:0 0 14px; font-size:20px; font-weight:700; color:#FFFFFF; letter-spacing:-0.01em;">
-                Your Account Has Been Deleted
-              </h1>
-              <p style="margin:0 0 20px; font-size:15px; line-height:1.65; color:#94A3B8;">
-                Hi <strong style="color:#F1F5F9;">${safeName}</strong>,<br><br>
-                This confirmation email is to inform you that your VitalUp account associated with <strong style="color:#19C3E0;">${safeEmail}</strong> has been permanently deleted in accordance with your in-app deletion request.
-              </p>
-
-              <!-- Purged Data Checklist Card -->
-              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#162032; border:1px solid rgba(239,68,68,0.28); border-radius:14px; margin-bottom:22px; padding:18px;">
-                <tr>
-                  <td style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#EF4444; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06);">
-                    🗑️ Permanently Expunged Records
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding-top:12px; font-size:13px; line-height:1.75; color:#E2E8F0;">
-                    <div>&bull; <strong>Credentials:</strong> Account login and authentication profiles</div>
-                    <div>&bull; <strong>Health &amp; Vitals:</strong> Biometric stats, heart rate history, body weight</div>
-                    <div>&bull; <strong>Activities:</strong> GPS workout tracks, steps, calories burned</div>
-                    <div>&bull; <strong>Nutrition:</strong> Daily macro logs, meals, water tracking</div>
-                    <div>&bull; <strong>AI Coach:</strong> Vita coach conversation logs and personalized memories</div>
-                    <div>&bull; <strong>Storage:</strong> Avatars, photos, and all uploaded attachments</div>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Notice on App Subscriptions -->
-              <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#162032; border:1px solid rgba(186,186,186,0.16); border-radius:14px; margin-bottom:22px; padding:16px 18px;">
-                <tr>
-                  <td width="32" valign="top" style="padding-right:12px;">
-                    <div style="width:28px; height:28px; border-radius:6px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); text-align:center; line-height:26px; font-size:14px;">
-                      ⚠️
-                    </div>
-                  </td>
-                  <td valign="middle" style="font-size:13px; line-height:1.55; color:#E2E8F0;">
-                    <strong>Active Subscriptions:</strong> If you purchased a subscription via Google Play or the Apple App Store, remember to cancel it directly in your store account. App stores do not permit automatic third-party subscription cancellations.
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Security Notice -->
-              <p style="margin:0; font-size:13px; line-height:1.6; color:#94A3B8;">
-                If you did not initiate this deletion, someone may have accessed your device or account. Please contact us immediately at <a href="mailto:privacy@vitalup.live" style="color:#19C3E0; text-decoration:none; font-weight:600;">privacy@vitalup.live</a>.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding:22px 24px; border-top:1px solid #1F293D; background-color:#0B0F19;">
-              <p style="margin:0 0 6px; font-size:12px; color:#64748B;">
-                Processed on: ${dateStr}
-              </p>
-              <p style="margin:0; font-size:11px; color:#475569;">
-                &copy; 2026 VitalUp &bull; <a href="https://vitalup.live/privacy" style="color:#64748B; text-decoration:none;">Privacy Policy</a> &bull; <a href="https://vitalup.live/terms" style="color:#64748B; text-decoration:none;">Terms</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-  // 1. Dispatch confirmation to the user
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: SENDER_EMAIL,
-      to: [userEmail],
-      reply_to: SUPPORT_EMAIL,
-      subject: "Your VitalUp account has been permanently deleted",
-      html: userHtml,
-      text: `Hi ${userName || "there"},\n\nYour VitalUp account (${userEmail}) and all associated health, activity, and personal data have been permanently deleted from our servers.\n\nDate: ${dateStr}\n\nIf you have any active subscriptions on Google Play or the App Store, remember to cancel them in your device settings.\n\nVitalUp Security Team (privacy@vitalup.live)`,
-    }),
+  // 1. Confirmation to the user
+  await sendResend({
+    from: SENDER_EMAIL,
+    to: [userEmail],
+    reply_to: SUPPORT_EMAIL,
+    subject: "Your VitalUp account has been deleted",
+    ...renderDeletionConfirmed(details, deletedAt),
   }).catch((err) => console.error("Failed to send user deletion email:", err));
 
-  // 2. Dispatch comprehensive audit email to BOTH privacy@vitalup.live AND support@vitalup.live
-  const adminHtml = renderAdminDeletionNoticeHtml({
-    ...details,
-    dateStr,
-  });
-
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "VitalUp Audit <privacy@vitalup.live>",
-      to: [PRIVACY_EMAIL, SUPPORT_EMAIL],
-      reply_to: userEmail,
-      subject: `[Account Purged - In-App] ${userEmail} (${userName || details.username || "User"})`,
-      html: adminHtml,
-      text: `VitalUp User Account Deleted via Mobile App\n\nUser Email: ${userEmail}\nName: ${userName || "None"}\nUsername: ${details.username || "None"}\nUser ID: ${userId}\nProvider: ${details.provider || "email"}\nPhone: ${details.phone || "None"}\nCreated At: ${details.createdAt || "N/A"}\nLast Sign In: ${details.lastSignInAt || "N/A"}\nTimestamp: ${dateStr}\n\nAll database rows and storage buckets for this user have been permanently purged.`,
-    }),
+  // 2. Audit note to the privacy and support desks
+  await sendResend({
+    from: "VitalUp Audit <privacy@vitalup.live>",
+    to: [PRIVACY_EMAIL, SUPPORT_EMAIL],
+    reply_to: userEmail,
+    subject: `[Audit · Account deleted] ${userEmail} (${userName || details.username || "User"})`,
+    ...renderAdminDeletionNotice(details, deletedAt),
   }).catch((err) => console.error("Failed to notify privacy and support emails:", err));
 }
 

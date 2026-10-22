@@ -1006,7 +1006,7 @@ class _FoodScannerViewState extends State<FoodScannerView>
                       children: [
                         Row(
                           children: [
-                            BackIcon(onClick: _handleBack),
+                            BackIcon(onClick: _handleBack, elevated: true),
                             const Spacer(),
                             _ScannerIconButton(
                               iconAsset: 'assets/icons/ui/info_icon.svg',
