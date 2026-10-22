@@ -19,7 +19,7 @@ import 'package:vital_up/features/community/domain/repositories/community_reposi
 import 'package:vital_up/features/community/presentation/cubit/leaderboard_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
-import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
+import 'package:vital_up/features/community/presentation/pages/player_profile_page.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/utils/number_formats.dart';
@@ -260,7 +260,7 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
                 LeaderboardAwardsCard(
                   period: state.awardPeriod!,
                   winners: state.pastWinners,
-                  onOpenPlayer: (w) => PublicProfileSheet.show(
+                  onOpenPlayer: (w) => PlayerProfilePage.open(
                     context,
                     username: w.username,
                     level: w.level,
@@ -662,19 +662,14 @@ class _PodiumPlace extends StatelessWidget {
     if (e == null) return const SizedBox.shrink();
     final color = _rankColor(e.rank ?? 3);
     return GestureDetector(
-      onTap: () {
-        if (!e.isMe) {
-          PublicProfileSheet.show(
-            context,
-            username: e.username,
-            level: e.level,
-            avatarUrl: e.avatarUrl,
-            userId: e.userId,
-            points: e.points,
-            rank: e.rank,
-          );
-        }
-      },
+      // Your own spot shows your profile as others see it.
+      onTap: () => PlayerProfilePage.open(
+        context,
+        username: e.username,
+        level: e.level,
+        avatarUrl: e.avatarUrl,
+        userId: e.userId,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -765,17 +760,14 @@ class _RankRow extends StatelessWidget {
     return Material(
       color: e.isMe ? context.vColors.primaryTint : Colors.transparent,
       child: InkWell(
-        onTap: e.isMe
-            ? null
-            : () => PublicProfileSheet.show(
-                context,
-                username: e.username,
-                level: e.level,
-                avatarUrl: e.avatarUrl,
-                userId: e.userId,
-                points: e.points,
-                rank: e.rank,
-              ),
+        // Your own row shows your profile as others see it.
+        onTap: () => PlayerProfilePage.open(
+          context,
+          username: e.username,
+          level: e.level,
+          avatarUrl: e.avatarUrl,
+          userId: e.userId,
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimens.space16,
@@ -840,11 +832,9 @@ class _RankRow extends StatelessWidget {
                   color: context.colors.onSurface,
                 ),
               ),
-              // Opens their profile; your own row keeps the points aligned.
+              // Opens the profile (yours: as others see it).
               const SizedBox(width: AppDimens.space4),
-              e.isMe
-                  ? const SizedBox(width: AppDimens.iconMd)
-                  : const AppChevron(),
+              const AppChevron(),
             ],
           ),
         ),

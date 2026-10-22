@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
@@ -40,6 +41,8 @@ import 'package:vital_up/core/config/secure_session_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Which icons are bundled: missing ones show their fallback quietly.
+  BundledAssets.preload();
   GoogleFonts.config.allowRuntimeFetching = false; // bundled in assets/google_fonts
   // OFL fonts ship with their licences; list them on the licences page.
   LicenseRegistry.addLicense(() async* {

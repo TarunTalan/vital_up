@@ -28,7 +28,8 @@ class CommunityRepositoryImpl implements CommunityRepository {
   static const _friendsMaxAge = Duration(minutes: 5);
   static const _boardMaxAge = Duration(minutes: 3);
 
-  /// Awards change at most once a week.
+  /// Awards are always asked for fresh (see [getCommunityWinners]); this
+  /// only applies to the copy shown offline.
   static const _awardsMaxAge = Duration(minutes: 30);
 
   /// Gives up on a hung request early enough to fall back to the cache
@@ -55,12 +56,14 @@ class CommunityRepositoryImpl implements CommunityRepository {
   Future<List<Map<String, dynamic>>> _rows(
     String key,
     Future<List<Map<String, dynamic>>> Function() remote,
-    Duration maxAge,
-  ) => _cache.fetch<List<Map<String, dynamic>>>(
+    Duration maxAge, {
+    bool forceRefresh = false,
+  }) => _cache.fetch<List<Map<String, dynamic>>>(
     key,
     remote: () => remote().timeout(_requestTimeout),
     maxAge: maxAge,
     decode: _decodeRows,
+    forceRefresh: forceRefresh,
   );
 
   static List<Map<String, dynamic>> _decodeRows(Object? json) => [
@@ -290,6 +293,9 @@ class CommunityRepositoryImpl implements CommunityRepository {
           period: period.name,
         ),
         _awardsMaxAge,
+        // Asked fresh each time (small, and winners must show as soon as
+        // they're announced); the saved copy is for offline.
+        forceRefresh: true,
       ))
         AwardWinner.fromJson(r),
     ];
@@ -301,6 +307,7 @@ class CommunityRepositoryImpl implements CommunityRepository {
       '${_key('awards')}:${userId ?? 'me'}',
       () => _remote.fetchPlayerAwards(userId),
       _awardsMaxAge,
+      forceRefresh: true,
     ))
       CommunityAward.fromJson(r),
   ];

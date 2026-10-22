@@ -20,8 +20,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/invite_share_card.dart';
-import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
-import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
+import 'package:vital_up/features/community/presentation/pages/player_profile_page.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/widgets/name_with_you_tag.dart';
 
@@ -86,38 +85,14 @@ class _FriendsViewState extends State<_FriendsView> {
     );
   }
 
-  Future<void> _confirmRemove(Friend friend) async {
-    final cubit = context.read<FriendsCubit>();
-    final errorColor = context.colors.error;
-    final ok = await showSmoothDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove @${friend.username}?'),
-        content: const Text(
-          "You'll no longer see each other on your friends board.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: errorColor),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) await cubit.remove(friend);
-  }
-
-  void _showProfile(Friend f) => PublicProfileSheet.show(
+  void _showProfile(Friend f) => PlayerProfilePage.open(
     context,
     username: f.username,
     level: f.level,
     avatarUrl: f.avatarUrl,
+    fullName: f.fullName,
     userId: f.userId,
+    onFriendRemoved: context.read<FriendsCubit>().load,
   );
 
   bool _matches(String username, String? name) {
@@ -247,11 +222,7 @@ class _FriendsViewState extends State<_FriendsView> {
                 : null,
             onTap: item.friend == null
                 ? null
-                : () => PlayerInspectSheet.show(
-                    context,
-                    friend: item.friend!,
-                    onRemove: () => _confirmRemove(item.friend!),
-                  ),
+                : () => _showProfile(item.friend!),
           ),
       ],
     );

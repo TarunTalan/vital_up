@@ -315,7 +315,11 @@ make one back press skip two tabs).
   `_TileScope.titlesUnder`; never with today's titles).
 - Rules: no hardcoded colours/sizes, 16dp gutter, no emojis (Material/SVG
   icons; icon assets are supplied by the user, never created; `GameIcon`
-  falls back to a Material icon when an SVG is missing), Home is health-first
+  falls back to a Material icon when an asset isn't bundled, without
+  trying to load it: `BundledAssets` reads the asset manifest at launch,
+  since failed SVG loads report uncaught errors; community icons
+  `assets/icons/communities/{global,local,strength,dieting,mindful}.svg`
+  aren't supplied yet), Home is health-first
   and calm, gamification lives in Arena, rewards are quiet (snackbars).
 - Core widgets (`lib/core/widgets`): `AppScaffold` (background, header,
   scroll, `onRefresh`, `bottomBar`), `AppPageHeader` + `AppHeaderAction`,
@@ -897,13 +901,49 @@ Route names are GoRouter `name`s.
   hourly `use-streak-freezes` cron, refunded on late sync);
   `get_badge_progress()` for locked badges. Challenges are online-only.
   Rewards: snackbars via `awardMessage`; celebration dialog in Arena.
-  - **Arena UI (Oct 21):** hub order = level card + shortcuts,
+  - **Who sees what (Oct 22):** every member opens one page,
+    `PlayerProfilePage.open` (`community/presentation/pages/
+    player_profile_page.dart`; replaced the two profile sheets) from
+    leaderboards, champions, friends and the hub's friends row; your own
+    row / place opens yours ("This is how other members see you", no
+    actions). Top down: avatar, name, @username, level; actions (Add
+    friend + "Friends can cheer, compare and challenge each other." /
+    Accept + Decline / Request sent / friend: Challenge, then Cheer +
+    Compare; Remove friend in the header's ⋮ menu, asks first); one
+    stats card (Points, Streak, Badges); Awards (`AwardsSummaryCard`,
+    more than one opens `PlayerAwardsPage`: summary, then
+    `AwardsByPeriod`, one section per week / month, newest first);
+    Recent badges (`BadgeEmblem`, tap for details); Points by area for
+    friends and yourself only (`PlayerProfile.isFriend`). Hidden members:
+    a lock note. Your own awards: Achievements page (`MyCommunityAwards`:
+    one summary card under the badge summary, never the whole list),
+    celebration dialog, `award` notification. Others: their profile, hub
+    `ChampionsCard` (crown badge in the title: the rows carry the medals),
+    each leaderboard's `LeaderboardAwardsCard` (champions rows open it);
+    friends get `friend_award`. Tests: `test/features/community/champions_test.dart`,
+    `player_profile_page_test.dart`.
+  - **Achievements page** (route `badges`, kept for links; was "Badges"):
+    "N of M badges" summary, Awards card, "Badges earned", "Badges to
+    unlock". Arena hub shortcuts: Achievements and Points (the activity
+    calendar lives on Home: Today > History); square tiles while every
+    label fits whole at the text size, else full-width rows with a
+    chevron (`_Shortcuts`, measured, never shrunk).
+  - **Arena UI (Oct 21):** hub order = level card + shortcuts (Achievements, Points),
     `PointGoalsNudge` (only while a goal that points need is missing:
     `PointGoal` water / calories / activity, `DailyMetricsCollector
     .missingPointGoals`; "Set goals" opens `my-goals`, "Not now" hides it
     until a different set is missing; the Points page puts "Set a water
-    goal to earn these" under those rules), Challenges, Friends, Leaderboards, then Monthly champions only when
-    there are winners (rules and countdown live on each leaderboard).
+    goal to earn these" under those rules), Challenges (at most 2 on the hub: open invites first as one-line
+    `_InviteRow`s with Join (under the text when beside it would get
+    narrow; Decline on the Challenges page), then running ones, then a
+    "+ New challenge" text link (lighter than a full-width button); the
+    title counts all when some are left out), Friends, Leaderboards, then
+    `ChampionsCard` only when there are winners: one row per community
+    (Global, your city) with its winner, "You 2nd" when you placed, a
+    chevron to that leaderboard (which lists the top 3); Week / Month
+    switch when both, opens on the one announced last via
+    `latestChampionsPeriod` / `awardAnnouncedAt`. Kept to about 1.5
+    screens at 1.0 text: add sections as summaries with "See all".
     `ChallengeTile`: running = brand icon badge + time bar ("Day 6 of 7 ·
     1 day left"); finished / left = grey badge + `TrackerStatusChip`
     ("You won", "Finished", "You left"); rank + score sit in the footer
@@ -955,8 +995,8 @@ Route names are GoRouter `name`s.
     Importance: global monthly > local monthly > interest monthly > weekly
     (`awardPrestige`). Entities, `AwardRules` and the countdown
     (`nextAwardCountdown`) in `community/domain/entities/community_award.dart`;
-    UI in `award_widgets.dart` (Arena `MonthlyChampionsCard`, leaderboard
-    `LeaderboardAwardsCard`, profile `PlayerAwardsSummary`, Badges page
+    UI in `award_widgets.dart` (Arena `ChampionsCard`, leaderboard
+    `LeaderboardAwardsCard`, profile awards card, Achievements page
     section, `showAwardRulesSheet`) and `award_celebration.dart` (one-time
     dialog for a new trophy, pref `community_award_seen_<uid>`).
 - **subscription (VitalUp Pro):** `vitalup-pro` (`ProPage`: plan, Manage
@@ -1078,6 +1118,17 @@ Route names are GoRouter `name`s.
   the daily chat limit, so a chat only counts when it gets a real answer
   (errors, off-topic and replaced replies are refunded); vita-chat using
   it is deployed (Oct 22).
+  `20261031_public_profiles_friend_awards.sql` (NOT pushed yet; tested on
+  local Postgres): `get_player_profile` for any signed-in member, adds
+  `friend`; members on leaderboards share points, streaks, badge count and
+  6 recent badges, points by area only for the caller and friends; hidden
+  members name / avatar / level only (no more `not_friends` error; cheers
+  and challenges still check friendship). Notification type
+  `friend_award`: a deferred constraint trigger on `community_awards`
+  tells each accepted friend of the winner's best award per period
+  (global > local > interest, then place; once, `actor_id` + username /
+  avatar in data; hidden winners not told). Push it with the app update
+  (older apps show these as plain announcements).
 - Never edit an applied migration; add a new one. Clients never write
   points/stats/badges directly: everything goes through RPCs.
 - Edge functions (`_shared/llm.ts` Gemini -> Groq fallback, `_shared/quota.ts`):
@@ -1155,7 +1206,7 @@ Route names are GoRouter `name`s.
 7. **App-Wide Loading States:** Centered loaders across all full pages in `AppScaffold` with modernized `VitalUpLoader` design.
 8. **Nutrition Navigation Split:** Dashboard Nutrition section routes to `meal-log-history` for complete chronological meal history; `DietProgressPage` focuses on today's logged meals.
 9. **Modern 3D Achievement Badges (32 SVGs):** Extracted, alpha-keyed, and deployed full 32-badge asset suite with standalone SVGs embedding base64 high-res graphics without vector distortion.
-10. **Gamification Badge UI:** Reusable `BadgeEmblem`, `BadgeTile`, `showBadgeDetailSheet`, and responsive grid integrated into `BadgesPage`, player profile sheets, and reward dialogs.
+10. **Gamification Badge UI:** Reusable `BadgeEmblem`, `BadgeTile`, `showBadgeDetailSheet`, and responsive grid integrated into `BadgesPage` (Achievements), `PlayerProfilePage`, and reward dialogs.
 11. **Tracker Trends & Sleep Insights:** Modernized `TrendBarChart`, detailed sleep card metrics, and proportional status bars in `ActivityCalendarPage`.
 12. **Play Store Pre-Release Suite:** Renamed application package to `com.vitalup.app`, upgraded to target SDK 36, enabled R8 minification with ProGuard keep rules, NDK symbol tables, GitHub Actions CI/CD workflows for release and Shorebird patches, and comprehensive `docs/PLAY_STORE_PRE_RELEASE_GUIDE.md`.
 13. **Play App Signing & Android OAuth Clients:** Registered Google Play App Signing key SHA-1 (`F9:63:25:22:11:92:D8:2E:5D:DA:DC:F7:10:FA:D1:07:91:54:7C:0C`), Upload key SHA-1/256, and local Debug keystore SHA-1/256 to Firebase `com.vitalup.app`, auto-provisioning Google Cloud OAuth clients.

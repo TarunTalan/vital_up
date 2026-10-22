@@ -15,7 +15,8 @@ final _points = NumberFormat.decimalPattern();
 
 /// Arena hero: level ring, level title and points to the next level, then
 /// streak, today's points and banked rest days. Tap for points history.
-/// Shortcuts to badges, points and the activity calendar sit below it.
+/// Shortcuts to Achievements and points history sit below it (the activity
+/// calendar is on Home: Today > History).
 class ScoreStreakCard extends StatelessWidget {
   const ScoreStreakCard({super.key});
 
@@ -146,35 +147,19 @@ class ScoreStreakCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppDimens.cardGap),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _Shortcut(
-                      icon: Icons.military_tech_rounded,
-                      label: 'Badges',
-                      onTap: () => _push(context, 'badges'),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimens.cardGap),
-                  Expanded(
-                    child: _Shortcut(
-                      icon: Icons.insights_rounded,
-                      label: 'Points',
-                      onTap: () => _push(context, 'points-history'),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimens.cardGap),
-                  Expanded(
-                    child: _Shortcut(
-                      icon: Icons.calendar_month_rounded,
-                      label: 'Calendar',
-                      onTap: () => _push(context, 'activity-calendar'),
-                    ),
-                  ),
-                ],
-              ),
+            _Shortcuts(
+              items: [
+                (
+                  Icons.military_tech_rounded,
+                  'Achievements',
+                  () => _push(context, 'badges'),
+                ),
+                (
+                  Icons.insights_rounded,
+                  'Points',
+                  () => _push(context, 'points-history'),
+                ),
+              ],
             ),
           ],
         );
@@ -236,19 +221,75 @@ class _Stat extends StatelessWidget {
 }
 
 /// Square-ish shortcut card: icon over a one-word label.
-class _Shortcut extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+typedef _ShortcutItem = (IconData icon, String label, VoidCallback onTap);
 
-  const _Shortcut({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+/// The hero's shortcuts: square tiles side by side while every label fits
+/// whole; otherwise (large text, narrow phones) full-width rows, so a
+/// label never shrinks or ends in "...".
+class _Shortcuts extends StatelessWidget {
+  final List<_ShortcutItem> items;
+
+  const _Shortcuts({required this.items});
 
   @override
   Widget build(BuildContext context) {
+    final style = context.text.labelLarge?.copyWith(
+      color: context.colors.onSurface,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final n = items.length;
+        final tile =
+            (constraints.maxWidth - AppDimens.cardGap * (n - 1)) / n -
+            AppDimens.space8 * 2;
+        final fits = items.every((item) {
+          final painter = TextPainter(
+            text: TextSpan(text: item.$2, style: style),
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            maxLines: 1,
+          )..layout();
+          final width = painter.width;
+          painter.dispose();
+          return width <= tile;
+        });
+        if (!fits) {
+          return Column(
+            children: [
+              for (final (i, item) in items.indexed) ...[
+                if (i > 0) const SizedBox(height: AppDimens.space8),
+                _ShortcutRow(item: item, style: style),
+              ],
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (i, item) in items.indexed) ...[
+                if (i > 0) const SizedBox(width: AppDimens.cardGap),
+                Expanded(
+                  child: _ShortcutTile(item: item, style: style),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShortcutTile extends StatelessWidget {
+  final _ShortcutItem item;
+  final TextStyle? style;
+
+  const _ShortcutTile({required this.item, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, label, onTap) = item;
     return Semantics(
       button: true,
       label: label,
@@ -268,16 +309,35 @@ class _Shortcut extends StatelessWidget {
               color: context.vColors.accentText,
             ),
             const SizedBox(height: AppDimens.space6),
-            // One word: shrinks to fit rather than breaking mid-word.
-            FitText(
-              label,
-              textAlign: TextAlign.center,
-              style: context.text.labelLarge?.copyWith(
-                color: context.colors.onSurface,
-              ),
-            ),
+            // Measured to fit by [_Shortcuts]; whole, never shrunk.
+            Text(label, textAlign: TextAlign.center, maxLines: 1, style: style),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShortcutRow extends StatelessWidget {
+  final _ShortcutItem item;
+  final TextStyle? style;
+
+  const _ShortcutRow({required this.item, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, label, onTap) = item;
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPaddingCompact,
+      onTap: onTap,
+      showChevron: true,
+      child: Row(
+        children: [
+          Icon(icon, size: AppDimens.iconLg, color: context.vColors.accentText),
+          const SizedBox(width: AppDimens.space12),
+          Expanded(child: Text(label, style: style)),
+        ],
       ),
     );
   }

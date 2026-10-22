@@ -254,10 +254,10 @@ const List<FaqItem> kFaqDatabase = [
         '• Points are added once your day syncs, so go online now and then.\n'
         '• Rest days protect a streak: you earn one for every 7 active days, '
         'up to 2.\n'
-        '• Badges, challenges, friends and leaderboards are in the Arena '
-        'tab.',
+        '• Achievements (badges and community awards), challenges, '
+        'friends and leaderboards are in the Arena tab.',
     tags: ['points', 'streak', 'level', 'badge', 'rest day', 'arena'],
-    actionLabel: 'View badges',
+    actionLabel: 'View achievements',
     actionRoute: 'badges',
   ),
   FaqItem(

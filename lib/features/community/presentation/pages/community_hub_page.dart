@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/point_goals_nudge.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -16,7 +17,6 @@ import 'package:vital_up/features/community/presentation/widgets/award_celebrati
 import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_leaderboards_section.dart';
 import 'package:vital_up/features/community/presentation/widgets/friends_quick_row.dart';
-import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/score_streak_card.dart';
 
@@ -106,15 +106,16 @@ class _ArenaHubView extends StatelessWidget {
                     // them.
                     if (state.champions.any((c) => c.winners.isNotEmpty)) ...[
                       const SizedBox(height: AppDimens.sectionGap),
-                      MonthlyChampionsCard(
+                      ChampionsCard(
                         champions: state.champions,
-                        onOpenPlayer: (w) => PublicProfileSheet.show(
-                          context,
-                          username: w.username,
-                          level: w.level,
-                          avatarUrl: w.avatarUrl,
-                          userId: w.userId,
-                        ),
+                        onOpenCommunity: (community) async {
+                          await context.pushNamed(
+                            'leaderboard',
+                            pathParameters: {'id': community.id},
+                            extra: community,
+                          );
+                          cubit.load();
+                        },
                       ),
                     ],
 

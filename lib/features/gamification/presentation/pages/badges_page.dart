@@ -43,7 +43,8 @@ class _BadgesPageState extends State<BadgesPage> {
         _reload();
         await _badges.catchError((_) => const <GameBadge>[]);
       },
-      header: const AppPageHeader(title: 'Badges'),
+      // Badges and community awards (route `badges`, kept for links).
+      header: const AppPageHeader(title: 'Achievements'),
       body: FutureBuilder<List<GameBadge>>(
         future: _badges,
         builder: (context, snapshot) {
@@ -83,10 +84,11 @@ class _BadgesPageState extends State<BadgesPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const MyCommunityAwards(),
               _SummaryCard(earned: earned.length, total: badges.length),
+              // Medals and trophies: one card, the full list a tap away.
+              const MyCommunityAwards(),
               const SizedBox(height: AppDimens.sectionGap),
-              AppSectionHeader('Earned', count: earned.length),
+              AppSectionHeader('Badges earned', count: earned.length),
               if (earned.isEmpty)
                 const AppInfoNote(
                   icon: Icons.military_tech_outlined,
@@ -98,7 +100,7 @@ class _BadgesPageState extends State<BadgesPage> {
                 _BadgeGrid(badges: earned),
               if (locked.isNotEmpty) ...[
                 const SizedBox(height: AppDimens.sectionGap),
-                AppSectionHeader('Locked', count: locked.length),
+                AppSectionHeader('Badges to unlock', count: locked.length),
                 _BadgeGrid(badges: locked),
               ],
             ],
@@ -136,7 +138,7 @@ class _SummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$earned of $total earned',
+                      '$earned of $total badges',
                       style: context.text.titleMedium,
                     ),
                     const SizedBox(height: AppDimens.space2),

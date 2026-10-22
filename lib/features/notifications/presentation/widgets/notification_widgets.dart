@@ -45,7 +45,8 @@ String? notificationRoute(NotificationType type, String? route) =>
     switch (type) {
       NotificationType.friendRequest ||
       NotificationType.friendAccepted ||
-      NotificationType.cheer => 'friends',
+      NotificationType.cheer ||
+      NotificationType.friendAward => 'friends',
       NotificationType.badge || NotificationType.award => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
       NotificationType.challenge => 'challenges',

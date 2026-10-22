@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
@@ -13,15 +14,17 @@ import 'package:vital_up/features/challenges/presentation/widgets/challenge_tile
 import 'package:vital_up/features/challenges/presentation/widgets/custom_challenge_wizard.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 
-/// Arena section: open invites first, then up to [_maxActive] running
-/// challenges and a way to start a new one. Finished ones live behind
-/// "See all" to keep the hub short.
+/// Arena section, kept short: at most [_maxShown] items, open invites
+/// first as one-line rows with Join (Decline is on the Challenges page),
+/// then running challenges, and a "New challenge" link under them; the rest
+/// (more invites, finished ones) live behind "See all" (the title counts
+/// them all when some are left out).
 class ArenaChallengesSection extends StatelessWidget {
   final VoidCallback? onRefresh;
 
   const ArenaChallengesSection({super.key, this.onRefresh});
 
-  static const _maxActive = 2;
+  static const _maxShown = 2;
 
   void _openAll(BuildContext context) {
     context.pushNamed('challenges').then((_) => onRefresh?.call());
@@ -52,15 +55,18 @@ class ArenaChallengesSection extends StatelessWidget {
               (c) =>
                   c.myStatus == ParticipantStatus.joined && c.isActiveAt(now),
             )
-            .take(_maxActive)
             .toList();
-        final shown = [...invites, ...active];
+        final open = [...invites, ...active];
+        final shown = open.take(_maxShown).toList();
+        final more = open.length - shown.length;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppSectionHeader(
               'Challenges',
+              // The full count when the hub leaves some out.
+              count: more > 0 ? open.length : null,
               actionLabel: 'See all',
               onAction: () => _openAll(context),
             ),
@@ -81,17 +87,27 @@ class ArenaChallengesSection extends StatelessWidget {
             else if (shown.isEmpty)
               _EmptyChallenges(onCreate: () => _create(context))
             else ...[
-              for (final c in shown) ...[
-                ChallengeTile(challenge: c, busy: state.busy.contains(c.id)),
-                const SizedBox(height: AppDimens.cardGap),
+              for (final (i, c) in shown.indexed) ...[
+                if (i > 0) const SizedBox(height: AppDimens.cardGap),
+                c.myStatus == ParticipantStatus.invited
+                    ? _InviteRow(challenge: c, busy: state.busy.contains(c.id))
+                    : ChallengeTile(
+                        challenge: c,
+                        busy: state.busy.contains(c.id),
+                      ),
               ],
-              AppSecondaryButton(
-                label: 'New challenge',
-                leadingIcon: const Icon(
-                  Icons.add_rounded,
-                  size: AppDimens.iconSm,
+              // A labelled link, lighter than a full-width button.
+              const SizedBox(height: AppDimens.space4),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () => _create(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: context.vColors.accentText,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: AppDimens.iconMd),
+                  label: const Text('New challenge'),
                 ),
-                onTap: () => _create(context),
               ),
             ],
           ],
@@ -154,6 +170,74 @@ class _EmptyChallenges extends StatelessWidget {
             onTap: onCreate,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// An open invite: what, who and time left, and Join beside it; Join
+/// moves under the text when beside it the text would get narrow (large
+/// text, small phones).
+class _InviteRow extends StatelessWidget {
+  final Challenge challenge;
+  final bool busy;
+
+  const _InviteRow({required this.challenge, required this.busy});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = challenge;
+    final grey = context.vColors.grayText;
+    final join = AppPrimaryButton(
+      label: 'Join',
+      expand: false,
+      isLoading: busy,
+      onTap: () => context.read<ChallengesCubit>().respond(c, accept: true),
+    );
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          challengeTitle(c),
+          style: context.text.titleSmall?.copyWith(
+            color: context.colors.onSurface,
+          ),
+        ),
+        const SizedBox(height: AppDimens.space2),
+        Text(
+          '@${c.creatorUsername} invited you · '
+          '${challengeTimeLeft(c.endsAt)}',
+          style: context.text.bodySmall?.copyWith(color: grey),
+        ),
+      ],
+    );
+    return AppCard(
+      width: double.infinity,
+      padding: AppDimens.cardPaddingCompact,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final beside = constraints.maxWidth >= context.textScaled(300);
+          final header = Row(
+            children: [
+              AppIconBadge(
+                icon: Icon(challengeMetricIcon(c.metric)),
+                color: context.colors.primary,
+              ),
+              const SizedBox(width: AppDimens.space12),
+              Expanded(child: text),
+              if (beside) ...[const SizedBox(width: AppDimens.space8), join],
+            ],
+          );
+          if (beside) return header;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header,
+              const SizedBox(height: AppDimens.space12),
+              Align(alignment: AlignmentDirectional.centerEnd, child: join),
+            ],
+          );
+        },
       ),
     );
   }

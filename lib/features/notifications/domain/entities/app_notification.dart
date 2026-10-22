@@ -16,6 +16,9 @@ enum NotificationType {
   /// A weekly medal or monthly trophy from a community (route: badges).
   award('award'),
 
+  /// A friend won a medal or trophy (route: friends, to cheer them).
+  friendAward('friend_award'),
+
   /// Sent by the VitalUp team (app news, tips, reminders).
   announcement('announcement');
 
@@ -30,7 +33,8 @@ enum NotificationType {
       this == friendRequest ||
       this == friendAccepted ||
       this == challenge ||
-      this == cheer;
+      this == cheer ||
+      this == friendAward;
   bool get isAchievement =>
       this == badge || this == levelUp || this == streak || this == award;
 }

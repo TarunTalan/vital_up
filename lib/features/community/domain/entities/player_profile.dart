@@ -2,8 +2,9 @@ import 'package:equatable/equatable.dart';
 import 'package:vital_up/features/gamification/domain/entities/game_badge.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
 
-/// Level, points, streaks and recent badges of the caller or an accepted
-/// friend, from `get_player_profile`.
+/// Level, points, streaks and recent badges of any member, from
+/// `get_player_profile`: points by area only for the caller and friends.
+/// Members hidden from leaderboards share name, avatar and level only.
 class PlayerProfile extends Equatable {
   final String userId;
   final String username;
@@ -22,9 +23,12 @@ class PlayerProfile extends Equatable {
   /// The caller already cheered this friend today.
   final bool cheeredToday;
 
-  /// The friend turned off "Show me on leaderboards": only name, avatar
+  /// The member turned off "Show me on leaderboards": only name, avatar
   /// and level are shared; every stat below reads as zero.
   final bool isPrivate;
+
+  /// The caller or an accepted friend: [categoryPoints] are filled in.
+  final bool isFriend;
 
   const PlayerProfile({
     required this.userId,
@@ -40,6 +44,7 @@ class PlayerProfile extends Equatable {
     required this.recentBadges,
     required this.cheeredToday,
     this.isPrivate = false,
+    this.isFriend = true,
   });
 
   int pointsIn(ScoreCategory category) => categoryPoints[category] ?? 0;
@@ -69,6 +74,8 @@ class PlayerProfile extends Equatable {
       ],
       cheeredToday: json['cheered_today'] as bool? ?? false,
       isPrivate: json['private'] as bool? ?? false,
+      // Servers before 20261031 answered friends only.
+      isFriend: json['friend'] as bool? ?? true,
     );
   }
 
@@ -86,6 +93,7 @@ class PlayerProfile extends Equatable {
     recentBadges: recentBadges,
     cheeredToday: cheeredToday ?? this.cheeredToday,
     isPrivate: isPrivate,
+    isFriend: isFriend,
   );
 
   @override
@@ -103,6 +111,7 @@ class PlayerProfile extends Equatable {
     recentBadges,
     cheeredToday,
     isPrivate,
+    isFriend,
   ];
 }
 

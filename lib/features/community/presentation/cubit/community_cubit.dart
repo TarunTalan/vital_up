@@ -179,21 +179,22 @@ class CommunityCubit extends Cubit<CommunityState> {
     final boards = [?state.global, ?state.local];
     try {
       final champions = await Future.wait([
-        for (final c in boards)
-          _repository
-              .getCommunityWinners(c, AwardPeriod.month)
-              .then(
-                (w) => CommunityWinners(
-                  community: c,
-                  period: AwardPeriod.month,
-                  winners: w,
+        for (final period in AwardPeriod.values)
+          for (final c in boards)
+            _repository
+                .getCommunityWinners(c, period)
+                .then(
+                  (w) => CommunityWinners(
+                    community: c,
+                    period: period,
+                    winners: w,
+                  ),
                 ),
-              ),
       ]).withLoadTimeout();
       if (isClosed) return;
       emit(state.copyWith(champions: champions));
     } catch (e) {
-      debugPrint('Monthly champions failed to load: $e');
+      debugPrint('Champions failed to load: $e');
     }
   }
 

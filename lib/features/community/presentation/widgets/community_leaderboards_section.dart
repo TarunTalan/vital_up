@@ -337,8 +337,9 @@ class CommunitySettingsSheet extends StatelessWidget {
                               ),
                             ),
                             subtitle: Text(
-                              'Public boards show your username, avatar and points. When off, friends '
-                              'still see your name and level, but not your stats.',
+                              'Members see your username, avatar, points, streak, badges '
+                              'and awards. When off, everyone sees only your name and '
+                              'level, friends included.',
                               style: context.text.bodySmall?.copyWith(
                                 color: v.grayText,
                               ),
