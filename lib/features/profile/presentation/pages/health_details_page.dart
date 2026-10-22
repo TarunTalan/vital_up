@@ -20,6 +20,8 @@ import 'package:vital_up/core/widgets/app_segmented_control.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/value_ruler.dart';
 import 'package:vital_up/core/widgets/tracker/goal_controls.dart';
 import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
@@ -30,6 +32,7 @@ import 'package:vital_up/features/profile/presentation/cubit/profile_cubit.dart'
 import 'package:vital_up/features/profile/presentation/cubit/profile_state.dart';
 import 'package:vital_up/features/profile/presentation/utils/body_metrics.dart';
 import 'package:vital_up/features/profile/presentation/widgets/health_snapshot_card.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
 
 /// Body measurements, vitals, lifestyle and medical history. Each section
@@ -120,6 +123,22 @@ class _HealthBody extends StatelessWidget {
 
   const _HealthBody({required this.profile, required this.onEdit});
 
+  /// The Body sheet starts its weight scale at the latest weigh-in (else
+  /// the profile's weight), in the unit set in Settings.
+  Future<void> _editBody(BuildContext context) async {
+    final service = sl<WeightService>();
+    final unit = await service.unit();
+    final latest = await service.latest();
+    if (!context.mounted) return;
+    onEdit(
+      (p) => _BodySheet(
+        profile: p,
+        weightUnit: unit,
+        weightKg: latest?.weightKg ?? profileWeightKg(p),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final v = context.vColors;
@@ -138,7 +157,7 @@ class _HealthBody extends StatelessWidget {
         AppSectionHeader(
           'Body',
           actionLabel: 'Edit',
-          onAction: () => onEdit((p) => _BodySheet(profile: p)),
+          onAction: () => _editBody(context),
         ),
         HealthSnapshotCard(
           profile: profile,
@@ -317,7 +336,9 @@ class _SectionSheet extends StatefulWidget {
   final String title;
   final String subtitle;
   final List<Widget> Function(BuildContext context) fields;
-  final ProfileEntity? Function() onSave;
+
+  /// The edited profile to save, or null to stay open (shows its error).
+  final FutureOr<ProfileEntity?> Function() onSave;
 
   const _SectionSheet({
     required this.title,
@@ -332,11 +353,19 @@ class _SectionSheet extends StatefulWidget {
 
 class _SectionSheetState extends State<_SectionSheet> {
   final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final updated = widget.onSave();
-    if (updated != null) Navigator.of(context).pop(updated);
+    setState(() => _saving = true);
+    final updated = await widget.onSave();
+    if (!mounted) return;
+    if (updated != null) {
+      Navigator.of(context).pop(updated);
+    } else {
+      setState(() => _saving = false);
+    }
   }
 
   @override
@@ -366,7 +395,7 @@ class _SectionSheetState extends State<_SectionSheet> {
             const SizedBox(height: AppDimens.space20),
             ...widget.fields(context),
             const SizedBox(height: AppDimens.space8),
-            AppPrimaryButton(label: 'Save', onTap: _save),
+            AppPrimaryButton(label: 'Save', isLoading: _saving, onTap: _save),
           ],
         ),
       ),
@@ -397,94 +426,210 @@ String? Function(String) _range(int min, int max, String name) => (value) {
 
 class _BodySheet extends StatefulWidget {
   final ProfileEntity profile;
+  final WeightUnit weightUnit;
 
-  const _BodySheet({required this.profile});
+  /// Where the weight scale starts (latest weigh-in); null when none.
+  final double? weightKg;
+
+  const _BodySheet({
+    required this.profile,
+    required this.weightUnit,
+    this.weightKg,
+  });
 
   @override
   State<_BodySheet> createState() => _BodySheetState();
 }
 
+/// Height and weight on the same scales as onboarding and Log weight. A
+/// scale left untouched saves nothing (a height saved in cm and shown in
+/// ft / in would otherwise be rounded on every save); a new weight is
+/// logged as today's weigh-in so Home and the trend see it.
 class _BodySheetState extends State<_BodySheet> {
-  late final double? _cm = profileHeightCm(widget.profile);
-  late final _heightCm = TextEditingController(
-    text: _cm == null ? '' : _cm.round().toString(),
+  static const _cmPerInch = CalculateCalorieGoal.cmPerInch;
+
+  /// The feet scale runs in whole inches from 2 ft (labels on whole feet).
+  static const _minInches = 24;
+  static final _maxInches = (InputLimits.heightCmMax / _cmPerInch).floor();
+
+  /// Where the scales start without a saved value.
+  static const _typicalCm = 170.0;
+  static const _typicalKg = 70.0;
+
+  late final double? _savedCm = profileHeightCm(widget.profile);
+  late double _cm = _savedCm ?? _typicalCm;
+  bool _heightTouched = false;
+
+  WeightUnit get _unit => widget.weightUnit;
+
+  /// The picked weight in [_unit], one decimal.
+  late double _weight = double.parse(
+    _unit
+        .fromKg(widget.weightKg ?? _typicalKg)
+        .clamp(_unit.minValue.toDouble(), _unit.maxValue.toDouble())
+        .toStringAsFixed(1),
   );
-  late final int? _inches = _cm == null
-      ? null
-      : (_cm / CalculateCalorieGoal.cmPerInch).round();
-  late final _feet = TextEditingController(text: _initialFeet);
-  late final _inch = TextEditingController(text: _initialInch);
-  late final String _initialFeet = _inches == null ? '' : '${_inches ~/ 12}';
-  late final String _initialInch = _inches == null ? '' : '${_inches % 12}';
-  late final String _initialCm = _heightCm.text;
+  bool _weightTouched = false;
 
-  /// Height in cm from the fields (null while empty).
-  double? _enteredCm(bool imperial) {
-    if (!imperial) return double.tryParse(_heightCm.text.trim());
-    final ft = int.tryParse(_feet.text.trim());
-    if (ft == null) return null;
-    final inch = int.tryParse(_inch.text.trim()) ?? 0;
-    return (ft * 12 + inch) * CalculateCalorieGoal.cmPerInch;
-  }
-
-  /// Range check on the whole height, or null when fine or left empty.
-  String? _heightError(bool imperial) {
-    final empty = imperial
-        ? _feet.text.trim().isEmpty && _inch.text.trim().isEmpty
-        : _heightCm.text.trim().isEmpty;
-    if (empty) return null;
-    if (imperial && _feet.text.trim().isEmpty) return 'Enter feet too';
-    return ProfileRules.heightError(_enteredCm(imperial));
-  }
+  /// Which measure the scale edits (height first).
+  bool _editingWeight = false;
+  String? _weightError;
 
   late String _activity = widget.profile.activity;
 
-  @override
-  void dispose() {
-    _heightCm.dispose();
-    _feet.dispose();
-    _inch.dispose();
-    super.dispose();
+  int get _inches => (_cm / _cmPerInch).round().clamp(_minInches, _maxInches);
+
+  Future<ProfileEntity?> _save(bool feet) async {
+    var profile = widget.profile.copyWith(activity: _activity);
+    if (_heightTouched) {
+      profile = feet
+          ? profile.copyWith(
+              height: '${_inches ~/ 12}-${_inches % 12}',
+              heightUnit: 'ft',
+            )
+          : profile.copyWith(height: '${_cm.round()}', heightUnit: 'cm');
+    }
+    if (_weightTouched) {
+      final kg = _unit.toKg(_weight);
+      String? error;
+      try {
+        error = await sl<WeightService>().add(kg);
+      } catch (e) {
+        debugPrint('Weight not saved: $e');
+        error = "Couldn't save your weight. Try again.";
+      }
+      if (error != null) {
+        if (mounted) setState(() => _weightError = error);
+        return null;
+      }
+      // The figure WeightService writes to the profile too, so whichever
+      // save lands last, the profile keeps the new weight.
+      final profileUnit = WeightUnit.fromCode(widget.profile.weightUnit);
+      profile = profile.copyWith(
+        weight: profileUnit.fromKg(kg).toStringAsFixed(1),
+        weightUnit: profileUnit.label,
+      );
+    }
+    return profile;
   }
 
   @override
   Widget build(BuildContext context) {
-    final imperial = usesImperialHeight(watchSettings(context));
+    final feet = usesImperialHeight(watchSettings(context));
     final levels = [
       ...activityLevels,
       // Keep an older saved value selectable instead of replacing it.
       if (_activity.isNotEmpty && !activityLevels.contains(_activity))
         _activity,
     ];
+    final height = feet
+        ? '${_inches ~/ 12} ft ${_inches % 12} in'
+        : '${_cm.round()} cm';
+    final weight = '${_weight.toStringAsFixed(1)} ${_unit.label}';
+    final heightAdded = _savedCm != null || _heightTouched;
+    final weightAdded = widget.weightKg != null || _weightTouched;
+    final added = _editingWeight ? weightAdded : heightAdded;
+    final note = !added
+        ? 'Not added yet. Drag the scale to set it.'
+        : _editingWeight && _weightTouched
+        ? "Saved as today's weigh-in."
+        : null;
 
     return _SectionSheet(
       title: 'Body',
       subtitle: 'Used to set your calorie and activity targets.',
       fields: (context) => [
-        if (imperial)
-          _pair(
-            AppTextField.integer(
-              controller: _feet,
-              label: 'Height',
-              suffixText: 'ft',
-              validator: (value) =>
-                  _range(1, 8, 'feet')(value) ?? _heightError(true),
+        Row(
+          children: [
+            Expanded(
+              child: _MeasureTile(
+                label: 'Height',
+                figure: heightAdded ? height : 'Not added',
+                selected: !_editingWeight,
+                onTap: () => setState(() => _editingWeight = false),
+              ),
             ),
-            AppTextField.integer(
-              controller: _inch,
-              label: ' ',
-              suffixText: 'in',
-              validator: _range(0, 11, 'inches'),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: _MeasureTile(
+                label: 'Weight',
+                figure: weightAdded ? weight : 'Not added',
+                selected: _editingWeight,
+                onTap: () => setState(() => _editingWeight = true),
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space16),
+        // One scale for the selected measure.
+        if (_editingWeight)
+          ValueRuler(
+            key: const ValueKey('kg'),
+            value: _weight,
+            min: _unit.minValue.toDouble(),
+            max: _unit.maxValue.toDouble(),
+            color: AppColors.trackWeight,
+            semanticValue: (v) => '${v.toStringAsFixed(1)} ${_unit.label}',
+            onChanged: (v) => setState(() {
+              _weight = v;
+              _weightTouched = true;
+              _weightError = null;
+            }),
+          )
+        else if (feet)
+          ValueRuler(
+            key: const ValueKey('ft'),
+            value: _inches.toDouble(),
+            min: _minInches.toDouble(),
+            max: _maxInches.toDouble(),
+            step: 1,
+            majorEvery: 12,
+            midEvery: 6,
+            color: context.colors.primary,
+            labelFor: (v) => '${v.round() ~/ 12} ft',
+            semanticValue: (v) =>
+                '${v.round() ~/ 12} feet ${v.round() % 12} inches',
+            onChanged: (v) => setState(() {
+              _cm = v * _cmPerInch;
+              _heightTouched = true;
+            }),
           )
         else
-          AppTextField.integer(
-            controller: _heightCm,
-            label: 'Height',
-            prefixIcon: Icons.straighten_rounded,
-            suffixText: 'cm',
-            validator: (_) => _heightError(false),
+          ValueRuler(
+            key: const ValueKey('cm'),
+            value: _cm.roundToDouble().clamp(
+              InputLimits.heightCmMin,
+              InputLimits.heightCmMax,
+            ),
+            min: InputLimits.heightCmMin,
+            max: InputLimits.heightCmMax,
+            step: 1,
+            color: context.colors.primary,
+            semanticValue: (v) => '${v.round()} centimetres',
+            onChanged: (v) => setState(() {
+              _cm = v;
+              _heightTouched = true;
+            }),
           ),
+        if (_weightError case final error?) ...[
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.colors.error,
+            ),
+          ),
+        ] else if (note != null) ...[
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            note,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
+        ],
         _fieldGap,
         AppDropdownField<String>(
           label: 'Activity level',
@@ -496,38 +641,55 @@ class _BodySheetState extends State<_BodySheet> {
           onChanged: (value) => setState(() => _activity = value ?? ''),
         ),
         _fieldGap,
-        const AppInfoNote(
-          message:
-              'To change your weight, use Log weight so your trend '
-              'stays up to date.',
-        ),
-        _fieldGap,
       ],
-      onSave: () {
-        // Untouched height keeps its saved value and unit (a cm height
-        // shown in ft/in would otherwise be rounded on every save).
-        final heightUnchanged = imperial
-            ? _feet.text == _initialFeet && _inch.text == _initialInch
-            : _heightCm.text == _initialCm;
-        if (heightUnchanged) {
-          return widget.profile.copyWith(activity: _activity);
-        }
-        if (imperial) {
-          final ft = _feet.text.trim();
-          final inch = _inch.text.trim();
-          return widget.profile.copyWith(
-            height: ft.isEmpty ? '' : '$ft-${inch.isEmpty ? '0' : inch}',
-            heightUnit: ft.isEmpty ? widget.profile.heightUnit : 'ft',
-            activity: _activity,
-          );
-        }
-        final cm = _heightCm.text.trim();
-        return widget.profile.copyWith(
-          height: cm,
-          heightUnit: cm.isEmpty ? widget.profile.heightUnit : 'cm',
-          activity: _activity,
-        );
-      },
+      onSave: () => _save(feet),
+    );
+  }
+}
+
+/// Height or weight with its value; the selected one is on the scale.
+/// Picks something, so no chevron (like the other choice cards).
+class _MeasureTile extends StatelessWidget {
+  final String label;
+  final String figure;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _MeasureTile({
+    required this.label,
+    required this.figure,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grey = context.vColors.grayText;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: AppCard(
+        width: double.infinity,
+        padding: AppDimens.cardPaddingCompact,
+        borderColor: selected ? context.colors.primary : null,
+        tint: selected ? context.vColors.primaryFill : null,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: context.text.bodySmall?.copyWith(color: grey)),
+            const SizedBox(height: AppDimens.space4),
+            FitText(
+              figure,
+              style: context.text.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colors.onSurface,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

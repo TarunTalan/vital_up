@@ -15,7 +15,8 @@ class SettingsEntity extends Equatable {
     this.notificationsEnabled = true,
     this.healthSyncEnabled = false,
     this.weightUnit = 'kg',
-    this.heightUnit = 'cm',
+    // Feet and inches unless the user picks cm in Settings.
+    this.heightUnit = 'in',
     this.analyticsEnabled = true,
   });
 

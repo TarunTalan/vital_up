@@ -201,8 +201,10 @@ void main() {
       final cubit = await _pump(tester, step: OnboardingStep.height);
       expect(find.text('How tall are you?'), findsOneWidget);
       await _continue(tester);
-      // The shown default (female: 163 cm) is saved, not left empty.
-      expect(_prefs.getString('onboarding_height'), '163');
+      // The shown default (female: 163 cm) is saved, not left empty, in
+      // feet and inches (the default height unit).
+      expect(_prefs.getString('onboarding_height'), '5-4');
+      expect(_prefs.getString('onboarding_height_unit'), 'ft');
       expect(find.text('What do you weigh?'), findsOneWidget);
       expect(cubit.state.currentStep, 'weight');
     });

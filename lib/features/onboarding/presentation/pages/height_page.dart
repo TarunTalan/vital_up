@@ -11,6 +11,7 @@ import 'package:vital_up/features/onboarding/presentation/widgets/onboarding_wid
 import 'package:vital_up/features/profile/domain/profile_rules.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 
 /// Step 2: height on a sliding scale, in cm or feet and inches. Saved as
 /// "170" (cm) or "5-7" (ft-in), what the rest of the app reads.
@@ -51,7 +52,11 @@ class _HeightStepState extends State<HeightStep> with OnboardingStepState {
       // Nothing picked yet: the unit set in Settings, at a typical height.
       final settings = context.read<SettingsCubit>().state;
       final imperial =
-          settings is SettingsLoaded && settings.settings.heightUnit == 'in';
+          (settings is SettingsLoaded
+                  ? settings.settings
+                  : const SettingsEntity())
+              .heightUnit ==
+          'in';
       _unit = imperial ? 'ft' : 'cm';
     }
     _cm = _snapToUnit(

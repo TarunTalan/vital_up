@@ -466,7 +466,7 @@ Route names are GoRouter `name`s.
   `AccountDetailsPage` (`account-details`; name, `UsernameInput`
   availability check, DOB ddMMyyyy, gender male/female, read-only email,
   export/delete), `HealthDetailsPage` (`health-details`; per-section edit
-  sheets; weight via `WeightService` / `showWeightEntrySheet`; units from
+  sheets; the Body sheet has Height / Weight tiles over one `ValueRuler` for the selected one, a moved weight scale logs a weigh-in through `WeightService`; also `showWeightEntrySheet`; units from
   Settings). Helpers: `presentation/utils/body_metrics.dart`. Pass the
   Profile tab's `ProfileCubit` as `extra` (`_withProfileCubit` in the
   router); `ProfileState.shownProfile`; a failed save emits `ProfileError`
@@ -485,7 +485,7 @@ Route names are GoRouter `name`s.
   "Share usage analytics"), About.
   Units also has Distance (km / mi, `DistanceUnitNotifier`, pref
   `activity_distance_unit`, read by the workout screens).
-  `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`), notification,
+  `SettingsEntity`: themeMode, units (`cm`/`in`, `kg`/`lbs`; height defaults to `in` = ft / in), notification,
   health-sync and analytics flags (`settings_analytics_enabled`, read by
   `AnalyticsService.init` before DI; off clears the user id and data).
   Analytics sends only automatic events: never log health figures, food

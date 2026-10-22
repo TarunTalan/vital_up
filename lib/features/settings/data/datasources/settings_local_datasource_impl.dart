@@ -28,7 +28,10 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
     final healthSyncEnabled =
         sharedPreferences.getBool(_keyHealthSyncEnabled) ?? false;
     final weightUnit = _oneOf(_keyWeightUnit, const ['kg', 'lbs'], 'kg');
-    final heightUnit = _oneOf(_keyHeightUnit, const ['cm', 'in'], 'cm');
+    final heightUnit = _oneOf(_keyHeightUnit, const [
+      'cm',
+      'in',
+    ], const SettingsEntity().heightUnit);
     final analyticsEnabled =
         sharedPreferences.getBool(keyAnalyticsEnabled) ?? true;
 
