@@ -347,15 +347,26 @@ section { position: relative; }
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--hairline); padding: 56px 0 32px; margin-top: 40px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .footer-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
-.footer-grid h4 { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); margin-bottom: 14px; }
+.footer-grid h2 { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-subtle); margin-bottom: 14px; }
 .footer-grid ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .footer-grid li a { color: var(--text-muted); font-weight: 500; }
 .footer-grid li a:hover { color: var(--text); }
 .footer-about p { color: var(--text-muted); font-size: 15px; margin-top: 14px; max-width: 34ch; }
 .footer-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--hairline); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; color: var(--text-subtle); font-size: 14px; }
+.footer-grid .narrow { display: none; }
+/* Phones keep the desktop arrangement: brand on top, then the three link
+   columns side by side (short labels) instead of a long stack. */
 @media (max-width: 760px) {
-  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .site-footer { padding: 36px 0 24px; margin-top: 24px; }
+  .footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 12px; }
   .footer-about { grid-column: 1 / -1; }
+  .footer-about p { margin-top: 8px; font-size: 14px; max-width: none; }
+  .footer-grid h2 { margin-bottom: 10px; }
+  .footer-grid ul { gap: 8px; }
+  .footer-grid li a { font-size: 14.5px; }
+  .footer-grid .wide { display: none; }
+  .footer-grid .narrow { display: inline; }
+  .footer-bottom { margin-top: 24px; padding-top: 16px; font-size: 13px; gap: 4px; flex-direction: column; }
 }
 
 /* ---------- Legal / document pages ---------- */

@@ -15,8 +15,8 @@
   function systemDark() { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
   function currentTheme() { return root.getAttribute('data-theme') || (systemDark() ? 'dark' : 'light'); }
   function syncThemeMeta() {
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', currentTheme() === 'dark' ? '#141414' : '#F6F8F9');
+    var colour = currentTheme() === 'dark' ? '#141414' : '#F6F8F9';
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', colour); });
     document.querySelectorAll('.theme-toggle').forEach(function (b) {
       b.setAttribute('aria-label', currentTheme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
     });

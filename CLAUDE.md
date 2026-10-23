@@ -1212,7 +1212,16 @@ Route names are GoRouter `name`s.
   `vitalup-theme`). Shared `assets/site.css` + `site.js` (menu, reveal on scroll,
   TOC highlight, carousel); `assets/icons.css` is generated (app SVGs from
   `assets/icons` + Material paths as CSS masks; regenerate rather than edit).
-  Pages link each other as `*.html` (Cloudflare serves the clean URLs too).
+  SEO (Oct 23): links and assets are root-relative clean URLs (`/privacy`,
+  `/assets/...`, matching each page's canonical), so preview with a server
+  that maps clean URLs (`npx serve website`), not `file://` or `http.server`.
+  Every page head has title / description / canonical / Open Graph / Twitter
+  tags and a JSON-LD `@graph` (Organization, WebSite, WebPage; home adds
+  MobileApplication (no rating until real reviews exist) and FAQPage built
+  from the visible FAQ, keep them in step; legal pages add BreadcrumbList).
+  `robots.txt`, `sitemap.xml` (bump `lastmod` on content changes),
+  `site.webmanifest`, `404.html` (noindex) and `_headers` (Cloudflare cache
+  and security headers). Hero isn't scroll-revealed (it's the LCP).
   - `index.html` (+ `assets/home.css`): hero with phones, stats, tracker bento,
     feature rows, screenshot carousel, privacy band, reviews (hidden markup to fill
     with real Play reviews; a "Rate on Google Play" card meanwhile), Free / Pro

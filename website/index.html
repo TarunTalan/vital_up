@@ -3,43 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>VitalUp: Health, fitness and nutrition tracker with an AI coach</title>
-  <meta name="description" content="Track activity, meals, water, sleep, mood and weight in one calm app that works offline. AI food scanner, Vita AI coach, GPS workouts, widgets and friendly challenges. Free on Android.">
-  <meta name="theme-color" content="#F6F8F9">
+  <title>VitalUp: AI Calorie Counter & Health Tracker for Android</title>
+  <meta name="description" content="Track calories, workouts, water, sleep, mood and weight in one free app that works offline. AI food scanner, AI health coach, GPS runs and widgets for Android.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
   <link rel="canonical" href="https://vitalup.live/">
+  <meta name="application-name" content="VitalUp">
+  <meta name="theme-color" content="#F6F8F9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="format-detection" content="telephone=no">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="VitalUp">
+  <meta property="og:locale" content="en_US">
   <meta property="og:title" content="VitalUp: your health, all in one calm place">
-  <meta property="og:description" content="Activity, nutrition, water, sleep, mood and weight in one offline-first app, with an AI food scanner and Vita, your AI coach.">
+  <meta property="og:description" content="A free, offline-first health tracker for Android: AI food scanner, AI coach, GPS workouts, sleep, water, mood and weight.">
   <meta property="og:url" content="https://vitalup.live/">
   <meta property="og:image" content="https://vitalup.live/assets/og-image.png">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="VitalUp home screen in light and dark themes, with the tagline: Your health, all in one calm place">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="favicon.ico" sizes="any">
-  <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-  <link rel="preload" href="assets/fonts/nunito-bold.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/fonts/nunito-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <script>try{var t=localStorage.getItem('vitalup-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
-  <link rel="stylesheet" href="assets/site.css">
-  <link rel="stylesheet" href="assets/icons.css">
-  <link rel="stylesheet" href="assets/home.css">
+  <meta name="twitter:title" content="VitalUp: your health, all in one calm place">
+  <meta name="twitter:description" content="A free, offline-first health tracker for Android: AI food scanner, AI coach, GPS workouts, sleep, water, mood and weight.">
+  <meta name="twitter:image" content="https://vitalup.live/assets/og-image.png">
+  <meta name="twitter:image:alt" content="VitalUp home screen in light and dark themes">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/logo-mark.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preload" href="/assets/fonts/nunito-bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/nunito-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" as="image" href="/assets/screens/home-dark.webp" type="image/webp" fetchpriority="high">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "VitalUp",
-    "operatingSystem": "Android",
-    "applicationCategory": "HealthApplication",
-    "url": "https://vitalup.live/",
-    "downloadUrl": "https://play.google.com/store/apps/details?id=com.vitalup.app",
-    "description": "Health, fitness and nutrition tracker with an AI food scanner, an AI coach and GPS workouts. Works offline.",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "publisher": { "@type": "Organization", "name": "VitalUp", "email": "support@vitalup.live" }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://vitalup.live/#organization",
+        "name": "VitalUp",
+        "url": "https://vitalup.live/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://vitalup.live/android-chrome-512x512.png",
+          "width": 512,
+          "height": 512
+        },
+        "email": "support@vitalup.live",
+        "contactPoint": [
+          {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "support@vitalup.live"
+          },
+          {
+            "@type": "ContactPoint",
+            "contactType": "privacy",
+            "email": "privacy@vitalup.live"
+          }
+        ],
+        "sameAs": [
+          "https://play.google.com/store/apps/details?id=com.vitalup.app"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://vitalup.live/#website",
+        "name": "VitalUp",
+        "url": "https://vitalup.live/",
+        "inLanguage": "en",
+        "publisher": {
+          "@id": "https://vitalup.live/#organization"
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://vitalup.live/#webpage",
+        "url": "https://vitalup.live/",
+        "name": "VitalUp: AI Calorie Counter & Health Tracker for Android",
+        "description": "Track calories, workouts, water, sleep, mood and weight in one free app that works offline. AI food scanner, AI health coach, GPS runs and widgets for Android.",
+        "isPartOf": {
+          "@id": "https://vitalup.live/#website"
+        },
+        "about": {
+          "@id": "https://vitalup.live/#app"
+        },
+        "primaryImageOfPage": "https://vitalup.live/assets/og-image.png",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "MobileApplication",
+        "@id": "https://vitalup.live/#app",
+        "name": "VitalUp",
+        "operatingSystem": "Android 8.0 or later",
+        "applicationCategory": "HealthApplication",
+        "applicationSubCategory": "Health and fitness tracker",
+        "description": "Health, fitness and nutrition tracker with an AI food scanner, an AI health coach (Vita), GPS workouts, sleep, water, mood and weight tracking, home screen widgets and friendly challenges. Works offline.",
+        "url": "https://vitalup.live/",
+        "downloadUrl": "https://play.google.com/store/apps/details?id=com.vitalup.app",
+        "installUrl": "https://play.google.com/store/apps/details?id=com.vitalup.app",
+        "image": "https://vitalup.live/assets/og-image.png",
+        "screenshot": [
+          "https://vitalup.live/assets/screens/home-light.webp",
+          "https://vitalup.live/assets/screens/food-scan.webp",
+          "https://vitalup.live/assets/screens/vita-chat.webp",
+          "https://vitalup.live/assets/screens/gps-workout.webp",
+          "https://vitalup.live/assets/screens/sleep.webp",
+          "https://vitalup.live/assets/screens/arena.webp",
+          "https://vitalup.live/assets/screens/widgets.webp",
+          "https://vitalup.live/assets/screens/home-dark.webp"
+        ],
+        "featureList": [
+          "AI food scanner for photos, barcodes and nutrition labels",
+          "AI health coach (Vita)",
+          "AI diet plans",
+          "GPS workouts with offline maps",
+          "Timed gym, yoga, HIIT and swim workouts",
+          "Calorie and macro tracking",
+          "Water, sleep, mood, stress, weight and screen time tracking",
+          "Google Health Connect import",
+          "Android home screen widgets",
+          "Points, streaks, badges, challenges and leaderboards",
+          "Data export and account deletion"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "category": "free"
+        },
+        "publisher": {
+          "@id": "https://vitalup.live/#organization"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://vitalup.live/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is VitalUp free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Every tracker, trend, report, workout, widget and the Arena are free. AI features have a daily allowance, and VitalUp Pro raises it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which phones can use it?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "VitalUp is on Android 8.0 and newer, through Google Play. An iPhone version isn't available yet."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work without internet?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Logging, trends, timers and GPS workouts all work offline, and you can download maps for the areas you run or ride. AI features and the Arena need a connection. Your logs back up when you're online again."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work with my watch?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "If your watch or fitness app saves to Health Connect, VitalUp can read your steps, sleep, workouts, weight and heart data from there. You can also pair a Bluetooth heart rate strap for workouts."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What does Vita do with my data?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Vita only sees your data after you agree, and only to answer you. Your name and email are not sent. Health Connect readings stay out unless you switch them on. Chats are kept on your phone, not on our servers. Read more in the privacy policy."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is VitalUp a medical device?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. VitalUp is for general wellness. It doesn't diagnose or treat anything. Talk to a doctor before big changes to your diet or exercise."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I delete my account?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "In the app, open Profile, then Account details, then Delete account. You can also ask us on the web."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I get help?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Ask Vita or open Help and support in the app, or email support@vitalup.live."
+            }
+          }
+        ]
+      }
+    ]
   }
   </script>
+  <script>try{var t=localStorage.getItem('vitalup-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/icons.css">
+  <link rel="stylesheet" href="/assets/home.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -47,8 +223,8 @@
 
   <header class="site-header">
     <div class="container nav">
-      <a class="brand" href="./" aria-label="VitalUp home">
-        <img src="assets/logo-mark.svg" alt="" width="36" height="36">
+      <a class="brand" href="/" aria-label="VitalUp home">
+        <img src="/assets/logo-mark.svg" alt="" width="36" height="36">
         VitalUp
       </a>
       <nav class="nav-links" id="nav-menu" aria-label="Main">
@@ -72,27 +248,27 @@
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <span class="chip reveal"><span class="dot"><i class="ic ic-bolt"></i></span>Free on Android</span>
-          <h1 class="reveal">Your health,<br><span class="gradient-text">all in one calm place.</span></h1>
-          <p class="lead reveal">Track activity, meals, water, sleep, mood and weight in one app that works offline. Snap a meal for its macros, ask Vita, your AI coach, anything about your day, and stay motivated with friends.</p>
-          <div class="hero-actions reveal">
+          <span class="chip"><span class="dot"><i class="ic ic-bolt"></i></span>Free health and fitness tracker for Android</span>
+          <h1>Your health,<br><span class="gradient-text">all in one calm place.</span></h1>
+          <p class="lead">Count calories and track workouts, water, sleep, mood and weight in one app that works offline. Snap a meal for its macros, ask Vita, your AI health coach, anything about your day, and stay motivated with friends.</p>
+          <div class="hero-actions">
             <a class="play-btn" href="https://play.google.com/store/apps/details?id=com.vitalup.app" rel="noopener" aria-label="Get VitalUp on Google Play">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#00D7FE" d="M3.6 2.3 13.4 12l-9.8 9.7c-.4-.2-.6-.6-.6-1.1V3.4c0-.5.2-.9.6-1.1z"/><path fill="#FFCE00" d="m16.8 8.6-3.4 3.4 3.4 3.4 3.8-2.2c.8-.5.8-1.7 0-2.2z"/><path fill="#00F076" d="M3.6 2.3c.3-.2.8-.2 1.2 0l12 6.3-3.4 3.4z"/><path fill="#F83A4F" d="m13.4 12 3.4 3.4-12 6.3c-.4.2-.9.2-1.2 0z"/></svg>
               <span><small>Get it on</small><b>Google Play</b></span>
             </a>
             <a class="btn btn-secondary" href="#features">See what it does <i class="ic ic-expand" aria-hidden="true"></i></a>
           </div>
-          <ul class="hero-trust reveal">
+          <ul class="hero-trust">
             <li><i class="ic ic-check" aria-hidden="true"></i>Free to use</li>
             <li><i class="ic ic-check" aria-hidden="true"></i>Works offline</li>
             <li><i class="ic ic-check" aria-hidden="true"></i>No ads, no data selling</li>
           </ul>
         </div>
 
-        <div class="hero-visual reveal" aria-label="VitalUp home screen in light and dark themes">
+        <div class="hero-visual" aria-label="VitalUp home screen in light and dark themes">
           <div class="glow" aria-hidden="true"></div>
-          <div class="phone back"><img src="assets/screens/home-light.webp" alt="VitalUp home screen in the light theme" width="600" height="1329" fetchpriority="high"><span class="punch"></span></div>
-          <div class="phone front"><img src="assets/screens/home-dark.webp" alt="VitalUp home screen in the dark theme with nutrition and activity cards" width="600" height="1329" fetchpriority="high"><span class="punch"></span></div>
+          <div class="phone back"><img src="/assets/screens/home-light.webp" alt="VitalUp home screen in the light theme" width="600" height="1329"><span class="punch"></span></div>
+          <div class="phone front"><img src="/assets/screens/home-dark.webp" alt="VitalUp home screen in the dark theme with nutrition and activity cards" width="600" height="1329" fetchpriority="high"><span class="punch"></span></div>
           <div class="float f1 t-water" aria-hidden="true">
             <span class="badge-icon"><i class="ic ic-water"></i></span>
             <span><small>Water</small><b>1.25 L <span>of 2.5 L</span></b></span>
@@ -177,8 +353,9 @@
     </section>
 
     <!-- Feature deep dives -->
-    <section class="section features-rows" style="padding-top:0">
+    <section class="section features-rows" style="padding-top:0" aria-labelledby="features-detail">
       <div class="container">
+        <h2 class="sr-only" id="features-detail">VitalUp features in detail</h2>
         <article class="feature">
           <div class="feature-copy reveal">
             <span class="eyebrow t-nutrition"><i class="ic ic-camera" aria-hidden="true"></i>AI food scanner</span>
@@ -192,8 +369,8 @@
           </div>
           <div class="feature-media reveal">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone pair-a"><img src="assets/screens/food-scan.webp" alt="Food scanner result for a meal of roti and chana masala with a nutrition score" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
-            <div class="phone pair-b"><img src="assets/screens/diet-plan.webp" alt="AI diet plan with a daily calorie target and meals" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone pair-a"><img src="/assets/screens/food-scan.webp" alt="Food scanner result for a meal of roti and chana masala with a nutrition score" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone pair-b"><img src="/assets/screens/diet-plan.webp" alt="AI diet plan with a daily calorie target and meals" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
           </div>
         </article>
 
@@ -210,7 +387,7 @@
           </div>
           <div class="feature-media reveal" style="--halo:linear-gradient(135deg, rgba(224,131,255,0.24), rgba(25,195,224,0.16))">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone"><img src="assets/screens/vita-chat.webp" alt="Vita chat giving a short health report with calories, sleep, water and stress" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone"><img src="/assets/screens/vita-chat.webp" alt="Vita chat giving a short health report with calories, sleep, water and stress" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
           </div>
         </article>
 
@@ -227,7 +404,7 @@
           </div>
           <div class="feature-media reveal" style="--halo:linear-gradient(135deg, rgba(255,112,67,0.22), rgba(25,195,224,0.14))">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone"><img src="assets/screens/gps-workout.webp" alt="GPS workout screen with a map, timer and activity picker" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone"><img src="/assets/screens/gps-workout.webp" alt="GPS workout screen with a map, timer and activity picker" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
           </div>
         </article>
 
@@ -244,8 +421,8 @@
           </div>
           <div class="feature-media reveal" style="--halo:linear-gradient(135deg, rgba(124,131,253,0.24), rgba(66,165,245,0.16))">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone pair-a"><img src="assets/screens/sleep.webp" alt="Sleep page with last night's 8 hours, a score of 95 and a 7-day trend" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
-            <div class="phone pair-b"><img src="assets/screens/water-trends.webp" alt="Water page with 1800 ml of 2500 ml today and a 7-day chart" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone pair-a"><img src="/assets/screens/sleep.webp" alt="Sleep page with last night's 8 hours, a score of 95 and a 7-day trend" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone pair-b"><img src="/assets/screens/water-trends.webp" alt="Water page with 1800 ml of 2500 ml today and a 7-day chart" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
           </div>
         </article>
 
@@ -262,11 +439,11 @@
           </div>
           <div class="feature-media reveal" style="--halo:linear-gradient(135deg, rgba(255,194,51,0.22), rgba(224,131,255,0.14))">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone"><img src="assets/screens/arena.webp" alt="Arena with level, streak, challenges and friends" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone"><img src="/assets/screens/arena.webp" alt="Arena with level, streak, challenges and friends" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
             <div class="badges-float" style="bottom:10%;left:2%" aria-hidden="true">
-              <img src="assets/badges/streak_7.webp" alt="" width="60" height="60" loading="lazy">
-              <img src="assets/badges/steps_10k.webp" alt="" width="60" height="60" loading="lazy">
-              <img src="assets/badges/water_days_30.webp" alt="" width="60" height="60" loading="lazy">
+              <img src="/assets/badges/streak_7.webp" alt="" width="60" height="60" loading="lazy">
+              <img src="/assets/badges/steps_10k.webp" alt="" width="60" height="60" loading="lazy">
+              <img src="/assets/badges/water_days_30.webp" alt="" width="60" height="60" loading="lazy">
             </div>
           </div>
         </article>
@@ -284,7 +461,7 @@
           </div>
           <div class="feature-media reveal" style="--halo:linear-gradient(135deg, rgba(38,117,237,0.20), rgba(25,195,224,0.18))">
             <div class="halo" aria-hidden="true"></div>
-            <div class="phone"><img src="assets/screens/widgets.webp" alt="Android home screen with VitalUp Today, shortcuts and mood widgets" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
+            <div class="phone"><img src="/assets/screens/widgets.webp" alt="Android home screen with VitalUp Today, shortcuts and mood widgets" width="600" height="1329" loading="lazy"><span class="punch"></span></div>
           </div>
         </article>
       </div>
@@ -301,18 +478,18 @@
       </div>
       <div class="gallery" data-carousel>
         <div class="gallery-track" tabindex="0" aria-label="App screenshots, scroll sideways">
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/home-light.webp" alt="Home screen, light theme" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Home</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/food-scan.webp" alt="Food scan result" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Food scanner</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/vita-chat.webp" alt="Vita chat" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Vita chat</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/vita-analysis.webp" alt="Vita health analysis" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Health analysis</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/diet-plan.webp" alt="AI diet plan" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Diet plan</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/gps-workout.webp" alt="GPS workout" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>GPS workouts</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/sleep.webp" alt="Sleep trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Sleep</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/mood.webp" alt="Mood and stress trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Mood and stress</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/water-trends.webp" alt="Water trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Water</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/arena.webp" alt="Arena" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Arena</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/widgets.webp" alt="Home screen widgets" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Widgets</figcaption></figure>
-          <figure class="gallery-item"><div class="phone"><img src="assets/screens/home-dark.webp" alt="Home screen, dark theme" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Dark theme</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/home-light.webp" alt="Home screen, light theme" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Home</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/food-scan.webp" alt="Food scan result" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Food scanner</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/vita-chat.webp" alt="Vita chat" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Vita chat</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/vita-analysis.webp" alt="Vita health analysis" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Health analysis</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/diet-plan.webp" alt="AI diet plan" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Diet plan</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/gps-workout.webp" alt="GPS workout" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>GPS workouts</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/sleep.webp" alt="Sleep trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Sleep</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/mood.webp" alt="Mood and stress trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Mood and stress</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/water-trends.webp" alt="Water trends" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Water</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/arena.webp" alt="Arena" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Arena</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/widgets.webp" alt="Home screen widgets" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Widgets</figcaption></figure>
+          <figure class="gallery-item"><div class="phone"><img src="/assets/screens/home-dark.webp" alt="Home screen, dark theme" width="600" height="1329" loading="lazy"><span class="punch"></span></div><figcaption>Dark theme</figcaption></figure>
         </div>
         <div class="gallery-nav">
           <button class="icon-btn" type="button" data-dir="-1" aria-label="Previous screenshots"><i class="ic ic-chevron-left" aria-hidden="true"></i></button>
@@ -330,7 +507,7 @@
               <span class="eyebrow"><i class="ic ic-shield" aria-hidden="true"></i>Private by design</span>
               <h2>Your health data stays <span class="gradient-text">yours.</span></h2>
             </div>
-            <a class="btn btn-secondary" href="privacy.html">Read the privacy policy <i class="ic ic-arrow" aria-hidden="true"></i></a>
+            <a class="btn btn-secondary" href="/privacy">Read the privacy policy <i class="ic ic-arrow" aria-hidden="true"></i></a>
           </div>
           <div class="privacy-grid">
             <div class="privacy-item"><span class="badge-icon"><i class="ic ic-phone"></i></span><h3>Offline first</h3><p>Everything you log is saved on your phone first. Backups sync when you're online.</p></div>
@@ -429,9 +606,9 @@
           <details class="card reveal"><summary>Which phones can use it?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>VitalUp is on Android 8.0 and newer, through Google Play. An iPhone version isn't available yet.</p></div></details>
           <details class="card reveal"><summary>Does it work without internet?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>Yes. Logging, trends, timers and GPS workouts all work offline, and you can download maps for the areas you run or ride. AI features and the Arena need a connection. Your logs back up when you're online again.</p></div></details>
           <details class="card reveal"><summary>Does it work with my watch?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>If your watch or fitness app saves to Health Connect, VitalUp can read your steps, sleep, workouts, weight and heart data from there. You can also pair a Bluetooth heart rate strap for workouts.</p></div></details>
-          <details class="card reveal"><summary>What does Vita do with my data?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>Vita only sees your data after you agree, and only to answer you. Your name and email are not sent. Health Connect readings stay out unless you switch them on. Chats are kept on your phone, not on our servers.</p><p>Read more in the <a href="privacy.html#ai-processing">privacy policy</a>.</p></div></details>
+          <details class="card reveal"><summary>What does Vita do with my data?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>Vita only sees your data after you agree, and only to answer you. Your name and email are not sent. Health Connect readings stay out unless you switch them on. Chats are kept on your phone, not on our servers.</p><p>Read more in the <a href="/privacy#ai-processing">privacy policy</a>.</p></div></details>
           <details class="card reveal"><summary>Is VitalUp a medical device?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>No. VitalUp is for general wellness. It doesn't diagnose or treat anything. Talk to a doctor before big changes to your diet or exercise.</p></div></details>
-          <details class="card reveal"><summary>How do I delete my account?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>In the app, open Profile, then Account details, then Delete account. You can also <a href="delete-account.html">ask us on the web</a>.</p></div></details>
+          <details class="card reveal"><summary>How do I delete my account?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>In the app, open Profile, then Account details, then Delete account. You can also <a href="/delete-account">ask us on the web</a>.</p></div></details>
           <details class="card reveal"><summary>How do I get help?<i class="ic ic-expand" aria-hidden="true"></i></summary><div class="answer"><p>Ask Vita or open Help and support in the app, or email <a href="mailto:support@vitalup.live">support@vitalup.live</a>.</p></div></details>
         </div>
       </div>
@@ -441,7 +618,7 @@
     <section class="section" style="padding-top:clamp(24px,4vw,48px)">
       <div class="container">
         <div class="cta reveal">
-          <img class="mark" src="assets/logo-mark.svg" alt="" width="72" height="72">
+          <img class="mark" src="/assets/logo-mark.svg" alt="" width="72" height="72">
           <h2>Start feeling better, <span class="gradient-text">one day at a time.</span></h2>
           <p class="lead">Free on Google Play for Android phones.</p>
           <a class="play-btn" href="https://play.google.com/store/apps/details?id=com.vitalup.app" rel="noopener" aria-label="Get VitalUp on Google Play">
@@ -457,31 +634,31 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-about">
-          <a class="brand" href="./"><img src="assets/logo-mark.svg" alt="" width="36" height="36">VitalUp</a>
+          <a class="brand" href="/"><img src="/assets/logo-mark.svg" alt="" width="36" height="36">VitalUp</a>
           <p>A calm, private health companion for activity, nutrition, sleep and wellbeing.</p>
         </div>
         <div>
-          <h4>Product</h4>
+          <h2>Product</h2>
           <ul>
-            <li><a href="./#features">Features</a></li>
-            <li><a href="./#pricing">Pricing</a></li>
-            <li><a href="./#faq">FAQ</a></li>
+            <li><a href="/#features">Features</a></li>
+            <li><a href="/#pricing">Pricing</a></li>
+            <li><a href="/#faq">FAQ</a></li>
             <li><a href="https://play.google.com/store/apps/details?id=com.vitalup.app" rel="noopener">Google Play</a></li>
           </ul>
         </div>
         <div>
-          <h4>Legal</h4>
+          <h2>Legal</h2>
           <ul>
-            <li><a href="privacy.html">Privacy policy</a></li>
-            <li><a href="terms.html">Terms of service</a></li>
-            <li><a href="delete-account.html">Delete your account</a></li>
+            <li><a href="/privacy">Privacy</a></li>
+            <li><a href="/terms">Terms</a></li>
+            <li><a href="/delete-account">Delete account</a></li>
           </ul>
         </div>
         <div>
-          <h4>Contact</h4>
+          <h2>Contact</h2>
           <ul>
-            <li><a href="mailto:support@vitalup.live">support@vitalup.live</a></li>
-            <li><a href="mailto:privacy@vitalup.live">privacy@vitalup.live</a></li>
+            <li><a href="mailto:support@vitalup.live"><span class="wide">support@vitalup.live</span><span class="narrow">Support</span></a></li>
+            <li><a href="mailto:privacy@vitalup.live"><span class="wide">privacy@vitalup.live</span><span class="narrow">Privacy team</span></a></li>
           </ul>
         </div>
       </div>
@@ -493,6 +670,6 @@
   </footer>
 
   <button class="icon-btn back-top" type="button" aria-label="Back to top"><i class="ic ic-up" aria-hidden="true"></i></button>
-  <script src="assets/site.js" defer></script>
+  <script src="/assets/site.js" defer></script>
 </body>
 </html>
