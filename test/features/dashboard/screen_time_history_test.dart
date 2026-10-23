@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
@@ -44,10 +46,8 @@ void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(
-    () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      _channel,
-      null,
-    ),
+    () =>
+        binding.defaultBinaryMessenger.setMockMethodCallHandler(_channel, null),
   );
 
   test('history goes back past the 10 days Android keeps', () async {
@@ -126,4 +126,36 @@ void main() {
     );
     expect(await service.history(), isEmpty);
   });
+
+  test(
+    'screen time is Android only: hidden and never asked for on iOS',
+    () async {
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      var asked = false;
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(_channel, (
+        call,
+      ) async {
+        asked = true;
+        return true;
+      });
+      addTearDown(
+        () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          _channel,
+          null,
+        ),
+      );
+
+      expect(TrackerMetric.screenTime.isAvailable, isTrue);
+      expect(await ScreenTimeService().hasPermission(), isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      asked = false;
+      expect(ScreenTimeService.isSupported, isFalse);
+      expect(TrackerMetric.screenTime.isAvailable, isFalse);
+      expect(TrackerMetric.water.isAvailable, isTrue);
+      expect(await ScreenTimeService().hasPermission(), isFalse);
+      expect(asked, isFalse);
+    },
+  );
 }

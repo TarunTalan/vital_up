@@ -129,14 +129,15 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final metric in TrackerMetric.values) ...[
-                _GoalRow(
-                  metric: metric,
-                  goal: goals[metric],
-                  onTap: () => _edit(metric),
-                ),
-                const SizedBox(height: AppDimens.cardGap),
-              ],
+              for (final metric in TrackerMetric.values)
+                if (metric.isAvailable) ...[
+                  _GoalRow(
+                    metric: metric,
+                    goal: goals[metric],
+                    onTap: () => _edit(metric),
+                  ),
+                  const SizedBox(height: AppDimens.cardGap),
+                ],
               const AppInfoNote(
                 message:
                     'Goals drive the status on your home cards, the '

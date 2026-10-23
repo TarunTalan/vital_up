@@ -15,6 +15,12 @@ class ScreenTimeService {
 
   ScreenTimeService([this._prefs]);
 
+  /// Screen time needs Android's Usage Access. iOS gives apps no usage
+  /// figures (its Screen Time API only draws them in a sandboxed view), so
+  /// every screen time card, goal and FAQ is hidden there.
+  static bool get isSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   static const _limitKey = 'daily_screen_time_limit_min';
   static const defaultLimitMinutes = 240;
 
@@ -89,6 +95,7 @@ class ScreenTimeService {
   };
 
   Future<bool> hasPermission() async {
+    if (!isSupported) return false;
     try {
       final bool hasPermission = await _channel.invokeMethod(
         'checkUsageStatsPermission',

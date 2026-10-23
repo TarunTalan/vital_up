@@ -12,6 +12,7 @@ import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_text_field.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import '../../data/datasources/faq_data.dart';
 import '../../domain/entities/faq_item.dart';
 import '../../domain/entities/support_ticket.dart';
@@ -26,6 +27,12 @@ void openSupportRoute(BuildContext context, String routeName) {
     debugPrint('Help link to unknown route "$routeName": $e');
     showErrorSnackBar(context, "That screen isn't available.");
   }
+}
+
+extension on FaqCategory {
+  /// Screen time FAQs only where the app tracks it (Android).
+  bool get isAvailable =>
+      this != FaqCategory.screenTime || ScreenTimeService.isSupported;
 }
 
 /// Articles in [category] that match [query], best first. Each word of the
@@ -130,7 +137,10 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   }
 
   List<FaqItem> get _filteredFaqs => searchFaqs(
-    kFaqDatabase,
+    [
+      for (final faq in kFaqDatabase)
+        if (faq.category.isAvailable) faq,
+    ],
     _searchController.text,
     category: _selectedCategory,
   );
@@ -355,17 +365,18 @@ class _CategoryChips extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final cat in FaqCategory.values) ...[
-            if (cat != FaqCategory.values.first)
-              const SizedBox(width: AppDimens.space8),
-            ChoiceChip(
-              avatar: Icon(cat.icon, size: AppDimens.iconXs),
-              label: Text(cat.label),
-              selected: cat == selected,
-              showCheckmark: false,
-              onSelected: (_) => onSelected(cat),
-            ),
-          ],
+          for (final cat in FaqCategory.values)
+            if (cat.isAvailable) ...[
+              if (cat != FaqCategory.values.first)
+                const SizedBox(width: AppDimens.space8),
+              ChoiceChip(
+                avatar: Icon(cat.icon, size: AppDimens.iconXs),
+                label: Text(cat.label),
+                selected: cat == selected,
+                showCheckmark: false,
+                onSelected: (_) => onSelected(cat),
+              ),
+            ],
         ],
       ),
     );

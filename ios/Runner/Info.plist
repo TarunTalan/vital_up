@@ -22,29 +22,44 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<!-- vitalup:// links (notifications, /open?route=) are routed by GoRouter. -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.vitalup.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vitalup</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-    	<string>VitalUp uses the camera to scan food.</string>
-    	<key>NSPhotoLibraryUsageDescription</key>
-    	<string>VitalUp uses your photo library so you can choose food images to scan.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>VitalUp uses your location to track walking, running, and cycling distance.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>VitalUp needs background location access to keep tracking workouts while the screen is locked.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>VitalUp needs background location access to keep tracking workouts while the screen is locked.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>VitalUp uses motion data to estimate steps during activity tracking.</string>
+	<!-- Purpose strings. Each one enables its permission_handler strategy
+	     (SPM reads these keys), so keep only what the app asks for. -->
 	<key>NSAppleMusicUsageDescription</key>
-	<string>VitalUp needs access to your media library to play local device music during workouts.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>audio</string>
-	</array>
+	<string>VitalUp plays music from your library during workouts.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>VitalUp connects to Bluetooth heart rate straps to show your heart rate during workouts.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>VitalUp uses the camera to scan food, barcodes and nutrition labels.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>VitalUp uses Face ID to unlock the app when app lock is on.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>VitalUp reads your steps, workouts, weight, sleep, heart rate, heart rate variability, blood oxygen and blood pressure from Apple Health to show your progress and give personal insights. VitalUp never writes to Apple Health.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>VitalUp uses your location to map your route and measure distance and pace during walks, runs and rides, and to download maps of your area for offline use.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>VitalUp uses motion data to count your steps during workouts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>VitalUp lets you choose a food photo from your library to scan.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -68,26 +83,23 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- location: a GPS workout keeps recording with the screen locked (While
+	     In Use + the blue indicator, never Always). audio: workout music and
+	     the voice coach. remote-notification: FCM data messages. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<!-- iPhone only and portrait, like main.dart's setPreferredOrientations. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>We need access to your sleep data to provide personalized insights.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>We need access to your sleep data to provide personalized insights.</string>
 </dict>
 </plist>

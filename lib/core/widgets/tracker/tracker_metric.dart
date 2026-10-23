@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
 /// Shared action icons from the assets, used wherever a card offers that
@@ -121,6 +122,10 @@ enum TrackerMetric {
 
   /// Screen time is read from the device, so it has nothing to log by hand.
   bool get isAutoTracked => this == TrackerMetric.screenTime;
+
+  /// Whether this device can track the metric (screen time is Android only).
+  bool get isAvailable =>
+      this != TrackerMetric.screenTime || ScreenTimeService.isSupported;
 
   /// How a day's value relates to the goal.
   GoalDirection get direction => switch (this) {

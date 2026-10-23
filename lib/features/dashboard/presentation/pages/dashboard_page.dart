@@ -752,8 +752,10 @@ class _HomeTabState extends State<_HomeTab> {
                           left: SleepCard(),
                           right: MoodCard(),
                         ),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const ScreenTimeSummaryRow(),
+                        if (TrackerMetric.screenTime.isAvailable) ...[
+                          const SizedBox(height: AppDimens.cardGap),
+                          const ScreenTimeSummaryRow(),
+                        ],
                       ],
                     ),
                   ),

@@ -1315,7 +1315,25 @@ Route names are GoRouter `name`s.
   in history reads, camera NV21 without copies, image `cacheWidth`, fewer
   blurs, Nunito instead of SF Pro (0.4 MB vs 28 MB), ML Kit from Play
   Services, `device_preview` only in debug; arm64 download ~29 MB est.).
-- Decide: 10 iOS gaps (no Crashlytics, push or widgets).
+- Decide: 10 iOS gaps (no Crashlytics, push or widgets). Project prep
+  done Oct 23 (never built yet: needs a Mac / macOS CI; plugins use SPM,
+  Flutter creates the Podfile for the rest): bundle id `com.vitalup.app`,
+  iOS 15.5 (ML Kit's minimum), iPhone only, portrait; `Runner.entitlements`
+  (HealthKit read, `aps-environment`); app `PrivacyInfo.xcprivacy`;
+  `Info.plist` purpose strings (each key also switches on its
+  permission_handler strategy under SPM, so add none the app doesn't
+  ask for), `vitalup://` scheme, While In Use location only,
+  `ITSAppUsesNonExemptEncryption` false. Still to do: Firebase iOS app +
+  `GoogleService-Info.plist` + APNs key, Google sign-in iOS client
+  (`GIDClientID` + reversed-id URL scheme, Supabase authorised client
+  ids), Sign in with Apple (guideline 4.8), App Store id in
+  `about_page.dart`, iOS release workflow (signing, TestFlight, Shorebird).
+  CI's `ios-build` job (`ci.yml`, macos-15, free: public repo) runs
+  `flutter build ios --release --no-codesign` on every push / PR. Screen time is Android
+  only (`ScreenTimeService.isSupported`, `TrackerMetric.isAvailable`:
+  Home row, My goals, FAQ hidden on iOS; `hasPermission` false without a
+  channel call); iOS later = Family Controls entitlement + a
+  DeviceActivityReport extension (figures never reach Dart).
 - Fixed Oct 20: widgets redraw just after midnight (`WidgetMidnight.kt`,
   inexact alarm re-armed on every widget update, plus TIME_SET /
   TIMEZONE_CHANGED); water / mood / sleep logged from widgets or
