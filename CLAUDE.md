@@ -1423,6 +1423,12 @@ scans `lib` for patterns the analyzer misses.
 - `test/helpers/pump_app.dart` (`pumpPage`, `kSmallPhone`,
   `kMaxTextScale`): page state tests (`*_states_test.dart`) check each
   state and no overflow at max text (`kMaxTextScale` = 1.5). `testWidgets` takes only `skip: true`.
+- README screenshots (`docs/screenshots/`, demo user Tarun Talan /
+  `tarun_talan`): `readme` cases in the Home, water detail, log sheets,
+  meal history, Vita, Arena, onboarding and Pro tests, skipped unless
+  `README_SHOTS=1` (command in README "Regenerating screenshots"; helper
+  `test/helpers/readme_shots.dart`, 412 x 892 dp at 2x). The old
+  `assets/screenshots/` set is no longer referenced by the README.
 - `test/flows/` run real services, Isar, Drift and the Supabase client
   against `support/fake_backend.dart` (HTTP fake with RLS-like rules);
   `support/test_device.dart` is one simulated phone. Isar loads the

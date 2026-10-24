@@ -53,6 +53,7 @@ Future<void> pumpPage(
   });
   await tester.pumpWidget(
     MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: theme ?? AppTheme.lightTheme,
       builder: (context, child) => ResponsiveTextScale(child: child!),
       home: page,

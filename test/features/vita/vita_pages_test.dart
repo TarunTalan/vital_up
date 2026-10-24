@@ -33,6 +33,7 @@ import 'package:vital_up/features/vita/presentation/pages/vita_home_page.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_stress_guide_page.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 /// Noon yesterday (calendar step, safe across a clock change).
 final _yesterday = () {
@@ -98,9 +99,9 @@ class _FakeVita implements VitaRepository {
         summary: '6h 10m a night on average, 1h 50m under your goal',
       ),
       HealthSignal(
-        kind: HealthSignalKind.metrics,
-        title: 'Health metrics',
-        summary: 'Resting heart rate 64 bpm, steady this week',
+        kind: HealthSignalKind.activity,
+        title: 'Activity',
+        summary: '8,120 steps a day on average, goal met on 5 of 7 days',
       ),
     ],
   );
@@ -205,6 +206,57 @@ class _FakePlans implements DietPlanRepository {
     MealPlan? basePlan,
   }) async => ApiSuccess(active!);
 }
+
+/// A full day for the README's diet plan shot.
+const _readmePlan = MealPlan(
+  meals: [
+    Meal(
+      name: 'Breakfast',
+      items: ['2 Besan Chilla', '1 Cup Curd', '1 Apple'],
+      calories: 480,
+      protein: 24,
+      carbs: 58,
+      fat: 14,
+      alternatives: [
+        MealOption(
+          items: ['1 Bowl Vegetable Upma', '1 Glass Milk'],
+          calories: 460,
+          protein: 18,
+          carbs: 62,
+          fat: 14,
+        ),
+      ],
+    ),
+    Meal(
+      name: 'Lunch',
+      items: ['2 Roti', '1 Bowl Palak Dal', '1 Cup Brown Rice', 'Salad'],
+      calories: 640,
+      protein: 28,
+      carbs: 92,
+      fat: 16,
+    ),
+    Meal(
+      name: 'Snack',
+      items: ['1 Cup Roasted Chana', 'Green Tea'],
+      calories: 210,
+      protein: 11,
+      carbs: 30,
+      fat: 4,
+    ),
+    Meal(
+      name: 'Dinner',
+      items: ['150 g Grilled Paneer', '1 Bowl Mixed Veg', '1 Roti'],
+      calories: 620,
+      protein: 38,
+      carbs: 40,
+      fat: 32,
+    ),
+  ],
+  totalCalories: 1950,
+  totalProtein: 101,
+  totalCarbs: 220,
+  totalFat: 66,
+);
 
 /// A free account that can buy Pro.
 class _FreePlan implements SubscriptionRepository {
@@ -466,6 +518,64 @@ void main() {
       await tester.pump();
     }
   }
+
+  group('readme', () {
+    final now = DateTime.now();
+    final at = DateTime(now.year, now.month, now.day - 1, 18, 40);
+    final chat = [
+      VitaMessage(
+        sender: VitaSender.user,
+        text: 'How am I doing this week?',
+        sentAt: at,
+      ),
+      VitaMessage(
+        sender: VitaSender.vita,
+        text:
+            'A solid week, Tarun. You hit your step goal on 5 of 7 days '
+            'and logged every meal. Sleep is the one to watch: 6h 40m a '
+            'night, about 1h 20m under your goal.',
+        bullets: const [
+          'Aim to be in bed by 10:45 pm tonight',
+          'Keep screens away for the last 30 minutes',
+          'A 10 minute walk after dinner helps you wind down',
+        ],
+        action: VitaAction.viewAnalysis,
+        sentAt: at,
+      ),
+      VitaMessage(
+        sender: VitaSender.user,
+        text: 'What should I eat for dinner to hit my protein?',
+        sentAt: at,
+      ),
+      VitaMessage(
+        sender: VitaSender.vita,
+        text:
+            "You're at 68 g of your 150 g protein goal. Grilled paneer "
+            'or chicken with dal and a bowl of curd would add about 55 g.',
+        sentAt: at,
+      ),
+    ];
+
+    final pages = <String, Widget Function()>{
+      'vita': () => Scaffold(
+        extendBody: true,
+        body: const VitaHomePage(),
+        bottomNavigationBar: readmeNavBar(2),
+      ),
+      'vita_chat': () => const VitaChatPage(),
+      'vita_analysis': () => const VitaHealthAnalysisPage(),
+      'vita_diet_plan': () => const VitaDietPlanPage(),
+    };
+    for (final MapEntry(key: name, value: page) in pages.entries) {
+      testWidgets(name, (tester) async {
+        final repo = await _register(history: chat);
+        repo.scroll = null;
+        sl<_FakePlans>().active = _readmePlan;
+        await pumpReadmePage(tester, page());
+        await captureReadmeShot(tester, name);
+      }, skip: !readmeShots);
+    }
+  });
 
   testWidgets('chat: messages left show with the Pro link', (tester) async {
     await openChatAfter(tester, 12);

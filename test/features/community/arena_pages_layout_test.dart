@@ -36,6 +36,7 @@ import 'package:vital_up/features/gamification/domain/repositories/gamification_
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 final _writeShots = Platform.environment['HOME_SHOTS'] == '1';
 
@@ -126,8 +127,9 @@ LeaderboardEntry _entry(int rank, String name, {bool isMe = false}) =>
 final _board = [
   _entry(1, 'asha_runs'),
   _entry(2, 'mike'),
-  _entry(3, 'longest_username_20c'),
-  _entry(4, 'tarun', isMe: true),
+  // README shots show a plain name where the layout check needs a long one.
+  _entry(3, readmeShots ? 'kavya_fit' : 'longest_username_20c'),
+  _entry(4, kDemoUsername, isMe: true),
   _entry(5, 'priya'),
   _entry(6, 'deepak'),
   _entry(7, 'nina'),
@@ -270,6 +272,23 @@ class _Repo implements CommunityRepository, GamificationRepository {
       threshold: 20000,
       progress: 12500,
     ),
+    for (final (code, name, description, day) in [
+      ('streak_3', 'Warming Up', 'Keep a 3 day streak', 2),
+      ('workouts_1', 'First Workout', 'Finish your first workout', 6),
+      ('water_days_7', 'Hydration Hero', 'Meet your water goal 7 days', 8),
+      ('steps_10k', '10K Day', 'Walk 10,000 steps in a day', 12),
+      ('diet_days_7', 'Mindful Eater', 'Stay on your diet plan 7 days', 15),
+    ])
+      GameBadge(
+        code: code,
+        name: name,
+        description: description,
+        iconKey: code,
+        bonusPoints: 50,
+        threshold: 1,
+        progress: 1,
+        earnedAt: DateTime(2026, 10, day),
+      ),
     const GameBadge(
       code: 'workouts_200',
       name: 'Two Hundred Club',
@@ -439,10 +458,32 @@ void main() {
       create: (_) => ChallengesCubit(_Challenges())..load(),
       child: const ChallengesPage(),
     ),
-    'friends': () => const FriendsPage(myUsername: 'tarun'),
+    'friends': () => const FriendsPage(myUsername: kDemoUsername),
     'badges': () => const BadgesPage(),
     'points': () => const PointsHistoryPage(),
   };
+
+  for (final (name, shot, tab) in [
+    ('hub', 'arena', 3),
+    ('leaderboard', 'leaderboard', null),
+    ('challenges', 'challenges', null),
+    ('badges', 'achievements', null),
+  ]) {
+    testWidgets('readme: $shot', (tester) async {
+      final page = pages[name]!();
+      await pumpReadmePage(
+        tester,
+        tab == null
+            ? page
+            : Scaffold(
+                extendBody: true,
+                body: page,
+                bottomNavigationBar: readmeNavBar(tab),
+              ),
+      );
+      await captureReadmeShot(tester, shot);
+    }, skip: !readmeShots);
+  }
 
   for (final MapEntry(key: name, value: build) in pages.entries) {
     for (final c in _cases) {

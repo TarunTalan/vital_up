@@ -16,6 +16,7 @@ import 'package:vital_up/features/subscription/presentation/pages/pro_page.dart'
 import 'package:vital_up/features/subscription/presentation/widgets/pro_paywall.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 const _yearly = ProPlan(
   id: r'$rc_annual',
@@ -350,6 +351,13 @@ void main() {
         expect(truncatedTexts(tester), isEmpty);
       });
     }
+
+    testWidgets('readme: pro', (tester) async {
+      await tester.runAsync(loadAllFonts);
+      await pump(tester, const ProPage(), size: kReadmePhone);
+      await settleReadmeAssets(tester);
+      await captureReadmeShot(tester, 'pro');
+    }, skip: !readmeShots);
 
     // Whole page on a tall screen, free and Pro, light and dark, normal and
     // largest text. `HOME_SHOTS=1` writes PNGs to build/pro_shots/.

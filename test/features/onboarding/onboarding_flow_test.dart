@@ -27,6 +27,7 @@ import 'package:vital_up/features/settings/domain/repositories/settings_reposito
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 import 'starting_goals_test.dart' show goalsWriter, FakeActivityGoals;
 
 class _FakeRepository implements OnboardingRepository {
@@ -287,6 +288,45 @@ void main() {
       expect(find.text('Your data, your call'), findsOneWidget);
       expect(find.text("You're offline. Try again."), findsOneWidget);
     });
+  });
+
+  group('readme', () {
+    const tarun = {
+      'onboarding_full_name': kDemoName,
+      'onboarding_dob': '14031998',
+      'onboarding_gender': 'male',
+      'onboarding_weight': '72',
+      'onboarding_weight_unit': 'kg',
+      'onboarding_height': '176',
+      'onboarding_height_unit': 'cm',
+      'onboarding_activity': 'Moderately active',
+    };
+
+    testWidgets('onboarding', (tester) async {
+      await tester.runAsync(loadAllFonts);
+      await _pump(
+        tester,
+        step: OnboardingStep.weight,
+        prefs: tarun,
+        size: kReadmePhone,
+      );
+      await settleReadmeAssets(tester);
+      await captureReadmeShot(tester, 'onboarding');
+    }, skip: !readmeShots);
+
+    testWidgets('onboarding_done', (tester) async {
+      await tester.runAsync(loadAllFonts);
+      await _pump(
+        tester,
+        step: OnboardingStep.privacy,
+        prefs: tarun,
+        size: kReadmePhone,
+      );
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+      await settleReadmeAssets(tester);
+      await captureReadmeShot(tester, 'onboarding_done');
+    }, skip: !readmeShots);
   });
 
   // The finish screen with the longest figures (lb, 4 L of water).
