@@ -78,14 +78,6 @@ void main() {
       importedWorkoutsThisWeek: 1,
       importedDistanceThisWeekKm: 5,
       importedActiveMinutesThisWeek: 30,
-      vitals: const VitalsSnapshot(
-        connected: true,
-        restingHeartRate: 58,
-        hrvMs: 45,
-        spo2Percent: 97,
-        systolic: 120,
-        diastolic: 80,
-      ),
     );
 
     test('with the opt-in, everything is sent', () {
@@ -143,8 +135,7 @@ void main() {
       // "20061995" used to be parsed as the year 2006.
       final age = HealthSnapshotBuilder.ageFromDob('20061995');
       final now = DateTime.now();
-      final hadBirthday =
-          now.month > 6 || (now.month == 6 && now.day >= 20);
+      final hadBirthday = now.month > 6 || (now.month == 6 && now.day >= 20);
       expect(age, now.year - 1995 - (hadBirthday ? 0 : 1));
     });
 

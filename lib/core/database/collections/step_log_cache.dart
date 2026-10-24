@@ -10,11 +10,11 @@ class StepLogCache {
   late String userId;
 
   late int steps;
-  
+
   @Index()
   late DateTime date;
-  
+
   bool isSynced = false;
-  
+
   DateTime? createdAt;
 }

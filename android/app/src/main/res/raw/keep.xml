@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource shrinking can't see drawables named only from Dart (launcher
+     shortcut icons, LauncherShortcuts): keep them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/shortcut_*" />

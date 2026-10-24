@@ -4,7 +4,11 @@ import 'package:vital_up/features/auth/domain/entities/user_entity.dart';
 
 abstract class AuthRepository {
   Future<Either<Failure, UserEntity>> signIn(String username, String password);
-  Future<Either<Failure, String>> signUp(String username, String email, String password); // Returns registration token
+  Future<Either<Failure, String>> signUp(
+    String username,
+    String email,
+    String password,
+  ); // Returns registration token
   Future<Either<Failure, void>> verifyRegistrationOTP({
     required String email,
     required String otp,
@@ -15,7 +19,9 @@ abstract class AuthRepository {
     required String token,
   });
   Future<Either<Failure, String>> checkUsernameAvailability(String username);
-  Future<Either<Failure, String>> requestForgotPassword(String email); // Returns verification token
+  Future<Either<Failure, String>> requestForgotPassword(
+    String email,
+  ); // Returns verification token
   Future<Either<Failure, String>> verifyForgotPassword({
     required String email,
     required String otp,

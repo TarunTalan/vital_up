@@ -1,17 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_bloc.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
+import 'package:vital_up/features/activity_tracking/domain/usecases/get_activity_history.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_card.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/activity_history_filter_bar.dart';
@@ -64,7 +69,14 @@ class _ActivityHistoryView extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: RefreshIndicator(
-            onRefresh: () async => _reload(context),
+            onRefresh: () async {
+              final done = Completer<void>();
+              context.read<ActivityHistoryBloc>().add(
+                LoadActivityHistory(done: done),
+              );
+              // The spinner stays until the list has reloaded.
+              await done.future.timeout(kLoadTimeout, onTimeout: () {});
+            },
             child: BlocConsumer<ActivityHistoryBloc, ActivityHistoryState>(
               listenWhen: (previous, current) =>
                   current is ActivityHistoryLoaded &&
@@ -135,7 +147,65 @@ class _HistoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<ActivityHistoryBloc>();
-    final entries = state.visibleEntries;
+    // The filter first, then each day's heading and its activities (or
+    // why there are none), as in every tracker's history.
+    final items = <Widget>[
+      ActivityHistoryFilterBar(
+        selectedGroup: state.groupFilter,
+        onGroupSelected: (group) => bloc.add(FilterByActivityGroup(group)),
+        onSearchChanged: (query) => bloc.add(SearchHistory(query)),
+      ),
+    ];
+    final days = groupLogsByDay(
+      state.visibleEntries,
+      (HistoryEntry e) => e.session.startTime,
+    );
+    if (days.isEmpty) {
+      items.add(
+        const TrackerEmptyState(
+          metric: TrackerMetric.activity,
+          title: 'No activities match',
+          message: 'Try a different filter or search term.',
+        ),
+      );
+    }
+    for (final (day, entries) in days) {
+      items.add(
+        Padding(
+          padding: const EdgeInsets.only(top: AppDimens.space12),
+          child: LogDayHeader(
+            formatLogDay(day),
+            summary: entries.length == 1
+                ? '1 activity'
+                : '${entries.length} activities',
+          ),
+        ),
+      );
+      for (final entry in entries) {
+        items.add(
+          ActivityHistoryCard(
+            entry: entry,
+            onTap: () async {
+              final result = await showSessionDetailSheet(
+                context,
+                entry: entry,
+              );
+              if (result == null || !context.mounted) return;
+              final (tag, note) = result;
+              bloc.add(
+                UpdateSessionAnnotation(
+                  sessionId: entry.session.id,
+                  tag: tag,
+                  note: note,
+                ),
+              );
+            },
+            onDelete: () =>
+                bloc.add(DeleteSessionFromHistory(entry.session.id)),
+          ),
+        );
+      }
+    }
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -143,42 +213,9 @@ class _HistoryList extends StatelessWidget {
         horizontal: context.gutter,
         vertical: AppDimens.sectionGap,
       ),
-      // The filter first, then the entries (or why there are none).
-      itemCount: 1 + (entries.isEmpty ? 1 : entries.length),
+      itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppDimens.cardGap),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return ActivityHistoryFilterBar(
-            selectedGroup: state.groupFilter,
-            onGroupSelected: (group) => bloc.add(FilterByActivityGroup(group)),
-            onSearchChanged: (query) => bloc.add(SearchHistory(query)),
-          );
-        }
-        if (entries.isEmpty) {
-          return const TrackerEmptyState(
-            metric: TrackerMetric.activity,
-            title: 'No activities match',
-            message: 'Try a different filter or search term.',
-          );
-        }
-        final entry = entries[index - 1];
-        return ActivityHistoryCard(
-          entry: entry,
-          onTap: () async {
-            final result = await showSessionDetailSheet(context, entry: entry);
-            if (result == null || !context.mounted) return;
-            final (tag, note) = result;
-            bloc.add(
-              UpdateSessionAnnotation(
-                sessionId: entry.session.id,
-                tag: tag,
-                note: note,
-              ),
-            );
-          },
-          onDelete: () => bloc.add(DeleteSessionFromHistory(entry.session.id)),
-        );
-      },
+      itemBuilder: (context, index) => items[index],
     );
   }
 }

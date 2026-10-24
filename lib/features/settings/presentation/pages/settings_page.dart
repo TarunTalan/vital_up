@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/preferences/distance_unit_notifier.dart';
 import 'package:vital_up/core/services/biometric_auth_service.dart';
@@ -20,6 +21,7 @@ import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// How the app behaves: appearance, units, notifications, connected apps,
 /// privacy and about. Account and health items live under Profile.
@@ -32,7 +34,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _packageInfo = PackageInfo.fromPlatform();
-  bool _openingLeaderboards = false;
 
   static const _themes = ['system', 'light', 'dark'];
 
@@ -80,30 +81,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// Leaderboard visibility and city, the same sheet as in Arena.
   Future<void> _openLeaderboards() async {
-    if (_openingLeaderboards) return;
-    setState(() => _openingLeaderboards = true);
-    final cubit = sl<CommunityCubit>();
-    var failed = false;
-    try {
-      await cubit.load();
-      failed = cubit.state.failed;
-    } catch (e) {
-      debugPrint('Leaderboard settings failed to load: $e');
-      failed = true;
-    }
-    if (!mounted) {
-      await cubit.close();
-      return;
-    }
-    setState(() => _openingLeaderboards = false);
-    if (failed) {
-      showErrorSnackBar(
-        context,
-        "Couldn't load leaderboard settings. Try again.",
-      );
-    } else {
-      await CommunitySettingsSheet.show(context, cubit: cubit);
-    }
+    final cubit = sl<CommunityCubit>()..loadSettings();
+    await CommunitySettingsSheet.show(context, cubit: cubit);
     await cubit.close();
   }
 
@@ -112,15 +91,6 @@ class _SettingsPageState extends State<SettingsPage> {
     'dark' => 'Dark',
     _ => 'System',
   };
-
-  Widget _chevronSpinner() => SizedBox.square(
-    dimension: AppDimens.iconMd,
-    child: CircularProgressIndicator(
-      strokeWidth: AppDimens.borderThick,
-      color: context.colors.primary,
-      strokeCap: StrokeCap.round,
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +182,20 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: 'Meals, water, sleep, activity',
                     onTap: () => context.pushNamed('reminders'),
                   ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: sl<FeatureTipsService>().enabled,
+                    builder: (context, on, _) => AppListTile(
+                      icon: Icons.lightbulb_outline_rounded,
+                      title: 'Feature tips',
+                      subtitle:
+                          'Now and then, something you may not have '
+                          'tried',
+                      trailing: Switch(
+                        value: on,
+                        onChanged: sl<FeatureTipsService>().setEnabled,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.sectionGap),
@@ -223,7 +207,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.sync_rounded,
                     iconColor: v.success,
                     title: 'Health sync',
-                    subtitle: 'Health Connect / Apple Health',
+                    subtitle: healthStoreName,
                     trailing: Switch(
                       value: s.healthSyncEnabled,
                       onChanged: (on) => _setHealthSync(s, on),
@@ -256,7 +240,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     iconColor: AppColors.scoreBonus,
                     title: 'Leaderboards',
                     subtitle: 'Who sees you, and your city',
-                    trailing: _openingLeaderboards ? _chevronSpinner() : null,
                     onTap: _openLeaderboards,
                   ),
                   AppListTile(

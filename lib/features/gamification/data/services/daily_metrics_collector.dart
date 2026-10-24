@@ -19,6 +19,7 @@ import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan
 import 'package:vital_up/features/food_scanner/domain/entities/meal_log_entry.dart';
 import 'package:vital_up/features/food_scanner/domain/usecases/get_meal_log_history.dart';
 import 'package:vital_up/features/gamification/domain/entities/daily_metrics.dart';
+import 'package:vital_up/features/gamification/domain/entities/point_goal.dart';
 import 'package:vital_up/features/vita/data/datasources/vita_local_datasource.dart';
 import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
 
@@ -141,7 +142,7 @@ class DailyMetricsCollector {
     required List<MealLogEntry> meals,
     required MealPlan? plan,
     required List<WaterLogCache> water,
-    required int waterGoal,
+    required int? waterGoal,
     required List<SleepSessionInfo> sleep,
     required StressCheckIn? checkIn,
     required Future<int?>? profileGoal,
@@ -194,7 +195,8 @@ class DailyMetricsCollector {
       weeklyGoalsAchieved: weekly,
       foodLogs: meals.length,
       waterLogs: water.length,
-      waterGoalMet: waterMl > 0 && waterMl >= waterGoal,
+      // No goal, no goal days: no Arena water points or water badge days.
+      waterGoalMet: waterGoal != null && waterMl > 0 && waterMl >= waterGoal,
       plannedMeals: planned.length,
       plannedMealsLogged: planned.where((p) => p.logged).length,
       calorieGoalMet:
@@ -217,6 +219,22 @@ class DailyMetricsCollector {
     if (goal == null || goal <= 0) return false;
     final eaten = meals.fold<double>(0, (sum, m) => sum + m.totalCalories);
     return (eaten - goal).abs() <= goal * calorieTolerance;
+  }
+
+  /// Goals the point rules score against that the user hasn't set, read
+  /// the same way [collectDays] reads them, so Arena can say which points
+  /// are out of reach. The calorie goal is the diet plan's, else the
+  /// profile's.
+  Future<Set<PointGoal>> missingPointGoals() async {
+    final plan = await _activePlan().orFallback(null);
+    final planCalories = plan?.totalCalories ?? 0;
+    final hasCalories =
+        planCalories > 0 || (await _profileCalorieGoal() ?? 0) > 0;
+    return {
+      if (_water.getDailyGoal() == null) PointGoal.water,
+      if (!hasCalories) PointGoal.calories,
+      if (_goals.getGoals().isEmpty) PointGoal.activity,
+    };
   }
 
   Future<int?> _profileCalorieGoal() async {

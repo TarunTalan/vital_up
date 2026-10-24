@@ -45,6 +45,7 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
     this._connectivity,
     this._writes, {
     SyncRemote? remote,
+    this.beforeFirstSync,
   }) : _uploader = SyncUploader(
          remote ?? SupabaseSyncRemote(_client),
          batchSize: _uploadBatch,
@@ -87,12 +88,29 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
 
   String? get _userId => _client.auth.currentUser?.id;
 
+  /// Runs on sign-in before anything is uploaded or pulled: wipes another
+  /// account's data left on the device (see `AccountService.claimDevice`),
+  /// so it is never uploaded to this account.
+  final Future<void> Function(String userId)? beforeFirstSync;
+
   final _pulled = StreamController<String>.broadcast();
 
   /// Table names (`water_logs`, `user_backups`...) whose rows from the
   /// server were just written to the device, so open screens can re-read
   /// them. Not [HabitEvents]: pulled rows can be from any day.
   Stream<String> get pulled => _pulled.stream;
+
+  Future<void> _claimThenSync(String userId) async {
+    final claim = beforeFirstSync;
+    if (claim != null) {
+      try {
+        await claim(userId);
+      } catch (e) {
+        debugPrint('Checking the device owner failed: $e');
+      }
+    }
+    await sync(force: true);
+  }
 
   /// Starts syncing on sign-in, app resume and reconnect. Call once at
   /// startup.
@@ -113,11 +131,12 @@ class SyncService with WidgetsBindingObserver implements SyncHooks {
             _lastPull = null;
             return;
           }
-          if (auth.session != null &&
+          final session = auth.session;
+          if (session != null &&
               (auth.event == AuthChangeEvent.initialSession ||
                   auth.event == AuthChangeEvent.signedIn)) {
             _consecutiveFailures = 0;
-            sync(force: true);
+            _claimThenSync(session.user.id);
           }
         });
     _onlineSub = _connectivity.onlineChanges.listen((online) {

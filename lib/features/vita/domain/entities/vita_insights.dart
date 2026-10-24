@@ -60,9 +60,9 @@ class StressTrigger extends Equatable {
 }
 
 enum StressLevel {
-  low('Low Stress'),
-  moderate('Moderate Stress'),
-  high('High Stress');
+  low('Low stress'),
+  moderate('Moderate stress'),
+  high('High stress');
 
   final String label;
   const StressLevel(this.label);
@@ -70,15 +70,13 @@ enum StressLevel {
   static StressLevel fromScore(int score) => score < 35
       ? StressLevel.low
       : score < 65
-          ? StressLevel.moderate
-          : StressLevel.high;
+      ? StressLevel.moderate
+      : StressLevel.high;
 }
 
 /// What today's stress score is based on, most to least reliable.
 enum StressSource {
-  checkInAndWearable('From your check-in and watch data'),
   checkIn("From today's check-in"),
-  wearable('From your watch heart data'),
   estimated('Estimated from your sleep, activity, meals and screen time');
 
   final String description;
@@ -129,17 +127,19 @@ class StressCheckIn extends Equatable {
   String get label => labels[(level - 1).clamp(0, 4)];
 
   Map<String, dynamic> toJson() => {
-        'd': date.toIso8601String(),
-        'l': level,
-        if (tags.isNotEmpty) 't': [for (final t in tags) t.name],
-      };
+    'd': date.toIso8601String(),
+    'l': level,
+    if (tags.isNotEmpty) 't': [for (final t in tags) t.name],
+  };
 
   /// Older check-ins have no `t` (tags) key.
   ///
   /// Throws [FormatException] when the stored entry has no valid date or
   /// level; the reader skips such entries instead of dropping all of them.
   factory StressCheckIn.fromJson(Map<String, dynamic> json) {
-    final date = json['d'] is String ? DateTime.tryParse(json['d'] as String) : null;
+    final date = json['d'] is String
+        ? DateTime.tryParse(json['d'] as String)
+        : null;
     final level = json['l'] is num ? (json['l'] as num).toInt() : null;
     if (date == null || level == null || level < 1 || level > 5) {
       throw const FormatException('Invalid stress check-in');
@@ -148,10 +148,10 @@ class StressCheckIn extends Equatable {
   }
 
   StressCheckIn._parsed(this.date, this.level, Object? tags)
-      : tags = [
-          for (final name in (tags is List ? tags : const []).whereType<String>())
-            ?StressTag.fromName(name),
-        ];
+    : tags = [
+        for (final name in (tags is List ? tags : const []).whereType<String>())
+          ?StressTag.fromName(name),
+      ];
 
   @override
   List<Object?> get props => [date, level, tags];
@@ -161,8 +161,7 @@ class StressCheckIn extends Equatable {
 /// isn't logged yet, so the streak doesn't look broken in the morning.
 int stressStreak(Iterable<StressCheckIn> checkIns, {DateTime? now}) {
   final days = {
-    for (final c in checkIns)
-      DateTime(c.date.year, c.date.month, c.date.day),
+    for (final c in checkIns) DateTime(c.date.year, c.date.month, c.date.day),
   };
   final today = now ?? DateTime.now();
   var day = DateTime(today.year, today.month, today.day);
@@ -202,9 +201,6 @@ class StressReport extends Equatable {
   /// AI technique tip; null offline / before first fetch.
   final String? tip;
 
-  /// Whether wearable heart data could be connected for better accuracy.
-  final bool canConnectWearable;
-
   const StressReport({
     required this.score,
     required this.level,
@@ -213,24 +209,28 @@ class StressReport extends Equatable {
     required this.triggers,
     this.todayCheckIn,
     this.tip,
-    this.canConnectWearable = false,
   });
 
-  StressReport copyWith({String? tip, bool? canConnectWearable}) =>
-      StressReport(
-        score: score,
-        level: level,
-        source: source,
-        trend: trend,
-        triggers: triggers,
-        todayCheckIn: todayCheckIn,
-        tip: tip ?? this.tip,
-        canConnectWearable: canConnectWearable ?? this.canConnectWearable,
-      );
+  StressReport copyWith({String? tip}) => StressReport(
+    score: score,
+    level: level,
+    source: source,
+    trend: trend,
+    triggers: triggers,
+    todayCheckIn: todayCheckIn,
+    tip: tip ?? this.tip,
+  );
 
   @override
-  List<Object?> get props =>
-      [score, level, source, trend, triggers, todayCheckIn, tip, canConnectWearable];
+  List<Object?> get props => [
+    score,
+    level,
+    source,
+    trend,
+    triggers,
+    todayCheckIn,
+    tip,
+  ];
 }
 
 /// AI text refreshed once a day across Vita screens.
@@ -248,11 +248,11 @@ class VitaDailyInsights extends Equatable {
   });
 
   Map<String, dynamic> toJson() => {
-        'date': date.toIso8601String(),
-        'headline': headline,
-        'stressTip': stressTip,
-        'dietNote': dietNote,
-      };
+    'date': date.toIso8601String(),
+    'headline': headline,
+    'stressTip': stressTip,
+    'dietNote': dietNote,
+  };
 
   factory VitaDailyInsights.fromJson(Map<String, dynamic> json) =>
       VitaDailyInsights(

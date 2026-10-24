@@ -11,8 +11,16 @@ class ActivityGoalsLocalDataSource {
 
   /// Shown until the user sets their own goals.
   static const defaults = [
-    ActivityGoal(metric: GoalMetric.steps, period: GoalPeriod.daily, target: 8000),
-    ActivityGoal(metric: GoalMetric.workouts, period: GoalPeriod.weekly, target: 3),
+    ActivityGoal(
+      metric: GoalMetric.steps,
+      period: GoalPeriod.daily,
+      target: 8000,
+    ),
+    ActivityGoal(
+      metric: GoalMetric.workouts,
+      period: GoalPeriod.weekly,
+      target: 3,
+    ),
   ];
 
   ActivityGoalsLocalDataSource(this._prefs);
@@ -23,7 +31,8 @@ class ActivityGoalsLocalDataSource {
     if (raw == null) return [...defaults];
     try {
       return [
-        for (final item in (jsonDecode(raw) as List).whereType<Map<String, dynamic>>())
+        for (final item
+            in (jsonDecode(raw) as List).whereType<Map<String, dynamic>>())
           ?ActivityGoal.fromJson(item),
       ];
     } catch (_) {
@@ -31,8 +40,9 @@ class ActivityGoalsLocalDataSource {
     }
   }
 
-  Future<void> write(List<ActivityGoal> goals) => _prefs.setString(
-        _key,
-        jsonEncode([for (final g in goals) g.toJson()]),
-      );
+  /// False until goals are first saved ([read] shows [defaults] then).
+  bool get hasSaved => _prefs.containsKey(_key);
+
+  Future<void> write(List<ActivityGoal> goals) =>
+      _prefs.setString(_key, jsonEncode([for (final g in goals) g.toJson()]));
 }

@@ -17,13 +17,15 @@ abstract final class ReminderRules {
   /// Interval choices offered by the editor.
   static const intervals = [30, 60, 90, 120, 180, 240];
 
-  static String cleanTitle(String raw) => sanitizeText(raw, maxLength: titleMax);
+  static String cleanTitle(String raw) =>
+      sanitizeText(raw, maxLength: titleMax);
 
   static String cleanBody(String raw) =>
       sanitizeText(raw, maxLength: bodyMax, multiline: true);
 
   /// True for `DateTime.monday`..`DateTime.sunday`.
-  static bool isWeekday(int day) => day >= DateTime.monday && day <= DateTime.sunday;
+  static bool isWeekday(int day) =>
+      day >= DateTime.monday && day <= DateTime.sunday;
 
   /// Inline error for an edited reminder, or null when it can be saved.
   static String? validate({

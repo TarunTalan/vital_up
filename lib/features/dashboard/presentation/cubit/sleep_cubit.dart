@@ -20,9 +20,7 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
   SleepCubit(this._service) : super(SleepInitial()) {
     WidgetsBinding.instance.addObserver(this);
     // Saves and bedtimes from anywhere (sheets, notification actions).
-    _changes = _service.changes.listen(
-      (_) => loadSleepData(requestPermission: false, silent: true),
-    );
+    _changes = _service.changes.listen((_) => loadSleepData(silent: true));
   }
 
   @override
@@ -41,8 +39,8 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _staleOnResume) {
-      // Never prompt here: closing a permission screen resumes the app.
-      loadSleepData(requestPermission: false, silent: true);
+      // Closing a permission screen resumes the app: re-read quietly.
+      loadSleepData(silent: true);
     }
   }
 
@@ -57,19 +55,15 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
 
   /// Last night from Health Connect or a saved entry, else a phone estimate
   /// to confirm; while a "Going to bed" is open, the in-bed state.
-  /// [silent] skips the loading state (background refreshes).
-  Future<void> loadSleepData({
-    bool requestPermission = true,
-    bool silent = false,
-  }) async {
+  /// [silent] skips the loading state (background refreshes). Never asks
+  /// for health access: only [connectHealth] does, from a tap.
+  Future<void> loadSleepData({bool silent = false}) async {
     if (!silent) emit(SleepLoading());
     try {
       // Estimates left unreviewed are saved first, so the card and trends
       // show them as logged nights.
       await _service.saveUnreviewedEstimates();
-      final session = await _service.getSleepDataForLastNight(
-        requestPermission: requestPermission,
-      );
+      final session = await _service.getSleepDataForLastNight();
       final bed = await _service.pendingBedtime();
       if (bed != null && (session == null || bed.isAfter(session.wakeTime))) {
         // Screen data beats the tap once they're up: it knows when they
@@ -113,6 +107,7 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
         SleepNeedsManualEntry(
           canDetect:
               !Platform.isAndroid || await _service.canEstimateFromPhone(),
+          canConnect: await _service.canAskForHealthAccess(),
         ),
       );
     } catch (e) {
@@ -173,6 +168,19 @@ class SleepCubit extends Cubit<SleepState> with WidgetsBindingObserver {
       debugPrint('$what failed: $e');
       return false;
     }
+  }
+
+  /// "Connect Health Connect" tapped: asks for sleep access, then
+  /// re-reads last night. Returns whether access was given.
+  Future<bool> connectHealth() async {
+    var granted = false;
+    try {
+      granted = await _service.hasPermission();
+    } catch (e) {
+      debugPrint('Sleep access request failed: $e');
+    }
+    await loadSleepData(silent: true);
+    return granted;
   }
 
   Future<void> installHealthConnect() async {

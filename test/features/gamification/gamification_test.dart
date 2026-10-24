@@ -18,6 +18,7 @@ import 'package:vital_up/features/gamification/domain/entities/score_category.da
 import 'package:vital_up/features/gamification/domain/repositories/gamification_repository.dart';
 import 'package:vital_up/features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/reward_celebration_dialog.dart';
+import 'package:vital_up/features/gamification/domain/entities/point_goal.dart';
 
 const _levels = [
   GameLevel(level: 1, minPoints: 0, title: 'Starter'),
@@ -40,6 +41,9 @@ class _FakeCollector implements DailyMetricsCollector {
     List<DateTime> days, {
     DateTime? now,
   }) async => [for (final d in days) await collect(userId, d, now: now)];
+
+  @override
+  Future<Set<PointGoal>> missingPointGoals() async => const {};
 }
 
 class _FakeRemote implements GamificationRemoteDataSource {

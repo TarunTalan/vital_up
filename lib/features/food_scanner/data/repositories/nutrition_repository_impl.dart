@@ -82,7 +82,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
     Duration timeout = const Duration(seconds: 25),
   }) async {
     if (!connectivity.hasNetwork) {
-      final cached = await cacheStore.read<Map<String, dynamic>>(key, decode: _asMap);
+      final cached = await cacheStore.read<Map<String, dynamic>>(
+        key,
+        decode: _asMap,
+      );
       if (cached != null) return cached.value;
       throw const SocketException('No network');
     }
@@ -92,8 +95,11 @@ class NutritionRepositoryImpl implements NutritionRepository {
         maxAge: _lookupMaxAge,
         decode: _asMap,
         remote: () async {
-          if (supabaseClient.auth.currentSession?.accessToken == null) throw const _NoSession();
-          final response = await supabaseClient.functions.invoke('scan-food', body: body).timeout(timeout);
+          if (supabaseClient.auth.currentSession?.accessToken == null)
+            throw const _NoSession();
+          final response = await supabaseClient.functions
+              .invoke('scan-food', body: body)
+              .timeout(timeout);
           if (response.status != 200) throw _BadStatus(response.status);
           final data = _decodeMap(response.data);
           if (!worthCaching(data)) throw _Uncached(data);
@@ -105,7 +111,8 @@ class NutritionRepositoryImpl implements NutritionRepository {
     }
   }
 
-  static Map<String, dynamic> _asMap(Object? json) => Map<String, dynamic>.from(json as Map);
+  static Map<String, dynamic> _asMap(Object? json) =>
+      Map<String, dynamic>.from(json as Map);
 
   @override
   Future<Either<Failure, NutritionInfo>> getNutrition(FoodItem item) async {
@@ -126,7 +133,12 @@ class NutritionRepositoryImpl implements NutritionRepository {
           'serving_description': item.servingDescription,
         },
         // All zeros means "not found, estimate offline"; worth asking again later.
-        worthCaching: (data) => const ['calories', 'protein_g', 'carbs_g', 'fat_g'].any((k) => saneAmount(data[k]) != 0),
+        worthCaching: (data) => const [
+          'calories',
+          'protein_g',
+          'carbs_g',
+          'fat_g',
+        ].any((k) => saneAmount(data[k]) != 0),
       );
       return Right(parseNutritionResponse(data, item));
     } on _NoSession {
@@ -139,7 +151,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       if (isOfflineError(e)) {
         final local = await _offlineNutrition(item);
         if (local != null) {
-          logger.i('getNutrition offline: using seeded offline food for "${item.name}"');
+          logger.i(
+            'getNutrition offline: using seeded offline food for "${item.name}"',
+          );
           return Right(local);
         }
         return const Left(NetworkFailure(_offlineMessage));
@@ -153,11 +167,15 @@ class NutritionRepositoryImpl implements NutritionRepository {
   /// scaled from the food's serving to [item]'s quantity where the units
   /// line up. Null when there is no match.
   Future<NutritionInfo?> _offlineNutrition(FoodItem item) async {
-    final name = item.id.startsWith(_offlineIdPrefix) ? item.id.substring(_offlineIdPrefix.length) : item.name;
+    final name = item.id.startsWith(_offlineIdPrefix)
+        ? item.id.substring(_offlineIdPrefix.length)
+        : item.name;
     final wanted = normalizeFoodQuery(name);
     if (wanted.isEmpty) return null;
     final matches = await searchOfflineFoods(wanted);
-    final food = matches.where((f) => normalizeFoodQuery(f.name) == wanted).firstOrNull;
+    final food = matches
+        .where((f) => normalizeFoodQuery(f.name) == wanted)
+        .firstOrNull;
     if (food == null) return null;
 
     final base = NutritionInfo(
@@ -171,7 +189,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       per: item,
     );
     final factor = servingScale(food.servingSize, item);
-    return sanitizeNutrition(factor == 1.0 ? base : base.scaledBy(factor).copyWith(per: item));
+    return sanitizeNutrition(
+      factor == 1.0 ? base : base.scaledBy(factor).copyWith(per: item),
+    );
   }
 
   /// How many of [serving] (e.g. "1 bowl (150g)", "2 pieces (60g)") make up
@@ -182,11 +202,15 @@ class NutritionRepositoryImpl implements NutritionRepository {
     if (item.quantity <= 0) return 1.0;
     final unit = item.unit.toLowerCase();
     if (unit == 'g' || unit == 'ml') {
-      final grams = RegExp(r'(\d+(?:\.\d+)?)\s*(?:g|ml)\b').firstMatch(serving.toLowerCase());
+      final grams = RegExp(
+        r'(\d+(?:\.\d+)?)\s*(?:g|ml)\b',
+      ).firstMatch(serving.toLowerCase());
       final amount = double.tryParse(grams?.group(1) ?? '');
       return amount == null || amount <= 0 ? 1.0 : item.quantity / amount;
     }
-    final count = double.tryParse(RegExp(r'^\s*(\d+(?:\.\d+)?)').firstMatch(serving)?.group(1) ?? '');
+    final count = double.tryParse(
+      RegExp(r'^\s*(\d+(?:\.\d+)?)').firstMatch(serving)?.group(1) ?? '',
+    );
     return count == null || count <= 0 ? item.quantity : item.quantity / count;
   }
 
@@ -197,7 +221,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       final cleanBarcode = normalizeProductBarcode(barcode);
       if (cleanBarcode == null) {
         logger.w('lookupBarcode: "$barcode" is not a product barcode');
-        return const Left(ValidationFailure("That isn't a product barcode. Try another."));
+        return const Left(
+          ValidationFailure("That isn't a product barcode. Try another."),
+        );
       }
 
       // 1. Try local Isar cache first (Zero network cost)
@@ -207,7 +233,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
             .barcodeEqualTo(cleanBarcode)
             .findFirst();
         if (cached != null) {
-          logger.i('Local cache hit for barcode: "$cleanBarcode" -> "${cached.productName}"');
+          logger.i(
+            'Local cache hit for barcode: "$cleanBarcode" -> "${cached.productName}"',
+          );
           final foodItem = FoodItem(
             id: cleanBarcode,
             name: saneFoodName(cached.productName, fallback: 'Product'),
@@ -242,7 +270,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       NutritionInfo? offNutrition;
 
       try {
-        logger.i('Secondary lookup: Querying Open Food Facts for barcode: "$cleanBarcode"');
+        logger.i(
+          'Secondary lookup: Querying Open Food Facts for barcode: "$cleanBarcode"',
+        );
         final response = await dio.get(
           'https://in.openfoodfacts.org/api/v0/product/$cleanBarcode.json',
           options: Options(
@@ -254,7 +284,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
         final data = response.data;
         if (response.statusCode == 200 && data is Map) {
           final rawProduct = data['product'];
-          final product = rawProduct is Map ? Map<String, dynamic>.from(rawProduct) : null;
+          final product = rawProduct is Map
+              ? Map<String, dynamic>.from(rawProduct)
+              : null;
           final status = data['status'];
           final isFound = status == 1 || status == '1';
 
@@ -264,20 +296,31 @@ class NutritionRepositoryImpl implements NutritionRepository {
               fallback: 'Unknown Product',
             );
             final rawNutriments = product['nutriments'];
-            final nutriments = rawNutriments is Map ? Map<String, dynamic>.from(rawNutriments) : <String, dynamic>{};
+            final nutriments = rawNutriments is Map
+                ? Map<String, dynamic>.from(rawNutriments)
+                : <String, dynamic>{};
 
             // Read every nutrient on one basis: per serving when the label
             // gives energy per serving, otherwise per 100 g. Mixing the two
             // (calories per serving, protein per 100 g) skews the entry.
-            final perServing = saneAmount(nutriments['energy-kcal_serving']) > 0 ||
+            final perServing =
+                saneAmount(nutriments['energy-kcal_serving']) > 0 ||
                 saneAmount(nutriments['energy_serving']) > 0;
             final servingSize = perServing
                 ? saneFoodName(product['serving_size'], fallback: '1 serving')
                 : '100g';
 
-            final countriesTags = product['countries_tags'] is List ? product['countries_tags'] as List : null;
-            final isIndian = countriesTags?.any((t) => t.toString().toLowerCase().contains('india')) ?? false;
-            logger.d('Open Food Facts hit countries: $countriesTags (isIndian: $isIndian)');
+            final countriesTags = product['countries_tags'] is List
+                ? product['countries_tags'] as List
+                : null;
+            final isIndian =
+                countriesTags?.any(
+                  (t) => t.toString().toLowerCase().contains('india'),
+                ) ??
+                false;
+            logger.d(
+              'Open Food Facts hit countries: $countriesTags (isIndian: $isIndian)',
+            );
 
             final foodItem = FoodItem(
               id: cleanBarcode,
@@ -288,12 +331,14 @@ class NutritionRepositoryImpl implements NutritionRepository {
               unit: 'serving',
             );
 
-            double getNutrientValue(String baseKey) =>
-                saneAmount(nutriments['${baseKey}_${perServing ? 'serving' : '100g'}']);
+            double getNutrientValue(String baseKey) => saneAmount(
+              nutriments['${baseKey}_${perServing ? 'serving' : '100g'}'],
+            );
 
             double getNutrientInGrams(String baseKey) {
               final val = getNutrientValue(baseKey);
-              final unit = (nutriments['${baseKey}_unit']?.toString() ?? 'g').toLowerCase();
+              final unit = (nutriments['${baseKey}_unit']?.toString() ?? 'g')
+                  .toLowerCase();
               if (unit == 'mg') return val / 1000.0;
               if (unit == 'mcg' || unit == 'µg') return val / 1000000.0;
               return val;
@@ -301,7 +346,8 @@ class NutritionRepositoryImpl implements NutritionRepository {
 
             double getNutrientInMilligrams(String baseKey) {
               final val = getNutrientValue(baseKey);
-              final unit = (nutriments['${baseKey}_unit']?.toString() ?? 'g').toLowerCase();
+              final unit = (nutriments['${baseKey}_unit']?.toString() ?? 'g')
+                  .toLowerCase();
               if (unit == 'g') return val * 1000.0;
               if (unit == 'mcg' || unit == 'µg') return val / 1000.0;
               return val;
@@ -310,7 +356,8 @@ class NutritionRepositoryImpl implements NutritionRepository {
             double calories = getNutrientValue('energy-kcal');
             if (calories == 0.0) {
               final energyKj = getNutrientValue('energy');
-              final energyUnit = (nutriments['energy_unit']?.toString() ?? '').toLowerCase();
+              final energyUnit = (nutriments['energy_unit']?.toString() ?? '')
+                  .toLowerCase();
               if (energyUnit == 'kcal') {
                 calories = energyKj;
               } else {
@@ -327,24 +374,27 @@ class NutritionRepositoryImpl implements NutritionRepository {
             final carbsG = getNutrientInGrams('carbohydrates');
             final fatG = getNutrientInGrams('fat');
 
-            offNutrition = sanitizeNutrition(NutritionInfo(
-              calories: calories,
-              proteinG: proteinG,
-              carbsG: carbsG,
-              fatG: fatG,
-              fiberG: getNutrientInGrams('fiber'),
-              sugarG: getNutrientInGrams('sugars'),
-              sodiumMg: sodiumMg,
-              saturatedFatG: getNutrientInGrams('saturated-fat'),
-              transFatG: getNutrientInGrams('trans-fat'),
-              cholesterolMg: getNutrientInMilligrams('cholesterol'),
-              calciumMg: getNutrientInMilligrams('calcium'),
-              ironMg: getNutrientInMilligrams('iron'),
-              potassiumMg: getNutrientInMilligrams('potassium'),
-              per: foodItem,
-            ));
+            offNutrition = sanitizeNutrition(
+              NutritionInfo(
+                calories: calories,
+                proteinG: proteinG,
+                carbsG: carbsG,
+                fatG: fatG,
+                fiberG: getNutrientInGrams('fiber'),
+                sugarG: getNutrientInGrams('sugars'),
+                sodiumMg: sodiumMg,
+                saturatedFatG: getNutrientInGrams('saturated-fat'),
+                transFatG: getNutrientInGrams('trans-fat'),
+                cholesterolMg: getNutrientInMilligrams('cholesterol'),
+                calciumMg: getNutrientInMilligrams('calcium'),
+                ironMg: getNutrientInMilligrams('iron'),
+                potassiumMg: getNutrientInMilligrams('potassium'),
+                per: foodItem,
+              ),
+            );
 
-            if (productName != 'Unknown Product' && (calories > 0 || proteinG > 0 || carbsG > 0 || fatG > 0)) {
+            if (productName != 'Unknown Product' &&
+                (calories > 0 || proteinG > 0 || carbsG > 0 || fatG > 0)) {
               offSuccess = true;
             }
           }
@@ -359,30 +409,41 @@ class NutritionRepositoryImpl implements NutritionRepository {
       }
 
       if (offSuccess && offNutrition != null) {
-        logger.i('Secondary Open Food Facts lookup succeeded for barcode "$cleanBarcode"');
+        logger.i(
+          'Secondary Open Food Facts lookup succeeded for barcode "$cleanBarcode"',
+        );
         // Save to local cache
-        await _cacheLocally(cleanBarcode, offNutrition.per.name, offNutrition.per.servingDescription, offNutrition);
+        await _cacheLocally(
+          cleanBarcode,
+          offNutrition.per.name,
+          offNutrition.per.servingDescription,
+          offNutrition,
+        );
         return Right(offNutrition);
       }
 
       // 3. Fallback: Query the Supabase Edge Function (checks proprietary DB first, then OFF global, then Gemini search grounding)
-      logger.i('Tertiary lookup: Querying Edge Function for barcode: "$cleanBarcode"');
+      logger.i(
+        'Tertiary lookup: Querying Edge Function for barcode: "$cleanBarcode"',
+      );
       if (supabaseClient.auth.currentSession?.accessToken == null) {
         logger.e('lookupBarcode fallback failed: No active session found.');
         return const Left(ServerFailure(_signInMessage));
       }
-      final response = await supabaseClient.functions.invoke(
-        'scan-food',
-        body: {
-          'barcode': cleanBarcode,
-        },
-      ).timeout(const Duration(seconds: 25));
+      final response = await supabaseClient.functions
+          .invoke('scan-food', body: {'barcode': cleanBarcode})
+          .timeout(const Duration(seconds: 25));
 
       final decoded = _decodeMap(response.data);
       final rawNutriments = decoded['nutriments'];
       final productName = saneFoodName(decoded['productName']);
-      if (response.status == 200 && productName.isNotEmpty && rawNutriments is Map) {
-        final servingSize = saneFoodName(decoded['servingSize'], fallback: '100g');
+      if (response.status == 200 &&
+          productName.isNotEmpty &&
+          rawNutriments is Map) {
+        final servingSize = saneFoodName(
+          decoded['servingSize'],
+          fallback: '100g',
+        );
         final nutriments = Map<String, dynamic>.from(rawNutriments);
 
         final foodItem = FoodItem(
@@ -394,26 +455,35 @@ class NutritionRepositoryImpl implements NutritionRepository {
           unit: 'serving',
         );
 
-        final nutritionInfo = sanitizeNutrition(NutritionInfo(
-          calories: saneAmount(nutriments['calories']),
-          proteinG: saneAmount(nutriments['protein']),
-          carbsG: saneAmount(nutriments['carbs']),
-          fatG: saneAmount(nutriments['fat']),
-          fiberG: saneAmount(nutriments['fiber']),
-          sugarG: saneAmount(nutriments['sugar']),
-          sodiumMg: saneAmount(nutriments['sodium']),
-          per: foodItem,
-        ));
+        final nutritionInfo = sanitizeNutrition(
+          NutritionInfo(
+            calories: saneAmount(nutriments['calories']),
+            proteinG: saneAmount(nutriments['protein']),
+            carbsG: saneAmount(nutriments['carbs']),
+            fatG: saneAmount(nutriments['fat']),
+            fiberG: saneAmount(nutriments['fiber']),
+            sugarG: saneAmount(nutriments['sugar']),
+            sodiumMg: saneAmount(nutriments['sodium']),
+            per: foodItem,
+          ),
+        );
 
         // Save to local cache
-        await _cacheLocally(cleanBarcode, productName, servingSize, nutritionInfo);
+        await _cacheLocally(
+          cleanBarcode,
+          productName,
+          servingSize,
+          nutritionInfo,
+        );
 
         return Right(nutritionInfo);
       } else {
         return const Left(BarcodeNotFoundFailure());
       }
     } on FunctionException catch (e) {
-      logger.e('Function error in lookupBarcode: status=${e.status} details=${e.details}');
+      logger.e(
+        'Function error in lookupBarcode: status=${e.status} details=${e.details}',
+      );
       if (e.status == 404) {
         return const Left(BarcodeNotFoundFailure());
       }
@@ -421,7 +491,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
         connectivity.reportFailure();
         return const Left(NetworkFailure(_offlineMessage));
       }
-      return const Left(ServerFailure("Couldn't look up that barcode. Try again."));
+      return const Left(
+        ServerFailure("Couldn't look up that barcode. Try again."),
+      );
     } on TimeoutException {
       logger.e('lookupBarcode timed out');
       return const Left(NetworkFailure('This is taking too long. Try again.'));
@@ -431,7 +503,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
         connectivity.reportFailure();
         return const Left(NetworkFailure(_offlineMessage));
       }
-      return const Left(ServerFailure("Couldn't look up that barcode. Try again."));
+      return const Left(
+        ServerFailure("Couldn't look up that barcode. Try again."),
+      );
     }
   }
 
@@ -469,7 +543,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
         logger.w('Not signed in; saved barcode "$cleanBarcode" locally only.');
         return const Right(null);
       }
-      logger.i('Saving barcode "$cleanBarcode" to Supabase proprietary_products...');
+      logger.i(
+        'Saving barcode "$cleanBarcode" to Supabase proprietary_products...',
+      );
       final payload = {
         'barcode': cleanBarcode,
         'product_name': productName,
@@ -488,7 +564,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       try {
         final sent = await pendingWrites.sendOrQueue(
           supabaseClient,
-          PendingWrite.upsert(
+          // Adds products nobody has entered yet; the shared catalogue's
+          // existing entries can't be changed from the app (RLS).
+          PendingWrite.insertIfMissing(
             'proprietary_products',
             values: payload,
             userId: userId,
@@ -496,9 +574,11 @@ class NutritionRepositoryImpl implements NutritionRepository {
             key: 'proprietary_products:$cleanBarcode',
           ),
         );
-        logger.i(sent
-            ? 'Successfully saved product "$productName" to remote proprietary DB.'
-            : 'Offline: queued product "$productName" for the remote proprietary DB.');
+        logger.i(
+          sent
+              ? 'Successfully saved product "$productName" to remote proprietary DB.'
+              : 'Offline: queued product "$productName" for the remote proprietary DB.',
+        );
       } catch (e) {
         // Rejected by the server; the local copy still serves this device.
         logger.e('Remote save of barcode "$cleanBarcode" failed: $e');
@@ -510,7 +590,9 @@ class NutritionRepositoryImpl implements NutritionRepository {
       return const Right(null);
     } catch (e) {
       logger.e('Error in saveProprietaryProduct: $e');
-      return const Left(ServerFailure("Couldn't save this product. Try again."));
+      return const Left(
+        ServerFailure("Couldn't save this product. Try again."),
+      );
     }
   }
 
@@ -554,7 +636,8 @@ class NutritionRepositoryImpl implements NutritionRepository {
         FoodCacheKeys.search(query),
         {'search_query': normalizeFoodQuery(query)},
         // An empty answer may be a provider hiccup; don't remember it.
-        worthCaching: (data) => (data['items'] as List<dynamic>?)?.isNotEmpty ?? false,
+        worthCaching: (data) =>
+            (data['items'] as List<dynamic>?)?.isNotEmpty ?? false,
       );
       // Malformed or nameless rows from the server are skipped.
       final rawItems = data['items'];
@@ -566,7 +649,10 @@ class NutritionRepositoryImpl implements NutritionRepository {
                 id: dto['fdc_id']?.toString() ?? dto['id']?.toString() ?? '',
                 name: saneFoodName(dto['name']),
                 confidenceScore: 1.0,
-                servingDescription: saneFoodName(dto['serving_description'], fallback: '100g'),
+                servingDescription: saneFoodName(
+                  dto['serving_description'],
+                  fallback: '100g',
+                ),
                 quantity: 1.0,
                 unit: 'serving',
               ),

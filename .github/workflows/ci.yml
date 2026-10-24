@@ -59,3 +59,43 @@ jobs:
 
       - name: Build Debug APK (Smoke Test)
         run: flutter build apk --debug
+
+  ios-build:
+    # Compiles the iOS app (plugins via Swift Package Manager, the rest via
+    # CocoaPods) without signing, so iOS breakage shows up before a release.
+    # Analysis and tests run once, in the validate job.
+    name: iOS Build (unsigned)
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.3'
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Prepare Environment File
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
+        run: |
+          if [ -n "$ENV_CONTENT" ]; then
+            echo "$ENV_CONTENT" > .env
+          else
+            echo "Using .env.example as fallback for CI validation"
+            cp .env.example .env
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build iOS Release (no code signing)
+        run: flutter build ios --release --no-codesign

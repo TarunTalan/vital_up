@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:device_preview/device_preview.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/core/di/injection_container.dart' as di;
 import 'package:vital_up/core/di/injection_container.dart';
@@ -16,7 +18,6 @@ import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
-import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/widgets/app_error_fallback.dart';
@@ -28,6 +29,8 @@ import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:vital_up/core/database/isar_service.dart';
+import 'package:vital_up/core/services/launcher_shortcuts.dart';
+import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground_service_manager.dart' show clearStaleWorkoutNotifications;
 import 'package:vital_up/features/dashboard/presentation/cubit/screen_time_cubit.dart' as vital_up_dashboard;
 import 'package:vital_up/features/notifications/data/services/push_service.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
@@ -38,6 +41,8 @@ import 'package:vital_up/core/config/secure_session_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Which icons are bundled: missing ones show their fallback quietly.
+  BundledAssets.preload();
   GoogleFonts.config.allowRuntimeFetching = false; // bundled in assets/google_fonts
   // OFL fonts ship with their licences; list them on the licences page.
   LicenseRegistry.addLicense(() async* {
@@ -113,6 +118,12 @@ void main() async {
     // Back up logs to the cloud and bring back ones from other devices.
     sl<SyncService>().start();
 
+    // Only at launch (not in the widget's background engine, which also
+    // runs initDependencies): nothing is recording yet, so workout
+    // notifications left by a closed app are stale. A GPS workout's comes
+    // back on Resume; the timer's stays while a timer is saved.
+    clearStaleWorkoutNotifications();
+
     // Trigger background sync of popular products to offline DB
     final isarService = sl<IsarService>();
     final supabase = sl<SupabaseClient>();
@@ -139,6 +150,11 @@ void main() async {
         ? const MyApp()
         : DevicePreview(builder: (context) => const MyApp()),
   );
+  // Long-press shortcuts on the app icon; one that launched the app opens
+  // once Home shows.
+  LauncherShortcuts.init();
+  // Pages opened count as features found (no tip about them).
+  sl<FeatureTipsService>().attach(AppRouter.router);
 }
 
 class MyApp extends StatelessWidget {
@@ -151,8 +167,8 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => sl<AuthCubit>()..checkSession()),
         BlocProvider(create: (context) => sl<OnboardingCubit>()),
         // One app-wide copy: the Home card and the routed trends page share
-        // it. (SleepCubit lives on the dashboard: loading it here would ask
-        // for Health Connect access before sign-in.)
+        // it. (SleepCubit lives on the dashboard: it reads the signed-in
+        // user's nights.)
         BlocProvider(create: (context) => sl<vital_up_dashboard.ScreenTimeCubit>()..loadStats()),
         BlocProvider(create: (context) => sl<SettingsCubit>()..loadSettings()),
         // VitalUp Pro, read by gates and the paywall anywhere in the app.
@@ -196,15 +212,6 @@ class MyApp extends StatelessWidget {
                       listener: (context, state) {
                         if (state is AuthError) {
                           showErrorSnackBar(context, state.message);
-                        }
-                      },
-                    ),
-                    BlocListener<OnboardingCubit, OnboardingData>(
-                      listenWhen: (previous, current) => previous.status != current.status,
-                      listener: (context, state) {
-                        // Errors are shown by the onboarding page itself.
-                        if (state.status == SubmissionStatus.success) {
-                          showSuccessSnackBar(context, 'Health profile saved.');
                         }
                       },
                     ),

@@ -37,7 +37,7 @@ class ScreenTimeWeeklySummary extends Equatable {
   final DailyScreenTime? highestDay;
   final Duration todayDuration;
   final double changeVsYesterdayPct; // e.g. -12.5 means 12.5% reduction
-  final int dailyGoalMinutes;
+  final int? dailyGoalMinutes;
 
   const ScreenTimeWeeklySummary({
     required this.dailyHistory,
@@ -46,7 +46,7 @@ class ScreenTimeWeeklySummary extends Equatable {
     this.highestDay,
     required this.todayDuration,
     required this.changeVsYesterdayPct,
-    this.dailyGoalMinutes = 240, // 4 hours default
+    this.dailyGoalMinutes,
   });
 
   String get wellnessRating {

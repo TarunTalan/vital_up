@@ -2,7 +2,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/entities/track_point.dart';
 
 abstract class LocationTrackingRepository {
-  Future<bool> ensurePermission();
+  Future<bool> hasPermission();
 
   Stream<TrackPoint> watchTrackPoints(ActivityType activityType);
 }

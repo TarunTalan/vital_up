@@ -72,7 +72,9 @@ class MealLogEntryDto {
       capturedAt: entry.capturedAt,
       imagePath: entry.imagePath,
       items: entry.items.map((item) => FoodItemDto.fromDomain(item)).toList(),
-      nutrition: entry.nutrition.map((nut) => NutritionInfoDto.fromDomain(nut)).toList(),
+      nutrition: entry.nutrition
+          .map((nut) => NutritionInfoDto.fromDomain(nut))
+          .toList(),
       totalCalories: entry.totalCalories,
       mealType: entry.mealType,
       userConfirmed: entry.userConfirmed,

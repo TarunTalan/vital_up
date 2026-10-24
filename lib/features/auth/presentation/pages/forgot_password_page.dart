@@ -76,9 +76,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-        body: AuthBackground(
-          style: AuthBackgroundStyle.ellipses,
-          child: ResponsiveCenter(
+          body: AuthBackground(
+            style: AuthBackgroundStyle.ellipses,
+            child: ResponsiveCenter(
               child: Column(
                 children: [
                   AuthHeader(
@@ -87,66 +87,67 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                          physics: const ClampingScrollPhysics(),
-                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                              child: Padding(
-                                padding: context.pagePadding,
-                                child: Column(
-                                  children: [
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    Text(
-                                      'Please enter your registered email to receive a verification code.',
-                                      style: context.text.bodyLarge?.copyWith(
-                                            color: colors.onSurface,
-                                          ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    // Email Input Block
-                                    StreamBuilder<String>(
-                                      stream: cubit.emailStream,
-                                      initialData: cubit.emailVal,
-                                      builder: (context, emailSnapshot) {
-                                        return StreamBuilder<String?>(
-                                          stream: cubit.emailErrorStream,
-                                          builder: (context, errorSnapshot) {
-                                            return AuthEmailField(
-                                              value: emailSnapshot.data ?? '',
-                                              label: 'Email ID',
-                                              textInputAction: TextInputAction.done,
-                                              onSubmitted: (_) => _submit(),
-                                              onChange: cubit.onEmailChange,
-                                              error: errorSnapshot.data,
-                                              validate: cubit.validateEmail,
-                                              enabled: !isLoading,
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    // Action Button
-                                    BlocBuilder<AuthCubit, AuthState>(
-                                      builder: (context, state) {
-                                        final isLoading = state is AuthLoading;
-                
-                                        return PrimaryAuthButton(
-                                          label: 'Send',
-                                          isLoading: isLoading,
-                                          onTap: _submit,
-                                        );
-                                      },
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                  ],
-                                ),
+                      physics: const ClampingScrollPhysics(),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Padding(
+                        padding: context.pagePadding,
+                        child: Column(
+                          children: [
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            Text(
+                              'Please enter your registered email to receive a verification code.',
+                              style: context.text.bodyLarge?.copyWith(
+                                color: colors.onSurface,
                               ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            // Email Input Block
+                            StreamBuilder<String>(
+                              stream: cubit.emailStream,
+                              initialData: cubit.emailVal,
+                              builder: (context, emailSnapshot) {
+                                return StreamBuilder<String?>(
+                                  stream: cubit.emailErrorStream,
+                                  builder: (context, errorSnapshot) {
+                                    return AuthEmailField(
+                                      value: emailSnapshot.data ?? '',
+                                      label: 'Email ID',
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) => _submit(),
+                                      onChange: cubit.onEmailChange,
+                                      error: errorSnapshot.data,
+                                      validate: cubit.validateEmail,
+                                      enabled: !isLoading,
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            // Action Button
+                            BlocBuilder<AuthCubit, AuthState>(
+                              builder: (context, state) {
+                                final isLoading = state is AuthLoading;
+
+                                return PrimaryAuthButton(
+                                  label: 'Send',
+                                  isLoading: isLoading,
+                                  onTap: _submit,
+                                );
+                              },
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
           ),
-        ),
         ),
       ),
     );

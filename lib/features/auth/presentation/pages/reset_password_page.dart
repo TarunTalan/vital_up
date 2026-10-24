@@ -58,9 +58,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-        body: AuthBackground(
-          style: AuthBackgroundStyle.ellipses,
-          child: ResponsiveCenter(
+          body: AuthBackground(
+            style: AuthBackgroundStyle.ellipses,
+            child: ResponsiveCenter(
               child: Column(
                 children: [
                   AuthHeader(
@@ -69,87 +69,88 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                          physics: const ClampingScrollPhysics(),
-                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                              child: Padding(
-                                padding: context.pagePadding,
-                                child: Column(
-                                  children: [
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    Text(
-                                      'Enter your new password below.',
-                                      style: context.text.bodyLarge?.copyWith(
-                                            color: colors.onSurface,
-                                          ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    // New Password Block
-                                    StreamBuilder<String>(
-                                      stream: cubit.passwordStream,
-                                      initialData: cubit.passwordVal,
-                                      builder: (context, passwordSnapshot) {
-                                        return StreamBuilder<String?>(
-                                          stream: cubit.passwordErrorStream,
-                                          builder: (context, errorSnapshot) {
-                                            return AuthPasswordField(
-                                              value: passwordSnapshot.data ?? '',
-                                              label: 'New Password',
-                                              textInputAction: TextInputAction.done,
-                                              onSubmitted: (_) {
-                                                FocusScope.of(context).unfocus();
-                                                cubit.resetPassword(
-                                                  resetToken: widget.resetToken,
-                                                  onSuccess: () {},
-                                                );
-                                              },
-                                              onChange: cubit.onPasswordChange,
-                                              error: errorSnapshot.data,
-                                              showForgot: false,
-                                              validate: cubit.validatePassword,
-                                              showValidation: true,
-                                              enabled: !isLoading,
-                                            );
-                                          },
+                      physics: const ClampingScrollPhysics(),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Padding(
+                        padding: context.pagePadding,
+                        child: Column(
+                          children: [
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            Text(
+                              'Enter your new password below.',
+                              style: context.text.bodyLarge?.copyWith(
+                                color: colors.onSurface,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            // New Password Block
+                            StreamBuilder<String>(
+                              stream: cubit.passwordStream,
+                              initialData: cubit.passwordVal,
+                              builder: (context, passwordSnapshot) {
+                                return StreamBuilder<String?>(
+                                  stream: cubit.passwordErrorStream,
+                                  builder: (context, errorSnapshot) {
+                                    return AuthPasswordField(
+                                      value: passwordSnapshot.data ?? '',
+                                      label: 'New Password',
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) {
+                                        FocusScope.of(context).unfocus();
+                                        cubit.resetPassword(
+                                          resetToken: widget.resetToken,
+                                          onSuccess: () {},
                                         );
                                       },
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    // Reset Button
-                                    BlocListener<AuthCubit, AuthState>(
-                                      listener: (context, state) {
-                                        if (state is AuthPasswordResetSuccess) {
-                                          context.goNamed('reset-completed');
-                                        }
-                                      },
-                                      child: BlocBuilder<AuthCubit, AuthState>(
-                                        builder: (context, state) {
-                                          final isLoading = state is AuthLoading;
-                  
-                                          return PrimaryAuthButton(
-                                            label: 'Reset Password',
-                                            isLoading: isLoading,
-                                            onTap: () {
-                                              FocusScope.of(context).unfocus();
-                                              cubit.resetPassword(
-                                                resetToken: widget.resetToken,
-                                                onSuccess: () {},
-                                              );
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                  ],
-                                ),
+                                      onChange: cubit.onPasswordChange,
+                                      error: errorSnapshot.data,
+                                      showForgot: false,
+                                      validate: cubit.validatePassword,
+                                      showValidation: true,
+                                      enabled: !isLoading,
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                            // Reset Button
+                            BlocListener<AuthCubit, AuthState>(
+                              listener: (context, state) {
+                                if (state is AuthPasswordResetSuccess) {
+                                  context.goNamed('reset-completed');
+                                }
+                              },
+                              child: BlocBuilder<AuthCubit, AuthState>(
+                                builder: (context, state) {
+                                  final isLoading = state is AuthLoading;
+
+                                  return PrimaryAuthButton(
+                                    label: 'Reset Password',
+                                    isLoading: isLoading,
+                                    onTap: () {
+                                      FocusScope.of(context).unfocus();
+                                      cubit.resetPassword(
+                                        resetToken: widget.resetToken,
+                                        onSuccess: () {},
+                                      );
+                                    },
+                                  );
+                                },
                               ),
+                            ),
+                            SizedBox(height: context.h(AppDimens.space32)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
           ),
-        ),
         ),
       ),
     );

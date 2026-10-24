@@ -20,8 +20,8 @@ class SettingsCubit extends Cubit<SettingsState> {
     required SettingsRepository settingsRepository,
     this._onNotificationsChanged,
     this._onAnalyticsChanged,
-  })  : _settingsRepository = settingsRepository,
-        super(SettingsInitial());
+  }) : _settingsRepository = settingsRepository,
+       super(SettingsInitial());
 
   Future<void> loadSettings() async {
     // Already loaded: refresh quietly. Emitting Loading here dropped the
@@ -63,14 +63,11 @@ class SettingsCubit extends Cubit<SettingsState> {
     final previousAnalytics = current?.analyticsEnabled;
     final result = await _settingsRepository.saveSettings(settings);
     if (isClosed) return;
-    result.fold(
-      (failure) {
-        // Report it, then keep the page (and theme) on the saved values.
-        emit(SettingsError(failure.message));
-        if (current != null) emit(SettingsLoaded(current));
-      },
-      (_) => emit(SettingsLoaded(settings)),
-    );
+    result.fold((failure) {
+      // Report it, then keep the page (and theme) on the saved values.
+      emit(SettingsError(failure.message));
+      if (current != null) emit(SettingsLoaded(current));
+    }, (_) => emit(SettingsLoaded(settings)));
     if (result.isRight() && previousAnalytics != settings.analyticsEnabled) {
       await _applyAnalytics(settings.analyticsEnabled);
     }

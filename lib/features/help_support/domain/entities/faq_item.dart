@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 
 enum FaqCategory {
   all(label: 'All', icon: Icons.apps_rounded),
-  gettingStarted(label: 'Getting Started', icon: Icons.rocket_launch_rounded),
-  activity(label: 'Activity & Workouts', icon: Icons.directions_run_rounded),
+  gettingStarted(label: 'Getting started', icon: Icons.rocket_launch_rounded),
+  activity(label: 'Activity & workouts', icon: Icons.directions_run_rounded),
   hydration(label: 'Hydration', icon: Icons.water_drop_rounded),
-  nutrition(label: 'Diet & Nutrition', icon: Icons.restaurant_rounded),
-  sleep(label: 'Sleep & Recovery', icon: Icons.bedtime_rounded),
-  screenTime(label: 'Screen Time', icon: Icons.smartphone_rounded),
-  sync(label: 'Health Sync', icon: Icons.sync_rounded),
-  account(label: 'Account & Privacy', icon: Icons.lock_rounded);
+  nutrition(label: 'Diet & nutrition', icon: Icons.restaurant_rounded),
+  sleep(label: 'Sleep', icon: Icons.bedtime_rounded),
+  screenTime(label: 'Screen time', icon: Icons.smartphone_rounded),
+  sync(label: 'Health sync & backup', icon: Icons.sync_rounded),
+  arena(label: 'Arena', icon: Icons.emoji_events_rounded),
+  app(label: 'Settings & Pro', icon: Icons.tune_rounded),
+  account(label: 'Account & privacy', icon: Icons.lock_rounded);
 
   final String label;
   final IconData icon;

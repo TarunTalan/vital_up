@@ -15,28 +15,41 @@ class AuthCubit extends Cubit<AuthState> {
   final Future<void> Function()? _beforeSignOut;
 
   AuthCubit({required this._authRepository, this._beforeSignOut})
-      : super(AuthInitial());
+    : super(AuthInitial());
 
   // Input Fields State Controllers
-  final StreamController<String> _usernameLoginController = StreamController<String>.broadcast();
-  final StreamController<String> _passwordController = StreamController<String>.broadcast();
-  final StreamController<String> _emailController = StreamController<String>.broadcast();
-  final StreamController<String> _usernameSignupController = StreamController<String>.broadcast();
+  final StreamController<String> _usernameLoginController =
+      StreamController<String>.broadcast();
+  final StreamController<String> _passwordController =
+      StreamController<String>.broadcast();
+  final StreamController<String> _emailController =
+      StreamController<String>.broadcast();
+  final StreamController<String> _usernameSignupController =
+      StreamController<String>.broadcast();
 
   // Field Errors State Controllers
-  final StreamController<String?> _usernameErrorLoginController = StreamController<String?>.broadcast();
-  final StreamController<String?> _passwordErrorController = StreamController<String?>.broadcast();
-  final StreamController<String?> _emailErrorController = StreamController<String?>.broadcast();
-  final StreamController<String?> _usernameErrorSignupController = StreamController<String?>.broadcast();
-  final StreamController<String?> _otpErrorController = StreamController<String?>.broadcast();
+  final StreamController<String?> _usernameErrorLoginController =
+      StreamController<String?>.broadcast();
+  final StreamController<String?> _passwordErrorController =
+      StreamController<String?>.broadcast();
+  final StreamController<String?> _emailErrorController =
+      StreamController<String?>.broadcast();
+  final StreamController<String?> _usernameErrorSignupController =
+      StreamController<String?>.broadcast();
+  final StreamController<String?> _otpErrorController =
+      StreamController<String?>.broadcast();
 
   // Checking state
-  final StreamController<bool> _isCheckingUsernameController = StreamController<bool>.broadcast();
-  final StreamController<bool?> _isUsernameAvailableController = StreamController<bool?>.broadcast();
+  final StreamController<bool> _isCheckingUsernameController =
+      StreamController<bool>.broadcast();
+  final StreamController<bool?> _isUsernameAvailableController =
+      StreamController<bool?>.broadcast();
 
   // Resend Timer Controllers
-  final StreamController<int> _registrationOtpResendTimerController = StreamController<int>.broadcast();
-  final StreamController<int> _forgotOtpResendTimerController = StreamController<int>.broadcast();
+  final StreamController<int> _registrationOtpResendTimerController =
+      StreamController<int>.broadcast();
+  final StreamController<int> _forgotOtpResendTimerController =
+      StreamController<int>.broadcast();
 
   // Current values cache
   String _usernameLogin = '';
@@ -71,17 +84,23 @@ class AuthCubit extends Cubit<AuthState> {
   Stream<String> get emailStream => _emailController.stream;
   Stream<String> get usernameSignupStream => _usernameSignupController.stream;
 
-  Stream<String?> get usernameErrorLoginStream => _usernameErrorLoginController.stream;
+  Stream<String?> get usernameErrorLoginStream =>
+      _usernameErrorLoginController.stream;
   Stream<String?> get passwordErrorStream => _passwordErrorController.stream;
   Stream<String?> get emailErrorStream => _emailErrorController.stream;
-  Stream<String?> get usernameErrorSignupStream => _usernameErrorSignupController.stream;
+  Stream<String?> get usernameErrorSignupStream =>
+      _usernameErrorSignupController.stream;
   Stream<String?> get otpErrorStream => _otpErrorController.stream;
 
-  Stream<bool> get isCheckingUsernameStream => _isCheckingUsernameController.stream;
-  Stream<bool?> get isUsernameAvailableStream => _isUsernameAvailableController.stream;
+  Stream<bool> get isCheckingUsernameStream =>
+      _isCheckingUsernameController.stream;
+  Stream<bool?> get isUsernameAvailableStream =>
+      _isUsernameAvailableController.stream;
 
-  Stream<int> get registrationOtpResendTimerStream => _registrationOtpResendTimerController.stream;
-  Stream<int> get forgotOtpResendTimerStream => _forgotOtpResendTimerController.stream;
+  Stream<int> get registrationOtpResendTimerStream =>
+      _registrationOtpResendTimerController.stream;
+  Stream<int> get forgotOtpResendTimerStream =>
+      _forgotOtpResendTimerController.stream;
 
   int get registrationResendSecs => _registrationResendSecs;
   int get forgotResendSecs => _forgotResendSecs;
@@ -222,7 +241,9 @@ class AuthCubit extends Cubit<AuthState> {
       (_) {
         if (_usernameSignup == username) {
           _isUsernameAvailable = true;
-          _usernameErrorSignupController.add(null); // Clear error — username is free
+          _usernameErrorSignupController.add(
+            null,
+          ); // Clear error — username is free
           _isUsernameAvailableController.add(true);
         }
       },
@@ -281,7 +302,8 @@ class AuthCubit extends Cubit<AuthState> {
         msg.contains('over_request_rate_limit')) {
       return 'Too many attempts. Wait a few minutes.';
     }
-    if (msg.contains('security purposes') || msg.contains('request this after')) {
+    if (msg.contains('security purposes') ||
+        msg.contains('request this after')) {
       final match = RegExp(r'\d+').firstMatch(cleanMsg);
       if (match != null) {
         return 'Wait ${match.group(0)}s before asking for a new code.';
@@ -384,7 +406,9 @@ class AuthCubit extends Cubit<AuthState> {
     if (_busy) return;
     // Guard: block if username availability check hasn't passed
     if (_isUsernameAvailable != true) {
-      final msg = _lastUsernameError ?? 'Checking your username. Try again in a moment.';
+      final msg =
+          _lastUsernameError ??
+          'Checking your username. Try again in a moment.';
       _usernameErrorSignupController.add(msg);
       onError(msg);
       return;
@@ -477,7 +501,8 @@ class AuthCubit extends Cubit<AuthState> {
           final user = UserEntity(
             id: currentUser.id,
             email: currentUser.email ?? email,
-            displayName: currentUser.userMetadata?['username'] as String? ??
+            displayName:
+                currentUser.userMetadata?['username'] as String? ??
                 email.split('@')[0],
           );
           emit(AuthAuthenticated(user));
@@ -508,7 +533,10 @@ class AuthCubit extends Cubit<AuthState> {
 
     result.fold(
       (failure) {
-        final userFriendlyMessage = _mapFailureToMessage(failure.message, otp: true);
+        final userFriendlyMessage = _mapFailureToMessage(
+          failure.message,
+          otp: true,
+        );
         emit(AuthOtpSent(token: token, email: email));
         _otpErrorController.add(userFriendlyMessage);
         onError(userFriendlyMessage);
@@ -521,7 +549,9 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  Future<void> requestForgotPassword({required Function(String token) onSuccess}) async {
+  Future<void> requestForgotPassword({
+    required Function(String token) onSuccess,
+  }) async {
     if (_busy) return;
     if (!validateEmail()) return;
 
@@ -608,7 +638,10 @@ class AuthCubit extends Cubit<AuthState> {
 
     result.fold(
       (failure) {
-        final userFriendlyMessage = _mapFailureToMessage(failure.message, otp: true);
+        final userFriendlyMessage = _mapFailureToMessage(
+          failure.message,
+          otp: true,
+        );
         emit(AuthForgotPasswordOtpSent(token: currentToken, email: _email));
         _otpErrorController.add(userFriendlyMessage);
         onError(userFriendlyMessage);
@@ -648,7 +681,6 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-
   Future<void> signInWithGoogle({required Function() onSuccess}) async {
     if (_busy) return;
     emit(AuthLoading());
@@ -673,7 +705,8 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   /// See [AuthRepository.hasCompletedOnboarding].
-  Future<bool> hasCompletedOnboarding() => _authRepository.hasCompletedOnboarding();
+  Future<bool> hasCompletedOnboarding() =>
+      _authRepository.hasCompletedOnboarding();
 
   Future<void> checkSession() async {
     final active = await _authRepository.isSessionActive();

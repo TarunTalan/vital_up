@@ -29,8 +29,22 @@ void main() {
   test('sums missing totals from the meals', () {
     final plan = MealPlanModel.fromJson({
       'meals': [
-        {'name': 'Lunch', 'items': ['Rice'], 'calories': 500, 'protein': 20, 'carbs': 80, 'fat': 10},
-        {'name': 'Dinner', 'items': ['Roti'], 'calories': 400, 'protein': 15, 'carbs': 60, 'fat': 8},
+        {
+          'name': 'Lunch',
+          'items': ['Rice'],
+          'calories': 500,
+          'protein': 20,
+          'carbs': 80,
+          'fat': 10,
+        },
+        {
+          'name': 'Dinner',
+          'items': ['Roti'],
+          'calories': 400,
+          'protein': 15,
+          'carbs': 60,
+          'fat': 8,
+        },
       ],
     }, 'k');
     expect(plan.totalCalories, 900);

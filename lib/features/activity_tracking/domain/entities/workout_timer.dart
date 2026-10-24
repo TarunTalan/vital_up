@@ -34,7 +34,9 @@ class WorkoutTimer {
     final since = runningSince;
     var total = banked;
     if (since != null && now.isAfter(since)) total += now.difference(since);
-    return total > WorkoutLogRules.maxLength ? WorkoutLogRules.maxLength : total;
+    return total > WorkoutLogRules.maxLength
+        ? WorkoutLogRules.maxLength
+        : total;
   }
 
   /// Whether the timer has reached [WorkoutLogRules.maxLength].

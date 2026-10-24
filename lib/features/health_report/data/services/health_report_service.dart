@@ -116,9 +116,11 @@ class HealthReportSummary {
       buffer.writeln('   - Medical Conditions: $conditions');
     }
     final allergies = note(profile?.allergies);
-    if (allergies.isNotEmpty) buffer.writeln('   - Allergies:         $allergies');
+    if (allergies.isNotEmpty)
+      buffer.writeln('   - Allergies:         $allergies');
     final medicines = note(profile?.medicines);
-    if (medicines.isNotEmpty) buffer.writeln('   - Current Meds:      $medicines');
+    if (medicines.isNotEmpty)
+      buffer.writeln('   - Current Meds:      $medicines');
     buffer.writeln();
     buffer.writeln('2. SLEEP & RECOVERY ($nightsLogged nights recorded):');
     buffer.writeln(
@@ -132,7 +134,9 @@ class HealthReportSummary {
     buffer.writeln('3. PHYSICAL ACTIVITY & CARDIO:');
     buffer.writeln('   - Total Workouts:    $totalWorkouts sessions');
     buffer.writeln('   - Active Minutes:    $totalActiveMinutes mins');
-    buffer.writeln('   - Total Distance:    ${totalDistanceKm.toStringAsFixed(2)} km');
+    buffer.writeln(
+      '   - Total Distance:    ${totalDistanceKm.toStringAsFixed(2)} km',
+    );
     buffer.writeln();
     buffer.writeln('4. HYDRATION ($waterDaysLogged days recorded):');
     buffer.writeln(
@@ -218,7 +222,10 @@ class HealthReportService {
         recentSessions.fold<int>(0, (sum, s) => sum + s.totalDurationSeconds) ~/
         60;
     final totalDistKm =
-        recentSessions.fold<double>(0, (sum, s) => sum + s.totalDistanceMeters) /
+        recentSessions.fold<double>(
+          0,
+          (sum, s) => sum + s.totalDistanceMeters,
+        ) /
         1000.0;
 
     return HealthReportSummary(

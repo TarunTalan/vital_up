@@ -76,16 +76,19 @@ class ActivityHistoryRepositoryImpl implements ActivityHistoryRepository {
     }
   }
 
-  Future<void> _saveStoredAnnotations(Map<String, SessionAnnotation> annotations) async {
-    final encoded = json.encode(annotations.map((key, value) => MapEntry(
-      key,
-      {
-        'sessionId': value.sessionId,
-        'tag': value.tag,
-        'note': value.note,
-        'updatedAt': value.updatedAt.toIso8601String(),
-      },
-    )));
+  Future<void> _saveStoredAnnotations(
+    Map<String, SessionAnnotation> annotations,
+  ) async {
+    final encoded = json.encode(
+      annotations.map(
+        (key, value) => MapEntry(key, {
+          'sessionId': value.sessionId,
+          'tag': value.tag,
+          'note': value.note,
+          'updatedAt': value.updatedAt.toIso8601String(),
+        }),
+      ),
+    );
     await sharedPreferences.setString(annotationsKey, encoded);
   }
 }

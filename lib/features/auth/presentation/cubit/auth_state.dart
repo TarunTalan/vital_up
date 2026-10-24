@@ -50,7 +50,10 @@ class AuthForgotPasswordOtpVerified extends AuthState {
   final String token; // Reset password token
   final String email;
 
-  const AuthForgotPasswordOtpVerified({required this.token, required this.email});
+  const AuthForgotPasswordOtpVerified({
+    required this.token,
+    required this.email,
+  });
 
   @override
   List<Object?> get props => [token, email];

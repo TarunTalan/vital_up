@@ -24,13 +24,11 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-sdk tools:overrideLibrary="cachet.plugins.health" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <!-- Health Connect, read only. Only types a visible feature shows (Play
+         minimum-scope policy): heart rate / HRV / SpO2 / blood pressure were
+         removed because nothing on screen displayed them. -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
-    <!-- Vita: wearable heart data for stress / health analysis (read only) -->
-    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
-    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
-    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
-    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
-    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <!-- Steps: Home, activity goals, Arena points -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <!-- Health Sync: import weight and workouts -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
@@ -165,6 +163,13 @@
         <!-- Home screen widgets, one receiver per size the app offers: Android
              pins a widget at its provider's default size (see WidgetSizes.kt).
              Original class names are kept so placed widgets keep working. -->
+        <!-- Redraws the widgets just after midnight (WidgetMidnight.kt). -->
+        <receiver android:name=".WidgetMidnightReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".TodaySmallWidgetProvider"
             android:exported="true"
             android:label="@string/wg_label_today_small">

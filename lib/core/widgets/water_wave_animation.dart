@@ -25,17 +25,14 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
 
   static const Duration _waveDuration = Duration(seconds: 2);
   static const Duration _fillDuration = Duration(milliseconds: 700);
-  
+
   bool _showSplash = false;
 
   @override
   void initState() {
     super.initState();
-    
-    _waveController = AnimationController(
-      vsync: this,
-      duration: _waveDuration,
-    );
+
+    _waveController = AnimationController(vsync: this, duration: _waveDuration);
 
     _splashController = AnimationController(
       vsync: this,
@@ -55,10 +52,10 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
       }
     }
   }
-  
+
   void _triggerSplash() {
     if (MediaQuery.disableAnimationsOf(context)) return;
-    
+
     setState(() {
       _showSplash = true;
     });
@@ -112,8 +109,9 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
                     builder: (context, child) {
                       return CustomPaint(
                         painter: _WavePainter(
-                          waveAnimationValue:
-                              disableAnimations ? 0.0 : _waveController.value,
+                          waveAnimationValue: disableAnimations
+                              ? 0.0
+                              : _waveController.value,
                           waveColor: widget.waveColor,
                         ),
                         child: const SizedBox.expand(),
@@ -139,7 +137,8 @@ class _WaterWaveAnimationState extends State<WaterWaveAnimation>
                               decoration: BoxDecoration(
                                 color: widget.waveColor.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(
-                                    AppDimens.radiusPill),
+                                  AppDimens.radiusPill,
+                                ),
                               ),
                             ),
                           ),
@@ -160,10 +159,7 @@ class _WavePainter extends CustomPainter {
   final double waveAnimationValue;
   final Color waveColor;
 
-  _WavePainter({
-    required this.waveAnimationValue,
-    required this.waveColor,
-  });
+  _WavePainter({required this.waveAnimationValue, required this.waveColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -181,7 +177,10 @@ class _WavePainter extends CustomPainter {
     final pathBack = Path();
 
     // Wave parameters
-    final double waveHeight = math.min(10.0, size.height * 0.1); // Wave amplitude
+    final double waveHeight = math.min(
+      10.0,
+      size.height * 0.1,
+    ); // Wave amplitude
     final double waveWidth = size.width;
 
     // We draw two waves offset by phase and slightly in amplitude
@@ -190,15 +189,22 @@ class _WavePainter extends CustomPainter {
 
     for (double i = 0.0; i <= size.width; i++) {
       // Front wave
-      final double yFront = waveHeight *
-              math.sin((i / waveWidth * 2 * math.pi) +
-                  (waveAnimationValue * 2 * math.pi)) +
+      final double yFront =
+          waveHeight *
+              math.sin(
+                (i / waveWidth * 2 * math.pi) +
+                    (waveAnimationValue * 2 * math.pi),
+              ) +
           waveHeight;
-      
+
       // Back wave (moving slightly faster, opposite phase)
-      final double yBack = (waveHeight * 0.8) *
-              math.sin((i / waveWidth * 2 * math.pi) +
-                  (waveAnimationValue * 3 * math.pi) + math.pi) +
+      final double yBack =
+          (waveHeight * 0.8) *
+              math.sin(
+                (i / waveWidth * 2 * math.pi) +
+                    (waveAnimationValue * 3 * math.pi) +
+                    math.pi,
+              ) +
           waveHeight;
 
       pathFront.lineTo(i, yFront);
@@ -220,6 +226,6 @@ class _WavePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WavePainter oldDelegate) {
     return oldDelegate.waveAnimationValue != waveAnimationValue ||
-           oldDelegate.waveColor != waveColor;
+        oldDelegate.waveColor != waveColor;
   }
 }

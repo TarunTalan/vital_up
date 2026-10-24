@@ -49,6 +49,7 @@ abstract class VitalWidgetProvider : HomeWidgetProvider() {
     ) {
         for (id in appWidgetIds) render(context, appWidgetManager, id, widgetData)
         Wg.maybeAutoRefresh(context, widgetData)
+        WidgetMidnight.schedule(context)
     }
 
     override fun onAppWidgetOptionsChanged(

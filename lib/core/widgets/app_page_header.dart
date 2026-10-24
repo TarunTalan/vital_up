@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -64,18 +65,21 @@ class AppPageHeader extends StatelessWidget {
               children: [
                 if (hasBack) ...[
                   BackIcon(
-                    onClick: onBack ?? () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      } else {
-                        context.goNamed('dashboard');
-                      }
-                    },
+                    onClick:
+                        onBack ??
+                        () {
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            context.goNamed('dashboard');
+                          }
+                        },
                   ),
                   const SizedBox(width: AppDimens.space12),
                 ],
                 Expanded(
-                  child: titleWidget ??
+                  child:
+                      titleWidget ??
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -91,8 +95,9 @@ class AppPageHeader extends StatelessWidget {
                             const SizedBox(height: AppDimens.space4),
                             Text(
                               subtitle!,
-                              style: context.text.bodyMedium
-                                  ?.copyWith(color: v.grayText),
+                              style: context.text.bodyMedium?.copyWith(
+                                color: v.grayText,
+                              ),
                             ),
                           ],
                         ],
@@ -124,77 +129,12 @@ class AppPageHeader extends StatelessWidget {
   }
 }
 
-/// Compact title bar — Figma Vita screens (health coach/*): back button on
-/// the left and a centred "heading 3" title in one row, drawn straight on
-/// the page background (no glass fill or hairline).
-///
-/// Includes the top safe-area inset, so place it at the top of a page body.
-class AppTitleBar extends StatelessWidget {
-  final String? title;
-  final VoidCallback? onBack;
-  final Widget? action;
-
-  const AppTitleBar({super.key, this.title, this.onBack, this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
-    bool isDashboard = false;
-    try {
-      isDashboard = GoRouterState.of(context).matchedLocation == '/dashboard';
-    } catch (_) {}
-    final hasBack = onBack != null || canPop || !isDashboard;
-    // Mirrors the back button so the title stays optically centred.
-    const slot = SizedBox.square(dimension: AppDimens.backButtonSize);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        top: context.safePadding.top + AppDimens.space20,
-        bottom: AppDimens.space16,
-      ),
-      child: ResponsiveCenter(
-        child: Padding(
-          padding: context.pagePadding,
-          child: Row(
-            children: [
-              if (hasBack)
-                BackIcon(
-                  onClick: onBack ?? () {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    } else {
-                      context.goNamed('dashboard');
-                    }
-                  },
-                )
-              else
-                slot,
-              Expanded(
-                child: title == null
-                    ? const SizedBox.shrink()
-                    : Text(
-                        title!,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.headlineSmall?.copyWith(
-                          color: context.colors.onSurface,
-                        ),
-                      ),
-              ),
-              action ?? slot,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Circular cyan-glass action button used in headers — Figma 44dp
-/// calendar button (rgba(25,195,224,0.13) fill, 0.27 border).
+/// Circular cyan-glass action button used in headers (rgba(25,195,224,0.13)
+/// fill, 0.27 border): same 48dp circle as [BackIcon], which is its neutral
+/// twin, so a header's buttons read as one set.
 class AppHeaderAction extends StatelessWidget {
-  final Widget icon;
+  final Widget? icon;
+  final String? svgAsset;
   final VoidCallback? onTap;
   final String? tooltip;
   final double size;
@@ -202,12 +142,16 @@ class AppHeaderAction extends StatelessWidget {
 
   const AppHeaderAction({
     super.key,
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     this.onTap,
     this.tooltip,
-    this.size = AppDimens.headerActionSize,
-    this.rounded = true,
-  });
+    this.size = AppDimens.backButtonSize,
+    this.rounded = false,
+  }) : assert(
+         icon != null || svgAsset != null,
+         'Either icon or svgAsset must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
@@ -219,6 +163,18 @@ class AppHeaderAction extends StatelessWidget {
           )
         : CircleBorder(side: BorderSide(color: v.primaryBorder!));
 
+    final Widget child = svgAsset != null
+        ? SvgPicture.asset(
+            svgAsset!,
+            width: AppDimens.iconLg,
+            height: AppDimens.iconLg,
+            colorFilter: ColorFilter.mode(
+              v.accentText ?? Theme.of(context).colorScheme.primary,
+              BlendMode.srcIn,
+            ),
+          )
+        : icon!;
+
     final button = SizedBox.square(
       dimension: size,
       child: Material(
@@ -228,11 +184,8 @@ class AppHeaderAction extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: IconTheme(
-            data: IconThemeData(
-              color: v.accentText,
-              size: AppDimens.iconLg,
-            ),
-            child: Center(child: icon),
+            data: IconThemeData(color: v.accentText, size: AppDimens.iconLg),
+            child: Center(child: child),
           ),
         ),
       ),

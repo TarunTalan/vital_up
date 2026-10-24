@@ -29,6 +29,8 @@ import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_remote_data_source_impl.dart';
 import 'package:vital_up/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:vital_up/features/onboarding/data/repositories/onboarding_repository_impl.dart';
+import 'package:vital_up/features/onboarding/data/starting_goals_writer.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
 import 'package:vital_up/features/diet_plan/data/datasources/diet_plan_remote_datasource.dart';
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/diet_plan/domain/repositories/diet_plan_repository.dart';
@@ -84,6 +86,7 @@ import 'package:vital_up/features/food_scanner/data/repositories/nutrition_repos
 import 'package:vital_up/core/config/env.dart';
 import 'package:vital_up/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:vital_up/features/subscription/data/services/store_billing.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/food_recognition_repository.dart';
 import 'package:vital_up/features/food_scanner/domain/repositories/meal_log_repository.dart';
@@ -126,6 +129,10 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 import 'package:vital_up/features/activity_tracking/domain/usecases/log_workout.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_timer_cubit.dart';
 import 'package:vital_up/features/activity_tracking/data/repositories/map_tile_repository_impl.dart';
+import 'package:vital_up/features/activity_tracking/data/services/body_weight_source.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/feature_tips/data/local_tip_scheduler.dart';
 import 'package:vital_up/features/activity_tracking/data/services/map_download_notification.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
@@ -343,6 +350,9 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<StoreBilling>(
     () => RevenueCatBilling(apiKey: Env.revenueCatGoogleApiKey),
   );
+  sl.registerLazySingleton(
+    () => AiQuotaService(sl<CacheStore>(), client: sl<SupabaseClient>()),
+  );
   sl.registerLazySingleton<SubscriptionRepository>(
     () => SubscriptionRepositoryImpl(
       supabaseClient: sl<SupabaseClient>(),
@@ -420,7 +430,11 @@ Future<void> initDependencies() async {
   );
   // 9. Diet Plan
   sl.registerLazySingleton<DietPlanRemoteDataSource>(
-    () => DietPlanRemoteDataSourceImpl(sl<DioClient>(), sl<VitaAiConsent>()),
+    () => DietPlanRemoteDataSourceImpl(
+      sl<DioClient>(),
+      sl<VitaAiConsent>(),
+      sl<AiQuotaService>(),
+    ),
   );
   sl.registerLazySingleton<DietPlanRepository>(
     () => DietPlanRepositoryImpl(
@@ -516,6 +530,19 @@ Future<void> initDependencies() async {
       MapDownloadNotifier(sl<FlutterLocalNotificationsPlugin>()),
     ),
   );
+  sl.registerLazySingleton(
+    () => OfflineMapService(
+      sl<MapTileRepository>(),
+      sl<SharedPreferences>(),
+      onlineChanges: sl<ConnectivityService>().onlineChanges,
+    ),
+  );
+  sl.registerLazySingleton(
+    () => BodyWeightSource(
+      weights: sl<WeightService>(),
+      profiles: sl<ProfileRepository>(),
+    ),
+  );
 
   sl.registerLazySingleton<LocationTrackingRepository>(
     () => LocationTrackingRepositoryImpl(),
@@ -545,18 +572,21 @@ Future<void> initDependencies() async {
     () => SaveSessionAnnotation(sl<ActivityHistoryRepository>()),
   );
   sl.registerLazySingleton(
-    () => DeleteActivitySession(sl<ActivityHistoryRepository>()),
+    () => DeleteActivitySession(
+      sl<ActivityHistoryRepository>(),
+      afterDelete: (id) async {
+        final checkpoint = sl<WorkoutCheckpointStore>();
+        if (checkpoint.read()?.sessionId == id) await checkpoint.clear();
+      },
+    ),
   );
   sl.registerLazySingleton(
     () => LogWorkout(
       repository: sl<ActivityRepository>(),
-      weightKg: () async => (await sl<AuthRepository>().getCurrentUser())
-          .fold((_) => null, (user) => user?.weightKg),
+      weightKg: () => sl<BodyWeightSource>()(),
     ),
   );
-  sl.registerLazySingleton(
-    () => WorkoutTimerStore(sl<SharedPreferences>()),
-  );
+  sl.registerLazySingleton(() => WorkoutTimerStore(sl<SharedPreferences>()));
   sl.registerLazySingleton<WorkoutTimerNotifier>(
     () => LocalWorkoutTimerNotifier(sl<FlutterLocalNotificationsPlugin>()),
   );
@@ -570,7 +600,7 @@ Future<void> initDependencies() async {
       getLiveLocationStream: sl<GetLiveLocationStream>(),
       getLiveStepsStream: sl<GetLiveStepsStream>(),
       stopAndSaveSession: sl<StopAndSaveSession>(),
-      authRepository: sl<AuthRepository>(),
+      weightKg: () => sl<BodyWeightSource>()(),
       checkpointStore: sl<WorkoutCheckpointStore>(),
     ),
   );
@@ -599,6 +629,13 @@ Future<void> initDependencies() async {
     () => InAppAudioDownloader(sl<IsarService>()),
   );
   sl.registerLazySingleton<VoiceCoachService>(() => VoiceCoachService());
+  sl.registerLazySingleton(
+    () => TimerVoiceCoach(
+      store: sl<WorkoutTimerStore>(),
+      voice: sl<VoiceCoachService>(),
+      weightKg: () => sl<BodyWeightSource>()(),
+    ),
+  );
   // 10. Dashboard / Screen Time / Sleep
   sl.registerLazySingleton<vital_up_dashboard.ScreenTimeService>(
     () => vital_up_dashboard.ScreenTimeService(sl<SharedPreferences>()),
@@ -665,10 +702,9 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<VitaRepository>(
     () => VitaRepositoryImpl(
-      remote: VitaRemoteDataSource(sl<SupabaseClient>()),
+      remote: VitaRemoteDataSource(sl<SupabaseClient>(), sl<AiQuotaService>()),
       local: VitaLocalDataSource(sl<SharedPreferences>()),
       snapshots: sl<HealthSnapshotBuilder>(),
-      vitals: sl<HealthVitalsService>(),
       supabase: sl<SupabaseClient>(),
       consent: sl<VitaAiConsent>(),
       events: sl<HabitEvents>(),
@@ -686,6 +722,14 @@ Future<void> initDependencies() async {
     ),
   );
   sl.registerFactory(() => ActivityGoalsCubit(sl<ActivityGoalsRepository>()));
+  sl.registerLazySingleton(
+    () => StartingGoalsWriter(
+      water: sl<WaterIntakeService>(),
+      sleep: sl<SleepService>(),
+      screenTime: sl<vital_up_dashboard.ScreenTimeService>(),
+      activity: sl<ActivityGoalsRepository>(),
+    ),
+  );
 
   // 14. Gamification: points, levels, badges, streaks
   sl.registerLazySingleton<DailyMetricsCollector>(
@@ -782,6 +826,17 @@ Future<void> initDependencies() async {
     () => ReminderScheduler(sl<FlutterLocalNotificationsPlugin>()),
   );
 
+  // Feature tips: a rare notification about a feature not tried yet.
+  sl.registerLazySingleton(
+    () => FeatureTipsService(
+      sl<SharedPreferences>(),
+      LocalTipScheduler(
+        sl<FlutterLocalNotificationsPlugin>(),
+        sl<ReminderScheduler>(),
+      ),
+    ),
+  );
+
   sl.registerLazySingleton(
     () => RemindersService(
       RemindersLocalDataSource(sl<SharedPreferences>()),
@@ -851,6 +906,7 @@ Future<void> initDependencies() async {
       ],
       sl<ConnectivityService>(),
       sl<PendingWrites>(),
+      beforeFirstSync: (userId) => sl<AccountService>().claimDevice(userId),
     ),
   );
 
@@ -881,6 +937,7 @@ Future<void> initDependencies() async {
       sl<CacheStore>(),
       sl<OnboardingDataStore>(),
       sl<WorkoutTimerNotifier>(),
+      () => sl<OfflineMapService>().clearAll(),
     ),
   );
 

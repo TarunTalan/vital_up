@@ -51,7 +51,7 @@ class ChallengesPage extends StatelessWidget {
                       )
                       .toList(),
                 ),
-                ('History', challenges.where((c) => !open(c)).toList()),
+                ('Finished', challenges.where((c) => !open(c)).toList()),
               ];
         return AppScaffold(
           onRefresh: () async => cubit.load(),
@@ -64,8 +64,8 @@ class ChallengesPage extends StatelessWidget {
           ),
           body: challenges == null
               ? state.failed
-                  ? LoadErrorView(onRetry: cubit.load)
-                  : const Center(child: VitalUpLoader())
+                    ? LoadErrorView(onRetry: cubit.load)
+                    : const Center(child: VitalUpLoader())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

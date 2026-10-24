@@ -4,16 +4,26 @@ import '../../domain/entities/onboarding_data.dart';
 import '../../data/datasources/onboarding_data_store.dart';
 import '../../domain/repositories/onboarding_repository.dart';
 import '../../domain/usecases/calculate_calorie_goal.dart';
+
 class OnboardingCubit extends Cubit<OnboardingData> {
   final OnboardingDataStore _onboardingDataStore;
   final OnboardingRepository _onboardingRepository;
-  final CalculateCalorieGoal _calculateCalorieGoal = const CalculateCalorieGoal();
+  final CalculateCalorieGoal _calculateCalorieGoal =
+      const CalculateCalorieGoal();
 
-  OnboardingCubit(this._onboardingDataStore, this._onboardingRepository) : super(const OnboardingData()) {
-    _loadSavedData();
+  OnboardingCubit(this._onboardingDataStore, this._onboardingRepository)
+    : super(const OnboardingData()) {
+    reload();
   }
 
-  Future<void> _loadSavedData() async {
+  /// Reads the saved answers again. The cubit lives as long as the app, so
+  /// the flow calls this on open: after a sign-out (which wipes the
+  /// answers) the next account must not see the previous one's in memory.
+  Future<void> reload() async {
+    if (state.currentStep != 'loading' ||
+        state.status != SubmissionStatus.initial) {
+      emit(const OnboardingData());
+    }
     final fullName = await _onboardingDataStore.getFullName();
     final dob = await _onboardingDataStore.getDob();
     final gender = await _onboardingDataStore.getGender();
@@ -25,7 +35,8 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final calorieGoal = await _onboardingDataStore.getCalorieGoal();
     final targetWeight = await _onboardingDataStore.getTargetWeight();
     final targetWeightUnit = await _onboardingDataStore.getTargetWeightUnit();
-    final goalDurationMonths = await _onboardingDataStore.getGoalDurationMonths();
+    final goalDurationMonths = await _onboardingDataStore
+        .getGoalDurationMonths();
     final goalType = await _onboardingDataStore.getGoalType();
     final weeklyPace = await _onboardingDataStore.getWeeklyPace();
     final healthConditions = await _onboardingDataStore.getHealthConditions();
@@ -39,46 +50,62 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final sleep = await _onboardingDataStore.getSleep();
     if (isClosed) return;
 
-    emit(OnboardingData(
-      fullName: fullName,
-      dob: dob,
-      gender: gender,
-      weight: weight.isEmpty ? "70" : weight,
-      weightUnit: weightUnit.isEmpty ? "kg" : weightUnit,
-      height: height,
-      heightUnit: heightUnit.isEmpty ? "cm" : heightUnit,
-      calorieGoal: calorieGoal,
-      targetWeight: targetWeight,
-      targetWeightUnit: targetWeightUnit,
-      goalDurationMonths: goalDurationMonths,
-      goalType: goalType,
-      weeklyPace: weeklyPace,
-      healthConditions: healthConditions,
-      medicines: medicines,
-      allergies: allergies,
-      smokes: smokes,
-      bloodPressureTop: bpTop,
-      bloodPressureBottom: bpBottom,
-      dietaryPreference: dietaryPreference,
-      activity: activity,
-      sleep: sleep,
-      currentStep: savedStep.isEmpty ? "personal_details" : savedStep,
-    ));
+    emit(
+      OnboardingData(
+        fullName: fullName,
+        dob: dob,
+        gender: gender,
+        // Empty until the user picks one: a skipped weight must not be
+        // saved as a made-up 70 kg.
+        weight: weight,
+        weightUnit: weightUnit.isEmpty ? "kg" : weightUnit,
+        height: height,
+        heightUnit: heightUnit.isEmpty ? "cm" : heightUnit,
+        calorieGoal: calorieGoal,
+        targetWeight: targetWeight,
+        targetWeightUnit: targetWeightUnit,
+        goalDurationMonths: goalDurationMonths,
+        goalType: goalType,
+        weeklyPace: weeklyPace,
+        healthConditions: healthConditions,
+        medicines: medicines,
+        allergies: allergies,
+        smokes: smokes,
+        bloodPressureTop: bpTop,
+        bloodPressureBottom: bpBottom,
+        dietaryPreference: dietaryPreference,
+        activity: activity,
+        sleep: sleep,
+        currentStep: savedStep.isEmpty ? "personal_details" : savedStep,
+      ),
+    );
   }
 
   Future<void> updateFullName(String name) async {
     emit(state.copyWith(fullName: name));
-    await _onboardingDataStore.savePersonalDetails(name, state.dob, state.gender);
+    await _onboardingDataStore.savePersonalDetails(
+      name,
+      state.dob,
+      state.gender,
+    );
   }
 
   Future<void> updateDob(String dob) async {
     emit(state.copyWith(dob: dob));
-    await _onboardingDataStore.savePersonalDetails(state.fullName, dob, state.gender);
+    await _onboardingDataStore.savePersonalDetails(
+      state.fullName,
+      dob,
+      state.gender,
+    );
   }
 
   Future<void> updateGender(String gender) async {
     emit(state.copyWith(gender: gender));
-    await _onboardingDataStore.savePersonalDetails(state.fullName, state.dob, gender);
+    await _onboardingDataStore.savePersonalDetails(
+      state.fullName,
+      state.dob,
+      gender,
+    );
   }
 
   Future<void> updateWeight(String weight, String unit) async {
@@ -100,13 +127,15 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     required String targetWeightUnit,
     required String goalDurationMonths,
   }) async {
-    emit(state.copyWith(
-      goalType: goalType,
-      weeklyPace: weeklyPace,
-      targetWeight: targetWeight,
-      targetWeightUnit: targetWeightUnit,
-      goalDurationMonths: goalDurationMonths,
-    ));
+    emit(
+      state.copyWith(
+        goalType: goalType,
+        weeklyPace: weeklyPace,
+        targetWeight: targetWeight,
+        targetWeightUnit: targetWeightUnit,
+        goalDurationMonths: goalDurationMonths,
+      ),
+    );
     await _onboardingDataStore.saveGoals(
       state.calorieGoal,
       targetWeight,
@@ -169,15 +198,23 @@ class OnboardingCubit extends Cubit<OnboardingData> {
     final newDietaryPreference = dietaryPreference ?? state.dietaryPreference;
     final newActivity = activity ?? state.activity;
     final newSleep = sleep ?? state.sleep;
-    
-    emit(state.copyWith(
-      bloodPressureTop: newTop,
-      bloodPressureBottom: newBottom,
-      dietaryPreference: newDietaryPreference,
-      activity: newActivity,
-      sleep: newSleep,
-    ));
-    await _onboardingDataStore.saveHealthVitals(newTop, newBottom, newDietaryPreference, newActivity, newSleep);
+
+    emit(
+      state.copyWith(
+        bloodPressureTop: newTop,
+        bloodPressureBottom: newBottom,
+        dietaryPreference: newDietaryPreference,
+        activity: newActivity,
+        sleep: newSleep,
+      ),
+    );
+    await _onboardingDataStore.saveHealthVitals(
+      newTop,
+      newBottom,
+      newDietaryPreference,
+      newActivity,
+      newSleep,
+    );
   }
 
   Future<void> setCurrentStep(String step) async {
@@ -211,10 +248,12 @@ class OnboardingCubit extends Cubit<OnboardingData> {
 
     final failure = result.fold((f) => f, (_) => null);
     if (failure != null) {
-      emit(state.copyWith(
-        status: SubmissionStatus.error,
-        errorMessage: failure.message,
-      ));
+      emit(
+        state.copyWith(
+          status: SubmissionStatus.error,
+          errorMessage: failure.message,
+        ),
+      );
       return;
     }
     try {

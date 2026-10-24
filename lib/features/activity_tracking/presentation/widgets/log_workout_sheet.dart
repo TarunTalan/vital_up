@@ -63,7 +63,10 @@ class _LogWorkoutSheetState extends State<_LogWorkoutSheet> {
     final now = DateTime.now();
     final start = now.subtract(const Duration(minutes: 45));
     _day = startOfDay(start);
-    _startTime = TimeOfDay(hour: start.hour, minute: start.minute - start.minute % 5);
+    _startTime = TimeOfDay(
+      hour: start.hour,
+      minute: start.minute - start.minute % 5,
+    );
   }
 
   @override
@@ -96,7 +99,9 @@ class _LogWorkoutSheetState extends State<_LogWorkoutSheet> {
     );
     final picked = await showDatePicker(
       context: context,
-      initialDate: _day.isBefore(first) ? first : (_day.isAfter(today) ? today : _day),
+      initialDate: _day.isBefore(first)
+          ? first
+          : (_day.isAfter(today) ? today : _day),
       firstDate: first,
       lastDate: today,
       helpText: 'Workout date',

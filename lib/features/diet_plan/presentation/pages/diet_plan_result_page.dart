@@ -11,6 +11,7 @@ import 'package:vital_up/features/diet_plan/domain/usecases/calculate_target_fro
 import 'package:vital_up/features/diet_plan/domain/usecases/get_active_meal_plan.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_cubit.dart';
 import 'package:vital_up/features/diet_plan/presentation/cubit/diet_plan_state.dart';
+import 'package:vital_up/features/diet_plan/presentation/widgets/meal_alternatives.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
@@ -24,6 +25,8 @@ import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/subscription/domain/pro_limits.dart';
 import 'package:vital_up/features/subscription/presentation/cubit/subscription_cubit.dart';
 import 'package:vital_up/features/subscription/presentation/widgets/pro_paywall.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
+import 'package:vital_up/features/subscription/presentation/widgets/ai_quota_line.dart';
 import 'package:vital_up/features/vita/presentation/pages/vita_chat_page.dart';
 
 class DietPlanResultPage extends StatefulWidget {
@@ -215,10 +218,7 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
   /// Today's plans are used up: free users can start Pro, then the plan
   /// is made.
   Future<void> _offerPro() async {
-    final started = await showProPaywall(
-      context,
-      reason: ProReason.dietPlans,
-    );
+    final started = await showProPaywall(context, reason: ProReason.dietPlans);
     if (started && mounted && _target != null) _retry();
   }
 
@@ -375,6 +375,9 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Regenerate and Vita's tweaks each use one of today's plans.
+        const AiQuotaLine(quota: AiQuota.dietPlan),
+        const SizedBox(height: AppDimens.space8),
         Row(
           children: [
             Expanded(
@@ -431,8 +434,19 @@ class _DietPlanResultPageState extends State<DietPlanResultPage> {
         const SizedBox(height: AppDimens.sectionGap),
         Text('Meals', style: context.text.headlineSmall),
         const SizedBox(height: AppDimens.cardGap),
-        for (final meal in plan.meals) ...[
-          _MealCard(meal: meal),
+        for (final (i, meal) in plan.meals.indexed) ...[
+          _MealCard(
+            meal: meal,
+            // A new plan is saved with "Set as active plan"; the active
+            // one (opened to view) saves each swap at once.
+            onOptions: () => pickMealAlternative(
+              context,
+              _cubit,
+              plan,
+              i,
+              save: _mode == 'cached',
+            ),
+          ),
           const SizedBox(height: AppDimens.cardGap),
         ],
       ],
@@ -584,8 +598,9 @@ class _MacroLegend extends StatelessWidget {
 
 class _MealCard extends StatelessWidget {
   final Meal meal;
+  final VoidCallback onOptions;
 
-  const _MealCard({required this.meal});
+  const _MealCard({required this.meal, required this.onOptions});
 
   @override
   Widget build(BuildContext context) {
@@ -637,6 +652,10 @@ class _MealCard extends StatelessWidget {
               ),
             ),
           ),
+          if (meal.alternatives.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.space4),
+            MealAlternativesLink(meal: meal, onTap: onOptions),
+          ],
         ],
       ),
     );

@@ -50,7 +50,10 @@ class AppErrorFallback extends StatelessWidget {
                     message,
                     textAlign: TextAlign.center,
                     style: (theme.textTheme.bodyMedium ?? const TextStyle())
-                        .copyWith(color: muted, decoration: TextDecoration.none),
+                        .copyWith(
+                          color: muted,
+                          decoration: TextDecoration.none,
+                        ),
                   ),
                   if (actionLabel != null && onAction != null) ...[
                     const SizedBox(height: AppDimens.space8),

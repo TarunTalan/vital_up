@@ -12,9 +12,6 @@ import 'package:vital_up/features/activity_tracking/domain/entities/workout_time
 abstract class WorkoutTimerNotifier {
   Future<void> show(WorkoutTimer timer, DateTime now);
   Future<void> cancel();
-
-  /// Asks for notification permission (Android 13+) when starting a timer.
-  Future<void> requestPermission();
 }
 
 /// The timer as an ongoing notification: a live system chronometer while
@@ -91,9 +88,7 @@ class LocalWorkoutTimerNotifier implements WorkoutTimerNotifier {
             // without the app running.
             showWhen: running,
             usesChronometer: running,
-            when: running
-                ? now.subtract(elapsed).millisecondsSinceEpoch
-                : null,
+            when: running ? now.subtract(elapsed).millisecondsSinceEpoch : null,
             // The plugin removes a notification when one of its buttons is
             // tapped unless told not to; the action shows it again instead.
             actions: [
@@ -127,19 +122,6 @@ class LocalWorkoutTimerNotifier implements WorkoutTimerNotifier {
       debugPrint('Cancelling workout timer notification failed: $e');
     }
   }
-
-  @override
-  Future<void> requestPermission() async {
-    try {
-      await plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
-    } catch (e) {
-      debugPrint('Notification permission request failed: $e');
-    }
-  }
 }
 
 /// Pause / Resume tapped on the timer notification. Updates the saved timer
@@ -154,7 +136,9 @@ Future<void> handleWorkoutTimerAction(
 }) async {
   final background = prefs == null;
   if (background) DartPluginRegistrant.ensureInitialized();
-  final store = WorkoutTimerStore(prefs ?? await SharedPreferences.getInstance());
+  final store = WorkoutTimerStore(
+    prefs ?? await SharedPreferences.getInstance(),
+  );
   // Another isolate (the app or an earlier action) may have written since.
   await store.prefs.reload();
 

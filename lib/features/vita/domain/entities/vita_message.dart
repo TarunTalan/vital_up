@@ -4,10 +4,10 @@ enum VitaSender { vita, user }
 
 /// Follow-up a Vita reply can offer as a button inside its bubble.
 enum VitaAction {
-  viewDietPlan('View Diet Plan', 'view_diet_plan'),
-  updateDietPlan('Update My Plan', 'update_diet_plan'),
-  viewAnalysis('View Health Analysis', 'view_analysis'),
-  viewStressGuide('Open Stress Guide', 'view_stress_guide');
+  viewDietPlan('View diet plan', 'view_diet_plan'),
+  updateDietPlan('Update my plan', 'update_diet_plan'),
+  viewAnalysis('View health analysis', 'view_analysis'),
+  viewStressGuide('Open stress guide', 'view_stress_guide');
 
   final String label;
 
@@ -51,41 +51,49 @@ class VitaMessage extends Equatable {
   bool get isFromVita => sender == VitaSender.vita;
 
   VitaMessage copyWith({bool? failed}) => VitaMessage(
-        sender: sender,
-        text: text,
-        sentAt: sentAt,
-        bullets: bullets,
-        action: action,
-        planInstructions: planInstructions,
-        failed: failed ?? this.failed,
-      );
+    sender: sender,
+    text: text,
+    sentAt: sentAt,
+    bullets: bullets,
+    action: action,
+    planInstructions: planInstructions,
+    failed: failed ?? this.failed,
+  );
 
   Map<String, dynamic> toJson() => {
-        's': sender.name,
-        't': text,
-        'at': sentAt.toIso8601String(),
-        if (bullets.isNotEmpty) 'b': bullets,
-        if (action != null) 'a': action!.wire,
-        if (planInstructions != null) 'pi': planInstructions,
-        if (failed) 'f': true,
-      };
+    's': sender.name,
+    't': text,
+    'at': sentAt.toIso8601String(),
+    if (bullets.isNotEmpty) 'b': bullets,
+    if (action != null) 'a': action!.wire,
+    if (planInstructions != null) 'pi': planInstructions,
+    if (failed) 'f': true,
+  };
 
   factory VitaMessage.fromJson(Map<String, dynamic> json) => VitaMessage(
-        sender: json['s'] == VitaSender.user.name
-            ? VitaSender.user
-            : VitaSender.vita,
-        text: json['t'] is String ? json['t'] as String : '',
-        sentAt: DateTime.tryParse(json['at'] is String ? json['at'] as String : '') ??
-            DateTime.now(),
-        bullets: json['b'] is List
-            ? (json['b'] as List).whereType<String>().toList()
-            : const [],
-        action: VitaAction.fromWire(json['a']),
-        planInstructions: json['pi'] is String ? json['pi'] as String : null,
-        failed: json['f'] == true,
-      );
+    sender: json['s'] == VitaSender.user.name
+        ? VitaSender.user
+        : VitaSender.vita,
+    text: json['t'] is String ? json['t'] as String : '',
+    sentAt:
+        DateTime.tryParse(json['at'] is String ? json['at'] as String : '') ??
+        DateTime.now(),
+    bullets: json['b'] is List
+        ? (json['b'] as List).whereType<String>().toList()
+        : const [],
+    action: VitaAction.fromWire(json['a']),
+    planInstructions: json['pi'] is String ? json['pi'] as String : null,
+    failed: json['f'] == true,
+  );
 
   @override
-  List<Object?> get props =>
-      [sender, text, bullets, action, planInstructions, sentAt, failed];
+  List<Object?> get props => [
+    sender,
+    text,
+    bullets,
+    action,
+    planInstructions,
+    sentAt,
+    failed,
+  ];
 }

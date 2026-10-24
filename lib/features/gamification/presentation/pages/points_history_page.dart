@@ -4,11 +4,18 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
+import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_editors.dart';
+import 'package:vital_up/features/gamification/data/services/daily_metrics_collector.dart';
+import 'package:vital_up/features/gamification/domain/entities/point_goal.dart';
+import 'package:vital_up/features/gamification/presentation/widgets/point_goals_nudge.dart';
 import 'package:vital_up/features/gamification/domain/entities/player_stats.dart';
 import 'package:vital_up/features/gamification/domain/entities/point_event.dart';
 import 'package:vital_up/features/gamification/domain/entities/score_category.dart';
@@ -33,6 +40,30 @@ class PointsHistoryPage extends StatefulWidget {
 class _PointsHistoryPageState extends State<PointsHistoryPage> {
   late Future<_HistoryData> _data = _load();
 
+  /// Goals some rules need that aren't set: those rules get a link.
+  Set<PointGoal> _missing = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMissing();
+  }
+
+  Future<void> _loadMissing() async {
+    try {
+      final missing = await sl<DailyMetricsCollector>().missingPointGoals();
+      if (mounted) setState(() => _missing = missing);
+    } catch (e) {
+      debugPrint('Point goals unavailable: $e');
+    }
+  }
+
+  Future<void> _setGoal(PointGoal goal) async {
+    if (await editTrackerGoal(context, goal.metric) && mounted) {
+      _loadMissing();
+    }
+  }
+
   Future<_HistoryData> _load() {
     final repo = sl<GamificationRepository>();
     return (
@@ -46,15 +77,20 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
   Widget build(BuildContext context) {
     return AppScaffold(
       // Keeps the pull spinner up until the new data has arrived.
+      // The current points stay on screen until the new ones arrive; a
+      // failed refresh keeps them and says so.
       onRefresh: () async {
-        final next = _load();
-        setState(() {
-          _data = next;
-        });
         try {
-          await next;
-        } catch (_) {
-          // Shown by the FutureBuilder below.
+          final next = await _load();
+          if (!mounted) return;
+          setState(() {
+            _data = Future.value(next);
+          });
+        } catch (e) {
+          debugPrint('Refreshing points history failed: $e');
+          if (mounted) {
+            showErrorSnackBar(this.context, "Couldn't refresh your points.");
+          }
         }
       },
       header: const AppPageHeader(title: 'Points'),
@@ -80,58 +116,67 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  LevelRing(stats: stats),
-                  const SizedBox(width: AppDimens.space16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              AppCard(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          '${_points.format(stats.totalPoints)} pts',
-                          style: context.text.headlineSmall,
-                        ),
-                        Row(
-                          children: [
-                            GameIcon(
-                              GamificationIcons.levelHexagon(stats.level.level),
-                              fallback: Icons.shield_rounded,
-                              size: AppDimens.iconSm,
-                              color: context.colors.primary,
-                            ),
-                            const SizedBox(width: AppDimens.space6),
-                            Flexible(
-                              child: Text(
-                                'Level ${stats.level.level} · ${stats.level.title}',
-                                style: context.text.bodyMedium?.copyWith(
-                                  color: context.vColors.grayText,
-                                ),
+                        LevelRing(stats: stats),
+                        const SizedBox(width: AppDimens.space16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_points.format(stats.totalPoints)} pts',
+                                style: context.text.headlineSmall,
                               ),
-                            ),
-                          ],
+                              Row(
+                                children: [
+                                  GameIcon(
+                                    GamificationIcons.levelHexagon(
+                                      stats.level.level,
+                                    ),
+                                    fallback: Icons.shield_rounded,
+                                    size: AppDimens.iconSm,
+                                    color: context.colors.primary,
+                                  ),
+                                  const SizedBox(width: AppDimens.space6),
+                                  Flexible(
+                                    child: Text(
+                                      'Level ${stats.level.level} · ${stats.level.title}',
+                                      style: context.text.bodyMedium?.copyWith(
+                                        color: context.vColors.grayText,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppDimens.space8),
+                              StreakPill(streak: stats.streak),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: AppDimens.space8),
-                        StreakPill(streak: stats.streak),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.cardInnerGap),
-              AdaptiveRow(
-                children: [
-                  for (final c in ScoreCategory.values)
-                    CategoryPointsTile(
-                      category: c,
-                      points: stats.pointsIn(c),
-                      signed: false,
+                    const SizedBox(height: AppDimens.cardInnerGap),
+                    AdaptiveRow(
+                      children: [
+                        for (final c in ScoreCategory.values)
+                          CategoryPointsTile(
+                            category: c,
+                            points: stats.pointsIn(c),
+                            signed: false,
+                          ),
+                      ],
                     ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: AppDimens.sectionGap),
-              Text('Last 30 days', style: context.text.titleMedium),
-              const SizedBox(height: AppDimens.space12),
+              const AppSectionHeader('Last 30 days'),
               if (days.isEmpty)
                 const AppInfoNote(
                   message:
@@ -143,8 +188,7 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                 const SizedBox(height: AppDimens.cardGap),
               ],
               const SizedBox(height: AppDimens.space12),
-              Text('How to earn', style: context.text.titleMedium),
-              const SizedBox(height: AppDimens.space12),
+              const AppSectionHeader('How to earn'),
               for (final c in ScoreCategory.values)
                 if (rules.any((r) => r.category == c && r.points > 0)) ...[
                   _RulesCard(
@@ -153,6 +197,8 @@ class _PointsHistoryPageState extends State<PointsHistoryPage> {
                       for (final r in rules)
                         if (r.category == c && r.points > 0) r,
                     ],
+                    missing: _missing,
+                    onSetGoal: _setGoal,
                   ),
                   const SizedBox(height: AppDimens.cardGap),
                 ],
@@ -191,12 +237,7 @@ class _DayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = events.fold<int>(0, (sum, e) => sum + e.points);
-    final today = startOfDay(DateTime.now());
-    final label = day == today
-        ? 'Today'
-        : day == DateTime(today.year, today.month, today.day - 1)
-        ? 'Yesterday'
-        : DateFormat('EEE, MMM d').format(day);
+    final label = formatLogDay(day);
     final sorted = [...events]
       ..sort(
         (a, b) => a.category.index != b.category.index
@@ -215,7 +256,7 @@ class _DayCard extends StatelessWidget {
               Text(
                 '+${_points.format(total)}',
                 style: context.text.titleSmall?.copyWith(
-                  color: context.colors.primary,
+                  color: context.vColors.accentText,
                 ),
               ),
             ],
@@ -254,8 +295,15 @@ class _DayCard extends StatelessWidget {
 class _RulesCard extends StatelessWidget {
   final ScoreCategory category;
   final List<PointRule> rules;
+  final Set<PointGoal> missing;
+  final ValueChanged<PointGoal> onSetGoal;
 
-  const _RulesCard({required this.category, required this.rules});
+  const _RulesCard({
+    required this.category,
+    required this.rules,
+    required this.missing,
+    required this.onSetGoal,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,12 +318,12 @@ class _RulesCard extends StatelessWidget {
                   ? GameIcon(
                       category.iconAsset!,
                       fallback: category.icon,
-                      color: category.color,
+                      color: context.iconTint(category.color),
                       size: AppDimens.iconMd,
                     )
                   : Icon(
                       category.icon,
-                      color: category.color,
+                      color: context.iconTint(category.color),
                       size: AppDimens.iconMd,
                     ),
               const SizedBox(width: AppDimens.space8),
@@ -283,21 +331,19 @@ class _RulesCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppDimens.space8),
+          // Points under each rule, so long rule names never get squeezed.
           for (final r in rules)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      r.name,
-                      style: context.text.bodyMedium?.copyWith(
-                        color: context.colors.onSurface,
-                      ),
+                  Text(
+                    r.name,
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurface,
                     ),
                   ),
-                  const SizedBox(width: AppDimens.space8),
                   Text(
                     '+${r.points} ${r.unit}'
                     '${r.dailyCap != null && r.dailyCap != r.points ? ' · max ${r.dailyCap}/day' : ''}',
@@ -305,10 +351,58 @@ class _RulesCard extends StatelessWidget {
                       color: context.vColors.grayText,
                     ),
                   ),
+                  // Out of reach until the goal it needs is set.
+                  if (PointGoal.forSource(r.source) case final goal?
+                      when missing.contains(goal))
+                    _GoalLink(goal: goal, onTap: () => onSetGoal(goal)),
                 ],
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Set a water goal ›": a text link under a rule that needs that goal,
+/// lined up with the rule's text.
+class _GoalLink extends StatelessWidget {
+  final PointGoal goal;
+  final VoidCallback onTap;
+
+  const _GoalLink({required this.goal, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.vColors.accentText;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Set ${goal == PointGoal.activity ? 'an' : 'a'} '
+                  '${goal.label} to earn these',
+                  style: context.text.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: AppDimens.iconSm,
+                color: color,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

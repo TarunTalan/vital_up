@@ -47,71 +47,72 @@ class _ResetCompletedPageState extends State<ResetCompletedPage> {
         body: AuthBackground(
           style: AuthBackgroundStyle.ellipses,
           child: ResponsiveCenter(
-              child: Column(
-                children: [
-                  AnimatedOpacity(
-                    opacity: _showContent ? 1.0 : 0.0,
-                    duration: animationDuration,
-                    child: AuthHeader(
-                      headerText: 'Password Changed',
-                      onBackClick: () => context.goNamed('dashboard'),
-                    ),
+            child: Column(
+              children: [
+                AnimatedOpacity(
+                  opacity: _showContent ? 1.0 : 0.0,
+                  duration: animationDuration,
+                  child: AuthHeader(
+                    headerText: 'Password Changed',
+                    onBackClick: () => context.goNamed('dashboard'),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                          physics: const ClampingScrollPhysics(),
-                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                              child: Padding(
-                                padding: context.pagePadding,
-                                child: Column(
-                                  children: [
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    AnimatedOpacity(
-                                      opacity: _showContent ? 1.0 : 0.0,
-                                      duration: animationDuration,
-                                      child: Text(
-                                        'Your password has been changed successfully.',
-                                        style: context.text.bodyLarge?.copyWith(
-                                              color: colors.onSurface,
-                                            ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    // The tick is always rendered in its final spot
-                                    AnimatedTick(
-                                      play: _playAnimation,
-                                      completed: _showContent,
-                                      totalSize: AppDimens.successBadge,
-                                      tickSize: AppDimens.successTick,
-                                      onFinished: () {
-                                        if (mounted) {
-                                          setState(() {
-                                            _showContent = true;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                    AnimatedOpacity(
-                                      opacity: _showContent ? 1.0 : 0.0,
-                                      duration: animationDuration,
-                                      child: PrimaryAuthButton(
-                                        label: 'Go to Dashboard',
-                                        isLoading: false,
-                                        onTap: () {
-                                          context.goNamed('dashboard');
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(height: context.h(AppDimens.space32)),
-                                  ],
-                                ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Padding(
+                      padding: context.pagePadding,
+                      child: Column(
+                        children: [
+                          SizedBox(height: context.h(AppDimens.space32)),
+                          AnimatedOpacity(
+                            opacity: _showContent ? 1.0 : 0.0,
+                            duration: animationDuration,
+                            child: Text(
+                              'Your password has been changed successfully.',
+                              style: context.text.bodyLarge?.copyWith(
+                                color: colors.onSurface,
                               ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(height: context.h(AppDimens.space32)),
+                          // The tick is always rendered in its final spot
+                          AnimatedTick(
+                            play: _playAnimation,
+                            completed: _showContent,
+                            totalSize: AppDimens.successBadge,
+                            tickSize: AppDimens.successTick,
+                            onFinished: () {
+                              if (mounted) {
+                                setState(() {
+                                  _showContent = true;
+                                });
+                              }
+                            },
+                          ),
+                          SizedBox(height: context.h(AppDimens.space32)),
+                          AnimatedOpacity(
+                            opacity: _showContent ? 1.0 : 0.0,
+                            duration: animationDuration,
+                            child: PrimaryAuthButton(
+                              label: 'Go to Dashboard',
+                              isLoading: false,
+                              onTap: () {
+                                context.goNamed('dashboard');
+                              },
+                            ),
+                          ),
+                          SizedBox(height: context.h(AppDimens.space32)),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

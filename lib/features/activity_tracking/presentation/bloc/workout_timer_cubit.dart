@@ -163,8 +163,8 @@ class WorkoutTimerCubit extends Cubit<WorkoutTimerState> {
 
   Future<void> start() async {
     if (state.isStarted) return;
-    // Without it the tray can't show the timer (the timer still works).
-    await notifier?.requestPermission();
+    // Notification permission is asked by the page's card first (without
+    // it the tray can't show the timer; the timer still works).
     await _save(WorkoutTimer.start(state.type, _clock()));
   }
 

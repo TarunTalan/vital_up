@@ -14,22 +14,19 @@ HealthSnapshot _snapshot({
   int mealsWeek = 0,
   int mealDays = 0,
   int? steps,
-  VitalsSnapshot vitals = const VitalsSnapshot(),
   ProfileSnapshot profile = const ProfileSnapshot(),
-}) =>
-    HealthSnapshot(
-      takenAt: DateTime(2026, 10, 1, hour),
-      profile: profile,
-      sleepLastNightHours: sleep,
-      screenTimeTodayMinutes: screenMinutes,
-      tracksWater: tracksWater,
-      waterTodayMl: waterMl,
-      mealsToday: mealsToday,
-      mealsThisWeek: mealsWeek,
-      daysWithMealsThisWeek: mealDays,
-      stepsToday: steps,
-      vitals: vitals,
-    );
+}) => HealthSnapshot(
+  takenAt: DateTime(2026, 10, 1, hour),
+  profile: profile,
+  sleepLastNightHours: sleep,
+  screenTimeTodayMinutes: screenMinutes,
+  tracksWater: tracksWater,
+  waterTodayMl: waterMl,
+  mealsToday: mealsToday,
+  mealsThisWeek: mealsWeek,
+  daysWithMealsThisWeek: mealDays,
+  stepsToday: steps,
+);
 
 void main() {
   const estimator = StressEstimator();
@@ -100,24 +97,6 @@ void main() {
       expect(report.level, StressLevel.high);
     });
 
-    test('HRV well below baseline raises the wearable score', () {
-      final vitals = const VitalsSnapshot(hrvMs: 30, hrvBaselineMs: 50);
-      expect(estimator.wearableScore(vitals), greaterThan(65));
-      final report = estimator.estimate(snapshot: _snapshot(vitals: vitals));
-      expect(report.source, StressSource.wearable);
-      expect(
-        report.triggers.map((t) => t.name),
-        contains('Lower heart-rate variability'),
-      );
-    });
-
-    test('wearable score is null without a baseline', () {
-      expect(
-        estimator.wearableScore(const VitalsSnapshot(hrvMs: 40)),
-        isNull,
-      );
-    });
-
     test('trend compares with yesterday', () {
       expect(estimator.trendText(60, 40), 'Higher than yesterday');
       expect(estimator.trendText(40, 60), 'Lower than yesterday');
@@ -130,7 +109,10 @@ void main() {
 
     test('only shows rows backed by data (stress always present)', () {
       final snapshot = _snapshot();
-      final rows = builder.build(snapshot, estimator.estimate(snapshot: snapshot));
+      final rows = builder.build(
+        snapshot,
+        estimator.estimate(snapshot: snapshot),
+      );
       expect(rows.map((r) => r.kind), [HealthSignalKind.stress]);
     });
 
@@ -142,22 +124,39 @@ void main() {
         avgCaloriesPerDay: 1840,
         sleepLastNightHours: 6.2,
         stepsToday: 7240,
-        vitals: const VitalsSnapshot(avgHeartRate: 72, spo2Percent: 98),
-        profile: const ProfileSnapshot(medicines: 'Metformin'),
+        profile: const ProfileSnapshot(
+          medicines: 'Metformin',
+          bloodPressureTop: 120,
+          bloodPressureBottom: 80,
+        ),
       );
-      final rows = builder.build(snapshot, estimator.estimate(snapshot: snapshot));
+      final rows = builder.build(
+        snapshot,
+        estimator.estimate(snapshot: snapshot),
+      );
       final byKind = {for (final r in rows) r.kind: r.summary};
 
-      expect(byKind[HealthSignalKind.diet], 'Tracked 18 meals · Avg 1840 cal/day');
-      expect(byKind[HealthSignalKind.metrics], 'HR avg 72bpm · SpO2 98%');
+      expect(
+        byKind[HealthSignalKind.diet],
+        'Tracked 18 meals · Avg 1840 cal/day',
+      );
+      expect(byKind[HealthSignalKind.metrics], 'From your profile: BP 120/80');
       expect(byKind[HealthSignalKind.sleep], '6.2h last night');
       expect(byKind[HealthSignalKind.activity], '7,240 steps today');
-      expect(byKind[HealthSignalKind.medication], 'From your profile: Metformin');
+      expect(
+        byKind[HealthSignalKind.medication],
+        'From your profile: Metformin',
+      );
     });
 
     test('ignores "none" profile answers', () {
-      final snapshot = _snapshot(profile: const ProfileSnapshot(medicines: 'None'));
-      final rows = builder.build(snapshot, estimator.estimate(snapshot: snapshot));
+      final snapshot = _snapshot(
+        profile: const ProfileSnapshot(medicines: 'None'),
+      );
+      final rows = builder.build(
+        snapshot,
+        estimator.estimate(snapshot: snapshot),
+      );
       expect(rows.any((r) => r.kind == HealthSignalKind.medication), isFalse);
     });
   });

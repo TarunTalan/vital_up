@@ -4,7 +4,8 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_typ
 
 const _kVoiceCoachKey = 'workout_voice_coach';
 const _kCountdownKey = 'workout_countdown';
-const _kTargetTypeKey = 'workout_target_type'; // 'none' | 'distance' | 'calories'
+const _kTargetTypeKey =
+    'workout_target_type'; // 'none' | 'distance' | 'calories'
 const _kTargetValueKey = 'workout_target_value';
 const _kSelectedMetricsKey = 'workout_selected_metrics';
 // The workout timer's own target: [WorkoutTargetType.duration] (minutes) or
@@ -88,7 +89,8 @@ class WorkoutPrefs {
   /// The user's own layout; empty until they save one, and the workout
   /// shows [defaultStatsFor] its type instead.
   final List<StatMetric> selectedMetrics;
-  final String backgroundAudioTrack; // 'None', 'Story: It\'s Possible', 'Lo-Fi Jogging Beats', 'Synthwave Cardio Energy'
+  final String
+  backgroundAudioTrack; // 'None', 'Story: It\'s Possible', 'Lo-Fi Jogging Beats', 'Synthwave Cardio Energy'
   final String backgroundAudioQueueType; // 'curated', 'local', 'favorite'
   final String preferredPlayerPackage; // 'builtIn' or package name
 
@@ -123,13 +125,16 @@ class WorkoutPrefs {
   }) {
     return WorkoutPrefs(
       voiceCoachEnabled: voiceCoachEnabled ?? this.voiceCoachEnabled,
-      countdownDurationSeconds: countdownDurationSeconds ?? this.countdownDurationSeconds,
+      countdownDurationSeconds:
+          countdownDurationSeconds ?? this.countdownDurationSeconds,
       targetType: targetType ?? this.targetType,
       targetValue: targetValue ?? this.targetValue,
       selectedMetrics: selectedMetrics ?? this.selectedMetrics,
       backgroundAudioTrack: backgroundAudioTrack ?? this.backgroundAudioTrack,
-      backgroundAudioQueueType: backgroundAudioQueueType ?? this.backgroundAudioQueueType,
-      preferredPlayerPackage: preferredPlayerPackage ?? this.preferredPlayerPackage,
+      backgroundAudioQueueType:
+          backgroundAudioQueueType ?? this.backgroundAudioQueueType,
+      preferredPlayerPackage:
+          preferredPlayerPackage ?? this.preferredPlayerPackage,
       timerTargetType: timerTargetType ?? this.timerTargetType,
       timerTargetValue: timerTargetValue ?? this.timerTargetValue,
     );
@@ -139,6 +144,18 @@ class WorkoutPrefs {
 /// A [ValueNotifier] that loads / saves [WorkoutPrefs] in SharedPreferences.
 class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
   WorkoutPrefsNotifier() : super(const WorkoutPrefs());
+
+  /// The saved settings once, for code without a screen (the timer's
+  /// voice coach).
+  static Future<WorkoutPrefs> read() async {
+    final notifier = WorkoutPrefsNotifier();
+    try {
+      await notifier.load();
+      return notifier.value;
+    } finally {
+      notifier.dispose();
+    }
+  }
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -153,7 +170,12 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     List<StatMetric> metrics = const [];
     if (savedMetrics != null) {
       metrics = savedMetrics
-          .map((m) => StatMetric.values.firstWhere((e) => e.name == m, orElse: () => StatMetric.distance))
+          .map(
+            (m) => StatMetric.values.firstWhere(
+              (e) => e.name == m,
+              orElse: () => StatMetric.distance,
+            ),
+          )
           .toList();
     }
 
@@ -167,7 +189,8 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
     } else {
       defaultCountdown = 3;
     }
-    final countdownDuration = prefs.getInt('workout_countdown_duration') ?? defaultCountdown;
+    final countdownDuration =
+        prefs.getInt('workout_countdown_duration') ?? defaultCountdown;
 
     value = WorkoutPrefs(
       voiceCoachEnabled: prefs.getBool(_kVoiceCoachKey) ?? true,
@@ -176,14 +199,17 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
       targetValue: prefs.getDouble(_kTargetValueKey) ?? 0.0,
       selectedMetrics: metrics,
       backgroundAudioTrack: 'None',
-      backgroundAudioQueueType: (prefs.getString('workout_audio_queue_type') == 'curated')
+      backgroundAudioQueueType:
+          (prefs.getString('workout_audio_queue_type') == 'curated')
           ? 'stories'
           : (prefs.getString('workout_audio_queue_type') ?? 'stories'),
-      preferredPlayerPackage: prefs.getString('workout_preferred_player_package') ?? 'builtIn',
+      preferredPlayerPackage:
+          prefs.getString('workout_preferred_player_package') ?? 'builtIn',
       timerTargetType: WorkoutTargetType.values.firstWhere(
         (e) =>
             e.name == prefs.getString(_kTimerTargetTypeKey) &&
-            (e == WorkoutTargetType.duration || e == WorkoutTargetType.calories),
+            (e == WorkoutTargetType.duration ||
+                e == WorkoutTargetType.calories),
         orElse: () => WorkoutTargetType.none,
       ),
       timerTargetValue: prefs.getDouble(_kTimerTargetValueKey) ?? 0.0,
@@ -212,7 +238,9 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
 
   Future<void> clearTarget() async {
     value = value.copyWith(
-        targetType: WorkoutTargetType.none, targetValue: 0.0);
+      targetType: WorkoutTargetType.none,
+      targetValue: 0.0,
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kTargetTypeKey, WorkoutTargetType.none.name);
     await prefs.setDouble(_kTargetValueKey, 0.0);
@@ -221,11 +249,18 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
   Future<void> setSelectedMetrics(List<StatMetric> metrics) async {
     value = value.copyWith(selectedMetrics: metrics);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_kSelectedMetricsKey, metrics.map((e) => e.name).toList());
+    await prefs.setStringList(
+      _kSelectedMetricsKey,
+      metrics.map((e) => e.name).toList(),
+    );
   }
 
-  Future<void> setBackgroundAudioTrack(String track, {String? queueType}) async {
-    final resolvedQueueType = queueType ?? (track.startsWith('Local:') ? 'local' : 'stories');
+  Future<void> setBackgroundAudioTrack(
+    String track, {
+    String? queueType,
+  }) async {
+    final resolvedQueueType =
+        queueType ?? (track.startsWith('Local:') ? 'local' : 'stories');
     value = value.copyWith(
       backgroundAudioTrack: track,
       backgroundAudioQueueType: resolvedQueueType,
@@ -243,8 +278,14 @@ class WorkoutPrefsNotifier extends ValueNotifier<WorkoutPrefs> {
 
   /// The workout timer's target: [WorkoutTargetType.duration] (minutes) or
   /// calories.
-  Future<void> setTimerTarget(WorkoutTargetType type, double targetValue) async {
-    value = value.copyWith(timerTargetType: type, timerTargetValue: targetValue);
+  Future<void> setTimerTarget(
+    WorkoutTargetType type,
+    double targetValue,
+  ) async {
+    value = value.copyWith(
+      timerTargetType: type,
+      timerTargetValue: targetValue,
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kTimerTargetTypeKey, type.name);
     await prefs.setDouble(_kTimerTargetValueKey, targetValue);

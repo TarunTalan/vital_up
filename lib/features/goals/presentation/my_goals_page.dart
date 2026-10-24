@@ -68,13 +68,20 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
                 )
                 .join(' · '),
       TrackerMetric.mood: 'Check in once a day',
-      TrackerMetric.water:
-          '${formatWaterGoal(sl<WaterIntakeService>().getDailyGoal().toDouble())} a day',
-      TrackerMetric.sleep:
-          '${formatMinutesGoal(sl<SleepService>().getGoalMinutes().toDouble())} a night',
+      TrackerMetric.water: switch (sl<WaterIntakeService>().getDailyGoal()) {
+        null => null,
+        final ml => '${formatWaterGoal(ml.toDouble())} a day',
+      },
+      TrackerMetric.sleep: switch (sl<SleepService>().getGoalMinutes()) {
+        null => null,
+        final minutes => '${formatMinutesGoal(minutes.toDouble())} a night',
+      },
       TrackerMetric.weight: target == null ? null : unit.format(target),
-      TrackerMetric.screenTime:
-          'Under ${formatMinutesGoal(sl<ScreenTimeService>().getDailyLimitMinutes().toDouble())} a day',
+      TrackerMetric.screenTime: switch (sl<ScreenTimeService>()
+          .getDailyLimitMinutes()) {
+        null => null,
+        final limit => 'Under ${formatMinutesGoal(limit.toDouble())} a day',
+      },
     };
   }
 
@@ -122,14 +129,15 @@ class _MyGoalsPageState extends State<MyGoalsPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final metric in TrackerMetric.values) ...[
-                _GoalRow(
-                  metric: metric,
-                  goal: goals[metric],
-                  onTap: () => _edit(metric),
-                ),
-                const SizedBox(height: AppDimens.cardGap),
-              ],
+              for (final metric in TrackerMetric.values)
+                if (metric.isAvailable) ...[
+                  _GoalRow(
+                    metric: metric,
+                    goal: goals[metric],
+                    onTap: () => _edit(metric),
+                  ),
+                  const SizedBox(height: AppDimens.cardGap),
+                ],
               const AppInfoNote(
                 message:
                     'Goals drive the status on your home cards, the '
@@ -185,13 +193,17 @@ class _GoalRow extends StatelessWidget {
           ),
           const SizedBox(width: AppDimens.space8),
           !editable
-              ? Icon(Icons.chevron_right_rounded, size: AppDimens.iconMd, color: grey)
+              ? const AppChevron()
               : goal == null
-              ? Icon(Icons.add_circle_outline_rounded, size: AppDimens.iconMd, color: metric.color)
+              ? Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: AppDimens.iconMd,
+                  color: metric.color,
+                )
               : SvgPicture.asset(
-                  'assets/icons/ui/edit.svg', 
-                  width: AppDimens.iconMd, 
-                  height: AppDimens.iconMd, 
+                  'assets/icons/ui/edit.svg',
+                  width: AppDimens.iconMd,
+                  height: AppDimens.iconMd,
                   colorFilter: ColorFilter.mode(grey!, BlendMode.srcIn),
                 ),
         ],

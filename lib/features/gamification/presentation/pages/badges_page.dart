@@ -15,7 +15,7 @@ import 'package:vital_up/features/gamification/presentation/widgets/badge_widget
 import 'package:vital_up/core/utils/responsive.dart';
 
 /// Community awards (trophies and medals, most important first), then every
-/// badge: a summary, the closest one to unlock, then earned and locked
+/// badge: a summary, then earned and locked (closest to unlocking first)
 /// grids. Tapping a badge opens its detail sheet.
 class BadgesPage extends StatefulWidget {
   const BadgesPage({super.key});
@@ -43,7 +43,8 @@ class _BadgesPageState extends State<BadgesPage> {
         _reload();
         await _badges.catchError((_) => const <GameBadge>[]);
       },
-      header: const AppPageHeader(title: 'Badges'),
+      // Badges and community awards (route `badges`, kept for links).
+      header: const AppPageHeader(title: 'Achievements'),
       body: FutureBuilder<List<GameBadge>>(
         future: _badges,
         builder: (context, snapshot) {
@@ -64,32 +65,30 @@ class _BadgesPageState extends State<BadgesPage> {
             for (final b in badges)
               if (b.earned) b,
           ]..sort((a, b) => b.earnedAt!.compareTo(a.earnedAt!));
-          final locked = [
-            for (final b in badges)
-              if (!b.earned) b,
-          ];
-          final inProgress = [
-            for (final b in locked)
-              if ((b.progressFraction ?? 0) > 0) b,
-          ];
-          final nextUp = inProgress.isEmpty
-              ? null
-              : inProgress.reduce(
-                  (a, b) => b.progressFraction! > a.progressFraction! ? b : a,
+          // Closest to unlocking first (a stable sort keeps the server's
+          // order between equals).
+          final order = {for (final (i, b) in badges.indexed) b.code: i};
+          final locked =
+              [
+                for (final b in badges)
+                  if (!b.earned) b,
+              ]..sort((a, b) {
+                final byProgress = (b.progressFraction ?? 0).compareTo(
+                  a.progressFraction ?? 0,
                 );
+                return byProgress != 0
+                    ? byProgress
+                    : order[a.code]!.compareTo(order[b.code]!);
+              });
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const MyCommunityAwards(),
               _SummaryCard(earned: earned.length, total: badges.length),
-              if (nextUp != null) ...[
-                const SizedBox(height: AppDimens.sectionGap),
-                const AppSectionHeader('Closest to unlock'),
-                _NextUpCard(badge: nextUp),
-              ],
+              // Medals and trophies: one card, the full list a tap away.
+              const MyCommunityAwards(),
               const SizedBox(height: AppDimens.sectionGap),
-              AppSectionHeader('Earned', count: earned.length),
+              AppSectionHeader('Badges earned', count: earned.length),
               if (earned.isEmpty)
                 const AppInfoNote(
                   icon: Icons.military_tech_outlined,
@@ -101,7 +100,7 @@ class _BadgesPageState extends State<BadgesPage> {
                 _BadgeGrid(badges: earned),
               if (locked.isNotEmpty) ...[
                 const SizedBox(height: AppDimens.sectionGap),
-                AppSectionHeader('Locked', count: locked.length),
+                AppSectionHeader('Badges to unlock', count: locked.length),
                 _BadgeGrid(badges: locked),
               ],
             ],
@@ -139,7 +138,7 @@ class _SummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$earned of $total earned',
+                      '$earned of $total badges',
                       style: context.text.titleMedium,
                     ),
                     const SizedBox(height: AppDimens.space2),
@@ -165,61 +164,6 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _NextUpCard extends StatelessWidget {
-  final GameBadge badge;
-
-  const _NextUpCard({required this.badge});
-
-  @override
-  Widget build(BuildContext context) {
-    final grey = context.vColors.grayText;
-    final progress = badgeProgressLabel(badge);
-    return AppCard(
-      onTap: () => showBadgeDetailSheet(context, badge),
-      child: Row(
-        children: [
-          BadgeEmblem(badge: badge, size: AppDimens.iconBadgeLarge),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  badge.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall,
-                ),
-                const SizedBox(height: AppDimens.space8),
-                AppProgressBar(
-                  value: badge.progressFraction ?? 0,
-                  color: context.colors.primary,
-                  height: AppDimens.badgeProgressHeight,
-                ),
-                if (progress != null) ...[
-                  const SizedBox(height: AppDimens.space6),
-                  Text(
-                    progress,
-                    style: context.text.labelSmall?.copyWith(color: grey),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppDimens.space8),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: grey,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Responsive grid whose rows size to their tallest tile, so long names and
-/// large text never clip.
 class _BadgeGrid extends StatelessWidget {
   final List<GameBadge> badges;
 

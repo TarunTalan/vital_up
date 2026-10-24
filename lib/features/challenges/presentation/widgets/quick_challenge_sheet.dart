@@ -9,13 +9,13 @@ import 'package:vital_up/features/challenges/data/challenges_repository.dart';
 import 'package:vital_up/features/challenges/presentation/widgets/challenge_tile.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 
-/// Ready-made challenges. The server accepts 3, 7 or 14 days on active
-/// minutes, distance or workouts, so every option here is one it takes.
+/// Ready-made challenges, all ones `create_challenge` accepts.
 const _options = [
-  (metric: ChallengeMetric.activeMinutes, days: 3),
+  (metric: ChallengeMetric.points, days: 1),
+  (metric: ChallengeMetric.points, days: 7),
+  (metric: ChallengeMetric.nutritionPoints, days: 7),
+  (metric: ChallengeMetric.steps, days: 7),
   (metric: ChallengeMetric.activeMinutes, days: 7),
-  (metric: ChallengeMetric.distanceKm, days: 7),
-  (metric: ChallengeMetric.workouts, days: 7),
   (metric: ChallengeMetric.distanceKm, days: 14),
 ];
 
@@ -51,11 +51,9 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
         metric: _selected.metric,
         days: _selected.days,
         friendIds: [widget.friend.userId],
-        requestId: _requestIds.forChallenge(
-          _selected.metric,
-          _selected.days,
-          [widget.friend.userId],
-        ),
+        requestId: _requestIds.forChallenge(_selected.metric, _selected.days, [
+          widget.friend.userId,
+        ]),
       );
       if (mounted) navigator.pop(true);
       if (rootContext.mounted) {
@@ -106,7 +104,7 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
             ),
             const SizedBox(height: AppDimens.space4),
             Text(
-              'Pick what to compete on. Scores come from synced workouts.',
+              'Pick what to compete on. Scores come from what you both log.',
               style: context.text.bodySmall?.copyWith(color: grey),
             ),
             const SizedBox(height: AppDimens.space16),
@@ -117,9 +115,8 @@ class _QuickChallengeSheetState extends State<QuickChallengeSheet> {
                     for (final o in _options) ...[
                       ChallengeOptionTile(
                         icon: challengeMetricIcon(o.metric),
-                        title:
-                            'Most ${o.metric.label.toLowerCase()} in '
-                            '${o.days} days',
+                        title: challengeName(o.metric, o.days),
+                        subtitle: o.metric.description,
                         selected: o == _selected,
                         onTap: () => setState(() => _selected = o),
                       ),

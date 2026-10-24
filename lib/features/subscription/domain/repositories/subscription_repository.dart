@@ -59,4 +59,8 @@ abstract class SubscriptionRepository {
 
   /// Today's photo scans left on the free plan; -1 with Pro.
   Future<int> remainingFreeScans();
+
+  /// Fires when the known number of scans left changes (a scan used one,
+  /// a purchase cleared it), so a counter can re-read it.
+  Stream<void> get remainingScansChanges;
 }

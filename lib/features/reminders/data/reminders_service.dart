@@ -71,6 +71,7 @@ class RemindersService {
 
   /// Skips today's remaining reminders made unnecessary by [event].
   Future<void> markDone(HabitLogged event) async {
+    await _local.reload();
     if (!_local.smartSkip()) return;
     final reminders = _local.load();
     final today = dayKey(DateTime.now());
@@ -112,6 +113,7 @@ class RemindersService {
   Future<void> resync() async {
     try {
       await _scheduler.init();
+      await _local.reload();
       await _sync(_local.load());
     } catch (e) {
       debugPrint('Reminder resync failed: $e');

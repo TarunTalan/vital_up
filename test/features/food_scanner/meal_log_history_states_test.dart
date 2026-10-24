@@ -158,10 +158,11 @@ void main() {
     await pumpPage(tester, const MealLogHistoryPage());
     await settle(tester);
 
-    Finder pill(String text) => find.text(text, findRichText: true);
-    expect(pill('Cals: 1840'), findsOneWidget);
+    // The meal's calories (and its day's total).
+    expect(find.text('1,840 kcal'), findsWidgets);
     // 18.2 + 6.4 g protein, summed over both items.
-    expect(pill('P: 25g'), findsOneWidget);
+    expect(find.text('25 g'), findsWidgets);
+    expect(find.text('Protein'), findsWidgets);
   });
 
   testWidgets('fits a small phone at the largest text size', (tester) async {

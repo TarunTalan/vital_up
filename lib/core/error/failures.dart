@@ -14,15 +14,21 @@ class ServerFailure extends Failure {
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([super.message = "Couldn't load your saved data. Try again."]);
+  const CacheFailure([
+    super.message = "Couldn't load your saved data. Try again.",
+  ]);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = "You're offline. Check your connection."]);
+  const NetworkFailure([
+    super.message = "You're offline. Check your connection.",
+  ]);
 }
 
 class DatabaseFailure extends Failure {
-  const DatabaseFailure([super.message = "Couldn't save on this phone. Try again."]);
+  const DatabaseFailure([
+    super.message = "Couldn't save on this phone. Try again.",
+  ]);
 }
 
 class ValidationFailure extends Failure {
@@ -30,21 +36,31 @@ class ValidationFailure extends Failure {
 }
 
 class NoFoodDetectedFailure extends Failure {
-  const NoFoodDetectedFailure([super.message = 'No food found. Try a clearer photo.']);
+  const NoFoodDetectedFailure([
+    super.message = 'No food found. Try a clearer photo.',
+  ]);
 }
 
 class LowConfidenceFailure extends Failure {
-  const LowConfidenceFailure([super.message = 'Not sure about this one. Check the items.']);
+  const LowConfidenceFailure([
+    super.message = 'Not sure about this one. Check the items.',
+  ]);
 }
 
 class BarcodeNotFoundFailure extends Failure {
-  const BarcodeNotFoundFailure([super.message = 'Barcode not found. Try searching instead.']);
+  const BarcodeNotFoundFailure([
+    super.message = 'Barcode not found. Try searching instead.',
+  ]);
 }
 
 class RecognitionUnavailableFailure extends Failure {
-  const RecognitionUnavailableFailure([super.message = 'Food scanning is busy. Try again soon.']);
+  const RecognitionUnavailableFailure([
+    super.message = 'Food scanning is busy. Try again soon.',
+  ]);
 }
 
 class ScanQuotaExceededFailure extends Failure {
-  const ScanQuotaExceededFailure([super.message = "No photo scans left today. Try again later."]);
+  const ScanQuotaExceededFailure([
+    super.message = "No photo scans left today. Try again later.",
+  ]);
 }

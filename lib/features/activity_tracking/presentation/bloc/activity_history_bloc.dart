@@ -9,7 +9,8 @@ import 'package:vital_up/features/activity_tracking/domain/usecases/save_session
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_event.dart';
 import 'package:vital_up/features/activity_tracking/presentation/bloc/activity_history_state.dart';
 
-class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryState> {
+class ActivityHistoryBloc
+    extends Bloc<ActivityHistoryEvent, ActivityHistoryState> {
   final GetActivityHistory getActivityHistory;
   final SaveSessionAnnotation saveSessionAnnotation;
   final DeleteActivitySession deleteActivitySession;
@@ -28,26 +29,42 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
   }
 
   Future<void> _onLoad(
-      LoadActivityHistory event,
-      Emitter<ActivityHistoryState> emit,
-      ) async {
-    emit(const ActivityHistoryLoading());
+    LoadActivityHistory event,
+    Emitter<ActivityHistoryState> emit,
+  ) async {
+    // A reload keeps the list, its filters and search on screen; only the
+    // first load shows the loader.
+    if (state is! ActivityHistoryLoaded) emit(const ActivityHistoryLoading());
     try {
       final entries = await getActivityHistory().withLoadTimeout();
-      emit(ActivityHistoryLoaded(
-        allEntries: entries,
-        visibleEntries: entries,
-      ));
+      final s = state;
+      if (s is ActivityHistoryLoaded) {
+        final updated = s.copyWith(allEntries: entries);
+        emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
+      } else {
+        emit(
+          ActivityHistoryLoaded(allEntries: entries, visibleEntries: entries),
+        );
+      }
     } catch (e) {
       debugPrint('Loading activity history failed: $e');
-      emit(const ActivityHistoryError("Couldn't load your workouts. Try again."));
+      if (state is ActivityHistoryLoaded) {
+        _emitActionError(emit, "Couldn't refresh your workouts. Try again.");
+      } else {
+        emit(
+          const ActivityHistoryError("Couldn't load your workouts. Try again."),
+        );
+      }
+    } finally {
+      final done = event.done;
+      if (done != null && !done.isCompleted) done.complete();
     }
   }
 
   void _onFilterByActivityGroup(
-      FilterByActivityGroup event,
-      Emitter<ActivityHistoryState> emit,
-      ) {
+    FilterByActivityGroup event,
+    Emitter<ActivityHistoryState> emit,
+  ) {
     final s = state;
     if (s is! ActivityHistoryLoaded) return;
 
@@ -60,9 +77,9 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
   }
 
   void _onFilterByActivityType(
-      FilterByActivityType event,
-      Emitter<ActivityHistoryState> emit,
-      ) {
+    FilterByActivityType event,
+    Emitter<ActivityHistoryState> emit,
+  ) {
     final s = state;
     if (s is! ActivityHistoryLoaded) return;
 
@@ -103,9 +120,9 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
   }
 
   Future<void> _onUpdateAnnotation(
-      UpdateSessionAnnotation event,
-      Emitter<ActivityHistoryState> emit,
-      ) async {
+    UpdateSessionAnnotation event,
+    Emitter<ActivityHistoryState> emit,
+  ) async {
     if (state is! ActivityHistoryLoaded) return;
 
     try {
@@ -140,9 +157,9 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
   }
 
   Future<void> _onDelete(
-      DeleteSessionFromHistory event,
-      Emitter<ActivityHistoryState> emit,
-      ) async {
+    DeleteSessionFromHistory event,
+    Emitter<ActivityHistoryState> emit,
+  ) async {
     final s = state;
     if (s is! ActivityHistoryLoaded) return;
 
@@ -151,8 +168,9 @@ class ActivityHistoryBloc extends Bloc<ActivityHistoryEvent, ActivityHistoryStat
     final removed = s.allEntries
         .where((e) => e.session.id == event.sessionId)
         .toList();
-    final remaining =
-        s.allEntries.where((e) => e.session.id != event.sessionId).toList();
+    final remaining = s.allEntries
+        .where((e) => e.session.id != event.sessionId)
+        .toList();
     final updated = s.copyWith(allEntries: remaining);
     emit(updated.copyWith(visibleEntries: _applyFilters(updated)));
 

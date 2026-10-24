@@ -5,6 +5,7 @@ import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_up/core/router/route_extras.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/database/drift_database.dart';
 import 'package:vital_up/core/database/collections/meal_log_cache.dart';
@@ -20,6 +21,10 @@ import 'package:vital_up/features/auth/domain/repositories/auth_repository.dart'
 import 'package:vital_up/features/diet_plan/data/repositories/diet_plan_repository_impl.dart';
 import 'package:vital_up/features/onboarding/data/datasources/onboarding_data_store.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
+import 'package:vital_up/features/dashboard/data/services/screen_time_service.dart';
+import 'package:vital_up/features/dashboard/data/services/sleep_bedtime.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 
 /// Permanently deletes the signed-in user's account (server: the
 /// `delete-account` Edge Function) and everything stored on this device.
@@ -35,6 +40,9 @@ class AccountService {
   final OnboardingDataStore? _onboarding;
   final WorkoutTimerNotifier? _workoutTimer;
 
+  /// Deletes the offline map areas (they can name places the user goes).
+  final Future<void> Function()? _clearOfflineMaps;
+
   AccountService(
     this._client,
     this._auth,
@@ -46,6 +54,7 @@ class AccountService {
     this._cache, [
     this._onboarding,
     this._workoutTimer,
+    this._clearOfflineMaps,
   ]);
 
   static const _deleteFailed = "Couldn't delete your account. Try again.";
@@ -128,14 +137,54 @@ class AccountService {
         await _prefs.remove(key);
       }
     });
+    // Goal weight (old device-wide key), "in bed" taps and the Health
+    // Connect import mark: the next account must start from its own.
+    await _step('other per-user values', () async {
+      await _prefs.remove(WeightService.legacyTargetKey);
+      await _prefs.remove(HealthImportService.lastImportKey);
+      await _prefs.remove(ScreenTimeService.savedDaysKey);
+      for (final key
+          in _prefs
+              .getKeys()
+              .where((k) => k.startsWith(bedtimeKey('')))
+              .toList()) {
+        await _prefs.remove(key);
+      }
+    });
+    // Pages remember what they were opened with (route_extras.dart).
+    await _step('open pages', () async => clearRouteExtras());
+    await _step('offline maps', () async {
+      await _clearOfflineMaps?.call();
+    });
     // Camera / picker photos, exports and health reports shared from here.
     await _step('temporary files', _deleteTemporaryFiles);
+    // Wiped: whoever signs in next starts clean without another wipe.
+    await _step('device owner', () async {
+      await _prefs.remove(deviceOwnerKey);
+    });
+  }
+
+  /// The account whose data is on this device.
+  static const deviceOwnerKey = 'local_data_owner_id';
+
+  /// Called on sign-in before the first sync. If another account's data
+  /// is still here (sign-out was cut short, the app was killed during it,
+  /// or the session simply expired), it is wiped first: otherwise this
+  /// account would show it and upload it as its own.
+  Future<void> claimDevice(String userId) async {
+    final owner = _prefs.getString(deviceOwnerKey);
+    if (owner == userId) return;
+    if (owner != null) {
+      debugPrint("Another account's data was on this device; clearing it.");
+      await clearLocalUserData();
+    }
+    await _prefs.setString(deviceOwnerKey, userId);
   }
 
   /// Per-user Vita history keys (`vita_<name>_<userId>`).
   @visibleForTesting
   static bool isVitaUserKey(String key) =>
-      RegExp(r'^vita_(chat|checkins|scores|insights)_').hasMatch(key);
+      RegExp(r'^vita_(chat|chatscroll|checkins|scores|insights)_').hasMatch(key);
 
   Future<void> _deleteMealPhotos() async {
     final paths = await _isar.isar.mealLogCaches

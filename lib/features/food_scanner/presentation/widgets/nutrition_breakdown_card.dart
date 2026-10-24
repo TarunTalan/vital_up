@@ -7,10 +7,7 @@ import 'package:vital_up/features/food_scanner/presentation/widgets/food_scan_ut
 class NutritionBreakdownCard extends StatelessWidget {
   final List<NutritionInfo> nutrition;
 
-  const NutritionBreakdownCard({
-    super.key,
-    required this.nutrition,
-  });
+  const NutritionBreakdownCard({super.key, required this.nutrition});
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +122,12 @@ class NutritionBreakdownCard extends StatelessWidget {
           spacing: AppDimens.space12,
           runSpacing: AppDimens.space4,
           children: [
-            _buildLegend(context, 'Protein', AppColors.scanProtein, proteinRatio),
+            _buildLegend(
+              context,
+              'Protein',
+              AppColors.scanProtein,
+              proteinRatio,
+            ),
             _buildLegend(context, 'Carbs', AppColors.scanCarbs, carbRatio),
             _buildLegend(context, 'Fat', AppColors.scanFat, fatRatio),
           ],

@@ -13,18 +13,22 @@ class FoodCacheKeys {
   static String nutrition(String id, String name, String serving) =>
       'food:nutrition:$_v:${hashString('${normalizeFoodQuery(id)}|${normalizeFoodQuery(name)}|${normalizeFoodQuery(serving)}')}';
 
-  static String search(String query) => 'food:search:$_v:${hashString(normalizeFoodQuery(query))}';
+  static String search(String query) =>
+      'food:search:$_v:${hashString(normalizeFoodQuery(query))}';
 
-  static String recognition(String imageHash) => 'food:recognition:$_v:$imageHash';
+  static String recognition(String imageHash) =>
+      'food:recognition:$_v:$imageHash';
 
   static String premium(String userId) => 'subscription:premium:$_v:$userId';
 
-  static String remainingScans(String userId) => 'subscription:remaining_scans:$_v:$userId';
+  static String remainingScans(String userId) =>
+      'subscription:remaining_scans:$_v:$userId';
 }
 
 /// Lowercase, trimmed, single-spaced, so "Dal  Tadka " and "dal tadka" share
 /// one cache entry.
-String normalizeFoodQuery(String query) => query.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+String normalizeFoodQuery(String query) =>
+    query.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
 
 /// 64-bit FNV-1a of [bytes] as hex. Not cryptographic; only used to name
 /// cache entries, where a collision would at worst return another scan's

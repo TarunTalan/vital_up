@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
@@ -327,6 +328,11 @@ class _AudioProgressBar extends StatelessWidget {
                         totalMs > 0 ? totalMs.toDouble() : 1.0,
                       ),
                       onChanged: (value) {
+                        final oldSec = (currentMs / 1000).floor();
+                        final newSec = (value / 1000).floor();
+                        if (newSec != oldSec) {
+                          HapticFeedback.lightImpact();
+                        }
                         audioService.seek(
                           Duration(milliseconds: value.toInt()),
                         );

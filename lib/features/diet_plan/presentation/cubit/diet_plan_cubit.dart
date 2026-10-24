@@ -78,6 +78,36 @@ class DietPlanCubit extends Cubit<DietPlanState> {
     if (!isClosed) emit(DietPlanError(message));
   }
 
+  /// Puts alternative [option] of meal [mealIndex] in place of its dish (no
+  /// AI call). With [save] (the active plan) it's stored at once, keeping
+  /// the plan's preferences; if that fails the swap is undone. False when
+  /// nothing changed.
+  Future<bool> chooseAlternative(
+    int mealIndex,
+    int option, {
+    bool save = false,
+  }) async {
+    final current = state;
+    if (current is! DietPlanLoaded) return false;
+    final plan = current.mealPlan;
+    if (mealIndex < 0 || mealIndex >= plan.meals.length) return false;
+    final alternatives = plan.meals[mealIndex].alternatives;
+    if (option < 0 || option >= alternatives.length) return false;
+
+    final updated = plan.withAlternative(mealIndex, option);
+    emit(DietPlanLoaded(updated));
+    if (!save) return true;
+    try {
+      final preferences = await _getActiveMealPlan.preferences();
+      await _setActiveMealPlan(updated, preferences: preferences);
+      return true;
+    } catch (e) {
+      addError(e);
+      if (!isClosed) emit(DietPlanLoaded(plan));
+      return false;
+    }
+  }
+
   /// Saves [plan] as the active plan. False when it couldn't be stored.
   Future<bool> saveActivePlan(
     MealPlan plan, {

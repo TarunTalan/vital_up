@@ -2,6 +2,7 @@ import 'package:vital_up/features/activity_tracking/domain/entities/activity_ses
 
 abstract class ActivityRepository {
   Future<void> saveSession(ActivitySession session);
+
   /// Saved sessions, newest first. [since] limits them to those started
   /// at or after it. GPS points are only loaded with [withRoutes] (a route
   /// is thousands of points; almost every reader only needs totals).

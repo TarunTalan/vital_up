@@ -37,11 +37,11 @@ class FoodItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        name,
-        confidenceScore,
-        servingDescription,
-        quantity,
-        unit,
-      ];
+    id,
+    name,
+    confidenceScore,
+    servingDescription,
+    quantity,
+    unit,
+  ];
 }

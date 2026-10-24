@@ -22,3 +22,11 @@ String quotaResetTime({DateTime? now}) {
   if (reset.hour == 0 && reset.minute == 0) return 'midnight';
   return DateFormat('h:mm a').format(reset);
 }
+
+/// The server's quota day ("2026-10-21", India time) that [now] falls in:
+/// usage rows are kept per this day, so a saved count from another day is
+/// stale.
+String serverQuotaDay({DateTime? now}) {
+  final server = (now ?? DateTime.now()).toUtc().add(_serverOffset);
+  return DateFormat('yyyy-MM-dd').format(server);
+}

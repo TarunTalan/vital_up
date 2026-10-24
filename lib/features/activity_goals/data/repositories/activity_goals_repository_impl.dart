@@ -26,26 +26,35 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
   List<ActivityGoal> getGoals() => [..._local.read()]
     ..sort((a, b) {
       final byPeriod = a.period.index.compareTo(b.period.index);
-      return byPeriod != 0 ? byPeriod : a.metric.index.compareTo(b.metric.index);
+      return byPeriod != 0
+          ? byPeriod
+          : a.metric.index.compareTo(b.metric.index);
     });
 
   @override
-  Future<void> saveGoal(ActivityGoal goal) => _local.write([
-        for (final g in _local.read())
-          if (g.id != goal.id) g,
-        goal,
-      ]);
+  bool get hasSavedGoals => _local.hasSaved;
 
   @override
-  Future<void> deleteGoal(ActivityGoal goal) =>
-      _local.write([for (final g in _local.read()) if (g.id != goal.id) g]);
+  Future<void> saveGoal(ActivityGoal goal) => _local.write([
+    for (final g in _local.read())
+      if (g.id != goal.id) g,
+    goal,
+  ]);
+
+  @override
+  Future<void> deleteGoal(ActivityGoal goal) => _local.write([
+    for (final g in _local.read())
+      if (g.id != goal.id) g,
+  ]);
 
   @override
   Future<ActivityGoalsSnapshot> getProgress(TrendRange range) async {
     final today = startOfDay(DateTime.now());
     final weekStart = startOfWeek(today);
     // Charts show the range; weekly goals also need every day since Monday.
-    final sinceMonday = today.difference(weekStart).inDays + 1;
+    // Calendar days: a week with a clock change has a 23 or 25 h day, so
+    // a Duration's inDays would come out one short.
+    final sinceMonday = calendarDaysBetween(weekStart, today) + 1;
     final days = lastNDays(range.days > sinceMonday ? range.days : sinceMonday);
     final from = days.first;
 
@@ -67,8 +76,10 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
     final byDay = bucketByDay<ActivitySession>(sessions, (s) => s.startTime);
 
     double valueOn(GoalMetric metric, DateTime day) {
-      final tracked = (byDay[day] ?? const <ActivitySession>[])
-          .fold(0.0, (sum, s) => sum + metric.fromSession(s));
+      final tracked = (byDay[day] ?? const <ActivitySession>[]).fold(
+        0.0,
+        (sum, s) => sum + metric.fromSession(s),
+      );
       if (metric == GoalMetric.steps && healthSteps != null) {
         return dailySteps(
           health: healthSteps[day],
@@ -86,12 +97,11 @@ class ActivityGoalsRepositoryImpl implements ActivityGoalsRepository {
           current: goal.period == GoalPeriod.daily
               ? valueOn(goal.metric, today)
               : days
-                  .where((d) => !d.isBefore(weekStart))
-                  .fold(0.0, (sum, d) => sum + valueOn(goal.metric, d)),
-          series: TrendSeries(
-            [for (final d in chartDays) DailyPoint(d, valueOn(goal.metric, d))],
-            goal: goal.period == GoalPeriod.daily ? goal.target : null,
-          ),
+                    .where((d) => !d.isBefore(weekStart))
+                    .fold(0.0, (sum, d) => sum + valueOn(goal.metric, d)),
+          series: TrendSeries([
+            for (final d in chartDays) DailyPoint(d, valueOn(goal.metric, d)),
+          ], goal: goal.period == GoalPeriod.daily ? goal.target : null),
         ),
     ];
 

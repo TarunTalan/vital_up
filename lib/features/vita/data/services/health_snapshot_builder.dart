@@ -57,7 +57,9 @@ class HealthSnapshotBuilder {
   Future<HealthSnapshot> build() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(const Duration(days: 6));
+    // Calendar days back, not 6 x 24 h (wrong by an hour across a
+    // daylight-saving change).
+    final weekStart = DateTime(today.year, today.month, today.day - 6);
 
     final results = await Future.wait<Object?>([
       _safe('meals', () => _meals(today, weekStart)),
@@ -68,7 +70,6 @@ class HealthSnapshotBuilder {
       _safe('profile', _profile),
       _safe<int?>('calorieGoal', _calorieGoal),
       _safe('plan', _planLines),
-      _safe('vitals', _vitals.readVitals),
       _safe<int?>('steps', _vitals.readStepsToday),
     ]);
 
@@ -76,7 +77,7 @@ class HealthSnapshotBuilder {
     final sleep = results[1] as _Sleep?;
     final water = results[2] as _Water?;
     final activity = results[4] as _Activity?;
-    final healthSteps = results[9] as int?;
+    final healthSteps = results[8] as int?;
 
     return HealthSnapshot(
       takenAt: now,
@@ -101,10 +102,7 @@ class HealthSnapshotBuilder {
       screenTimeTodayMinutes: results[3] as int?,
       stepsToday: healthSteps == null && activity?.stepsToday == null
           ? null
-          : dailySteps(
-              health: healthSteps,
-              tracked: activity?.stepsToday ?? 0,
-            ),
+          : dailySteps(health: healthSteps, tracked: activity?.stepsToday ?? 0),
       stepsFromHealthConnect: healthSteps != null,
       workoutStepsToday: activity?.stepsToday,
       workoutsThisWeek: activity?.workouts ?? 0,
@@ -113,7 +111,6 @@ class HealthSnapshotBuilder {
       importedWorkoutsThisWeek: activity?.importedWorkouts ?? 0,
       importedDistanceThisWeekKm: activity?.importedDistanceKm ?? 0,
       importedActiveMinutesThisWeek: activity?.importedMinutes ?? 0,
-      vitals: results[8] as VitalsSnapshot? ?? const VitalsSnapshot(),
       dietPlanMeals: results[7] as List<String>? ?? const [],
     );
   }
@@ -175,7 +172,9 @@ class HealthSnapshotBuilder {
     // Saved entries are manual or the phone's estimate, never Health Connect.
     final loggedLastNight =
         recent.isNotEmpty &&
-            recent.first.endTime.isAfter(now.subtract(const Duration(hours: 24)))
+            recent.first.endTime.isAfter(
+              now.subtract(const Duration(hours: 24)),
+            )
         ? recent.first.durationMinutes / 60
         : null;
     final logged = recent.map((l) => l.durationMinutes / 60).toList();

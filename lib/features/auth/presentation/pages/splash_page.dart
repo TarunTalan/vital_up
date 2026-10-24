@@ -108,11 +108,11 @@ class _SplashPageState extends State<SplashPage>
     );
     _taglineTranslationY = Tween<double>(begin: AppDimens.space16, end: 0.0)
         .animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: _interval(1650, 1950, Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: _interval(1650, 1950, Curves.easeOut),
+          ),
+        );
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -177,7 +177,8 @@ class _SplashPageState extends State<SplashPage>
   Widget build(BuildContext context) {
     final authState = context.watch<AuthCubit>().state;
     final backgroundColor = context.colors.surface;
-    final showLoaderAfterSplash = _animationCompleted &&
+    final showLoaderAfterSplash =
+        _animationCompleted &&
         (authState is AuthInitial || authState is AuthLoading);
 
     return BlocListener<AuthCubit, AuthState>(
@@ -214,8 +215,11 @@ class _SplashPageState extends State<SplashPage>
       screen.width * screen.width + screen.height * screen.height,
     );
     final fillScale = 1.0 + (2 * diagonal / circleSize) * _fillProgress.value;
-    final circleColor =
-        Color.lerp(AppColors.primary, AppColors.teal, _tealProgress.value)!;
+    final circleColor = Color.lerp(
+      AppColors.primary,
+      AppColors.teal,
+      _tealProgress.value,
+    )!;
     final filled = _fillProgress.value > 0.0;
 
     return Stack(
@@ -288,7 +292,9 @@ class _SplashPageState extends State<SplashPage>
         // Tagline on the teal fill.
         if (_taglineOpacity.value > 0.0)
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.w(AppDimens.space40)),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.w(AppDimens.space40),
+            ),
             child: Opacity(
               opacity: _taglineOpacity.value,
               child: Transform.translate(

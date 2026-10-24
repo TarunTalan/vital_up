@@ -7,76 +7,101 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   SharedPreferencesOnboardingDataStore(this._prefs);
 
   @override
-  Future<String> getFullName() async => _prefs.getString('onboarding_full_name') ?? '';
+  Future<String> getFullName() async =>
+      _prefs.getString('onboarding_full_name') ?? '';
 
   @override
   Future<String> getDob() async => _prefs.getString('onboarding_dob') ?? '';
 
   @override
-  Future<String> getGender() async => _prefs.getString('onboarding_gender') ?? '';
+  Future<String> getGender() async =>
+      _prefs.getString('onboarding_gender') ?? '';
 
   @override
-  Future<String> getWeight() async => _prefs.getString('onboarding_weight') ?? '70';
+  Future<String> getWeight() async =>
+      _prefs.getString('onboarding_weight') ?? '';
 
   @override
-  Future<String> getWeightUnit() async => _prefs.getString('onboarding_weight_unit') ?? 'kg';
+  Future<String> getWeightUnit() async =>
+      _prefs.getString('onboarding_weight_unit') ?? 'kg';
 
   @override
-  Future<String> getHeight() async => _prefs.getString('onboarding_height') ?? '';
+  Future<String> getHeight() async =>
+      _prefs.getString('onboarding_height') ?? '';
 
   @override
-  Future<String> getHeightUnit() async => _prefs.getString('onboarding_height_unit') ?? 'cm';
+  Future<String> getHeightUnit() async =>
+      _prefs.getString('onboarding_height_unit') ?? 'cm';
 
   @override
-  Future<String> getCurrentStep() async => _prefs.getString('onboarding_current_step') ?? 'personal_details';
+  Future<String> getCurrentStep() async =>
+      _prefs.getString('onboarding_current_step') ?? 'personal_details';
 
   @override
-  Future<String> getCalorieGoal() async => _prefs.getString('onboarding_calorie_goal') ?? '';
+  Future<String> getCalorieGoal() async =>
+      _prefs.getString('onboarding_calorie_goal') ?? '';
 
   @override
-  Future<String> getTargetWeight() async => _prefs.getString('onboarding_target_weight') ?? '';
+  Future<String> getTargetWeight() async =>
+      _prefs.getString('onboarding_target_weight') ?? '';
 
   @override
-  Future<String> getTargetWeightUnit() async => _prefs.getString('onboarding_target_weight_unit') ?? 'kg';
+  Future<String> getTargetWeightUnit() async =>
+      _prefs.getString('onboarding_target_weight_unit') ?? 'kg';
 
   @override
-  Future<String> getGoalDurationMonths() async => _prefs.getString('onboarding_goal_duration_months') ?? '3';
+  Future<String> getGoalDurationMonths() async =>
+      _prefs.getString('onboarding_goal_duration_months') ?? '3';
 
   @override
-  Future<String> getGoalType() async => _prefs.getString('onboarding_goal_type') ?? '';
+  Future<String> getGoalType() async =>
+      _prefs.getString('onboarding_goal_type') ?? '';
 
   @override
-  Future<String> getWeeklyPace() async => _prefs.getString('onboarding_weekly_pace') ?? '';
+  Future<String> getWeeklyPace() async =>
+      _prefs.getString('onboarding_weekly_pace') ?? '';
 
   @override
-  Future<String> getHealthConditions() async => _prefs.getString('onboarding_health_conditions') ?? '';
+  Future<String> getHealthConditions() async =>
+      _prefs.getString('onboarding_health_conditions') ?? '';
 
   @override
-  Future<String> getMedicines() async => _prefs.getString('onboarding_medicines') ?? '';
+  Future<String> getMedicines() async =>
+      _prefs.getString('onboarding_medicines') ?? '';
 
   @override
-  Future<String> getAllergies() async => _prefs.getString('onboarding_allergies') ?? '';
+  Future<String> getAllergies() async =>
+      _prefs.getString('onboarding_allergies') ?? '';
 
   @override
-  Future<String> getSmokes() async => _prefs.getString('onboarding_smokes') ?? '';
+  Future<String> getSmokes() async =>
+      _prefs.getString('onboarding_smokes') ?? '';
 
   @override
-  Future<String> getBloodPressureTop() async => _prefs.getString('onboarding_bp_top') ?? '';
+  Future<String> getBloodPressureTop() async =>
+      _prefs.getString('onboarding_bp_top') ?? '';
 
   @override
-  Future<String> getBloodPressureBottom() async => _prefs.getString('onboarding_bp_bottom') ?? '';
+  Future<String> getBloodPressureBottom() async =>
+      _prefs.getString('onboarding_bp_bottom') ?? '';
 
   @override
-  Future<String> getDietaryPreference() async => _prefs.getString('onboarding_dietary_preference') ?? '';
+  Future<String> getDietaryPreference() async =>
+      _prefs.getString('onboarding_dietary_preference') ?? '';
 
   @override
-  Future<String> getActivity() async => _prefs.getString('onboarding_activity') ?? '';
+  Future<String> getActivity() async =>
+      _prefs.getString('onboarding_activity') ?? '';
 
   @override
   Future<String> getSleep() async => _prefs.getString('onboarding_sleep') ?? '';
 
   @override
-  Future<void> savePersonalDetails(String name, String dob, String gender) async {
+  Future<void> savePersonalDetails(
+    String name,
+    String dob,
+    String gender,
+  ) async {
     await _prefs.setString('onboarding_full_name', name);
     await _prefs.setString('onboarding_dob', dob);
     await _prefs.setString('onboarding_gender', gender);
@@ -95,11 +120,21 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   }
 
   @override
-  Future<void> saveGoals(String calorieGoal, String targetWeight, String targetWeightUnit, String goalDurationMonths, String goalType, String weeklyPace) async {
+  Future<void> saveGoals(
+    String calorieGoal,
+    String targetWeight,
+    String targetWeightUnit,
+    String goalDurationMonths,
+    String goalType,
+    String weeklyPace,
+  ) async {
     await _prefs.setString('onboarding_calorie_goal', calorieGoal);
     await _prefs.setString('onboarding_target_weight', targetWeight);
     await _prefs.setString('onboarding_target_weight_unit', targetWeightUnit);
-    await _prefs.setString('onboarding_goal_duration_months', goalDurationMonths);
+    await _prefs.setString(
+      'onboarding_goal_duration_months',
+      goalDurationMonths,
+    );
     await _prefs.setString('onboarding_goal_type', goalType);
     await _prefs.setString('onboarding_weekly_pace', weeklyPace);
   }
@@ -110,7 +145,12 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   }
 
   @override
-  Future<void> saveExtraDetails(String conditions, String medicines, String allergies, String smokes) async {
+  Future<void> saveExtraDetails(
+    String conditions,
+    String medicines,
+    String allergies,
+    String smokes,
+  ) async {
     await _prefs.setString('onboarding_health_conditions', conditions);
     await _prefs.setString('onboarding_medicines', medicines);
     await _prefs.setString('onboarding_allergies', allergies);
@@ -118,7 +158,13 @@ class SharedPreferencesOnboardingDataStore implements OnboardingDataStore {
   }
 
   @override
-  Future<void> saveHealthVitals(String bpTop, String bpBottom, String dietaryPreference, String activity, String sleep) async {
+  Future<void> saveHealthVitals(
+    String bpTop,
+    String bpBottom,
+    String dietaryPreference,
+    String activity,
+    String sleep,
+  ) async {
     await _prefs.setString('onboarding_bp_top', bpTop);
     await _prefs.setString('onboarding_bp_bottom', bpBottom);
     await _prefs.setString('onboarding_dietary_preference', dietaryPreference);

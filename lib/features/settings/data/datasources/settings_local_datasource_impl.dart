@@ -8,7 +8,8 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
   SettingsLocalDataSourceImpl({required this.sharedPreferences});
 
   static const String _keyThemeMode = 'settings_theme_mode';
-  static const String _keyNotificationsEnabled = 'settings_notifications_enabled';
+  static const String _keyNotificationsEnabled =
+      'settings_notifications_enabled';
   static const String _keyHealthSyncEnabled = 'settings_health_sync_enabled';
   static const String _keyWeightUnit = 'settings_weight_unit';
   static const String _keyHeightUnit = 'settings_height_unit';
@@ -17,12 +18,22 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
   @override
   Future<SettingsEntity> getSettings() async {
     // Unknown stored values (older builds, edits) fall back to defaults.
-    final themeMode = _oneOf(_keyThemeMode, const ['system', 'light', 'dark'], 'system');
-    final notificationsEnabled = sharedPreferences.getBool(_keyNotificationsEnabled) ?? true;
-    final healthSyncEnabled = sharedPreferences.getBool(_keyHealthSyncEnabled) ?? false;
+    final themeMode = _oneOf(_keyThemeMode, const [
+      'system',
+      'light',
+      'dark',
+    ], 'system');
+    final notificationsEnabled =
+        sharedPreferences.getBool(_keyNotificationsEnabled) ?? true;
+    final healthSyncEnabled =
+        sharedPreferences.getBool(_keyHealthSyncEnabled) ?? false;
     final weightUnit = _oneOf(_keyWeightUnit, const ['kg', 'lbs'], 'kg');
-    final heightUnit = _oneOf(_keyHeightUnit, const ['cm', 'in'], 'cm');
-    final analyticsEnabled = sharedPreferences.getBool(keyAnalyticsEnabled) ?? true;
+    final heightUnit = _oneOf(_keyHeightUnit, const [
+      'cm',
+      'in',
+    ], const SettingsEntity().heightUnit);
+    final analyticsEnabled =
+        sharedPreferences.getBool(keyAnalyticsEnabled) ?? true;
 
     return SettingsEntity(
       themeMode: themeMode,
@@ -42,10 +53,19 @@ class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
   @override
   Future<void> saveSettings(SettingsEntity settings) async {
     await sharedPreferences.setString(_keyThemeMode, settings.themeMode);
-    await sharedPreferences.setBool(_keyNotificationsEnabled, settings.notificationsEnabled);
-    await sharedPreferences.setBool(_keyHealthSyncEnabled, settings.healthSyncEnabled);
+    await sharedPreferences.setBool(
+      _keyNotificationsEnabled,
+      settings.notificationsEnabled,
+    );
+    await sharedPreferences.setBool(
+      _keyHealthSyncEnabled,
+      settings.healthSyncEnabled,
+    );
     await sharedPreferences.setString(_keyWeightUnit, settings.weightUnit);
     await sharedPreferences.setString(_keyHeightUnit, settings.heightUnit);
-    await sharedPreferences.setBool(keyAnalyticsEnabled, settings.analyticsEnabled);
+    await sharedPreferences.setBool(
+      keyAnalyticsEnabled,
+      settings.analyticsEnabled,
+    );
   }
 }

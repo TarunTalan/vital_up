@@ -159,9 +159,17 @@ class DataExportService {
         'account': account,
         'health': health,
       };
-      points = await _game.getHistory(days: 3650).timeout(timeout);
     } catch (e) {
-      debugPrint('Export without server data: $e');
+      debugPrint('Export without profile: $e');
+    }
+    // Apart from the profile, with longer to finish: years of points are
+    // read 1,000 rows at a time.
+    try {
+      points = await _game
+          .getHistory(days: 3650)
+          .timeout(const Duration(seconds: 60));
+    } catch (e) {
+      debugPrint('Export without points history: $e');
     }
 
     final app = <String, Object?>{};
@@ -214,11 +222,14 @@ class DataExportService {
           .select('badge_code, earned_at')
           .eq('user_id', userId)
           .order('earned_at'),
-      'daily_reports': () => _client
-          .from('daily_reports')
-          .select('day, metrics, updated_at')
-          .eq('user_id', userId)
-          .order('day'),
+      'daily_reports': () => _paged(
+        (from, to) => _client
+            .from('daily_reports')
+            .select('day, metrics, updated_at')
+            .eq('user_id', userId)
+            .order('day')
+            .range(from, to),
+      ),
       // Friends as this user sees them: username, status and since when.
       'friends': () async => [
         for (final r in await _client.rpc('get_friends') as List)
@@ -235,11 +246,15 @@ class DataExportService {
       'community_awards': () =>
           _client.rpc('get_player_awards', params: {'p_user': userId}),
       'challenges': () => _client.rpc('get_challenges'),
-      'notifications': () => _client
-          .from('notifications')
-          .select('type, title, body, data, created_at, read_at')
-          .eq('user_id', userId)
-          .order('created_at'),
+      'notifications': () => _paged(
+        (from, to) => _client
+            .from('notifications')
+            .select('type, title, body, data, created_at, read_at')
+            .eq('user_id', userId)
+            .order('created_at')
+            .order('id')
+            .range(from, to),
+      ),
       'weekly_summaries': () => _client
           .from('weekly_summaries')
           .select('week_start, stats, sent_at')
@@ -249,12 +264,35 @@ class DataExportService {
     final server = <String, Object?>{};
     for (final MapEntry(key: kind, value: fetch) in parts.entries) {
       try {
-        server[kind] = await fetch().timeout(timeout);
+        // Paged tables get longer: a page each per bounded request.
+        final paged = kind == 'daily_reports' || kind == 'notifications';
+        server[kind] = await fetch().timeout(
+          paged ? const Duration(seconds: 60) : timeout,
+        );
       } catch (e) {
         debugPrint('Export without $kind: $e');
       }
     }
     return server;
+  }
+
+  /// Every row of a query, [_page] at a time: the API returns at most
+  /// 1,000 rows per request, so one plain select silently cut a long
+  /// history short. [page] must order by a unique key.
+  static const _page = 1000;
+
+  Future<List<Map<String, dynamic>>> _paged(
+    Future<List<Map<String, dynamic>>> Function(int from, int to) page,
+  ) async {
+    final rows = <Map<String, dynamic>>[];
+    while (true) {
+      final batch = await page(
+        rows.length,
+        rows.length + _page - 1,
+      ).timeout(const Duration(seconds: 15));
+      rows.addAll(batch);
+      if (batch.length < _page) return rows;
+    }
   }
 }
 

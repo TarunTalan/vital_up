@@ -56,7 +56,8 @@ class NutritionManualEntryDialog extends StatefulWidget {
     required double fiberG,
     required double sugarG,
     required double sodiumMg,
-  }) onSave;
+  })
+  onSave;
 
   const NutritionManualEntryDialog({
     super.key,
@@ -67,10 +68,12 @@ class NutritionManualEntryDialog extends StatefulWidget {
   });
 
   @override
-  State<NutritionManualEntryDialog> createState() => _NutritionManualEntryDialogState();
+  State<NutritionManualEntryDialog> createState() =>
+      _NutritionManualEntryDialogState();
 }
 
-class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog> {
+class _NutritionManualEntryDialogState
+    extends State<NutritionManualEntryDialog> {
   late TextEditingController _nameController;
   late TextEditingController _quantityController;
   late TextEditingController _caloriesController;
@@ -82,7 +85,16 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   late TextEditingController _sodiumController;
 
   String _selectedUnit = 'g';
-  final List<String> _units = ['g', 'serving', 'oz', 'cup', 'piece', 'slice', 'tbsp', 'tsp'];
+  final List<String> _units = [
+    'g',
+    'serving',
+    'oz',
+    'cup',
+    'piece',
+    'slice',
+    'tbsp',
+    'tsp',
+  ];
 
   /// Cloud search is an edge function call, so it waits for typing to pause
   /// and skips very short prefixes; offline matches show on every keystroke.
@@ -106,7 +118,9 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
 
   /// Cloud results for the latest query when they arrive after its offline
   /// matches are already showing; merged into the open options list.
-  final ValueNotifier<List<AutocompleteSuggestion>> _lateRemote = ValueNotifier(const []);
+  final ValueNotifier<List<AutocompleteSuggestion>> _lateRemote = ValueNotifier(
+    const [],
+  );
 
   @override
   void initState() {
@@ -117,22 +131,39 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     // Pre-fill parsed nutrition if available
     // OCR can misread; clamp what it found so the fields start sane.
     final parsed = widget.parsedNutrition;
-    String prefill(String key, double max) => _fmt(saneAmount(parsed?[key], max: max));
-    _caloriesController = TextEditingController(text: prefill('calories', NutritionLimits.caloriesMax));
-    _proteinController = TextEditingController(text: prefill('protein', NutritionLimits.macroGMax));
-    _carbsController = TextEditingController(text: prefill('carbs', NutritionLimits.macroGMax));
-    _fatController = TextEditingController(text: prefill('fat', NutritionLimits.macroGMax));
-    _fiberController = TextEditingController(text: prefill('fiber', NutritionLimits.macroGMax));
-    _sugarController = TextEditingController(text: prefill('sugar', NutritionLimits.macroGMax));
-    _sodiumController = TextEditingController(text: prefill('sodium', NutritionLimits.mgMax));
+    String prefill(String key, double max) =>
+        _fmt(saneAmount(parsed?[key], max: max));
+    _caloriesController = TextEditingController(
+      text: prefill('calories', NutritionLimits.caloriesMax),
+    );
+    _proteinController = TextEditingController(
+      text: prefill('protein', NutritionLimits.macroGMax),
+    );
+    _carbsController = TextEditingController(
+      text: prefill('carbs', NutritionLimits.macroGMax),
+    );
+    _fatController = TextEditingController(
+      text: prefill('fat', NutritionLimits.macroGMax),
+    );
+    _fiberController = TextEditingController(
+      text: prefill('fiber', NutritionLimits.macroGMax),
+    );
+    _sugarController = TextEditingController(
+      text: prefill('sugar', NutritionLimits.macroGMax),
+    );
+    _sodiumController = TextEditingController(
+      text: prefill('sodium', NutritionLimits.mgMax),
+    );
   }
 
   /// "12.5" / "12" with at most one decimal.
-  static String _fmt(double v) => v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
 
   void _syncName() {
     final c = _autocompleteController;
-    if (c != null && _nameController.text != c.text) _nameController.text = c.text;
+    if (c != null && _nameController.text != c.text)
+      _nameController.text = c.text;
   }
 
   /// Fills quantity / unit from a serving text such as "1 bowl (150g)".
@@ -158,10 +189,15 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     super.dispose();
   }
 
-  Future<Iterable<AutocompleteSuggestion>> _fetchSuggestions(String query) async {
+  Future<Iterable<AutocompleteSuggestion>> _fetchSuggestions(
+    String query,
+  ) async {
     final generation = ++_queryGeneration;
     _lateRemote.value = const [];
-    final normalized = query.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+    final normalized = query.toLowerCase().trim().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
     if (normalized.isEmpty) {
       return const [];
     }
@@ -170,18 +206,22 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
 
     // 1. Fetch offline suggestions from Isar (instant)
     final offlineFoods = await repository.searchOfflineFoods(normalized);
-    final offlineSuggestions = offlineFoods.map((f) => AutocompleteSuggestion(
-      name: f.name,
-      servingSize: f.servingSize,
-      calories: f.calories,
-      protein: f.proteinG,
-      carbs: f.carbsG,
-      fat: f.fatG,
-      fiber: f.fiberG,
-      sugar: f.sugarG,
-      sodium: f.sodiumMg,
-      isOffline: true,
-    )).toList();
+    final offlineSuggestions = offlineFoods
+        .map(
+          (f) => AutocompleteSuggestion(
+            name: f.name,
+            servingSize: f.servingSize,
+            calories: f.calories,
+            protein: f.proteinG,
+            carbs: f.carbsG,
+            fat: f.fatG,
+            fiber: f.fiberG,
+            sugar: f.sugarG,
+            sodium: f.sodiumMg,
+            isOffline: true,
+          ),
+        )
+        .toList();
 
     if (normalized.length < _minRemoteQueryLength) return offlineSuggestions;
 
@@ -193,7 +233,8 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     if (offlineSuggestions.isNotEmpty) {
       // Show local matches now; cloud ones join via [_lateRemote].
       remote.then((items) {
-        if (mounted && items != null && generation == _queryGeneration) _lateRemote.value = items;
+        if (mounted && items != null && generation == _queryGeneration)
+          _lateRemote.value = items;
       });
       return offlineSuggestions;
     }
@@ -214,25 +255,26 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
     List<AutocompleteSuggestion> onlineSuggestions = [];
     try {
       final searchResult = await repository.searchByName(query);
-      searchResult.fold(
-        (failure) => null,
-        (foodItems) {
-          onlineSuggestions = foodItems.map((item) => AutocompleteSuggestion(
-            name: item.name,
-            servingSize: item.servingDescription,
-            calories: 0.0,
-            protein: 0.0,
-            carbs: 0.0,
-            fat: 0.0,
-            fiber: 0.0,
-            sugar: 0.0,
-            sodium: 0.0,
-            isOffline: false,
-            fdcId: item.id,
-          )).toList();
-          _remoteByQuery[query] = onlineSuggestions;
-        },
-      );
+      searchResult.fold((failure) => null, (foodItems) {
+        onlineSuggestions = foodItems
+            .map(
+              (item) => AutocompleteSuggestion(
+                name: item.name,
+                servingSize: item.servingDescription,
+                calories: 0.0,
+                protein: 0.0,
+                carbs: 0.0,
+                fat: 0.0,
+                fiber: 0.0,
+                sugar: 0.0,
+                sodium: 0.0,
+                isOffline: false,
+                fdcId: item.id,
+              ),
+            )
+            .toList();
+        _remoteByQuery[query] = onlineSuggestions;
+      });
     } catch (e) {
       // Suggestions are optional; offline matches still show.
       debugPrint('Food search failed: $e');
@@ -247,7 +289,10 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
   ) {
     final Map<String, AutocompleteSuggestion> unique = {};
     for (final suggestion in [...first, ...second]) {
-      unique.putIfAbsent(suggestion.name.toLowerCase().trim(), () => suggestion);
+      unique.putIfAbsent(
+        suggestion.name.toLowerCase().trim(),
+        () => suggestion,
+      );
     }
     return unique.values.toList();
   }
@@ -262,13 +307,27 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       // Offline suggestion has all macros pre-populated.
       setState(() {
         _applyServing(suggestion.servingSize);
-        _caloriesController.text = _fmt(saneAmount(suggestion.calories, max: NutritionLimits.caloriesMax));
-        _proteinController.text = _fmt(saneAmount(suggestion.protein, max: NutritionLimits.macroGMax));
-        _carbsController.text = _fmt(saneAmount(suggestion.carbs, max: NutritionLimits.macroGMax));
-        _fatController.text = _fmt(saneAmount(suggestion.fat, max: NutritionLimits.macroGMax));
-        _fiberController.text = _fmt(saneAmount(suggestion.fiber, max: NutritionLimits.macroGMax));
-        _sugarController.text = _fmt(saneAmount(suggestion.sugar, max: NutritionLimits.macroGMax));
-        _sodiumController.text = _fmt(saneAmount(suggestion.sodium, max: NutritionLimits.mgMax));
+        _caloriesController.text = _fmt(
+          saneAmount(suggestion.calories, max: NutritionLimits.caloriesMax),
+        );
+        _proteinController.text = _fmt(
+          saneAmount(suggestion.protein, max: NutritionLimits.macroGMax),
+        );
+        _carbsController.text = _fmt(
+          saneAmount(suggestion.carbs, max: NutritionLimits.macroGMax),
+        );
+        _fatController.text = _fmt(
+          saneAmount(suggestion.fat, max: NutritionLimits.macroGMax),
+        );
+        _fiberController.text = _fmt(
+          saneAmount(suggestion.fiber, max: NutritionLimits.macroGMax),
+        );
+        _sugarController.text = _fmt(
+          saneAmount(suggestion.sugar, max: NutritionLimits.macroGMax),
+        );
+        _sodiumController.text = _fmt(
+          saneAmount(suggestion.sodium, max: NutritionLimits.mgMax),
+        );
       });
     } else {
       if (_loadingDetails) return;
@@ -293,7 +352,10 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       detailResult.fold(
         (failure) {
           debugPrint('Loading food details failed: $failure');
-          showErrorSnackBar(context, "Couldn't load details. Enter them yourself.");
+          showErrorSnackBar(
+            context,
+            "Couldn't load details. Enter them yourself.",
+          );
         },
         (raw) {
           final info = sanitizeNutrition(raw);
@@ -316,18 +378,26 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
 
   /// Reads [controller] as a number in [0, max] (empty counts as 0) and
   /// records an inline error when it is out of range.
-  double? _readAmount(TextEditingController controller, double max, String unit) {
+  double? _readAmount(
+    TextEditingController controller,
+    double max,
+    String unit,
+  ) {
     final text = controller.text.trim();
     if (text.isEmpty) return 0;
     final value = parseNumberInRange(text, min: 0, max: max);
-    if (value == null) _fieldErrors[controller] = 'Use 0 to ${max.round()} $unit';
+    if (value == null)
+      _fieldErrors[controller] = 'Use 0 to ${max.round()} $unit';
     return value;
   }
 
   void _handleSave() {
     if (_submitted) return;
     _syncName();
-    final name = sanitizeText(_nameController.text, maxLength: InputLimits.shortText);
+    final name = sanitizeText(
+      _nameController.text,
+      maxLength: InputLimits.shortText,
+    );
     _fieldErrors.clear();
 
     final quantity = parseNumberInRange(
@@ -336,10 +406,19 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
       max: NutritionLimits.quantityMax,
     );
     if (quantity == null) {
-      _fieldErrors[_quantityController] = 'Enter ${NutritionLimits.quantityMin} to ${NutritionLimits.quantityMax.round()}';
+      _fieldErrors[_quantityController] =
+          'Enter ${NutritionLimits.quantityMin} to ${NutritionLimits.quantityMax.round()}';
     }
-    final calories = _readAmount(_caloriesController, NutritionLimits.caloriesMax, 'kcal');
-    final protein = _readAmount(_proteinController, NutritionLimits.macroGMax, 'g');
+    final calories = _readAmount(
+      _caloriesController,
+      NutritionLimits.caloriesMax,
+      'kcal',
+    );
+    final protein = _readAmount(
+      _proteinController,
+      NutritionLimits.macroGMax,
+      'g',
+    );
     final carbs = _readAmount(_carbsController, NutritionLimits.macroGMax, 'g');
     final fat = _readAmount(_fatController, NutritionLimits.macroGMax, 'g');
     final fiber = _readAmount(_fiberController, NutritionLimits.macroGMax, 'g');
@@ -457,18 +536,26 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                     children: [
                       AppIconBadge(
                         icon: widget.parsedNutrition != null
-                            ? Icon(Icons.document_scanner_rounded, color: primary)
+                            ? Icon(
+                                Icons.document_scanner_rounded,
+                                color: primary,
+                              )
                             : SvgPicture.asset(
                                 'assets/icons/ui/edit.svg',
                                 width: AppDimens.iconMd,
                                 height: AppDimens.iconMd,
-                                colorFilter: ColorFilter.mode(primary, BlendMode.srcIn),
+                                colorFilter: ColorFilter.mode(
+                                  primary,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                       ),
                       const SizedBox(width: AppDimens.space12),
                       Expanded(
                         child: Text(
-                          widget.parsedNutrition != null ? 'Verify Nutrition Label' : 'Enter Product Details',
+                          widget.parsedNutrition != null
+                              ? 'Verify Nutrition Label'
+                              : 'Enter Product Details',
                           style: context.text.headlineSmall,
                         ),
                       ),
@@ -484,121 +571,193 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(bottom: AppDimens.inputLabelGap),
-                          child: Text('Product Name', style: context.text.titleSmall),
+                          padding: const EdgeInsets.only(
+                            bottom: AppDimens.inputLabelGap,
+                          ),
+                          child: Text(
+                            'Product Name',
+                            style: context.text.titleSmall,
+                          ),
                         ),
                         LayoutBuilder(
                           builder: (context, fieldConstraints) => Autocomplete<AutocompleteSuggestion>(
-                          optionsBuilder: (TextEditingValue textEditingValue) {
-                            return _fetchSuggestions(textEditingValue.text);
-                          },
-                          displayStringForOption: (AutocompleteSuggestion option) => option.name,
-                          onSelected: _onSuggestionSelected,
-                          optionsViewBuilder: (context, onSelected, options) {
-                            final grey = context.vColors.grayText;
-                            final divider = context.vColors.divider;
+                            optionsBuilder:
+                                (TextEditingValue textEditingValue) {
+                                  return _fetchSuggestions(
+                                    textEditingValue.text,
+                                  );
+                                },
+                            displayStringForOption:
+                                (AutocompleteSuggestion option) => option.name,
+                            onSelected: _onSuggestionSelected,
+                            optionsViewBuilder: (context, onSelected, options) {
+                              final grey = context.vColors.grayText;
+                              final divider = context.vColors.divider;
 
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: Container(
-                                  width: fieldConstraints.maxWidth,
-                                  constraints: BoxConstraints(
-                                    maxHeight: context.hFraction(0.3),
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: context.vColors.surfaceElevated,
-                                    borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                                    border: Border.all(color: context.vColors.hairline!),
-                                    boxShadow: AppShadows.elevated,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-                                    child: ValueListenableBuilder<List<AutocompleteSuggestion>>(
-                                      valueListenable: _lateRemote,
-                                      builder: (context, lateRemote, _) {
-                                        final shown = lateRemote.isEmpty ? options : _mergeSuggestions(options, lateRemote);
-                                        return ListView.separated(
-                                          padding: EdgeInsets.zero,
-                                          shrinkWrap: true,
-                                          itemCount: shown.length,
-                                          separatorBuilder: (_, _) => Divider(color: divider),
-                                          itemBuilder: (BuildContext context, int index) {
-                                            final option = shown.elementAt(index);
-                                            final tone = option.isOffline ? primary : grey;
-                                            return ListTile(
-                                              dense: true,
-                                              title: Text(
-                                                option.name,
-                                                style: context.text.bodyMedium?.copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              subtitle: Text(
-                                                option.isOffline ? 'Offline DB • ${option.servingSize}' : 'Cloud Database',
-                                                style: context.text.bodySmall?.copyWith(color: tone),
-                                              ),
-                                              trailing: Icon(
-                                                option.isOffline ? Icons.offline_bolt_rounded : Icons.cloud_queue_rounded,
-                                                size: AppDimens.iconXs,
-                                                color: tone,
-                                              ),
-                                              onTap: () => onSelected(option),
-                                            );
-                                          },
-                                        );
-                                      },
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: Container(
+                                    width: fieldConstraints.maxWidth,
+                                    constraints: BoxConstraints(
+                                      maxHeight: context.hFraction(0.3),
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: context.vColors.surfaceElevated,
+                                      borderRadius: BorderRadius.circular(
+                                        AppDimens.radiusCard,
+                                      ),
+                                      border: Border.all(
+                                        color: context.vColors.hairline!,
+                                      ),
+                                      boxShadow: AppShadows.elevated,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(
+                                        AppDimens.radiusCard,
+                                      ),
+                                      child:
+                                          ValueListenableBuilder<
+                                            List<AutocompleteSuggestion>
+                                          >(
+                                            valueListenable: _lateRemote,
+                                            builder: (context, lateRemote, _) {
+                                              final shown = lateRemote.isEmpty
+                                                  ? options
+                                                  : _mergeSuggestions(
+                                                      options,
+                                                      lateRemote,
+                                                    );
+                                              return ListView.separated(
+                                                padding: EdgeInsets.zero,
+                                                shrinkWrap: true,
+                                                itemCount: shown.length,
+                                                separatorBuilder: (_, _) =>
+                                                    Divider(color: divider),
+                                                itemBuilder:
+                                                    (
+                                                      BuildContext context,
+                                                      int index,
+                                                    ) {
+                                                      final option = shown
+                                                          .elementAt(index);
+                                                      final tone =
+                                                          option.isOffline
+                                                          ? primary
+                                                          : grey;
+                                                      return ListTile(
+                                                        dense: true,
+                                                        title: Text(
+                                                          option.name,
+                                                          style: context
+                                                              .text
+                                                              .bodyMedium
+                                                              ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                        ),
+                                                        subtitle: Text(
+                                                          option.isOffline
+                                                              ? 'Offline DB • ${option.servingSize}'
+                                                              : 'Cloud Database',
+                                                          style: context
+                                                              .text
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color: tone,
+                                                              ),
+                                                        ),
+                                                        trailing: Icon(
+                                                          option.isOffline
+                                                              ? Icons
+                                                                    .offline_bolt_rounded
+                                                              : Icons
+                                                                    .cloud_queue_rounded,
+                                                          size:
+                                                              AppDimens.iconXs,
+                                                          color: tone,
+                                                        ),
+                                                        onTap: () =>
+                                                            onSelected(option),
+                                                      );
+                                                    },
+                                              );
+                                            },
+                                          ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                          fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                            if (textEditingController.text != _nameController.text) {
-                                textEditingController.text = _nameController.text;
-                            }
-                            // Listen once: this builder runs on every rebuild.
-                            if (!identical(_autocompleteController, textEditingController)) {
-                              _autocompleteController?.removeListener(_syncName);
-                              _autocompleteController = textEditingController..addListener(_syncName);
-                            }
+                              );
+                            },
+                            fieldViewBuilder:
+                                (
+                                  context,
+                                  textEditingController,
+                                  focusNode,
+                                  onFieldSubmitted,
+                                ) {
+                                  if (textEditingController.text !=
+                                      _nameController.text) {
+                                    textEditingController.text =
+                                        _nameController.text;
+                                  }
+                                  // Listen once: this builder runs on every rebuild.
+                                  if (!identical(
+                                    _autocompleteController,
+                                    textEditingController,
+                                  )) {
+                                    _autocompleteController?.removeListener(
+                                      _syncName,
+                                    );
+                                    _autocompleteController =
+                                        textEditingController
+                                          ..addListener(_syncName);
+                                  }
 
-                            return AppTextField(
-                              controller: textEditingController,
-                              focusNode: focusNode,
-                              hint: 'e.g., Haldiram\'s Bhujia',
-                              error: _nameError,
-                              maxLength: InputLimits.shortText,
-                              inputFormatters: InputFormatters.text(InputLimits.shortText),
-                              suffix: _loadingDetails
-                                  ? SizedBox.square(
-                                      dimension: AppDimens.iconMd,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: AppDimens.borderThick,
-                                        color: primary,
-                                        strokeCap: StrokeCap.round,
-                                      ),
-                                    )
-                                  : null,
-                              textCapitalization: TextCapitalization.words,
-                              onSubmitted: (_) => onFieldSubmitted(),
-                              onChanged: (_) {
-                                if (_nameError != null) {
-                                  setState(() => _nameError = null);
-                                }
-                              },
-                            );
-                          },
-                        ),
+                                  return AppTextField(
+                                    controller: textEditingController,
+                                    focusNode: focusNode,
+                                    hint: 'e.g., Haldiram\'s Bhujia',
+                                    error: _nameError,
+                                    maxLength: InputLimits.shortText,
+                                    inputFormatters: InputFormatters.text(
+                                      InputLimits.shortText,
+                                    ),
+                                    suffix: _loadingDetails
+                                        ? SizedBox.square(
+                                            dimension: AppDimens.iconMd,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth:
+                                                  AppDimens.borderThick,
+                                              color: primary,
+                                              strokeCap: StrokeCap.round,
+                                            ),
+                                          )
+                                        : null,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    onSubmitted: (_) => onFieldSubmitted(),
+                                    onChanged: (_) {
+                                      if (_nameError != null) {
+                                        setState(() => _nameError = null);
+                                      }
+                                    },
+                                  );
+                                },
+                          ),
                         ),
                         const SizedBox(height: AppDimens.space16),
                         Row(
                           children: [
                             Expanded(
                               flex: 3,
-                              child: Text('Serving size', style: context.text.titleSmall),
+                              child: Text(
+                                'Serving size',
+                                style: context.text.titleSmall,
+                              ),
                             ),
                             const SizedBox(width: AppDimens.space8),
                             Expanded(
@@ -608,8 +767,12 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                                 hint: '1',
                                 error: _fieldErrors[_quantityController],
                                 onChanged: (_) {
-                                  if (_fieldErrors[_quantityController] != null) {
-                                    setState(() => _fieldErrors[_quantityController] = null);
+                                  if (_fieldErrors[_quantityController] !=
+                                      null) {
+                                    setState(
+                                      () => _fieldErrors[_quantityController] =
+                                          null,
+                                    );
                                   }
                                 },
                               ),
@@ -633,13 +796,41 @@ class _NutritionManualEntryDialogState extends State<NutritionManualEntryDialog>
                         const SizedBox(height: AppDimens.space16),
                         AppCaption('Nutrition Information', color: primary),
                         const SizedBox(height: AppDimens.space12),
-                        buildField(label: 'Calories', controller: _caloriesController, suffix: 'kcal'),
-                        buildField(label: 'Protein', controller: _proteinController, suffix: 'g'),
-                        buildField(label: 'Carbohydrates', controller: _carbsController, suffix: 'g'),
-                        buildField(label: 'Fat', controller: _fatController, suffix: 'g'),
-                        buildField(label: 'Sugar', controller: _sugarController, suffix: 'g'),
-                        buildField(label: 'Dietary Fiber', controller: _fiberController, suffix: 'g'),
-                        buildField(label: 'Sodium', controller: _sodiumController, suffix: 'mg'),
+                        buildField(
+                          label: 'Calories',
+                          controller: _caloriesController,
+                          suffix: 'kcal',
+                        ),
+                        buildField(
+                          label: 'Protein',
+                          controller: _proteinController,
+                          suffix: 'g',
+                        ),
+                        buildField(
+                          label: 'Carbohydrates',
+                          controller: _carbsController,
+                          suffix: 'g',
+                        ),
+                        buildField(
+                          label: 'Fat',
+                          controller: _fatController,
+                          suffix: 'g',
+                        ),
+                        buildField(
+                          label: 'Sugar',
+                          controller: _sugarController,
+                          suffix: 'g',
+                        ),
+                        buildField(
+                          label: 'Dietary Fiber',
+                          controller: _fiberController,
+                          suffix: 'g',
+                        ),
+                        buildField(
+                          label: 'Sodium',
+                          controller: _sodiumController,
+                          suffix: 'mg',
+                        ),
                       ],
                     ),
                   ),

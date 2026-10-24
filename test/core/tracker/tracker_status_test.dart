@@ -5,7 +5,10 @@ import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 void main() {
   group('TrackerStatus.of', () {
     test('no value and no goal is not logged', () {
-      expect(TrackerStatus.of(value: null, goal: null), TrackerStatus.notLogged);
+      expect(
+        TrackerStatus.of(value: null, goal: null),
+        TrackerStatus.notLogged,
+      );
     });
 
     test('a value without a goal asks for one', () {
@@ -44,11 +47,19 @@ void main() {
 
     test('"near" goals are done within 10%', () {
       expect(
-        TrackerStatus.of(value: 1950, goal: 2000, direction: GoalDirection.near),
+        TrackerStatus.of(
+          value: 1950,
+          goal: 2000,
+          direction: GoalDirection.near,
+        ),
         TrackerStatus.done,
       );
       expect(
-        TrackerStatus.of(value: 2600, goal: 2000, direction: GoalDirection.near),
+        TrackerStatus.of(
+          value: 2600,
+          goal: 2000,
+          direction: GoalDirection.near,
+        ),
         TrackerStatus.over,
       );
     });

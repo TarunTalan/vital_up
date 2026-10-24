@@ -31,7 +31,9 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   /// Succeeds offline too: the answers are queued and uploaded on reconnect,
   /// so finishing onboarding without a connection doesn't block the user.
   @override
-  Future<Either<Failure, void>> submitOnboardingData(OnboardingData data) async {
+  Future<Either<Failure, void>> submitOnboardingData(
+    OnboardingData data,
+  ) async {
     try {
       await remoteDataSource.submitOnboardingData(data);
       final userId = currentUserId();

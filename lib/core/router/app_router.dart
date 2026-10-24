@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/subscription/presentation/pages/pro_page.dart';
 import 'package:vital_up/core/router/app_page_transitions.dart';
+import 'package:vital_up/core/router/route_extras.dart';
 import 'package:vital_up/features/auth/presentation/pages/login_page.dart';
 import 'package:vital_up/features/auth/presentation/utils/post_sign_in_navigation.dart';
 import 'package:vital_up/features/auth/presentation/pages/onboarding_page.dart';
@@ -12,6 +13,8 @@ import 'package:vital_up/features/auth/presentation/pages/reset_completed_page.d
 import 'package:vital_up/features/auth/presentation/pages/splash_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_tracking_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/activity_history_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/offline_map_picker_page.dart';
+import 'package:vital_up/features/activity_tracking/presentation/pages/offline_maps_page.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_goals/presentation/pages/activity_goals_page.dart';
 import 'package:vital_up/features/dashboard/presentation/pages/dashboard_page.dart';
@@ -22,15 +25,10 @@ import 'package:vital_up/features/dashboard/presentation/pages/stress_trends_pag
 import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/food_scanner_page.dart';
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/activity_page.dart';
 
-import 'package:vital_up/features/onboarding/presentation/pages/dietary_preference_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/height_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/info_and_permission_page.dart';
+import 'package:vital_up/features/onboarding/domain/onboarding_step.dart';
 import 'package:vital_up/features/onboarding/presentation/pages/onboarding_entry_point.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/goals.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/personal_details_page.dart';
-import 'package:vital_up/features/onboarding/presentation/pages/weight_page.dart';
+import 'package:vital_up/features/onboarding/presentation/pages/onboarding_flow_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_mode_select_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_preferences_page.dart';
 import 'package:vital_up/features/diet_plan/presentation/pages/diet_plan_edit_page.dart';
@@ -39,7 +37,6 @@ import 'package:vital_up/features/diet_plan/presentation/pages/goal_setup_page.d
 import 'package:vital_up/features/diet_plan/presentation/pages/manual_target_page.dart';
 import 'package:vital_up/features/settings/presentation/pages/settings_page.dart';
 import 'package:vital_up/features/help_support/presentation/pages/help_support_page.dart';
-import 'package:vital_up/features/help_support/presentation/pages/support_chat_page.dart';
 import 'package:vital_up/features/help_support/presentation/pages/contact_support_page.dart';
 import 'package:vital_up/features/help_support/domain/entities/support_ticket.dart';
 import 'package:vital_up/features/about/presentation/pages/about_page.dart';
@@ -312,11 +309,11 @@ class AppRouter {
         // Opened from the home bell, which passes its cubit so the unread
         // count stays in sync; without it fall back to the dashboard.
         redirect: (context, state) =>
-            state.extra is NotificationsCubit ? null : '/dashboard',
+            routeExtra(state) is NotificationsCubit ? null : '/dashboard',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           child: BlocProvider.value(
-            value: state.extra! as NotificationsCubit,
+            value: routeExtra(state)! as NotificationsCubit,
             child: const NotificationsPage(),
           ),
         ),
@@ -375,11 +372,11 @@ class AppRouter {
         // Opened from the community tab, which passes the Community; without
         // it (a stale deep link) fall back to the dashboard.
         redirect: (context, state) =>
-            state.extra is Community ? null : '/dashboard',
+            routeExtra(state) is Community ? null : '/dashboard',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: state.extra is Community
-              ? LeaderboardPage(community: state.extra! as Community)
+          child: routeExtra(state) is Community
+              ? LeaderboardPage(community: routeExtra(state)! as Community)
               : const _RouteUnavailable(),
         ),
       ),
@@ -397,14 +394,26 @@ class AppRouter {
             AppPage(key: state.pageKey, child: const ActivityHistoryPage()),
       ),
       GoRoute(
+        path: '/offline-maps',
+        name: 'offline-maps',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const OfflineMapsPage()),
+      ),
+      GoRoute(
+        path: '/offline-maps/new',
+        name: 'offline-map-picker',
+        pageBuilder: (context, state) =>
+            AppPage(key: state.pageKey, child: const OfflineMapPickerPage()),
+      ),
+      GoRoute(
         path: '/workout-timer',
         name: 'workout-timer',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
           // The activity screen, on its workout timer (notification taps).
           child: ActivityTrackingPage(
-            workout: state.extra is ActivityType
-                ? state.extra! as ActivityType
+            workout: routeExtra(state) is ActivityType
+                ? routeExtra(state)! as ActivityType
                 : ActivityType.strength,
           ),
         ),
@@ -427,35 +436,37 @@ class AppRouter {
         pageBuilder: (context, state) =>
             AppPage(key: state.pageKey, child: const OnboardingEntryPoint()),
       ),
+      // Every step opens the same flow page at that step.
       GoRoute(
         path: '/health-onboarding/personal-details',
         name: 'health-personal-details',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const PersonalDetailsPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.about),
+        ),
       ),
       GoRoute(
         path: '/health-onboarding/height',
         name: 'health-height',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const HeightPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.height),
+        ),
       ),
       GoRoute(
         path: '/health-onboarding/weight',
         name: 'health-weight',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const WeightPage()),
+        pageBuilder: (context, state) => AppPage(
+          key: state.pageKey,
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.weight),
+        ),
       ),
-
       GoRoute(
         path: '/health-onboarding/dietary-preference',
         name: 'health-dietary-preference',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: DietaryPreferencePage(
-            onNext: () => context.goNamed('health-goals'),
-            onBack: () => context.goNamed('health-weight'),
-            onSkip: () => context.goNamed('health-goals'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.diet),
         ),
       ),
       GoRoute(
@@ -463,11 +474,7 @@ class AppRouter {
         name: 'health-goals',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: GoalsPage(
-            onNext: () => context.goNamed('health-activity'),
-            onBack: () => context.goNamed('health-dietary-preference'),
-            onSkip: () => context.goNamed('health-activity'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.goal),
         ),
       ),
       GoRoute(
@@ -475,24 +482,15 @@ class AppRouter {
         name: 'health-activity',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: ActivityPage(
-            onNext: () => context.goNamed('health-info-permission'),
-            onBack: () => context.goNamed('health-goals'),
-            onSkip: () => context.goNamed('health-info-permission'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.activity),
         ),
       ),
-
       GoRoute(
         path: '/health-onboarding/info-permission',
         name: 'health-info-permission',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: InfoAndPermissionPage(
-            onNext: () => context.goNamed('dashboard'), // Complete flow
-            onBack: () => context.goNamed('health-activity'),
-            onSkip: () => context.goNamed('dashboard'),
-          ),
+          child: const OnboardingFlowPage(initialStep: OnboardingStep.privacy),
         ),
       ),
       GoRoute(
@@ -587,12 +585,6 @@ class AppRouter {
             AppPage(key: state.pageKey, child: const HelpSupportPage()),
       ),
       GoRoute(
-        path: '/settings/help/chat',
-        name: 'support-chat',
-        pageBuilder: (context, state) =>
-            AppPage(key: state.pageKey, child: const SupportChatPage()),
-      ),
-      GoRoute(
         path: '/settings/help/contact',
         name: 'contact-support',
         pageBuilder: (context, state) => AppPage(
@@ -628,7 +620,7 @@ class AppRouter {
         path: '/vita/chat',
         name: 'vita-chat',
         pageBuilder: (context, state) {
-          final extra = state.extra;
+          final extra = routeExtra(state);
           final args = extra is VitaChatArgs
               ? extra
               : VitaChatArgs(initialPrompt: extra is String ? extra : null);
@@ -652,7 +644,7 @@ class AppRouter {
         name: 'vita-diet-plan',
         pageBuilder: (context, state) => AppPage(
           key: state.pageKey,
-          child: VitaDietPlanPage(fromChat: state.extra == true),
+          child: VitaDietPlanPage(fromChat: routeExtra(state) == true),
         ),
       ),
       GoRoute(
@@ -681,13 +673,13 @@ class AppRouter {
 /// `extra` when it has the expected type, otherwise null (deep links and
 /// restored routes carry no `extra`, or a different one).
 T? _extraAs<T>(GoRouterState state) {
-  final extra = state.extra;
+  final extra = routeExtra(state);
   return extra is T ? extra : null;
 }
 
 /// `extra` as a JSON-like map; empty when missing or of another type.
 Map<String, dynamic> _extraMap(GoRouterState state) {
-  final extra = state.extra;
+  final extra = routeExtra(state);
   if (extra is! Map) return <String, dynamic>{};
   return {
     for (final e in extra.entries)
@@ -735,7 +727,7 @@ class _RouteUnavailable extends StatelessWidget {
 /// Pages under Profile get the Profile tab's cubit as `extra`, so edits show
 /// there on return; opened directly (deep link) they load their own.
 Widget _withProfileCubit(GoRouterState state, Widget child) {
-  final cubit = state.extra;
+  final cubit = routeExtra(state);
   if (cubit is ProfileCubit) {
     return BlocProvider<ProfileCubit>.value(value: cubit, child: child);
   }

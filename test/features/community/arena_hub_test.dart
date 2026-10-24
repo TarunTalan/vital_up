@@ -18,6 +18,9 @@ import 'package:vital_up/features/gamification/presentation/widgets/score_streak
 
 class _NoRepo implements GamificationRepository, CommunityRepository {
   @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -87,7 +90,7 @@ void main() {
       expect(find.text('5 days'), findsOneWidget);
       expect(find.text('+40'), findsOneWidget);
       expect(find.text('Rest day'), findsOneWidget);
-      for (final s in ['Badges', 'Points', 'Calendar']) {
+      for (final s in ['Achievements', 'Points']) {
         expect(find.text(s), findsOneWidget);
       }
       expect(tester.takeException(), isNull);

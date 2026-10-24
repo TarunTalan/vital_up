@@ -121,6 +121,15 @@ class CommunityCubit extends Cubit<CommunityState> {
 
   Future<void> load() async {
     emit(state.copyWith(loading: true, failed: false));
+    // First open: the saved copy at once, so a slow connection shows the
+    // last Arena instead of a spinner (a failed refresh then keeps it).
+    if (state.communities == null) {
+      final saved = await _repository.savedHub();
+      if (isClosed) return;
+      if (saved != null && state.communities == null) {
+        emit(state.copyWith(communities: saved.$1, settings: saved.$2));
+      }
+    }
     try {
       // Friends and ranks are optional: the hub still works without them.
       final (
@@ -160,26 +169,41 @@ class CommunityCubit extends Cubit<CommunityState> {
     }
   }
 
+  /// Fast path for Settings: loads only settings without the full Arena payload.
+  Future<void> loadSettings() async {
+    emit(state.copyWith(loading: true, failed: false));
+    try {
+      final settings = await _repository.getSettings().withLoadTimeout();
+      if (isClosed) return;
+      emit(state.copyWith(loading: false, settings: settings));
+    } catch (e) {
+      debugPrint('Leaderboard settings failed to load: $e');
+      if (isClosed) return;
+      emit(state.copyWith(loading: false, failed: true));
+    }
+  }
+
   /// Optional: the Arena shows without it, keeping the last copy.
   Future<void> _loadChampions() async {
     final boards = [?state.global, ?state.local];
     try {
       final champions = await Future.wait([
-        for (final c in boards)
-          _repository
-              .getCommunityWinners(c, AwardPeriod.month)
-              .then(
-                (w) => CommunityWinners(
-                  community: c,
-                  period: AwardPeriod.month,
-                  winners: w,
+        for (final period in AwardPeriod.values)
+          for (final c in boards)
+            _repository
+                .getCommunityWinners(c, period)
+                .then(
+                  (w) => CommunityWinners(
+                    community: c,
+                    period: period,
+                    winners: w,
+                  ),
                 ),
-              ),
       ]).withLoadTimeout();
       if (isClosed) return;
       emit(state.copyWith(champions: champions));
     } catch (e) {
-      debugPrint('Monthly champions failed to load: $e');
+      debugPrint('Champions failed to load: $e');
     }
   }
 
@@ -228,12 +252,31 @@ class CommunityCubit extends Cubit<CommunityState> {
   /// Returns false when saving failed. Offline, the change is queued and
   /// counts as saved.
   Future<bool> setCity(String city, String countryCode) async {
+    final c = sanitizeText(city, maxLength: InputLimits.city);
+    final cc = sanitizeText(countryCode).toUpperCase();
+    final previous = state.settings;
+    emit(
+      state.copyWith(
+        settings: CommunitySettings(
+          username: previous.username,
+          city: c.isEmpty ? null : c,
+          countryCode: cc.isEmpty ? null : cc,
+          leaderboardVisible: previous.leaderboardVisible,
+        ),
+      ),
+    );
     try {
       await _repository.setCity(city, countryCode).withLoadTimeout();
-      await load();
+      if (state.communities != null) {
+        await load();
+      } else {
+        await loadSettings();
+      }
       return true;
     } catch (e) {
       debugPrint('Setting city failed: $e');
+      if (isClosed) return false;
+      emit(state.copyWith(settings: previous));
       return false;
     }
   }

@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
-import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_score_ring.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_sheets.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_page_body.dart';
 
-/// Figma `health coach/ stress detect` (1912:17583). The score is computed on
-/// device from the daily check-in, watch HRV / resting heart rate and
-/// lifestyle triggers; only the tip text comes from the AI.
+/// Today's stress estimate, the check-in, Vita's tip and what may be
+/// adding stress. The score is worked out on the device from the check-in
+/// and lifestyle triggers; only the tip comes from the AI.
 class VitaStressGuidePage extends StatefulWidget {
   const VitaStressGuidePage({super.key});
 
@@ -29,9 +29,9 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   /// Caps the whole fetch so the loader can never spin forever.
   Future<StressReport> _load() =>
       _repository.getStressReport().timeout(const Duration(seconds: 60));
-  late final Future<VitaDailyInsights?> _insights =
-      _repository.getDailyInsights();
-  bool _connecting = false;
+  late final Future<VitaDailyInsights?> _insights = _repository
+      .getDailyInsights();
+  bool _checkingIn = false;
 
   // Block body: an arrow body would hand setState the Future and throw.
   void _reload() {
@@ -41,39 +41,26 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   }
 
   Future<void> _checkIn(int level) async {
+    if (_checkingIn) return;
+    _checkingIn = true;
     try {
       await _repository.saveStressCheckIn(level);
     } catch (e) {
       debugPrint('Stress check-in not saved: $e');
-      if (mounted) showErrorSnackBar(context, "Couldn't save your check-in. Try again.");
+      if (mounted) {
+        showErrorSnackBar(context, "Couldn't save your check-in. Try again.");
+      }
       return;
+    } finally {
+      _checkingIn = false;
     }
     if (mounted) _reload();
-  }
-
-  Future<void> _connectWearable() async {
-    if (_connecting) return;
-    setState(() => _connecting = true);
-    var granted = false;
-    try {
-      granted = await _repository.connectWearable();
-    } catch (e) {
-      debugPrint('Wearable connect failed: $e');
-    }
-    if (!mounted) return;
-    setState(() => _connecting = false);
-    if (granted) {
-      _reload();
-    } else {
-      showErrorSnackBar(context, 'No heart data access. Allow it in Health settings.');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      header: const AppTitleBar(title: 'Stress Guide'),
-      bodyPadding: vitaBodyPadding(context),
+      header: const AppPageHeader(title: 'Stress guide'),
       body: VitaFutureBody<StressReport>(
         future: _report,
         onRetry: _reload,
@@ -81,7 +68,7 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _StressLevelCard(report: report),
-            const SizedBox(height: AppDimens.space16),
+            const SizedBox(height: AppDimens.cardGap),
             _CheckInCard(
               selected: report.todayCheckIn?.level,
               onSelected: _checkIn,
@@ -90,26 +77,20 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
               future: _insights,
               builder: (context, snapshot) {
                 final tip = snapshot.data?.stressTip ?? report.tip;
-                if (tip == null) return const SizedBox.shrink();
+                if (tip == null || tip.isEmpty) return const SizedBox.shrink();
                 return Padding(
-                  padding: const EdgeInsets.only(top: AppDimens.space16),
+                  padding: const EdgeInsets.only(top: AppDimens.cardGap),
                   child: VitaInsightCard.message(tip),
                 );
               },
             ),
-            const SizedBox(height: AppDimens.space16),
+            const SizedBox(height: AppDimens.cardGap),
             _TriggersCard(triggers: report.triggers),
-            if (report.canConnectWearable) ...[
-              const SizedBox(height: AppDimens.space16),
-              _ConnectWearableCard(
-                loading: _connecting,
-                onConnect: _connectWearable,
-              ),
-            ],
-            const SizedBox(height: AppDimens.space16),
+            const SizedBox(height: AppDimens.sectionGap),
             const AppInfoNote(
-              message: 'Stress scores are estimates for general wellbeing, '
-                  'not a medical assessment.',
+              message:
+                  'Stress scores are estimates for general wellbeing, not a '
+                  'medical assessment.',
             ),
           ],
         ),
@@ -118,11 +99,12 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
   }
 }
 
+/// Ring colour for a level (fills only: the label beside it is plain text).
 Color _levelColor(StressLevel level) => switch (level) {
-      StressLevel.low => AppColors.gradeGood,
-      StressLevel.moderate => AppColors.gradeModerate,
-      StressLevel.high => AppColors.gradeBad,
-    };
+  StressLevel.low => AppColors.gradeGood,
+  StressLevel.moderate => AppColors.gradeModerate,
+  StressLevel.high => AppColors.gradeBad,
+};
 
 class _StressLevelCard extends StatelessWidget {
   final StressReport report;
@@ -131,36 +113,35 @@ class _StressLevelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = _levelColor(report.level);
     final grey = context.vColors.grayText;
 
     return AppCard(
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
       child: Column(
         children: [
           Text(
-            'CURRENT STRESS LEVEL',
+            'Current stress level',
             textAlign: TextAlign.center,
-            style: context.text.titleSmall?.copyWith(color: grey),
+            style: context.text.bodySmall?.copyWith(color: grey),
           ),
-          const SizedBox(height: AppDimens.space16),
+          const SizedBox(height: AppDimens.space12),
           AppScoreRing(
             score: report.score,
             label: report.level.label.split(' ').first,
-            color: accent,
+            color: _levelColor(report.level),
           ),
-          const SizedBox(height: AppDimens.space16),
+          const SizedBox(height: AppDimens.space12),
           Text(
             report.level.label,
             textAlign: TextAlign.center,
-            style: context.text.headlineSmall?.copyWith(color: accent),
+            style: context.text.titleMedium?.copyWith(
+              color: context.colors.onSurface,
+            ),
           ),
-          const SizedBox(height: AppDimens.space2),
+          const SizedBox(height: AppDimens.space4),
           Text(
             report.trend,
             textAlign: TextAlign.center,
-            style: context.text.bodyLarge?.copyWith(color: grey),
+            style: context.text.bodyMedium?.copyWith(color: grey),
           ),
           const SizedBox(height: AppDimens.space8),
           Text(
@@ -174,7 +155,8 @@ class _StressLevelCard extends StatelessWidget {
   }
 }
 
-/// Daily self-report, 1 (very calm) – 5 (very stressed).
+/// Daily self-report, 1 (very calm) to 5 (very stressed): the same faces
+/// as the check-in card on Home.
 class _CheckInCard extends StatelessWidget {
   final int? selected;
   final ValueChanged<int> onSelected;
@@ -183,47 +165,20 @@ class _CheckInCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final v = context.vColors;
-    final onSurface = context.colors.onSurface;
-
     return AppCard(
-      sheen: false,
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             selected == null
                 ? 'How stressed do you feel today?'
                 : "Today's check-in",
-            style: context.text.titleSmall?.copyWith(color: onSurface),
+            style: context.text.titleSmall?.copyWith(
+              color: context.colors.onSurface,
+            ),
           ),
           const SizedBox(height: AppDimens.space12),
-          Wrap(
-            spacing: AppDimens.space8,
-            runSpacing: AppDimens.space8,
-            children: [
-              for (var level = 1; level <= 5; level++)
-                ChoiceChip(
-                  label: Text(StressCheckIn.labels[level - 1]),
-                  selected: selected == level,
-                  showCheckmark: false,
-                  onSelected: (_) => onSelected(level),
-                  labelStyle: context.text.bodyMedium?.copyWith(
-                    color: selected == level ? v.buttonText : onSurface,
-                  ),
-                  selectedColor: context.colors.primary,
-                  backgroundColor: v.glassFill,
-                  side: BorderSide(
-                    color: selected == level
-                        ? context.colors.primary
-                        : v.glassBorder!,
-                  ),
-                  shape: const StadiumBorder(),
-                ),
-            ],
-          ),
+          MoodLevelPicker(selected: selected, onSelected: onSelected),
         ],
       ),
     );
@@ -238,77 +193,42 @@ class _TriggersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = context.colors.onSurface;
-    final rowStyle = context.text.bodyMedium?.copyWith(color: onSurface);
+    final grey = context.vColors.grayText;
 
     return AppCard(
-      sheen: false,
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Detected Triggers',
+            'Possible triggers today',
             style: context.text.titleSmall?.copyWith(color: onSurface),
           ),
           if (triggers.isEmpty) ...[
-            const SizedBox(height: AppDimens.space16),
+            const SizedBox(height: AppDimens.space8),
             Text(
-              'No triggers detected today',
-              style: rowStyle?.copyWith(color: context.vColors.grayText),
+              'Nothing stands out today.',
+              style: context.text.bodyMedium?.copyWith(color: grey),
             ),
           ],
           for (final trigger in triggers) ...[
-            const SizedBox(height: AppDimens.space16),
+            const SizedBox(height: AppDimens.space12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Text(trigger.name, style: rowStyle)),
+                Expanded(
+                  child: Text(
+                    trigger.name,
+                    style: context.text.bodyMedium?.copyWith(color: onSurface),
+                  ),
+                ),
                 const SizedBox(width: AppDimens.space12),
-                Text(trigger.severity.label, style: rowStyle),
+                Text(
+                  trigger.severity.label,
+                  style: context.text.bodySmall?.copyWith(color: grey),
+                ),
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ConnectWearableCard extends StatelessWidget {
-  final bool loading;
-  final VoidCallback onConnect;
-
-  const _ConnectWearableCard({required this.loading, required this.onConnect});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      sheen: false,
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'More accurate with your watch',
-            style: context.text.titleSmall?.copyWith(
-              color: context.colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space6),
-          Text(
-            'Vita can read heart-rate variability and resting heart rate '
-            'from Health Connect / Apple Health to measure stress.',
-            style: context.text.bodyMedium?.copyWith(
-              color: context.vColors.grayText,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space16),
-          AppSecondaryButton(
-            label: 'Connect watch data',
-            isLoading: loading,
-            onTap: onConnect,
-          ),
         ],
       ),
     );

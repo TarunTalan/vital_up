@@ -32,11 +32,14 @@ class TrendRangeToggle extends StatelessWidget {
   }
 }
 
-/// Trend card on detail pages: caption with the range toggle, the bar
-/// chart, then the average / best / goal readout, with the same spacing
-/// everywhere.
+/// Trend card on detail pages: what the chart shows ([title], e.g. "Last
+/// 7 days", over a grey [caption]) with the range toggle, the bar chart,
+/// then the average / best / goal readout, with the same spacing
+/// everywhere. The toggle sits beside the title when both fit and moves
+/// under it otherwise, so the title never squeezes into a narrow column.
 class TrendChartCard extends StatelessWidget {
-  final String caption;
+  final String title;
+  final String? caption;
   final TrendRange range;
   final List<TrendRange> ranges;
   final ValueChanged<TrendRange> onRange;
@@ -45,7 +48,8 @@ class TrendChartCard extends StatelessWidget {
 
   const TrendChartCard({
     super.key,
-    required this.caption,
+    required this.title,
+    this.caption,
     required this.range,
     required this.onRange,
     required this.chart,
@@ -55,16 +59,40 @@ class TrendChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final caption = this.caption;
     return AppCard(
       width: double.infinity,
       padding: AppDimens.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppDimens.space16,
+            runSpacing: AppDimens.space12,
             children: [
-              Expanded(child: AppCaption(caption)),
-              const SizedBox(width: AppDimens.space8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: context.text.titleSmall?.copyWith(
+                      color: context.colors.onSurface,
+                    ),
+                  ),
+                  if (caption != null) ...[
+                    const SizedBox(height: AppDimens.space2),
+                    Text(
+                      caption,
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.vColors.grayText,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               TrendRangeToggle(
                 value: range,
                 onChanged: onRange,

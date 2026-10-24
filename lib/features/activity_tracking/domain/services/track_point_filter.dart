@@ -29,8 +29,15 @@ class TrackPointFilter {
   /// Below this Doppler speed the device is treated as standing still.
   static const double _stationarySpeed = 0.4;
 
+  /// Consistent fixes in a row that all jump too far from the last
+  /// accepted one before the anchor itself is treated as the bad fix.
+  static const int _reanchorAfter = 3;
+
   TrackPoint? _lastSmoothed;
   TrackPoint? _lastAccepted;
+
+  /// Fixes rejected in a row for an impossible jump from [_lastAccepted].
+  final List<TrackPoint> _jumped = [];
 
   /// Returns the cleaned point to record, or null if [raw] should be dropped.
   TrackPoint? process(TrackPoint raw) {
@@ -58,7 +65,8 @@ class TrackPointFilter {
     // be more than 2× the activity max (very permissive — accounts for
     // accumulated positional error over short time windows).
     final distance = haversineMeters(previous, point);
-    if (distance / elapsedSeconds > maxSpeed * 2) return null;
+    if (distance / elapsedSeconds > maxSpeed * 2) return _onJump(point);
+    _jumped.clear();
 
     // Movement gate. When Doppler says we're moving, a small step is real.
     // When it says we're still (or the device reports no speed at all), the
@@ -71,6 +79,31 @@ class TrackPointFilter {
     if (distance < minDistance) return null;
 
     _lastAccepted = point;
+    return point;
+  }
+
+  /// A fix too far from the last accepted one. Usually a spike, dropped.
+  /// But when the accepted fix was the bad one (a cold-start or cached fix
+  /// hundreds of metres off), every real fix after it would be dropped
+  /// until enough time passed to make the jump look possible, and then be
+  /// counted as distance. So after [_reanchorAfter] fixes in a row that
+  /// agree with each other, follow them instead.
+  TrackPoint? _onJump(TrackPoint point) {
+    final last = _jumped.lastOrNull;
+    if (last != null) {
+      final seconds =
+          point.timestamp.difference(last.timestamp).inMilliseconds / 1000.0;
+      final consistent =
+          seconds > 0 &&
+          haversineMeters(last, point) / seconds <=
+              activityType.maxReasonableSpeedMetersPerSecond * 2;
+      if (!consistent) _jumped.clear();
+    }
+    _jumped.add(point);
+    if (_jumped.length < _reanchorAfter) return null;
+    _jumped.clear();
+    _lastAccepted = point;
+    _lastSmoothed = point;
     return point;
   }
 

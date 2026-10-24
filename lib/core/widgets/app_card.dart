@@ -23,6 +23,12 @@ class AppCard extends StatelessWidget {
   final double? width;
   final List<BoxShadow>? shadow;
 
+  /// Draws [AppChevron] at the trailing edge, centred: the card opens
+  /// another page or sheet. Every card that opens something says so,
+  /// either this way or with its own [AppChevron] in a row; cards that
+  /// pick something (radio, checkbox) and static cards never show one.
+  final bool showChevron;
+
   const AppCard({
     super.key,
     required this.child,
@@ -37,6 +43,7 @@ class AppCard extends StatelessWidget {
     this.borderColor,
     this.width,
     this.shadow,
+    this.showChevron = false,
   });
 
   @override
@@ -62,7 +69,18 @@ class AppCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(padding: padding, child: child),
+          child: Padding(
+            padding: padding,
+            child: showChevron && onTap != null
+                ? Row(
+                    children: [
+                      Expanded(child: child),
+                      const SizedBox(width: AppDimens.space8),
+                      const AppChevron(),
+                    ],
+                  )
+                : child,
+          ),
         ),
       ),
     );
@@ -70,7 +88,10 @@ class AppCard extends StatelessWidget {
     // The sheen gradient replaces the flat fill, so layer the fill underneath.
     if (sheen && tint == null) {
       content = DecoratedBox(
-        decoration: BoxDecoration(color: v.glassFill, borderRadius: borderRadius),
+        decoration: BoxDecoration(
+          color: v.glassFill,
+          borderRadius: borderRadius,
+        ),
         child: content,
       );
     }
@@ -90,12 +111,50 @@ class AppCard extends StatelessWidget {
 
     if (shadow != null) {
       content = DecoratedBox(
-        decoration: BoxDecoration(borderRadius: borderRadius, boxShadow: shadow),
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          boxShadow: shadow,
+        ),
         child: content,
       );
     }
 
     return Container(width: width, margin: margin, child: content);
+  }
+}
+
+/// The one "opens something" mark: a grey chevron at the trailing edge of
+/// a tappable card or row. Same size and colour everywhere; text links
+/// ("See all ›") draw their own accent chevron.
+class AppChevron extends StatelessWidget {
+  final Color? color;
+
+  const AppChevron({super.key, this.color});
+
+  /// The glyph's blank side: drawn into the padding after it, so the
+  /// visible arrow lines up with the content edge and takes less room.
+  static const double _inset = 6;
+
+  /// Width the chevron takes in a row.
+  static const double width = AppDimens.iconMd - _inset;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: width,
+        height: AppDimens.iconMd,
+        child: OverflowBox(
+          alignment: AlignmentDirectional.centerStart,
+          maxWidth: AppDimens.iconMd,
+          child: Icon(
+            Icons.chevron_right_rounded,
+            size: AppDimens.iconMd,
+            color: color ?? context.vColors.grayText,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -113,22 +172,33 @@ class AppIconBadge extends StatelessWidget {
     this.size = AppDimens.iconBadge,
   });
 
+  static const double _fillAlpha = 0.2;
+
+  /// Colour for a glyph on a badge of [accent]. It sits on the tinted
+  /// circle, not the bare card, so it gets 3:1 against the circle: a
+  /// deeper shade in light mode, lighter in dark. Pass it to icons that
+  /// set their own colour (SVGs).
+  static Color glyphColor(BuildContext context, Color accent) =>
+      AppColors.readableOn(
+        accent,
+        Color.alphaBlend(
+          accent.withValues(alpha: _fillAlpha),
+          context.isDark
+              ? AppColors.cardBackdropDark
+              : AppColors.cardBackdropLight,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final accent = color ?? context.colors.primary;
-    // The brand cyan is too light for an icon on its own tint in light
-    // mode; draw the glyph in the readable shade.
-    final glyph = accent == AppColors.primary
-        ? context.vColors.accentText ?? accent
-        : accent;
+    final fill = accent.withValues(alpha: _fillAlpha);
+    final glyph = glyphColor(context, accent);
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
       child: IconTheme(
         data: IconThemeData(color: glyph, size: size / 2),
         child: icon,
@@ -173,12 +243,7 @@ class AppCaption extends StatelessWidget {
   final Color? color;
   final bool uppercase;
 
-  const AppCaption(
-    this.text, {
-    super.key,
-    this.color,
-    this.uppercase = true,
-  });
+  const AppCaption(this.text, {super.key, this.color, this.uppercase = true});
 
   @override
   Widget build(BuildContext context) {

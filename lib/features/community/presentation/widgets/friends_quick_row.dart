@@ -8,7 +8,7 @@ import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/domain/entities/leaderboard_entry.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
-import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
+import 'package:vital_up/features/community/presentation/pages/player_profile_page.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/utils/number_formats.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -82,10 +82,14 @@ class FriendsQuickRow extends StatelessWidget {
                       isMe: c.isMe,
                       onTap: c.isMe
                           ? null
-                          : () => PlayerInspectSheet.show(
+                          : () => PlayerProfilePage.open(
                               context,
-                              friend: c.friend,
-                              onRemove: () => onRefresh?.call(),
+                              userId: c.friend.userId,
+                              username: c.friend.username,
+                              level: c.friend.level,
+                              avatarUrl: c.friend.avatarUrl,
+                              fullName: c.friend.fullName,
+                              onFriendRemoved: () => onRefresh?.call(),
                             ),
                     ),
                     const SizedBox(width: AppDimens.cardGap),
@@ -140,11 +144,7 @@ class _RequestsRow extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right_rounded,
-            size: AppDimens.iconMd,
-            color: context.vColors.grayText,
-          ),
+          const AppChevron(),
         ],
       ),
     );

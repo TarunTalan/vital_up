@@ -62,6 +62,10 @@ class WorkoutRecoveryService {
       }
     } catch (e) {
       debugPrint('Checking the interrupted workout failed: $e');
+      // Unknown: closing every open session would close the one to
+      // resume too, leaving Home's bar pointing at a workout the tracking
+      // screen no longer offers. Try again next launch.
+      return;
     }
     await repository.finalizeInterruptedSessions(keepOpenId: keepOpen);
   }

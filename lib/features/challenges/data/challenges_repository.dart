@@ -5,30 +5,73 @@ import 'package:uuid/uuid.dart';
 import 'package:vital_up/core/cache/cache_store.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/utils/number_formats.dart';
 
-/// What a challenge ranks on; scores come from synced workouts.
+/// What a challenge ranks on. Workout metrics are scored from synced
+/// workouts between start and end; daily ones ([isDaily]) from points and
+/// daily reports over whole days, in each person's own time zone.
 enum ChallengeMetric {
-  activeMinutes('active_minutes', 'Active minutes', 'min'),
-  distanceKm('distance_km', 'Distance', 'km'),
-  workouts('workouts', 'Workouts', ''),
-  xp('xp', 'XP Earned', 'XP');
+  points('points', 'Points', 'Everything that earns points, without bonuses'),
+  nutritionPoints(
+    'nutrition_points',
+    'Healthy eating points',
+    'Meals logged, diet plan, calorie target and water',
+  ),
+  steps('steps', 'Steps', 'Steps from your daily activity'),
+  activeMinutes('active_minutes', 'Active minutes', 'Time spent in workouts'),
+  workouts('workouts', 'Workouts', 'Workouts completed'),
+  distanceKm('distance_km', 'Distance', 'Distance from outdoor workouts'),
+  wellbeingPoints(
+    'wellbeing_points',
+    'Wellbeing points',
+    'Sleep, mood check-ins and calm days',
+  );
 
   final String code;
   final String label;
-  final String unit;
-  const ChallengeMetric(this.code, this.label, this.unit);
+
+  /// What counts, one line under the option.
+  final String description;
+  const ChallengeMetric(this.code, this.label, this.description);
 
   static ChallengeMetric fromCode(String? code) =>
       values.where((m) => m.code == code).firstOrNull ?? activeMinutes;
 
-  /// "42 min", "12.5 km", "3 workouts".
+  /// Scored over whole days (today and the next days - 1) rather than
+  /// from the moment it starts.
+  bool get isDaily => switch (this) {
+    points || nutritionPoints || wellbeingPoints || steps => true,
+    activeMinutes || workouts || distanceKm => false,
+  };
+
+  /// "42 min", "12.5 km", "3 workouts", "120 pts", "8,400 steps".
   String format(num score) => switch (this) {
     ChallengeMetric.distanceKm => '${score.toStringAsFixed(1)} km',
     ChallengeMetric.workouts =>
       '${score.toInt()} ${score == 1 ? 'workout' : 'workouts'}',
     ChallengeMetric.activeMinutes => '${score.toInt()} min',
-    ChallengeMetric.xp => '${score.toInt()} XP',
+    ChallengeMetric.points ||
+    ChallengeMetric.nutritionPoints ||
+    ChallengeMetric.wellbeingPoints => '${formatCompactCount(score)} pts',
+    ChallengeMetric.steps =>
+      '${formatCompactCount(score)} ${score == 1 ? 'step' : 'steps'}',
   };
+}
+
+/// "Most points in 1 day", "Most steps in 7 days".
+String challengeName(ChallengeMetric metric, int days) =>
+    'Most ${metric.label.toLowerCase()} in $days ${days == 1 ? 'day' : 'days'}';
+
+/// When a new challenge counts, for the form.
+String challengeWindowNote(ChallengeMetric metric, int days) {
+  if (metric.isDaily) {
+    return days == 1
+        ? 'Counts today, until midnight.'
+        : 'Counts today and the next ${days - 1} days.';
+  }
+  return days == 1
+      ? 'Counts workouts from now for 24 hours.'
+      : 'Counts workouts from now for $days days.';
 }
 
 enum ParticipantStatus {
@@ -172,8 +215,8 @@ class ChallengeRequestIds {
     Iterable<String> friendIds,
   ) {
     final friends = friendIds.toSet().toList()..sort();
-    return _ids['${metric.code}|$days|${friends.join(',')}'] ??=
-        const Uuid().v4();
+    return _ids['${metric.code}|$days|${friends.join(',')}'] ??= const Uuid()
+        .v4();
   }
 }
 
@@ -235,13 +278,9 @@ class ChallengesRepository {
       ChallengeStanding.fromJson(r),
   ];
 
-  /// Metrics and lengths `create_challenge` accepts.
-  static const creatableMetrics = [
-    ChallengeMetric.activeMinutes,
-    ChallengeMetric.distanceKm,
-    ChallengeMetric.workouts,
-  ];
-  static const durations = [3, 7, 14];
+  /// Metrics and lengths `create_challenge` accepts, in the form's order.
+  static const creatableMetrics = ChallengeMetric.values;
+  static const durations = [1, 3, 7, 14];
 
   /// Friends per challenge (server limit).
   static const maxFriends = 9;

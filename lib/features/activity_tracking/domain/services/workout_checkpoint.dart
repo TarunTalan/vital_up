@@ -53,13 +53,13 @@ class WorkoutCheckpoint {
   });
 
   String encode() => jsonEncode({
-        'v': version,
-        'id': sessionId,
-        'savedAt': savedAt.toUtc().toIso8601String(),
-        'paused': paused,
-        'elevation': elevationGainMeters,
-        'weightKg': weightKg,
-      });
+    'v': version,
+    'id': sessionId,
+    'savedAt': savedAt.toUtc().toIso8601String(),
+    'paused': paused,
+    'elevation': elevationGainMeters,
+    'weightKg': weightKg,
+  });
 
   /// Null for anything missing, malformed or from another format version,
   /// so a corrupt pref can never block the tracking screen.
@@ -83,7 +83,11 @@ class WorkoutCheckpoint {
     }
   }
 
-  static double _finiteOr(Object? value, double fallback, {required double min}) {
+  static double _finiteOr(
+    Object? value,
+    double fallback, {
+    required double min,
+  }) {
     if (value is! num) return fallback;
     final v = value.toDouble();
     return v.isFinite && v >= min ? v : fallback;
@@ -139,7 +143,9 @@ class WorkoutCheckpoint {
       points: session.points,
       targetType: targetType ?? session.targetType,
       targetValue: targetValue ?? session.targetValue,
-      targetAchieved: targetType != null ? targetAchieved : session.targetAchieved,
+      targetAchieved: targetType != null
+          ? targetAchieved
+          : session.targetAchieved,
     );
   }
 }

@@ -5,7 +5,8 @@ import '../../data/services/screen_time_service.dart';
 import '../../domain/entities/app_usage_info.dart';
 import 'screen_time_state.dart';
 
-class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver {
+class ScreenTimeCubit extends Cubit<ScreenTimeState>
+    with WidgetsBindingObserver {
   final ScreenTimeService _service;
 
   ScreenTimeCubit(this._service) : super(ScreenTimeInitial()) {
@@ -42,7 +43,7 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
       }
 
       final stats = await _service.getUsageStats().withLoadTimeout();
-      
+
       Duration total = Duration.zero;
       for (var stat in stats) {
         total += stat.usageDuration;
@@ -54,12 +55,14 @@ class ScreenTimeCubit extends Cubit<ScreenTimeState> with WidgetsBindingObserver
       } catch (e) {
         debugPrint('Weekly screen time summary failed: $e');
       }
-      
-      emit(ScreenTimeLoaded(
-        usageStats: stats,
-        totalDuration: total,
-        weeklySummary: summary,
-      ));
+
+      emit(
+        ScreenTimeLoaded(
+          usageStats: stats,
+          totalDuration: total,
+          weeklySummary: summary,
+        ),
+      );
     } catch (e) {
       debugPrint('Screen time load failed: $e');
       if (state is! ScreenTimeLoaded) {

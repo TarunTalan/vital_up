@@ -250,7 +250,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   AppListTile(
                     icon: Icons.help_outline_rounded,
                     title: 'Help & support',
-                    subtitle: 'FAQs, Vital Assistant, contact us',
+                    subtitle: 'FAQs, Ask Vita, contact us',
                     onTap: () => context.pushNamed('help-support'),
                   ),
                 ],
@@ -368,7 +368,7 @@ class _IdentityCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: v.grayText),
+              const AppChevron(),
             ],
           ),
           _ArenaStrip(onOpen: onOpenArena),

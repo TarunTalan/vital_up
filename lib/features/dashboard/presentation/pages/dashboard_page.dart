@@ -1,12 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/active_workout_bar.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
+import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/services/in_app_audio_downloader.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/feature_tips/data/feature_tips_service.dart';
+import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/widgets/tracker/quick_log_hub.dart';
@@ -28,6 +35,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_bottom_nav.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/features/profile/presentation/pages/profile_page.dart';
 import 'package:vital_up/features/activity_goals/presentation/cubit/activity_goals_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
@@ -116,10 +124,23 @@ class _DashboardPageState extends State<DashboardPage> {
       // Both only reach the server when something changed (time zone, push
       // token or account) since they last did.
       sl<WeeklySummaryService>().reportTimezone();
-      push.requestPermissionAndRegister();
+      // Registers only if notifications are allowed; the card below asks.
+      push.register();
+      _askForNotifications();
       sl<HomeWidgetService>().start(sl<HabitEvents>().stream);
       // Track downloads that finished while the app was closed.
       sl<InAppAudioDownloader>().start();
+      // The workout map is ready (and works offline) before it's opened;
+      // offline map downloads the app was closed in finish.
+      sl<OfflineMapService>().prefetchAtStartup();
+      // Records a feature tip that went out and plans the next (at most
+      // one a week, only for features not tried yet).
+      sl<FeatureTipsService>().reschedule();
+      // Binding the speech engine takes a second or two: done now, the
+      // first workout cue isn't late.
+      sl<VoiceCoachService>().init();
+      // Timed workouts' cues, also with the timer screen left.
+      sl<TimerVoiceCoach>().start();
     });
   }
 
@@ -140,6 +161,15 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       debugPrint('Username check failed: $e');
     }
+  }
+
+  /// Notifications off: the "Stay on track" card, once (never over another
+  /// sheet, e.g. the username prompt), then the system dialog on Allow.
+  Future<void> _askForNotifications() async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+    if (!await askForNotificationsOnce(context) || !mounted) return;
+    sl<PushService>().register();
+    sl<RemindersService>().resync();
   }
 
   /// A tapped push opens the screen its notification links to.
@@ -163,6 +193,7 @@ class _DashboardPageState extends State<DashboardPage> {
     HomeWidgetService.markNotReady();
     _dietPlanCubit.close();
     _profileCubit.close();
+    _scanBusy.dispose();
     super.dispose();
   }
 
@@ -191,7 +222,17 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _handlePop() {
+  /// A meal photo is being analysed on the Scan tab.
+  final ValueNotifier<bool> _scanBusy = ValueNotifier(false);
+
+  Future<void> _handlePop() async {
+    if (_selectedIndex == 1 && _scanBusy.value) {
+      if (!await confirmLeaveFoodScan(context) || !mounted) return;
+    }
+    _popTab();
+  }
+
+  void _popTab() {
     if (_navigationQueue.length > 1) {
       setState(() {
         _navigationQueue.removeLast();
@@ -296,12 +337,20 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: _buildSelectedTab(context),
               ),
+              // A workout under way floats above the nav on every tab;
+              // its height joins the bottom padding tabs already clear.
               bottomNavigationBar: _selectedIndex == 1
                   ? null
-                  : AppBottomNav(
-                      items: _items,
-                      selectedIndex: _selectedIndex,
-                      onItemSelected: _selectTab,
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const ActiveWorkoutBar(),
+                        AppBottomNav(
+                          items: _items,
+                          selectedIndex: _selectedIndex,
+                          onItemSelected: _selectTab,
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -336,8 +385,8 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-      1 => FoodScannerPage(onBack: _handlePop),
-      2 => VitaHomePage(onBack: _handlePop),
+      1 => FoodScannerPage(onBack: _handlePop, busy: _scanBusy),
+      2 => const VitaHomePage(),
       3 => const CommunityHubPage(),
       _ => BlocProvider.value(
         value: _profileCubit,
@@ -462,10 +511,7 @@ class _HomeTabState extends State<_HomeTab> {
       case 'activity_sessions':
         _reloadHabit(Habit.activity);
       case 'sleep_logs':
-        context.read<SleepCubit>().loadSleepData(
-          requestPermission: false,
-          silent: true,
-        );
+        context.read<SleepCubit>().loadSleepData(silent: true);
         context.read<TrendCubit<SleepSessionInfo>>().load();
       default:
         // Restored goals, mood check-ins or diet plan.
@@ -499,11 +545,8 @@ class _HomeTabState extends State<_HomeTab> {
   void _reloadAll() {
     _lastFullReload = DateTime.now();
     context.read<WaterIntakeCubit>().reload();
-    // Quiet and never prompting: the card keeps showing last night.
-    context.read<SleepCubit>().loadSleepData(
-      requestPermission: false,
-      silent: true,
-    );
+    // Quiet: the card keeps showing last night.
+    context.read<SleepCubit>().loadSleepData(silent: true);
     context.read<TrendCubit<SleepSessionInfo>>().load();
     context.read<ScreenTimeCubit>().loadStats();
     context.read<TrendCubit<WeightLogCache>>().load();
@@ -587,70 +630,6 @@ class _HomeTabState extends State<_HomeTab> {
     plan.loadActiveMealPlan();
   }
 
-  Widget _buildSectionTitle(
-    BuildContext context,
-    String title, {
-    String? note,
-    String? actionLabel,
-    VoidCallback? onAction,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: AppDimens.space12,
-        left: AppDimens.space4,
-        top: AppDimens.space8,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                text: title.toUpperCase(),
-                children: [
-                  // e.g. today's date beside "TODAY", in plain case.
-                  if (note != null)
-                    TextSpan(
-                      text: '  ·  $note',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.normal,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                ],
-              ),
-              style: context.text.labelMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: context.vColors.grayText,
-              ),
-            ),
-          ),
-          if (actionLabel != null)
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.space8,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(actionLabel),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: AppDimens.iconMd,
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final onScanMeal = widget.onScanMeal;
@@ -685,7 +664,7 @@ class _HomeTabState extends State<_HomeTab> {
         children: [
           AppPageHeader(
             showBack: false,
-            titleWidget: const _Greeting(),
+            titleWidget: const HomeGreeting(),
             action: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -724,8 +703,7 @@ class _HomeTabState extends State<_HomeTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildSectionTitle(
-                          context,
+                        AppSectionHeader(
                           'Today',
                           note: DateFormat('EEE, d MMM').format(DateTime.now()),
                           // Day-by-day history of every goal, not just activity.
@@ -739,7 +717,9 @@ class _HomeTabState extends State<_HomeTab> {
                         DashboardInsightCard(onLog: _logMetric),
                         const SizedBox(height: AppDimens.sectionGap),
 
-                        _buildSectionTitle(context, 'Nutrition'),
+                        // Each card carries its own title; one heading
+                        // for the pair rather than one repeating each.
+                        const AppSectionHeader('Nutrition & activity'),
                         BlocListener<MealLogBloc, MealLogState>(
                           // A newly logged meal moves today's calories bar.
                           listenWhen: (_, state) => state is MealLogLoaded,
@@ -758,13 +738,11 @@ class _HomeTabState extends State<_HomeTab> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppDimens.sectionGap),
-
-                        _buildSectionTitle(context, 'Activity'),
+                        const SizedBox(height: AppDimens.cardGap),
                         const ActivityGoalsCard(),
                         const SizedBox(height: AppDimens.sectionGap),
 
-                        _buildSectionTitle(context, 'Body & Wellbeing'),
+                        const AppSectionHeader('Body & wellbeing'),
                         const TrackerTilePair(
                           left: WaterIntakeCard(),
                           right: WeightCard(),
@@ -774,8 +752,10 @@ class _HomeTabState extends State<_HomeTab> {
                           left: SleepCard(),
                           right: MoodCard(),
                         ),
-                        const SizedBox(height: AppDimens.cardGap),
-                        const ScreenTimeSummaryRow(),
+                        if (TrackerMetric.screenTime.isAvailable) ...[
+                          const SizedBox(height: AppDimens.cardGap),
+                          const ScreenTimeSummaryRow(),
+                        ],
                       ],
                     ),
                   ),
@@ -790,8 +770,8 @@ class _HomeTabState extends State<_HomeTab> {
 }
 
 /// Header title: a time-of-day greeting with the first name.
-class _Greeting extends StatelessWidget {
-  const _Greeting();
+class HomeGreeting extends StatelessWidget {
+  const HomeGreeting({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -811,13 +791,30 @@ class _Greeting extends StatelessWidget {
             ? fullName.split(RegExp(r'\s+')).first
             : profile?.username ?? '';
         // Today's date sits beside the Today section label below.
-        return Text(
-          name.isEmpty ? greeting : '$greeting, $name',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.headlineSmall?.copyWith(
-            color: context.colors.onSurface,
-          ),
+        final title = context.text.headlineSmall?.copyWith(
+          color: context.colors.onSurface,
+        );
+        // Greeting as a quiet line above, the name as the title; same
+        // two lines before the profile loads, so the header doesn't jump.
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              greeting,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.bodyMedium?.copyWith(
+                color: context.vColors.grayText,
+              ),
+            ),
+            Text(
+              name.isEmpty ? 'Welcome' : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: title,
+            ),
+          ],
         );
       },
     );

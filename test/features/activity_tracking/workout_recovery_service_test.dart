@@ -156,4 +156,34 @@ void main() {
     expect(store.prefs.containsKey(WorkoutCheckpointStore.key), isFalse);
     expect((await repo.getSessions()).single.endTime, isNotNull);
   });
+
+  test('a failed check closes nothing, so the workout can still resume', () async {
+    await repo.saveSession(_open('recent'));
+    await mark('recent');
+    final failing = WorkoutRecoveryService(
+      repository: _FailingLookups(repo),
+      store: store,
+      now: () => now,
+    );
+
+    await failing.settleAtStartup();
+
+    expect((await repo.getSessions()).single.endTime, isNull);
+    expect((await recovery.pending())!.action, InterruptedWorkoutAction.offerResume);
+  });
+}
+
+/// The workout lookup fails (e.g. the database is busy at launch).
+class _FailingLookups extends Fake implements ActivityRepositoryImpl {
+  final ActivityRepositoryImpl real;
+
+  _FailingLookups(this.real);
+
+  @override
+  Future<ActivitySession?> getSessionById(String id) async =>
+      throw StateError('busy');
+
+  @override
+  Future<void> finalizeInterruptedSessions({String? keepOpenId}) =>
+      real.finalizeInterruptedSessions(keepOpenId: keepOpenId);
 }

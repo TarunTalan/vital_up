@@ -13,6 +13,8 @@ import 'package:vital_up/core/sync/sync_hooks.dart';
 /// Kinds:
 /// - `update`: `from(target).update(values).eq(k, v)...` for each [match];
 /// - `upsert`: `from(target).upsert(values, onConflict: onConflict)`;
+/// - `insert`: the same, but an existing row is left alone (needs only
+///   INSERT rights; a plain upsert needs UPDATE rights even for new rows);
 /// - `delete`: `from(target).delete().eq(k, v)...`;
 /// - `rpc`:    `rpc(target, params: values)`.
 ///
@@ -74,6 +76,23 @@ class PendingWrite {
          queuedAt: DateTime.now(),
        );
 
+  /// Adds the row unless one with the same [onConflict] key exists.
+  PendingWrite.insertIfMissing(
+    String table, {
+    required Map<String, dynamic> values,
+    required String userId,
+    String? onConflict,
+    String? key,
+  }) : this(
+         kind: 'insert',
+         target: table,
+         values: values,
+         onConflict: onConflict,
+         userId: userId,
+         key: key ?? 'insert:$table:${values[onConflict ?? 'id'] ?? userId}',
+         queuedAt: DateTime.now(),
+       );
+
   PendingWrite.delete(
     String table, {
     required Map<String, Object> match,
@@ -104,7 +123,7 @@ class PendingWrite {
 
   /// The row an `update` / `upsert` / `delete` touches; null for RPCs.
   String? get rowId => switch (kind) {
-    'upsert' => '$target:${values[onConflict ?? 'id']}',
+    'upsert' || 'insert' => '$target:${values[onConflict ?? 'id']}',
     'update' || 'delete' => '$target:${jsonEncode(match)}',
     _ => null,
   };
@@ -120,7 +139,7 @@ class PendingWrite {
   /// Row identity across kinds: an update matched by id and an upsert of
   /// that id are the same row.
   String? get _rowKey {
-    final id = kind == 'upsert'
+    final id = kind == 'upsert' || kind == 'insert'
         ? values[onConflict ?? 'id']
         : (match.length == 1 && match.containsKey('id') ? match['id'] : null);
     return id == null ? rowId : '$target:id=$id';
@@ -149,6 +168,10 @@ class PendingWrite {
         await q;
       case 'upsert':
         await client.from(target).upsert(values, onConflict: onConflict);
+      case 'insert':
+        await client
+            .from(target)
+            .upsert(values, onConflict: onConflict, ignoreDuplicates: true);
       case 'delete':
         var q = client.from(target).delete();
         for (final e in match.entries) {
@@ -315,8 +338,7 @@ class PendingWrites {
     // fields of the same row, must go first: queue behind it.
     final queuedAhead = _all().any(
       (w) =>
-          (w.key == write.key && w.userId == write.userId) ||
-          w.overlaps(write),
+          (w.key == write.key && w.userId == write.userId) || w.overlaps(write),
     );
     if (!_connectivity.hasNetwork || queuedAhead) {
       await enqueue(write);

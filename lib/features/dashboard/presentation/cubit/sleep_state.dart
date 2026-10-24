@@ -31,14 +31,17 @@ class SleepLoadedManual extends SleepState {
 }
 
 /// Nothing for last night yet. [canDetect] is false when usage access (for
-/// estimating sleep from screen time) could be turned on.
+/// estimating sleep from screen time) could be turned on; [canConnect] is
+/// true when sleep could come from Health Connect / Apple Health once the
+/// user allows it (Home never asks by itself).
 class SleepNeedsManualEntry extends SleepState {
   final bool canDetect;
+  final bool canConnect;
 
-  const SleepNeedsManualEntry({this.canDetect = true});
+  const SleepNeedsManualEntry({this.canDetect = true, this.canConnect = false});
 
   @override
-  List<Object?> get props => [canDetect];
+  List<Object?> get props => [canDetect, canConnect];
 }
 
 /// Last night estimated from screen-off time, waiting for the user to

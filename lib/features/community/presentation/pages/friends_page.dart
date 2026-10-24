@@ -20,8 +20,7 @@ import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/community/domain/entities/friend.dart';
 import 'package:vital_up/features/community/presentation/cubit/friends_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/invite_share_card.dart';
-import 'package:vital_up/features/community/presentation/widgets/player_inspect_sheet.dart';
-import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
+import 'package:vital_up/features/community/presentation/pages/player_profile_page.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/widgets/name_with_you_tag.dart';
 
@@ -86,38 +85,14 @@ class _FriendsViewState extends State<_FriendsView> {
     );
   }
 
-  Future<void> _confirmRemove(Friend friend) async {
-    final cubit = context.read<FriendsCubit>();
-    final errorColor = context.colors.error;
-    final ok = await showSmoothDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove @${friend.username}?'),
-        content: const Text(
-          "You'll no longer see each other on your friends board.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: errorColor),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) await cubit.remove(friend);
-  }
-
-  void _showProfile(Friend f) => PublicProfileSheet.show(
+  void _showProfile(Friend f) => PlayerProfilePage.open(
     context,
     username: f.username,
     level: f.level,
     avatarUrl: f.avatarUrl,
+    fullName: f.fullName,
     userId: f.userId,
+    onFriendRemoved: context.read<FriendsCubit>().load,
   );
 
   bool _matches(String username, String? name) {
@@ -247,11 +222,7 @@ class _FriendsViewState extends State<_FriendsView> {
                 : null,
             onTap: item.friend == null
                 ? null
-                : () => PlayerInspectSheet.show(
-                    context,
-                    friend: item.friend!,
-                    onRemove: () => _confirmRemove(item.friend!),
-                  ),
+                : () => _showProfile(item.friend!),
           ),
       ],
     );
@@ -277,23 +248,21 @@ class _FriendsViewState extends State<_FriendsView> {
             friend: f,
             subtitle: _levelLine(f),
             onTap: () => _showProfile(f),
-            trailing: state.busy.contains(f.userId)
-                ? const _Busy()
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _RowButton(
-                        label: 'Decline',
-                        onTap: () => cubit.respond(f, accept: false),
-                      ),
-                      const SizedBox(width: AppDimens.space6),
-                      _RowButton(
-                        label: 'Accept',
-                        filled: true,
-                        onTap: () => cubit.respond(f, accept: true),
-                      ),
-                    ],
-                  ),
+            trailing: state.busy.contains(f.userId) ? const _Busy() : null,
+            // Under the name, so a long name never gets squeezed.
+            actions: state.busy.contains(f.userId)
+                ? null
+                : [
+                    _RowButton(
+                      label: 'Decline',
+                      onTap: () => cubit.respond(f, accept: false),
+                    ),
+                    _RowButton(
+                      label: 'Accept',
+                      filled: true,
+                      onTap: () => cubit.respond(f, accept: true),
+                    ),
+                  ],
           ),
       ],
     );
@@ -304,7 +273,7 @@ class _FriendsViewState extends State<_FriendsView> {
       return _TabEmpty(
         icon: Icons.outgoing_mail,
         title: 'No pending requests',
-        message: 'Requests you send wait here until they accept.',
+        message: 'Requests you send wait here for 30 days.',
         action: AppSecondaryButton(label: 'Add a friend', onTap: _openAddSheet),
       );
     }
@@ -363,7 +332,9 @@ class _RowButton extends StatelessWidget {
           child: Text(
             label,
             style: context.text.labelLarge?.copyWith(
-              color: filled ? context.colors.onPrimary : primary,
+              color: filled
+                  ? context.colors.onPrimary
+                  : context.vColors.accentText,
             ),
           ),
         ),
@@ -443,6 +414,9 @@ class _PersonRow extends StatelessWidget {
   final bool showRank;
   final int? rank;
   final Widget? trailing;
+
+  /// Buttons on their own line under the name (request answers).
+  final List<Widget>? actions;
   final VoidCallback? onTap;
 
   const _PersonRow({
@@ -452,6 +426,7 @@ class _PersonRow extends StatelessWidget {
     this.showRank = false,
     this.rank,
     this.trailing,
+    this.actions,
     this.onTap,
   });
 
@@ -491,7 +466,7 @@ class _PersonRow extends StatelessWidget {
                       : Text(
                           r == null ? '–' : '$r',
                           style: context.text.titleSmall?.copyWith(
-                            color: isMe ? context.colors.primary : grey,
+                            color: isMe ? context.vColors.accentText : grey,
                           ),
                         ),
                 ),
@@ -520,6 +495,14 @@ class _PersonRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
+                    if (actions case final actions?) ...[
+                      const SizedBox(height: AppDimens.space8),
+                      Wrap(
+                        spacing: AppDimens.space8,
+                        runSpacing: AppDimens.space8,
+                        children: actions,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -528,11 +511,7 @@ class _PersonRow extends StatelessWidget {
                 trailing!,
               ] else if (onTap != null) ...[
                 const SizedBox(width: AppDimens.space4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: AppDimens.iconMd,
-                  color: grey,
-                ),
+                const AppChevron(),
               ],
             ],
           ),

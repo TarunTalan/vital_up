@@ -22,6 +22,9 @@ class ActivityGoalsSnapshot {
 abstract class ActivityGoalsRepository {
   List<ActivityGoal> getGoals();
 
+  /// False while [getGoals] still shows the built-in defaults.
+  bool get hasSavedGoals;
+
   /// Adds or replaces the goal with the same metric + period.
   Future<void> saveGoal(ActivityGoal goal);
 

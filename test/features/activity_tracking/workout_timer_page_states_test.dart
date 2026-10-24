@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_up/core/di/injection_container.dart';
@@ -51,7 +52,16 @@ class _SilentAudio implements WorkoutAudioService {
 
 class _SilentCoach implements VoiceCoachService {
   @override
+  Future<void> init() async {}
+
+  @override
   Future<void> stop() async {}
+
+  @override
+  Future<void> announceCount(int count) async {}
+
+  @override
+  Future<void> say(String text) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -63,6 +73,12 @@ void main() {
   late DateTime clock;
 
   setUp(() async {
+    // Notifications already allowed: Start shows no permission card.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('flutter.baseflow.com/permissions/methods'),
+          (call) async => 1,
+        );
     // No 3-2-1 before Start: the countdown has its own timers.
     SharedPreferences.setMockInitialValues({'workout_countdown_duration': 0});
     store = WorkoutTimerStore(await SharedPreferences.getInstance());
@@ -113,8 +129,9 @@ void main() {
     expect(find.text('00:03:05'), findsOneWidget);
     expect(store.read()!.type, ActivityType.yoga);
 
-    // Locked like a GPS workout: no Pause until the slider is pulled, and
-    // the page can't be left mid-workout.
+    // Locked: no Pause until the slider is pulled. The page can be left
+    // with the workout still running.
+    expect(find.byTooltip('Leave it running'), findsOneWidget);
     expect(find.text('PAUSE'), findsNothing);
     expect(find.text('SLIDE TO UNLOCK'), findsOneWidget);
     await tester.drag(
@@ -140,6 +157,37 @@ void main() {
     // Leaving the page keeps the workout for next time.
     await tester.pumpWidget(const SizedBox());
     expect(store.read(), isNotNull);
+  });
+
+  testWidgets('leaving keeps the workout running', (tester) async {
+    await pumpPage(
+      tester,
+      Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    const WorkoutTimerPage(type: ActivityType.yoga),
+              ),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await settle(tester);
+    await tester.tap(find.text('Start Yoga'));
+    await settle(tester);
+
+    await tester.tap(find.byTooltip('Leave it running'));
+    await settle(tester);
+    expect(find.byType(WorkoutTimerPage), findsNothing);
+    expect(find.text('Your yoga timer keeps running'), findsOneWidget);
+    final timer = store.read();
+    expect(timer, isNotNull);
+    expect(timer!.isRunning, isTrue);
   });
 
   testWidgets('the log sheet saves a past workout', (tester) async {

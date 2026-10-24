@@ -24,7 +24,9 @@ import 'sleep_bedtime.dart' as bedtime;
 class SleepStats {
   final int averageScore;
   final Duration averageDuration;
-  final Duration totalSleepDebt;
+
+  /// Null without a sleep goal (nothing to fall short of).
+  final Duration? totalSleepDebt;
   final int consistencyScore; // 0 - 100%
   final int nightsLogged;
 
@@ -65,6 +67,10 @@ class SleepService {
     'com.example.vital_up/usage_stats',
   );
 
+  /// Every sleep type Home reads; Health Sync asks for these too, so
+  /// turning it on doesn't leave a second prompt for Home.
+  static List<HealthDataType> get healthTypes => _allSleepTypes;
+
   static final _allSleepTypes = [
     HealthDataType.SLEEP_ASLEEP,
     if (Platform.isIOS) HealthDataType.SLEEP_IN_BED,
@@ -96,9 +102,21 @@ class SleepService {
   String get _userId =>
       Supabase.instance.client.auth.currentUser?.id ?? _legacyUserId;
 
-  /// Nightly goal; the default when unset or out of range.
-  int getGoalMinutes() =>
-      sanitizeSleepGoal(_prefs.getInt(_goalKey), fallback: defaultGoalMinutes);
+  /// Saved in place of minutes when the user removed their goal.
+  static const _noGoal = 0;
+
+  /// Nightly goal; the default when unset or out of range, null when the
+  /// user removed it.
+  int? getGoalMinutes() {
+    final raw = _prefs.getInt(_goalKey);
+    if (raw == _noGoal) return null;
+    return sanitizeSleepGoal(raw, fallback: defaultGoalMinutes);
+  }
+
+  Future<void> clearGoal() => _prefs.setInt(_goalKey, _noGoal);
+
+  /// Whether the user (or onboarding) ever saved a goal here.
+  bool get hasSavedGoal => _prefs.containsKey(_goalKey);
 
   Future<void> setGoalMinutes(int minutes) => _prefs.setInt(
     _goalKey,
@@ -191,6 +209,7 @@ class SleepService {
     for (final s in sessions) {
       totalMinutes += s.duration.inMinutes;
       totalScore += s.sleepScore;
+      if (goalMinutes == null) continue;
       final diff = goalMinutes - s.duration.inMinutes;
       if (diff > 0) debtMinutes += diff;
     }
@@ -198,7 +217,9 @@ class SleepService {
     return SleepStats(
       averageScore: (totalScore / sessions.length).round(),
       averageDuration: Duration(minutes: totalMinutes ~/ sessions.length),
-      totalSleepDebt: Duration(minutes: debtMinutes),
+      totalSleepDebt: goalMinutes == null
+          ? null
+          : Duration(minutes: debtMinutes),
       consistencyScore: bedtimeConsistency([
         for (final s in sessions) s.bedTime,
       ]),
@@ -242,20 +263,29 @@ class SleepService {
     return hasPermissions;
   }
 
+  /// True when the health store is there but sleep isn't readable yet,
+  /// so the card can offer to connect. iOS never says whether read access
+  /// was given, so it's always offered there (asking again shows nothing).
+  Future<bool> canAskForHealthAccess() async {
+    try {
+      if (Platform.isAndroid) {
+        if (await getHealthConnectStatus() !=
+            HealthConnectSdkStatus.sdkAvailable) {
+          return false;
+        }
+        return !await hasPermission(request: false);
+      }
+      return Platform.isIOS;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// The night that ended today (before 4 am, the one that ended
   /// yesterday): Health Connect / HealthKit first, else a saved entry.
-  /// Pass [requestPermission] false where a permission screen would be
-  /// unexpected (e.g. home screen widget refreshes, app resume).
-  Future<SleepSessionInfo?> getSleepDataForLastNight({
-    bool requestPermission = true,
-  }) async {
-    if (requestPermission) {
-      try {
-        await hasPermission();
-      } catch (e) {
-        debugPrint('Sleep permission request failed: $e');
-      }
-    }
+  /// Never asks for access: a permission screen must come from a tap
+  /// ([hasPermission]), never from opening Home, resume or widgets.
+  Future<SleepSessionInfo?> getSleepDataForLastNight() async {
     final now = DateTime.now();
     final today = startOfDay(now);
     // Calendar maths, not 24h steps, so DST days keep their boundaries.
@@ -466,5 +496,35 @@ class SleepService {
       duration: duration,
       source: source,
     );
+  }
+
+  /// Removes a night the user entered or confirmed. Health Connect
+  /// entries come from the watch and are left alone.
+  Future<void> deleteSleep(SleepSessionInfo session) async {
+    if (session.source == SleepDataSource.healthStore) return;
+    final userId = _userId;
+    final dayStart = startOfDay(session.wakeTime);
+    final deleted = <SleepLogCache>[];
+    await _isarService.isar.writeTxn(() async {
+      final sameNight = await _isarService.isar.sleepLogCaches
+          .filter()
+          .group(
+            (q) => q.userIdEqualTo(userId).or().userIdEqualTo(_legacyUserId),
+          )
+          .endTimeBetween(dayStart, nextDay(dayStart), includeUpper: false)
+          .findAll();
+      deleted.addAll(sameNight);
+      await _isarService.isar.sleepLogCaches.deleteAll([
+        for (final old in sameNight) old.id,
+      ]);
+    });
+    if (userId != _legacyUserId) {
+      for (final old in deleted) {
+        final id = syncId('sleep', userId, old.startTime);
+        await _sync?.recordDelete('sleep_logs', id);
+      }
+    }
+    _sync?.schedule();
+    _changes.add(null);
   }
 }

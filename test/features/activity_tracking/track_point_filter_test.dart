@@ -88,6 +88,20 @@ void main() {
       expect(filter.process(_p(3, northMeters: 9, speed: 3)), isNotNull);
     });
 
+    test('follows the real track when the first fix was far off', () {
+      final filter = TrackPointFilter(ActivityType.walk);
+      // A cached fix 400 m away, then the real position.
+      expect(filter.process(_p(0, northMeters: 400, speed: 1.4)), isNotNull);
+      final accepted = <TrackPoint>[];
+      for (var s = 1; s <= 60; s++) {
+        final p = filter.process(_p(s, northMeters: s * 1.4, speed: 1.4));
+        if (p != null) accepted.add(p);
+      }
+      // Re-anchored after three fixes, not after the jump looked possible.
+      expect(accepted.first.timestamp, _t0.add(const Duration(seconds: 3)));
+      expect(_trackLength(accepted), closeTo(57 * 1.4, 3));
+    });
+
     test('rejects poor, invalid and out-of-order fixes', () {
       final filter = TrackPointFilter(ActivityType.walk);
       expect(filter.process(_p(0, accuracy: 60)), isNull);

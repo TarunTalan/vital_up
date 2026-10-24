@@ -67,6 +67,14 @@ enum TrackerStatus {
     final hours = t.hour + t.minute / 60;
     return ((hours - 7) / 16).clamp(0.0, 1.0);
   }
+
+  /// Share of the week (Monday to Sunday) that has passed, counting today's
+  /// waking day: the pace for a weekly goal. Monday evening is ~1/7, not
+  /// "behind" a whole week's target.
+  static double weekPace([DateTime? now]) {
+    final t = now ?? DateTime.now();
+    return ((t.weekday - 1 + dayPace(t)) / 7).clamp(0.0, 1.0);
+  }
 }
 
 /// Pill with the status icon and label in the status colour.
@@ -79,7 +87,16 @@ class TrackerStatusChip extends StatelessWidget {
   /// Overrides the status colour (e.g. a mood level colour).
   final Color? color;
 
-  const TrackerStatusChip(this.status, {super.key, this.label, this.color});
+  /// Overrides the status icon (e.g. a challenge result).
+  final IconData? icon;
+
+  const TrackerStatusChip(
+    this.status, {
+    super.key,
+    this.label,
+    this.color,
+    this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +117,7 @@ class TrackerStatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(status.icon, size: AppDimens.iconXs, color: c),
+          Icon(icon ?? status.icon, size: AppDimens.iconXs, color: c),
           const SizedBox(width: AppDimens.space4),
           Text(
             label ?? status.label,

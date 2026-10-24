@@ -19,7 +19,7 @@ import 'package:vital_up/features/community/domain/repositories/community_reposi
 import 'package:vital_up/features/community/presentation/cubit/leaderboard_cubit.dart';
 import 'package:vital_up/features/community/presentation/widgets/award_widgets.dart';
 import 'package:vital_up/features/community/presentation/widgets/community_widgets.dart';
-import 'package:vital_up/features/community/presentation/widgets/public_profile_sheet.dart';
+import 'package:vital_up/features/community/presentation/pages/player_profile_page.dart';
 import 'package:vital_up/features/gamification/presentation/widgets/game_icon.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/utils/number_formats.dart';
@@ -170,8 +170,17 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
     return BlocConsumer<LeaderboardCubit, LeaderboardState>(
       // A new filter starts from the top ten again.
       listenWhen: (prev, next) =>
-          prev.period != next.period || prev.category != next.category,
-      listener: (_, _) => setState(() => _shown = _initialShown),
+          prev.period != next.period ||
+          prev.category != next.category ||
+          (next.failed && !prev.failed && next.entries != null),
+      listener: (context, state) {
+        if (state.failed && state.entries != null) {
+          // The board stays as it was; only say the refresh didn't work.
+          showErrorSnackBar(context, "Couldn't refresh the leaderboard.");
+          return;
+        }
+        setState(() => _shown = _initialShown);
+      },
       builder: (context, state) {
         final cubit = context.read<LeaderboardCubit>();
         final community = state.community;
@@ -199,19 +208,25 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
                 const SizedBox(height: AppDimens.space16),
               ],
               _Filters(state: state, cubit: cubit),
-              const SizedBox(height: AppDimens.space16),
-              if (state.loading && entries != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimens.space8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimens.radiusPill),
-                    child: LinearProgressIndicator(
-                      minHeight: AppDimens.progressHeight,
-                      color: context.colors.primary,
-                      backgroundColor: context.vColors.track,
-                    ),
-                  ),
+              // The reload bar sits in the gap under the filters, so the
+              // board doesn't move down and back while it reloads.
+              SizedBox(
+                height: AppDimens.space16,
+                child: Center(
+                  child: state.loading && entries != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppDimens.radiusPill,
+                          ),
+                          child: LinearProgressIndicator(
+                            minHeight: AppDimens.progressHeight,
+                            color: context.colors.primary,
+                            backgroundColor: context.vColors.track,
+                          ),
+                        )
+                      : null,
                 ),
+              ),
               if (entries == null)
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -245,7 +260,7 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
                 LeaderboardAwardsCard(
                   period: state.awardPeriod!,
                   winners: state.pastWinners,
-                  onOpenPlayer: (w) => PublicProfileSheet.show(
+                  onOpenPlayer: (w) => PlayerProfilePage.open(
                     context,
                     username: w.username,
                     level: w.level,
@@ -317,6 +332,19 @@ class _LeaderboardViewState extends State<_LeaderboardView> {
             for (final e in below)
               _RankRow(entry: e, isFriend: friendIds.contains(e.userId)),
           ],
+        ),
+      ],
+      if (state.coverageNote case final note? when !canShowMore) ...[
+        const SizedBox(height: AppDimens.space12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppDimens.space4),
+          child: Text(
+            note,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.vColors.grayText,
+            ),
+          ),
         ),
       ],
     ];
@@ -634,19 +662,14 @@ class _PodiumPlace extends StatelessWidget {
     if (e == null) return const SizedBox.shrink();
     final color = _rankColor(e.rank ?? 3);
     return GestureDetector(
-      onTap: () {
-        if (!e.isMe) {
-          PublicProfileSheet.show(
-            context,
-            username: e.username,
-            level: e.level,
-            avatarUrl: e.avatarUrl,
-            userId: e.userId,
-            points: e.points,
-            rank: e.rank,
-          );
-        }
-      },
+      // Your own spot shows your profile as others see it.
+      onTap: () => PlayerProfilePage.open(
+        context,
+        username: e.username,
+        level: e.level,
+        avatarUrl: e.avatarUrl,
+        userId: e.userId,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -666,11 +689,10 @@ class _PodiumPlace extends StatelessWidget {
             ringColor: color,
           ),
           const SizedBox(height: AppDimens.space6),
-          // Names wrap; points shrink to fit rather than being cut.
-          Text(
+          // Names and points shrink to fit on one line rather than
+          // breaking mid-name.
+          FitText(
             e.isMe ? 'You' : e.username,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: context.text.titleSmall?.copyWith(
               color: context.colors.onSurface,
@@ -738,17 +760,14 @@ class _RankRow extends StatelessWidget {
     return Material(
       color: e.isMe ? context.vColors.primaryTint : Colors.transparent,
       child: InkWell(
-        onTap: e.isMe
-            ? null
-            : () => PublicProfileSheet.show(
-                context,
-                username: e.username,
-                level: e.level,
-                avatarUrl: e.avatarUrl,
-                userId: e.userId,
-                points: e.points,
-                rank: e.rank,
-              ),
+        // Your own row shows your profile as others see it.
+        onTap: () => PlayerProfilePage.open(
+          context,
+          username: e.username,
+          level: e.level,
+          avatarUrl: e.avatarUrl,
+          userId: e.userId,
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimens.space16,
@@ -813,6 +832,9 @@ class _RankRow extends StatelessWidget {
                   color: context.colors.onSurface,
                 ),
               ),
+              // Opens the profile (yours: as others see it).
+              const SizedBox(width: AppDimens.space4),
+              const AppChevron(),
             ],
           ),
         ),

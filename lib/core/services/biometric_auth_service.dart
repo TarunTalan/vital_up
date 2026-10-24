@@ -12,8 +12,8 @@ class BiometricAuthService {
   BiometricAuthService({
     LocalAuthentication? auth,
     required SharedPreferences prefs,
-  })  : _auth = auth ?? LocalAuthentication(),
-        _prefs = prefs;
+  }) : _auth = auth ?? LocalAuthentication(),
+       _prefs = prefs;
 
   /// Whether the user has enabled biometric app lock in settings
   bool isBiometricEnabled() {

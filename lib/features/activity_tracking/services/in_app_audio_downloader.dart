@@ -52,7 +52,10 @@ class InAppAudioDownloader {
     try {
       FileDownloader().configureNotificationForGroup(
         group,
-        running: const TaskNotification('Downloading {displayName}', '{progress}'),
+        running: const TaskNotification(
+          'Downloading {displayName}',
+          '{progress}',
+        ),
         complete: const TaskNotification(
           '{displayName}',
           'Ready to play offline',
@@ -221,7 +224,10 @@ class InAppAudioDownloader {
   /// Checks if a track is downloaded offline
   Future<DownloadedTrack?> getDownloadedTrack(String trackId) async {
     final isar = _isarService.isar;
-    return await isar.downloadedTracks.filter().trackIdEqualTo(trackId).findFirst();
+    return await isar.downloadedTracks
+        .filter()
+        .trackIdEqualTo(trackId)
+        .findFirst();
   }
 
   /// Deletes a downloaded track from local disk and Isar database

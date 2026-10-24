@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +10,7 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/app_list_group.dart';
+import 'package:vital_up/core/widgets/fit_text.dart';
 import 'package:vital_up/core/widgets/vital_up_loader.dart';
 import 'package:vital_up/features/subscription/domain/entities/pro_status.dart';
 import 'package:vital_up/features/subscription/domain/pro_limits.dart';
@@ -120,7 +122,16 @@ class _ProPaywallState extends State<ProPaywall> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _ProHeader(reason: widget.reason),
+            _ProHero(
+              // The page's header already names Pro; the sheet has none.
+              title:
+                  widget.reason?.title ??
+                  (widget.popOnSuccess ? 'VitalUp Pro' : 'Get more every day'),
+              message: widget.reason == null
+                  ? 'More from Vita and the food scanner, every day.'
+                  : 'They reset at ${quotaResetTime()}. Pro gives you up to '
+                        '${widget.reason!.limit.pro} a day.',
+            ),
             const SizedBox(height: AppDimens.sectionGap),
             const ProLimitsList(),
             const SizedBox(height: AppDimens.cardGap),
@@ -146,19 +157,16 @@ class _ProPaywallState extends State<ProPaywall> {
                     context.read<SubscriptionCubit>().loadPlans(force: true),
               )
             else ...[
-              for (final p in state.plans) ...[
-                _PlanOption(
-                  plan: p,
-                  selected: p == plan,
-                  onTap: state.busy
-                      ? null
-                      : () => setState(() => _selectedId = p.id),
-                ),
-                const SizedBox(height: AppDimens.cardGap),
-              ],
-              const SizedBox(height: AppDimens.space4),
+              _PlanPicker(
+                plans: state.plans,
+                selected: plan!,
+                onSelect: state.busy
+                    ? null
+                    : (p) => setState(() => _selectedId = p.id),
+              ),
+              const SizedBox(height: AppDimens.sectionGap),
               AppPrimaryButton(
-                label: plan!.hasTrial ? 'Start free trial' : 'Subscribe',
+                label: plan.hasTrial ? 'Start free trial' : 'Subscribe',
                 isLoading: state.buyingPlanId != null,
                 enabled: !state.busy,
                 onTap: () => _buy(plan),
@@ -201,32 +209,60 @@ class _ProPaywallState extends State<ProPaywall> {
   }
 }
 
-class _ProHeader extends StatelessWidget {
-  final ProReason? reason;
+/// The top of the Pro page and sheet: a badge in a soft glow, a title and
+/// one grey line. Pro users see the same hero with their plan.
+class _ProHero extends StatelessWidget {
+  final String title;
+  final String message;
 
-  const _ProHeader({this.reason});
+  const _ProHero({required this.title, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    final reason = this.reason;
+    final primary = context.colors.primary;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppIconBadge(
-          icon: const Icon(Icons.workspace_premium_rounded),
-          color: context.colors.primary,
+        Container(
+          width: AppDimens.proGlow,
+          height: AppDimens.proGlow,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                primary.withValues(alpha: 0.22),
+                primary.withValues(alpha: 0),
+              ],
+            ),
+          ),
+          child: Container(
+            width: AppDimens.proBadge,
+            height: AppDimens.proBadge,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.vColors.surfaceElevated,
+              border: Border.all(
+                color: primary.withValues(alpha: AppDimens.tintBorderAlpha),
+                width: AppDimens.borderThick,
+              ),
+              boxShadow: AppShadows.soft,
+            ),
+            child: Icon(
+              Icons.workspace_premium_rounded,
+              size: AppDimens.iconXl,
+              color: context.iconTint(primary),
+            ),
+          ),
         ),
-        const SizedBox(height: AppDimens.space12),
         Text(
-          reason?.title ?? 'VitalUp Pro',
+          title,
+          textAlign: TextAlign.center,
           style: context.text.headlineSmall,
         ),
         const SizedBox(height: AppDimens.space4),
         Text(
-          reason == null
-              ? 'More from Vita and the food scanner, every day.'
-              : 'They reset at ${quotaResetTime()}. Pro gives you up to '
-                    '${reason.limit.pro} a day.',
+          message,
+          textAlign: TextAlign.center,
           style: context.text.bodyMedium?.copyWith(
             color: context.vColors.grayText,
           ),
@@ -236,29 +272,14 @@ class _ProHeader extends StatelessWidget {
   }
 }
 
-/// Free vs Pro daily allowances.
+/// Daily limits, free next to Pro (or Pro only, for users who have it).
+/// At large text, when the columns would squeeze the names, each row puts
+/// its figures under its name instead.
 class ProLimitsList extends StatelessWidget {
   /// Shows the Pro numbers only (for users who have Pro).
   final bool proOnly;
 
   const ProLimitsList({super.key, this.proOnly = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppListGroup(
-      title: proOnly ? 'Your daily allowance' : 'With Pro, every day',
-      children: [
-        for (final limit in ProLimits.all)
-          AppListTile(
-            icon: _icon(limit),
-            iconColor: context.colors.primary,
-            title: limit.label,
-            subtitle: proOnly ? null : 'Free plan: ${limit.free}',
-            value: 'Up to ${limit.pro}',
-          ),
-      ],
-    );
-  }
 
   static IconData _icon(ProLimit limit) => switch (limit) {
     ProLimits.photoScans => Icons.photo_camera_outlined,
@@ -266,65 +287,265 @@ class ProLimitsList extends StatelessWidget {
     ProLimits.dietPlans => Icons.restaurant_menu_rounded,
     _ => Icons.insights_rounded,
   };
+
+  static double _width(BuildContext context, String text, TextStyle? style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final freeStyle = context.text.bodyMedium?.copyWith(color: v.grayText);
+    final proStyle = context.text.titleSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    final headStyle = context.text.labelMedium?.copyWith(color: v.grayText);
+    final tagStyle = _Tag.style(context);
+    return AppCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Each figure column fits its widest entry, header included.
+          final column =
+              [
+                _width(context, 'Free', headStyle),
+                _width(context, 'Pro', tagStyle) + 2 * AppDimens.space8,
+                for (final l in ProLimits.all) ...[
+                  _width(context, '${l.free}', freeStyle),
+                  _width(context, '${l.pro}', proStyle),
+                ],
+              ].reduce(math.max) +
+              AppDimens.space16;
+          final columns = proOnly ? 1 : 2;
+          final nameRoom =
+              constraints.maxWidth -
+              AppDimens.iconSm -
+              AppDimens.space12 -
+              columns * column;
+          final stacked = nameRoom < context.textScaled(96);
+
+          Widget figure(String text, TextStyle? style) => SizedBox(
+            width: column,
+            child: Text(text, textAlign: TextAlign.center, style: style),
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      proOnly ? 'Your daily limits' : 'Daily limits',
+                      style: context.text.titleSmall,
+                    ),
+                  ),
+                  if (!stacked) ...[
+                    if (!proOnly) figure('Free', headStyle),
+                    SizedBox(
+                      width: column,
+                      child: const Center(child: _Tag('Pro')),
+                    ),
+                  ],
+                ],
+              ),
+              for (final limit in ProLimits.all) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppDimens.space12,
+                  ),
+                  child: Divider(
+                    height: AppDimens.hairline,
+                    thickness: AppDimens.hairline,
+                    color: v.divider,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(
+                      _icon(limit),
+                      size: AppDimens.iconSm,
+                      color: context.iconTint(context.colors.primary),
+                    ),
+                    const SizedBox(width: AppDimens.space12),
+                    Expanded(
+                      child: stacked
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  limit.label,
+                                  style: context.text.bodyMedium,
+                                ),
+                                Text(
+                                  proOnly
+                                      ? 'Up to ${limit.pro} a day'
+                                      : 'Free ${limit.free} · Pro up to '
+                                            '${limit.pro}',
+                                  style: context.text.bodySmall?.copyWith(
+                                    color: v.grayText,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(limit.label, style: context.text.bodyMedium),
+                    ),
+                    if (!stacked) ...[
+                      if (!proOnly) figure('${limit.free}', freeStyle),
+                      figure('${limit.pro}', proStyle),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _PlanOption extends StatelessWidget {
+/// The plans as selectable tiles: side by side when two fit, else stacked.
+class _PlanPicker extends StatelessWidget {
+  final List<ProPlan> plans;
+  final ProPlan selected;
+  final ValueChanged<ProPlan>? onSelect;
+
+  const _PlanPicker({
+    required this.plans,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSelect = this.onSelect;
+    Widget tile(ProPlan p) => _PlanTile(
+      plan: p,
+      selected: p == selected,
+      onTap: onSelect == null ? null : () => onSelect(p),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final half = (constraints.maxWidth - AppDimens.cardGap) / 2;
+        final sideBySide =
+            plans.length == 2 &&
+            half >= context.textScaled(AppDimens.proPlanTileMinWidth);
+        if (sideBySide) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: tile(plans[0])),
+                const SizedBox(width: AppDimens.cardGap),
+                Expanded(child: tile(plans[1])),
+              ],
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < plans.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppDimens.cardGap),
+              tile(plans[i]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One plan: name and check, the price large, per-month and tags in grey
+/// and tint. Selected, it takes the brand border and a light brand fill.
+class _PlanTile extends StatelessWidget {
   final ProPlan plan;
   final bool selected;
   final VoidCallback? onTap;
 
-  const _PlanOption({required this.plan, required this.selected, this.onTap});
+  const _PlanTile({required this.plan, required this.selected, this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final v = context.vColors;
+    final primary = context.colors.primary;
     final title = switch (plan.period) {
       ProPlanPeriod.annual => 'Yearly',
       ProPlanPeriod.monthly => 'Monthly',
       ProPlanPeriod.other => 'Pro',
     };
     final per = switch (plan.period) {
-      ProPlanPeriod.annual => ' a year',
-      ProPlanPeriod.monthly => ' a month',
-      ProPlanPeriod.other => '',
+      ProPlanPeriod.annual => 'a year',
+      ProPlanPeriod.monthly => 'a month',
+      ProPlanPeriod.other => null,
     };
     final tags = [
       if (plan.hasTrial) '${plan.trialDays} days free',
       if (plan.savingsPercent != null) 'Save ${plan.savingsPercent}%',
     ];
+    final grey = context.text.bodySmall?.copyWith(color: v.grayText);
+    final radius = BorderRadius.circular(AppDimens.radiusCard);
     return Semantics(
       selected: selected,
       button: true,
-      child: AppCard(
-        onTap: onTap,
-        highlighted: selected,
-        borderColor: selected ? context.colors.primary : null,
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected
-                  ? context.colors.primary
-                  : context.vColors.grayText,
-            ),
-            const SizedBox(width: AppDimens.space12),
-            Expanded(
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        decoration: BoxDecoration(
+          color: selected ? v.primaryFill : v.glassFill,
+          borderRadius: radius,
+          border: Border.all(
+            color: selected ? primary : v.glassBorder!,
+            width: selected ? AppDimens.borderThick : AppDimens.borderThin,
+          ),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Padding(
+              padding: AppDimens.cardPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: context.text.titleMedium),
-                  const SizedBox(height: AppDimens.space4),
-                  Text('${plan.price}$per', style: context.text.bodyLarge),
-                  if (plan.pricePerMonth != null)
-                    Text(
-                      '${plan.pricePerMonth} a month',
-                      style: context.text.bodySmall?.copyWith(
-                        color: context.vColors.grayText,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(title, style: context.text.titleSmall),
                       ),
+                      const SizedBox(width: AppDimens.space8),
+                      Icon(
+                        selected
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: AppDimens.iconMd,
+                        color: selected
+                            ? context.iconTint(primary)
+                            : v.grayText,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.space8),
+                  FitText(
+                    plan.price,
+                    maxLines: 1,
+                    style: context.text.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                  if (per != null) Text(per, style: grey),
+                  if (plan.pricePerMonth != null)
+                    Text('${plan.pricePerMonth} a month', style: grey),
                   if (tags.isNotEmpty) ...[
-                    const SizedBox(height: AppDimens.space8),
+                    const SizedBox(height: AppDimens.space12),
                     Wrap(
                       spacing: AppDimens.space8,
                       runSpacing: AppDimens.space4,
@@ -334,7 +555,7 @@ class _PlanOption extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -346,6 +567,12 @@ class _Tag extends StatelessWidget {
 
   const _Tag(this.label);
 
+  static TextStyle? style(BuildContext context) =>
+      context.text.labelMedium?.copyWith(
+        color: context.vColors.accentText,
+        fontWeight: FontWeight.w600,
+      );
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -356,14 +583,9 @@ class _Tag extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimens.space8,
-          vertical: AppDimens.space4,
+          vertical: AppDimens.space2,
         ),
-        child: Text(
-          label,
-          style: context.text.labelMedium?.copyWith(
-            color: context.vColors.accentText,
-          ),
-        ),
+        child: Text(label, style: style(context)),
       ),
     );
   }
@@ -407,27 +629,35 @@ class _FooterLinks extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = context.text.labelLarge?.copyWith(
+    // Small, tight links with dots between them, so all three sit on one
+    // line on a small phone even at the largest text.
+    final style = context.text.bodySmall?.copyWith(
       color: context.vColors.accentText,
+      fontWeight: FontWeight.w600,
+    );
+    final buttonStyle = TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.space4),
+      minimumSize: const Size(0, kMinInteractiveDimension),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    Widget link(String label, VoidCallback? onTap) => TextButton(
+      style: buttonStyle,
+      onPressed: onTap,
+      child: Text(label, style: style),
+    );
+    final dot = Text(
+      '·',
+      style: style?.copyWith(color: context.vColors.grayText),
     );
     return Wrap(
       alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        TextButton(
-          onPressed: onRestore,
-          child: Text(
-            restoring ? 'Restoring...' : 'Restore purchases',
-            style: style,
-          ),
-        ),
-        TextButton(
-          onPressed: () => _open(context, LegalLinks.terms),
-          child: Text('Terms', style: style),
-        ),
-        TextButton(
-          onPressed: () => _open(context, LegalLinks.privacyPolicy),
-          child: Text('Privacy', style: style),
-        ),
+        link(restoring ? 'Restoring...' : 'Restore purchases', onRestore),
+        dot,
+        link('Terms', () => _open(context, LegalLinks.terms)),
+        dot,
+        link('Privacy', () => _open(context, LegalLinks.privacyPolicy)),
       ],
     );
   }
@@ -452,39 +682,14 @@ class ProStatusCard extends StatelessWidget {
     if (end == null) return plan;
     final date = DateFormat('d MMM y').format(end);
     if (status.isTrial) {
-      return status.willRenew ? '$plan, paid plan starts $date' : '$plan, ends $date';
+      return status.willRenew
+          ? '$plan, paid plan starts $date'
+          : '$plan, ends $date';
     }
     return status.willRenew ? '$plan, renews $date' : '$plan, ends $date';
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      highlighted: true,
-      child: Row(
-        children: [
-          AppIconBadge(
-            icon: const Icon(Icons.workspace_premium_rounded),
-            color: context.colors.primary,
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("You're on VitalUp Pro", style: context.text.titleMedium),
-                const SizedBox(height: AppDimens.space4),
-                Text(
-                  describe(status),
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.vColors.grayText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      _ProHero(title: "You're on VitalUp Pro", message: describe(status));
 }

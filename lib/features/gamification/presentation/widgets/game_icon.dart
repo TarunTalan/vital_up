@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Asset paths for gamification icons. These SVGs are supplied by design;
@@ -81,7 +82,8 @@ abstract final class GamificationIcons {
     return 'assets/icons/levels/hexagon-number-$level.svg';
   }
 
-  /// `communities.icon_key` → `assets/icons/communities/<key>.svg`.
+  /// `communities.icon_key` → `assets/icons/communities/<key>.svg` (shows
+  /// the caller's Material fallback until that SVG is supplied).
   static String communityIcon(String iconKey) {
     final key = iconKey.toLowerCase();
     if (key == 'weight-loss' || key == 'weight' || key.contains('weight')) {
@@ -104,8 +106,32 @@ abstract final class GamificationIcons {
   }
 }
 
+/// Which assets the app bundles (its asset manifest), so an icon that
+/// hasn't been supplied yet (icons are added by hand) shows its fallback
+/// without a failed load: the SVG loader reports those as uncaught errors
+/// even when an errorBuilder draws the fallback.
+abstract final class BundledAssets {
+  static Set<String>? _all;
+  static Future<void>? _loading;
+
+  /// Reads the manifest once; [main] starts it early.
+  static Future<void> preload() => _loading ??= () async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      _all = manifest.listAssets().toSet();
+    } catch (e) {
+      // Unknown: loads are tried (and fall back) as before.
+      debugPrint('Asset manifest unavailable: $e');
+    }
+  }();
+
+  /// Whether [asset] is bundled; true while the manifest is unknown.
+  static bool has(String asset) => _all?.contains(asset) ?? true;
+}
+
 /// An SVG, PNG or WebP game icon. Monochrome SVGs are tinted with [color];
-/// badge and award art keeps its own colours.
+/// badge and award art keeps its own colours. An asset the app doesn't
+/// bundle (yet) shows [fallback], a Material icon, without trying to load.
 class GameIcon extends StatelessWidget {
   final String asset;
   final IconData fallback;
@@ -123,6 +149,9 @@ class GameIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = color ?? IconTheme.of(context).color;
+    if (asset.isEmpty || !BundledAssets.has(asset)) {
+      return Icon(fallback, size: size, color: tint);
+    }
     if (asset.endsWith('.png') || asset.endsWith('.webp')) {
       return Image.asset(
         asset,

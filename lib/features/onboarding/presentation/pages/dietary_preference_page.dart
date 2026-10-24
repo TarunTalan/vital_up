@@ -1,85 +1,93 @@
 import 'package:flutter/material.dart';
-import 'package:vital_up/core/theme/app_theme.dart';
-import 'package:vital_up/utils/onboarding_components.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/presentation/widgets/onboarding_widgets.dart';
 
+/// One answer to "How do you eat?". [value] is what's saved and sent to
+/// the diet plan AI, so it never changes with the copy.
 class DietaryOption {
-  final String title;
-  const DietaryOption(this.title);
+  final String value;
+  final String subtitle;
+  final IconData icon;
+
+  const DietaryOption(this.value, this.subtitle, this.icon);
 }
 
-class DietaryPreferencePage extends StatefulWidget {
-  final VoidCallback? onNext;
-  final VoidCallback? onBack;
-  final VoidCallback? onSkip;
+/// Step 4: dietary preference, one of [options].
+class DietaryPreferenceStep extends StatefulWidget {
+  final int revealFrom;
 
-  const DietaryPreferencePage({super.key, this.onNext, this.onBack, this.onSkip});
+  const DietaryPreferenceStep({super.key, this.revealFrom = 3});
+
+  static const options = [
+    DietaryOption(
+      'No specific preference',
+      'I eat a bit of everything',
+      Icons.restaurant_rounded,
+    ),
+    DietaryOption('Vegetarian', 'No meat or fish', Icons.eco_rounded),
+    DietaryOption('Vegan', 'No animal products at all', Icons.spa_rounded),
+    DietaryOption('Keto', 'Very low carb, higher fat', Icons.egg_alt_rounded),
+    DietaryOption(
+      'Paleo',
+      'Whole foods, no grains or dairy',
+      Icons.set_meal_rounded,
+    ),
+    DietaryOption(
+      'Halal',
+      'Prepared under Islamic dietary law',
+      Icons.verified_rounded,
+    ),
+  ];
 
   @override
-  State<DietaryPreferencePage> createState() => _DietaryPreferencePageState();
+  State<DietaryPreferenceStep> createState() => _DietaryPreferenceStepState();
 }
 
-class _DietaryPreferencePageState extends State<DietaryPreferencePage> {
-  int selectedIndex = 0;
-
-  final List<DietaryOption> options = const [
-    DietaryOption('No specific preference'),
-    DietaryOption('Vegetarian'),
-    DietaryOption('Vegan'),
-    DietaryOption('Keto'),
-    DietaryOption('Paleo'),
-    DietaryOption('Halal'),
-  ];
+class _DietaryPreferenceStepState extends State<DietaryPreferenceStep>
+    with OnboardingStepState {
+  int _selected = 0;
 
   @override
   void initState() {
     super.initState();
-    final state = context.read<OnboardingCubit>().state;
-    if (state.dietaryPreference.isNotEmpty) {
-      final index = options.indexWhere((o) => o.title == state.dietaryPreference);
-      if (index != -1) {
-        selectedIndex = index;
-      }
-    }
+    final saved = context.read<OnboardingCubit>().state.dietaryPreference;
+    final index = DietaryPreferenceStep.options.indexWhere(
+      (o) => o.value == saved,
+    );
+    if (index != -1) _selected = index;
+  }
+
+  @override
+  Future<bool> submit() async {
+    await context.read<OnboardingCubit>().updateHealthVitals(
+      dietaryPreference: DietaryPreferenceStep.options[_selected].value,
+    );
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
-    return OnboardingLayout(
-      step: 4,
-      onBack: widget.onBack ?? () {},
-      onSkip: widget.onSkip ?? () {},
-      onNext: () {
-        context.read<OnboardingCubit>().updateHealthVitals(
-          dietaryPreference: options[selectedIndex].title,
-        );
-        widget.onNext?.call();
-      },
-      title: "Dietary preferences",
-      subtitle: "To tailor your diet plan accurately.",
-      nextEnabled: true,
-      child: Column(
-        children: [
-          ...options.asMap().entries.map((entry) {
-            final index = entry.key;
-            final option = entry.value;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppDimens.space16),
-              child: OnboardingOptionTile(
-                label: option.title,
-                isSelected: selectedIndex == index,
-                onTap: () {
-                  setState(() {
-                    selectedIndex = index;
-                  });
-                },
+    const options = DietaryPreferenceStep.options;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < options.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppDimens.cardGap),
+            child: OnboardingReveal(
+              index: widget.revealFrom + i,
+              child: OnboardingChoiceTile(
+                title: options[i].value,
+                subtitle: options[i].subtitle,
+                icon: Icon(options[i].icon),
+                selected: _selected == i,
+                onTap: () => setState(() => _selected = i),
               ),
-            );
-          }),
-        ],
-      ),
+            ),
+          ),
+      ],
     );
   }
 }

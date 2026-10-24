@@ -22,6 +22,7 @@ class VitaException implements Exception {
   static String get dailyLimitReached =>
       "You've hit today's Vita limit. It resets at ${quotaResetTime()}.";
   static const tooSlow = 'Vita is taking too long. Try again.';
+  static const tooFast = "You're sending messages quickly. Wait a minute.";
   static const offlineMessage = "You're offline. Try again when connected.";
   static const consentNeeded = 'Allow Vita to use your data to get a reply.';
 
@@ -36,6 +37,17 @@ abstract class VitaRepository {
   Future<List<VitaMessage>> loadHistory();
 
   Future<void> saveHistory(List<VitaMessage> messages);
+
+  /// Whose chat [loadHistory] / [saveHistory] read and write right now
+  /// (changes on sign-out), so a reply that lands later is never saved into
+  /// another account's chat.
+  String get chatOwnerId;
+
+  /// How far up from the latest message the chat was left (logical
+  /// pixels); null when it was at the latest message.
+  double? readChatScroll();
+
+  Future<void> saveChatScroll(double? offsetFromEnd);
 
   /// Vita's answer to the latest user message in [history].
   /// [draftPlan] replaces the active plan in Vita's context when the user is
@@ -53,9 +65,6 @@ abstract class VitaRepository {
 
   /// Saved check-ins (last 90 days), oldest first.
   List<StressCheckIn> getStressCheckIns();
-
-  /// Asks for Health Connect / Apple Health heart data permissions.
-  Future<bool> connectWearable();
 
   /// AI headline / stress tip / diet note, fetched at most once a day and
   /// cached; returns the last cached copy (or null) when offline.

@@ -10,9 +10,10 @@ import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart'
 import 'package:vital_up/features/vita/presentation/utils/vita_icons.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.dart';
 import 'package:vital_up/features/vita/presentation/widgets/vita_page_body.dart';
-import 'package:vital_up/core/widgets/fit_text.dart';
 
-/// Figma `health coach/ analysis` (1908:13240).
+/// What the user's logs say, one card per area, under Vita's one-line
+/// summary. Figures are worked out on the device; only the summary line
+/// comes from the AI.
 class VitaHealthAnalysisPage extends StatefulWidget {
   const VitaHealthAnalysisPage({super.key});
 
@@ -42,8 +43,7 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      header: const AppTitleBar(title: 'Health Analysis'),
-      bodyPadding: vitaBodyPadding(context),
+      header: const AppPageHeader(title: 'Health analysis'),
       body: VitaFutureBody<HealthAnalysis>(
         future: _analysis,
         onRetry: _reload,
@@ -51,58 +51,19 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             VitaInsightCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FitText(
-                    'Vita knows you',
-                    style: context.text.headlineLarge?.copyWith(
-                      color: context.colors.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: AppDimens.space4),
-                  Text(
-                    'Analyzing ${analysis.signalCount} health '
-                    'signal${analysis.signalCount == 1 ? '' : 's'} across '
-                    '${analysis.featureCount} '
-                    'feature${analysis.featureCount == 1 ? '' : 's'}',
-                    style: context.text.bodyMedium?.copyWith(
-                      color: context.colors.onSurface,
-                    ),
-                  ),
-                  FutureBuilder<VitaDailyInsights?>(
-                    future: _insights,
-                    initialData: null,
-                    builder: (context, snapshot) {
-                      final headline =
-                          snapshot.data?.headline ?? analysis.headline;
-                      if (headline == null) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(top: AppDimens.space12),
-                        child: Text(
-                          headline,
-                          style: context.text.bodyLarge?.copyWith(
-                            color: context.colors.onSurface,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+              child: _Summary(analysis: analysis, insights: _insights),
             ),
             if (analysis.signals.length <= 1) ...[
-              const SizedBox(height: AppDimens.space16),
+              const SizedBox(height: AppDimens.cardGap),
               const AppInfoNote(
                 message:
-                    'Log meals, sleep, water and workouts — or connect '
-                    'your watch from the Stress Guide — and Vita will '
-                    'analyse more of your health here.',
+                    'Log meals, sleep, water and workouts, or turn on Health '
+                    'sync in Settings, and Vita will cover more here.',
               ),
             ],
             for (final signal in analysis.signals) ...[
-              const SizedBox(height: AppDimens.space16),
-              _SignalRow(signal: signal),
+              const SizedBox(height: AppDimens.cardGap),
+              _SignalCard(signal: signal),
             ],
           ],
         ),
@@ -111,39 +72,76 @@ class _VitaHealthAnalysisPageState extends State<VitaHealthAnalysisPage> {
   }
 }
 
-class _SignalRow extends StatelessWidget {
+class _Summary extends StatelessWidget {
+  final HealthAnalysis analysis;
+  final Future<VitaDailyInsights?> insights;
+
+  const _Summary({required this.analysis, required this.insights});
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = context.colors.onSurface;
+    final areas = analysis.featureCount;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your health at a glance',
+          style: context.text.titleMedium?.copyWith(color: onSurface),
+        ),
+        const SizedBox(height: AppDimens.space4),
+        Text(
+          'Based on $areas area${areas == 1 ? '' : 's'} you track',
+          style: context.text.bodySmall?.copyWith(
+            color: context.vColors.grayText,
+          ),
+        ),
+        FutureBuilder<VitaDailyInsights?>(
+          future: insights,
+          builder: (context, snapshot) {
+            final headline = snapshot.data?.headline ?? analysis.headline;
+            if (headline == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: AppDimens.space12),
+              child: Text(
+                headline,
+                style: context.text.bodyLarge?.copyWith(color: onSurface),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// One area: icon badge, its name and what the data says. Static (nothing
+/// to open), so no chevron.
+class _SignalCard extends StatelessWidget {
   final HealthSignal signal;
 
-  const _SignalRow({required this.signal});
+  const _SignalCard({required this.signal});
 
   @override
   Widget build(BuildContext context) {
     final onSurface = context.colors.onSurface;
     return AppCard(
-      sheen: false,
-      shadow: AppShadows.soft,
-      padding: VitaDimens.cardPadding,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: VitaDimens.signalBadge,
-            height: VitaDimens.signalBadge,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: VitaColors.signalBadge,
-              borderRadius: BorderRadius.circular(VitaDimens.signalBadgeRadius),
-            ),
-            child: SvgPicture.asset(
+          AppIconBadge(
+            color: VitaColors.accent,
+            icon: SvgPicture.asset(
               VitaIcons.forSignal(signal.kind),
               width: AppDimens.iconMd,
               height: AppDimens.iconMd,
-              colorFilter: const ColorFilter.mode(
-                AppColors.teal,
+              colorFilter: ColorFilter.mode(
+                AppIconBadge.glyphColor(context, VitaColors.accent),
                 BlendMode.srcIn,
               ),
             ),
           ),
-          const SizedBox(width: AppDimens.space20),
+          const SizedBox(width: AppDimens.space12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,10 +150,12 @@ class _SignalRow extends StatelessWidget {
                   signal.title,
                   style: context.text.titleSmall?.copyWith(color: onSurface),
                 ),
-                const SizedBox(height: AppDimens.space6),
+                const SizedBox(height: AppDimens.space4),
                 Text(
                   signal.summary,
-                  style: context.text.bodyMedium?.copyWith(color: onSurface),
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.vColors.grayText,
+                  ),
                 ),
               ],
             ),

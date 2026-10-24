@@ -12,11 +12,7 @@ class FoodItemEditDialog extends StatefulWidget {
   final FoodItem? item;
   final Function(String name, double quantity, String unit) onSave;
 
-  const FoodItemEditDialog({
-    super.key,
-    this.item,
-    required this.onSave,
-  });
+  const FoodItemEditDialog({super.key, this.item, required this.onSave});
 
   @override
   State<FoodItemEditDialog> createState() => _FoodItemEditDialogState();
@@ -29,7 +25,16 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
   String? _quantityError;
   String _selectedUnit = 'serving';
 
-  final List<String> _units = ['serving', 'g', 'oz', 'cup', 'piece', 'slice', 'tbsp', 'tsp'];
+  final List<String> _units = [
+    'serving',
+    'g',
+    'oz',
+    'cup',
+    'piece',
+    'slice',
+    'tbsp',
+    'tsp',
+  ];
 
   /// Prevents a double tap from adding the item twice.
   bool _submitted = false;
@@ -43,8 +48,8 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
       text: quantity == null
           ? '1'
           : quantity == quantity.roundToDouble()
-              ? quantity.round().toString()
-              : quantity.toStringAsFixed(1),
+          ? quantity.round().toString()
+          : quantity.toStringAsFixed(1),
     );
     _selectedUnit = widget.item?.unit ?? 'serving';
     // A unit from the server (e.g. "bowl") must be in the list, or the
@@ -61,7 +66,10 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
 
   void _handleSave() {
     if (_submitted) return;
-    final name = sanitizeText(_nameController.text, maxLength: InputLimits.shortText);
+    final name = sanitizeText(
+      _nameController.text,
+      maxLength: InputLimits.shortText,
+    );
     final quantity = parseNumberInRange(
       _quantityController.text,
       min: NutritionLimits.quantityMin,
@@ -134,7 +142,9 @@ class _FoodItemEditDialogState extends State<FoodItemEditDialog> {
                           hint: 'e.g., Grilled Chicken',
                           error: _nameError,
                           maxLength: InputLimits.shortText,
-                          inputFormatters: InputFormatters.text(InputLimits.shortText),
+                          inputFormatters: InputFormatters.text(
+                            InputLimits.shortText,
+                          ),
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.next,
                           onChanged: (_) {

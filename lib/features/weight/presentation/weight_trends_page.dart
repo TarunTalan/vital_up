@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/database/collections/weight_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
@@ -15,11 +16,62 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_ed
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 const _metric = TrackerMetric.weight;
 
-/// Within this many kg of the goal counts as reached.
-const _goalReachedKg = 0.5;
+const _goalReachedKg = weightGoalReachedKg;
+
+/// The unit, the latest weigh-in and the first one, all time (not just the
+/// chart's range, so a weigh-in from 3 weeks ago still shows), reloaded
+/// whenever the weight trend above it reloads (a log, an edit, a sync).
+class WeightLatestBuilder extends StatefulWidget {
+  final Widget Function(
+    BuildContext context,
+    WeightUnit unit,
+    WeightLogCache? latest,
+    WeightLogCache? first,
+  )
+  builder;
+
+  const WeightLatestBuilder({super.key, required this.builder});
+
+  @override
+  State<WeightLatestBuilder> createState() => _WeightLatestBuilderState();
+}
+
+class _WeightLatestBuilderState extends State<WeightLatestBuilder> {
+  late Future<(WeightUnit, WeightLogCache?, WeightLogCache?)> _ends = _load();
+
+  static Future<(WeightUnit, WeightLogCache?, WeightLogCache?)> _load() async {
+    final service = sl<WeightService>();
+    return (
+      await service.unit(),
+      await service.latest(),
+      await service.first(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<TrendCubit<WeightLogCache>, TrendState<WeightLogCache>>(
+      listenWhen: (_, next) => next.data != null,
+      listener: (context, _) {
+        setState(() {
+          _ends = _load();
+        });
+      },
+      child: FutureBuilder<(WeightUnit, WeightLogCache?, WeightLogCache?)>(
+        future: _ends,
+        builder: (context, snap) {
+          final (unit, latest, first) =
+              snap.data ?? (WeightUnit.kg, null, null);
+          return widget.builder(context, unit, latest, first);
+        },
+      ),
+    );
+  }
+}
 
 String _signed(WeightUnit unit, double kg) {
   // Round first: 0.04 kg must read "0.0 kg", not "+0.0 kg".
@@ -55,15 +107,13 @@ class WeightTrendsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = sl<WeightService>();
-    return FutureBuilder<WeightUnit>(
-      future: service.unit(),
-      builder: (context, snap) {
-        final unit = snap.data ?? WeightUnit.kg;
-        return BlocProvider(
-          create: (_) =>
-              TrendCubit<WeightLogCache>(service.trend, range: TrendRange.month)
-                ..load(),
-          child: Builder(
+    return BlocProvider(
+      create: (_) =>
+          TrendCubit<WeightLogCache>(service.trend, range: TrendRange.month)
+            ..load(),
+      child: WeightLatestBuilder(
+        builder: (context, unit, latestEver, first) {
+          return Builder(
             builder: (context) {
               final cubit = context.read<TrendCubit<WeightLogCache>>();
               return TrackerDetailScaffold<WeightLogCache>(
@@ -76,7 +126,7 @@ class WeightTrendsPage extends StatelessWidget {
                 axisFormat: (kg) => unit.fromKg(kg).toStringAsFixed(0),
                 heroLabel: 'Latest',
                 today: (data) {
-                  final latest = data.logs.firstOrNull;
+                  final latest = latestEver ?? data.logs.firstOrNull;
                   final goal = data.series.goal;
                   return TrackerToday(
                     value: latest == null ? '-' : unit.format(latest.weightKg),
@@ -88,7 +138,11 @@ class WeightTrendsPage extends StatelessWidget {
                     logged:
                         latest != null &&
                         isSameDay(latest.timestamp, DateTime.now()),
-                    fraction: _progress(data.logs, goal),
+                    fraction: weightGoalProgress(
+                      firstKg: first?.weightKg,
+                      latestKg: latest?.weightKg,
+                      goalKg: goal,
+                    ),
                   );
                 },
                 goalLabel: (data) => data.series.goal == null
@@ -108,16 +162,17 @@ class WeightTrendsPage extends StatelessWidget {
                 onLog: () async {
                   if (await showWeightEntrySheet(context)) cubit.load();
                 },
-                logBuilder: (context, log) => TrackerLogTile(
-                  id: log.id,
-                  icon: log.source == 'health'
-                      ? Icons.watch_rounded
-                      : _metric.icon,
+                logBuilder: (context, log) => LogHistoryCard(
+                  icon: Icon(
+                    log.source == 'health' ? Icons.watch_rounded : _metric.icon,
+                  ),
                   color: _metric.color,
-                  title: unit.format(log.weightKg),
+                  title: 'Weight',
                   subtitle:
-                      '${DateFormat('EEE d MMM · h:mm a').format(log.timestamp)}'
-                      ' · ${log.source == 'health' ? 'Synced' : 'Manual'}',
+                      '${DateFormat.jm().format(log.timestamp)} · '
+                      '${log.source == 'health' ? healthStoreName : 'Logged by you'}',
+                  value: unit.format(log.weightKg),
+                  deleteNoun: 'weigh-in',
                   onDelete: () => deleteTrackerLog(
                     context,
                     context.read<TrendCubit<WeightLogCache>>(),
@@ -127,22 +182,13 @@ class WeightTrendsPage extends StatelessWidget {
                 ),
               );
             },
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   /// Share of the way from the oldest entry in range to the goal.
-  static double? _progress(List<WeightLogCache> logs, double? goal) {
-    if (goal == null || logs.length < 2) return null;
-    final start = logs.last.weightKg;
-    final latest = logs.first.weightKg;
-    final total = (start - goal).abs();
-    if (total < _goalReachedKg) return 1;
-    return (1 - (latest - goal).abs() / total).clamp(0.0, 1.0);
-  }
-
   static List<TrackerInsight> _changeInsights(
     List<WeightLogCache> logs,
     WeightUnit unit,
@@ -169,10 +215,8 @@ class WeightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<WeightUnit>(
-      future: sl<WeightService>().unit(),
-      builder: (context, snap) {
-        final unit = snap.data ?? WeightUnit.kg;
+    return WeightLatestBuilder(
+      builder: (context, unit, latestEver, first) {
         return BlocBuilder<
           TrendCubit<WeightLogCache>,
           TrendState<WeightLogCache>
@@ -186,7 +230,8 @@ class WeightCard extends StatelessWidget {
                 onRetry: state.error != null ? cubit.load : null,
               );
             }
-            final latest = data.logs.firstOrNull;
+            // The latest weigh-in ever, not just this week's.
+            final latest = latestEver ?? data.logs.firstOrNull;
             final goal = data.series.goal;
             final status = _status(latest?.weightKg, goal);
             // Like the other cards: once today's weight is in, say so and
@@ -208,6 +253,9 @@ class WeightCard extends StatelessWidget {
                 TrackerQuickAction(
                   label: loggedToday ? 'Update' : _metric.logLabel,
                   icon: loggedToday ? Icons.edit_rounded : _metric.logIcon,
+                  svgAsset: loggedToday
+                      ? TrackerIcons.edit
+                      : _metric.logIconAsset,
                   color: _metric.color,
                   filled: true,
                   onTap: () async {
@@ -215,26 +263,27 @@ class WeightCard extends StatelessWidget {
                   },
                 ),
               ],
-              child: Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    latest == null
-                        ? TrackerPrompt(
-                            title: 'No weight logged',
-                            color: _metric.color,
-                          )
-                        : TrackerProgress(
-                            value: unit.format(latest.weightKg),
-                            goal: goal == null ? null : unit.format(goal),
-                            color: _metric.color,
-                            fraction: WeightTrendsPage._progress(
-                              data.logs,
-                              goal,
-                            ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  latest == null
+                      ? TrackerPrompt(
+                          title: "What's your weight?",
+                          color: _metric.color,
+                        )
+                      : TrackerProgress(
+                          value: unit.format(latest.weightKg),
+                          goal: goal == null ? null : unit.format(goal),
+                          // A target to reach, not an amount out of a total.
+                          goalPrefix: 'Goal',
+                          color: _metric.color,
+                          fraction: weightGoalProgress(
+                            firstKg: first?.weightKg,
+                            latestKg: latest.weightKg,
+                            goalKg: goal,
                           ),
-                  ],
-                ),
+                        ),
+                ],
               ),
             );
           },

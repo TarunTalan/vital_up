@@ -138,18 +138,18 @@ class AddCustomNutritionItemRequested extends FoodScanEvent {
 
   @override
   List<Object?> get props => [
-        barcode,
-        name,
-        quantity,
-        unit,
-        calories,
-        proteinG,
-        carbsG,
-        fatG,
-        fiberG,
-        sugarG,
-        sodiumMg,
-        source,
-        replaceCurrent,
-      ];
+    barcode,
+    name,
+    quantity,
+    unit,
+    calories,
+    proteinG,
+    carbsG,
+    fatG,
+    fiberG,
+    sugarG,
+    sodiumMg,
+    source,
+    replaceCurrent,
+  ];
 }

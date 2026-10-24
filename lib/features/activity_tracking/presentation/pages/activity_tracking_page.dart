@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mbx;
-import 'package:vital_up/core/config/supabase_config.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -16,7 +16,11 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/foreground
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_timer_page.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_recovery_service.dart';
 import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
-import 'package:vital_up/features/activity_tracking/domain/repositories/map_tile_repository.dart';
+import 'package:vital_up/core/network/connectivity_service.dart';
+import 'package:vital_up/features/activity_tracking/data/services/offline_map_service.dart';
+import 'package:vital_up/features/activity_tracking/presentation/widgets/offline_map_note.dart';
+import 'package:vital_up/core/widgets/feature_tip_card.dart';
+import 'package:vital_up/features/feature_tips/presentation/feature_tip_keys.dart';
 import 'package:vital_up/features/activity_tracking/domain/services/workout_checkpoint.dart';
 import 'package:vital_up/features/activity_goals/domain/repositories/activity_goals_repository.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
@@ -37,8 +41,6 @@ import 'package:vital_up/features/activity_tracking/presentation/widgets/interru
 import 'package:vital_up/features/activity_tracking/presentation/utils/activity_target_rules.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music.dart';
 import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
-
-const String kOfflineRegionId = 'local_workout_region_10k';
 
 /// The one screen for every activity. Outdoor types use the GPS view (map,
 /// location service, recovery); workouts without a route use the workout
@@ -138,7 +140,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   StreamSubscription<int?>? _hrSubscription;
   late final WorkoutMusic _music = WorkoutMusic(
     _prefsNotifier,
-    voiceCoach: _voiceCoach,
     onError: (message) {
       if (mounted) showErrorSnackBar(context, message);
     },
@@ -169,6 +170,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   late final Widget _mapLayer = Positioned.fill(
     child: mbx.MapWidget(
       key: const ValueKey("mapWidget"),
+      // The style in the offline pack. Left out, the widget first loads
+      // the heavy Standard style (not saved offline) and then swaps.
+      styleUri: mbx.MapboxStyles.MAPBOX_STREETS,
       onMapCreated: _onMapCreated,
       onTapListener: (context) {
         if (mounted) {
@@ -212,6 +216,9 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     });
     _prefsNotifier.addListener(_onPrefsChanged);
     _voiceCoach.init();
+    // The offline maps tip needs the saved areas read; Home's startup check
+    // may not have run yet (opened from a shortcut or straight away).
+    sl<OfflineMapService>().refresh();
     _hrSubscription = _hrManager.bpmStream.listen((bpm) {
       if (mounted) setState(() => _liveHeartRate = bpm);
     });
@@ -225,6 +232,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       _selectActivityForGoals();
       _loadGoalTarget();
       _startLocationUpdates();
+      _askOnFirstOpen();
     });
     // Checkpoint the workout whenever the app leaves the foreground — the
     // OS may kill a backgrounded app without further notice.
@@ -329,7 +337,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     _hrSubscription?.cancel();
     _notificationButtons?.cancel();
     _hrManager.dispose();
-    _voiceCoach.dispose();
     _music.dispose();
     _unitNotifier.dispose();
     _prefsNotifier.dispose();
@@ -343,10 +350,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
 
+      // Only checks: the card asks (first open, then Start).
       permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
     } catch (e) {
       // e.g. a permission request already in progress from the workout.
       debugPrint('Map preview location unavailable: $e');
@@ -393,6 +398,45 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
   void _stopLocationUpdates() {
     _positionSubscription?.cancel();
     _positionSubscription = null;
+  }
+
+  /// Location (needed), steps and notifications (asked with it when
+  /// missing), with the permission card before the countdown starts.
+  /// Location for the route, steps and the workout notification, asked
+  /// with the permission card. [onceKey]: asked only once from there.
+  static PermissionAsk _trackingAsk({String? onceKey}) => PermissionAsk(
+    main: AppPermission.location,
+    also: const [AppPermission.activity, AppPermission.notifications],
+    alsoOnceKey: 'workout_extras',
+    onceKey: onceKey,
+    title: 'Map your workout',
+    message:
+        'VitalUp follows your route while you track, so your distance '
+        'and pace are right.',
+  );
+
+  Future<bool> _allowTracking() async {
+    final allowed = await ensurePermission(context, _trackingAsk());
+    // Allowed just now: show where they are before the countdown ends.
+    if (allowed && mounted) _startLocationUpdates();
+    return allowed;
+  }
+
+  /// The first time the screen opens: the map is about where you are, so
+  /// the card asks then rather than only at Start. Once only (declined, it
+  /// waits for Start); after an interrupted workout's choice, which has
+  /// the screen first.
+  Future<void> _askOnFirstOpen() async {
+    if (!mounted ||
+        _workoutRequested ||
+        context.read<ActivityTrackingBloc>().state is! TrackingIdle) {
+      return;
+    }
+    final allowed = await ensurePermission(
+      context,
+      _trackingAsk(onceKey: 'workout_screen_open'),
+    );
+    if (allowed && mounted) _startLocationUpdates();
   }
 
   /// Starts the workout. Shared by the instant start and the countdown.
@@ -442,7 +486,8 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     if (!mounted || choice == null || _recoveryBusy) return;
     switch (choice) {
       case InterruptedWorkoutChoice.resume:
-        _resumeInterrupted(workout);
+        // Without location it can't go on; the checkpoint stays.
+        if (await _allowTracking() && mounted) _resumeInterrupted(workout);
       case InterruptedWorkoutChoice.save:
         await _finishInterrupted(workout);
       case InterruptedWorkoutChoice.discard:
@@ -529,25 +574,49 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
     }
   }
 
-  /// Keeps a 10 km offline map around the user so the tracking map still
-  /// renders with no connection. Runs once per visit, silently: offline the
-  /// download simply fails and is retried on the next visit.
-  Future<void> _ensureOfflineMap(double latitude, double longitude) async {
+  /// Once, before a GPS workout, to users with no saved area: the moment
+  /// someone plans a route is when offline maps make sense.
+  Widget _offlineMapsTip() {
+    final tips = featureTipsOrNull();
+    if (tips == null || tips.isDismissed(FeatureTipKeys.offlineMaps)) {
+      return const SizedBox.shrink();
+    }
+    return ValueListenableBuilder<OfflineMapsState>(
+      valueListenable: sl<OfflineMapService>().state,
+      builder: (context, maps, _) {
+        if (!maps.loaded || maps.saved.isNotEmpty) {
+          return const SizedBox.shrink();
+        }
+        void answer() {
+          tips.dismiss(FeatureTipKeys.offlineMaps);
+          if (mounted) setState(() {});
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimens.space8),
+          child: FeatureTipCard(
+            icon: Icons.download_for_offline_rounded,
+            title: 'Going somewhere without signal?',
+            message: 'Save the map before you go. Workouts record anywhere.',
+            actionLabel: 'Offline maps',
+            onAction: () {
+              answer();
+              context.pushNamed('offline-maps');
+            },
+            onDismiss: answer,
+            overlay: true,
+          ),
+        );
+      },
+    );
+  }
+
+  /// The app downloads the offline map at start; this catches a user who
+  /// has just allowed location or moved out of it since. Once per visit.
+  void _ensureOfflineMap(double latitude, double longitude) {
     if (_offlineMapChecked) return;
     _offlineMapChecked = true;
-    if (!SupabaseConfig.mapboxAccessToken.startsWith('pk.')) return;
-
-    final mapRepo = sl<MapTileRepository>();
-    try {
-      if (await mapRepo.regionCovers(kOfflineRegionId, latitude, longitude)) {
-        return;
-      }
-      await mapRepo
-          .downloadRegion(kOfflineRegionId, latitude, longitude, 10.0)
-          .drain<void>();
-    } catch (e) {
-      debugPrint('Offline map download skipped: $e');
-    }
+    sl<OfflineMapService>().ensureAround(latitude, longitude);
   }
 
   void _openSettings() {
@@ -571,15 +640,6 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
 
   void _onMapCreated(mbx.MapboxMap map) async {
     _mapboxMap = map;
-
-    // Set map style. Offline without a downloaded style pack this fails;
-    // carry on so the route and position markers are still created.
-    try {
-      await map.loadStyleURI(mbx.MapboxStyles.MAPBOX_STREETS);
-    } catch (e) {
-      debugPrint('Map style failed to load: $e');
-    }
-    if (!mounted) return;
 
     // Move compass to top right, at roughly 60% height of screen
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -808,11 +868,14 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             );
           }
 
-          // Set start point on first track point
-          if (_startPoint == null && state.routePoints.isNotEmpty) {
+          // Set start point on first track point (again if a bad first
+          // fix was replaced).
+          if (state.routePoints.isNotEmpty &&
+              !identical(_startPoint, state.routePoints.first)) {
+            final first = _startPoint == null;
             setState(() {
               _startPoint = state.routePoints.first;
-              _isLocked = true; // Lock when tracking actually begins
+              if (first) _isLocked = true; // Lock when tracking begins
             });
             _updateStartPoint(state.routePoints.first);
           }
@@ -853,6 +916,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             _voiceCoach.announceStop(
               distanceMeters: state.session.totalDistanceMeters,
               elapsedSeconds: state.session.totalDurationSeconds,
+              unit: _unitNotifier.value,
             );
           }
           final bloc = context.read<ActivityTrackingBloc>();
@@ -860,15 +924,19 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
             MaterialPageRoute(
               builder: (_) => ActivityCompletionPage(
                 session: state.session,
+                // Leaving the result cuts the summary cue short.
                 onNewActivity: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   Navigator.of(context).pop();
                 },
                 onBack: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   Navigator.of(context).pop();
                 },
                 onViewHistory: () {
+                  _voiceCoach.stop();
                   bloc.add(ResetTracking());
                   context.pushNamed('activity-history');
                 },
@@ -981,26 +1049,42 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                             ? AppDimens.backButtonSize + context.gutter * 2
                             : AppDimens.space12,
                       ),
-                      child: ValueListenableBuilder<DistanceUnit>(
-                        valueListenable: _unitNotifier,
-                        builder: (_, unit, __) {
-                          return ValueListenableBuilder<WorkoutPrefs>(
-                            valueListenable: _prefsNotifier,
-                            builder: (_, prefs, __) => TopStats(
-                              elapsed: elapsed,
-                              distanceMeters: distanceMeters,
-                              calories: calories,
-                              avgPace: avgPace,
-                              distanceUnit: unit,
-                              heartRateBpm: _liveHeartRate,
-                              workoutPrefs: prefs,
-                              steps: steps,
-                              currentSpeed: currentSpeed,
-                              elevationGain: elevationGain,
-                              activityType: state.activityType,
-                            ),
-                          );
-                        },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ValueListenableBuilder<DistanceUnit>(
+                            valueListenable: _unitNotifier,
+                            builder: (_, unit, __) {
+                              return ValueListenableBuilder<WorkoutPrefs>(
+                                valueListenable: _prefsNotifier,
+                                builder: (_, prefs, __) => TopStats(
+                                  elapsed: elapsed,
+                                  distanceMeters: distanceMeters,
+                                  calories: calories,
+                                  avgPace: avgPace,
+                                  distanceUnit: unit,
+                                  heartRateBpm: _liveHeartRate,
+                                  workoutPrefs: prefs,
+                                  steps: steps,
+                                  currentSpeed: currentSpeed,
+                                  elevationGain: elevationGain,
+                                  activityType: state.activityType,
+                                ),
+                              );
+                            },
+                          ),
+                          // No signal and no saved map here: the map may be
+                          // blank, the workout still records.
+                          OfflineMapNote(
+                            latitude: _currentPosition?.latitude,
+                            longitude: _currentPosition?.longitude,
+                            maps: sl<OfflineMapService>(),
+                            connectivity: sl<ConnectivityService>(),
+                            onTap: state is TrackingIdle
+                                ? () => context.pushNamed('offline-maps')
+                                : null,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1063,6 +1147,7 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                   children: [
                                     WorkoutMusicBar(music: _music),
                                     if (state is TrackingIdle) ...[
+                                      _offlineMapsTip(),
                                       ActivitySelector(
                                         selected: state.activityType,
                                         enabled: true,
@@ -1093,6 +1178,10 @@ class _ActivityTrackingViewState extends State<_ActivityTrackingView> {
                                         });
                                       },
                                       onStart: () async {
+                                        if (!await _allowTracking() ||
+                                            !mounted) {
+                                          return;
+                                        }
                                         final duration = _prefsNotifier
                                             .value
                                             .countdownDurationSeconds;

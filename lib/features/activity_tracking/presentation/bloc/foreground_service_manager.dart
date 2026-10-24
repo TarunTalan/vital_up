@@ -3,10 +3,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:vital_up/core/monitoring/crash_reporter.dart';
+import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_notification.dart';
+import 'package:vital_up/features/activity_tracking/data/services/workout_timer_store.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
-  CrashReporter.hookCurrentIsolate();
+  // Not awaited: the handler must be set synchronously.
+  CrashReporter.initBackground();
   FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
 }
 
@@ -131,15 +135,10 @@ class ForegroundServiceManager {
     FlutterForegroundTask.initCommunicationPort();
     _lastStatsText = null;
     _lastPaused = paused;
-    final text = paused
-        ? 'Paused'
-        : 'Tracking your $activityName...';
+    final text = paused ? 'Paused' : 'Tracking your $activityName...';
 
-    // Request notification permission for Android 13+
-    final reqResult = await FlutterForegroundTask.checkNotificationPermission();
-    if (reqResult != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
-    }
+    // Notification permission (Android 13+) is asked by the tracking
+    // page's card before Start; without it the service runs unseen.
 
     // No battery-optimisation exemption: a location foreground service
     // keeps GPS running under Doze, and Play restricts that permission.
@@ -201,5 +200,23 @@ class ForegroundServiceManager {
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.stopService();
     }
+  }
+}
+
+/// At app launch: the GPS workout notification of a workout the app was
+/// closed during (nothing records until Resume restarts it), and the
+/// timer's when no timer is saved any more. Never throws.
+Future<void> clearStaleWorkoutNotifications() async {
+  try {
+    await ForegroundServiceManager.stop();
+  } catch (e) {
+    debugPrint('Stopping a stale workout service failed: $e');
+  }
+  try {
+    if (sl<WorkoutTimerStore>().read() == null) {
+      await sl<WorkoutTimerNotifier>().cancel();
+    }
+  } catch (e) {
+    debugPrint('Clearing a stale timer notification failed: $e');
   }
 }

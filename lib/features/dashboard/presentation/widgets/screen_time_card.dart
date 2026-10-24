@@ -45,17 +45,15 @@ class ScreenTimeCard extends StatelessWidget {
                 onTap: cubit.openSettings,
               ),
             ],
-            child: Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  TrackerPrompt(
-                    title: 'Track screen time',
-                    color: AppColors.trackScreenTime,
-                  ),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                TrackerPrompt(
+                  title: 'Track screen time',
+                  color: AppColors.trackScreenTime,
+                ),
+              ],
             ),
           ),
           ScreenTimeError() => TrackerCardPlaceholder(
@@ -71,19 +69,22 @@ class ScreenTimeCard extends StatelessWidget {
   Widget _loaded(BuildContext context, ScreenTimeLoaded state) {
     final limit = sl<ScreenTimeService>().getDailyLimitMinutes();
     final minutes = state.totalDuration.inMinutes;
-    final left = limit - minutes;
+    final left = limit == null ? null : limit - minutes;
     return TrackerCard(
       metric: _metric,
-      status: TrackerStatus.of(
-        value: minutes.toDouble(),
-        goal: limit.toDouble(),
-        direction: _metric.direction,
-      ),
+      // No limit: today's time only, with no status to meet.
+      status: limit == null
+          ? null
+          : TrackerStatus.of(
+              value: minutes.toDouble(),
+              goal: limit.toDouble(),
+              direction: _metric.direction,
+            ),
       onOpen: () => _open(context),
       actions: [
         TrackerQuickAction(
-          label: 'Edit Goal',
-          svgAsset: 'assets/icons/ui/edit.svg',
+          label: limit == null ? 'Set a limit' : 'Edit goal',
+          svgAsset: limit == null ? TrackerIcons.goal : TrackerIcons.edit,
           color: _metric.color,
           filled: true,
           onTap: () async {
@@ -93,11 +94,17 @@ class ScreenTimeCard extends StatelessWidget {
           },
         ),
       ],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (limit == null || left == null)
+            TrackerProgress(
+              value: formatDashboardDuration(state.totalDuration),
+              color: _metric.color,
+              caption: 'Today · no daily limit',
+            )
+          else
             TrackerProgress(
               value: formatDashboardDuration(state.totalDuration),
               goal:
@@ -108,8 +115,7 @@ class ScreenTimeCard extends StatelessWidget {
                   ? '${formatDashboardDuration(Duration(minutes: left))} left today'
                   : 'Over by ${formatDashboardDuration(Duration(minutes: -left))}',
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -139,9 +145,10 @@ class ScreenTimeSummaryRow extends StatelessWidget {
         switch (state) {
           case ScreenTimeLoaded():
             final limit = sl<ScreenTimeService>().getDailyLimitMinutes();
-            final left = limit - state.totalDuration.inMinutes;
             value = formatDashboardDuration(state.totalDuration);
-            valueColor = left >= 0 ? null : context.colors.error;
+            if (limit != null && state.totalDuration.inMinutes > limit) {
+              valueColor = context.colors.error;
+            }
           case ScreenTimePermissionDenied():
             caption = 'Allow usage access to track it';
             onTap = cubit.openSettings;
@@ -154,51 +161,54 @@ class ScreenTimeSummaryRow extends StatelessWidget {
         return AppCard(
           width: double.infinity,
           onTap: onTap,
-          padding: AppDimens.cardPaddingCompact,
           child: Row(
             children: [
               const TrackerBadge(_metric),
               const SizedBox(width: AppDimens.space12),
+              // The figure sits at the end of the row, or under the title
+              // when both don't fit one line (narrow phone, large text).
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppDimens.space8,
+                  runSpacing: AppDimens.space2,
                   children: [
-                    Text(
-                      _metric.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.titleSmall?.copyWith(
-                        color: context.colors.onSurface,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _metric.label,
+                          style: context.text.titleSmall?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        if (caption != null) ...[
+                          const SizedBox(height: AppDimens.space2),
+                          Text(
+                            caption,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.bodySmall?.copyWith(
+                              color: grey,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (caption != null) ...[
-                      const SizedBox(height: AppDimens.space2),
+                    if (value != null)
                       Text(
-                        caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.bodySmall?.copyWith(color: grey),
+                        value,
+                        style: context.text.titleMedium?.copyWith(
+                          color: valueColor ?? context.colors.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ],
                   ],
                 ),
               ),
-              if (value != null) ...[
-                const SizedBox(width: AppDimens.space8),
-                Text(
-                  value,
-                  style: context.text.titleMedium?.copyWith(
-                    color: valueColor ?? context.colors.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
               const SizedBox(width: AppDimens.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: AppDimens.iconMd,
-                color: grey,
-              ),
+              const AppChevron(),
             ],
           ),
         );

@@ -78,12 +78,30 @@ class NutritionInfoDto {
   factory NutritionInfoDto.fromJson(Map<String, dynamic> json) {
     return NutritionInfoDto(
       calories: (json['calories'] as num?)?.toDouble() ?? 0.0,
-      proteinG: (json['protein'] as num?)?.toDouble() ?? (json['protein_g'] as num?)?.toDouble() ?? 0.0,
-      carbsG: (json['carbohydrate'] as num?)?.toDouble() ?? (json['carbs_g'] as num?)?.toDouble() ?? 0.0,
-      fatG: (json['fat'] as num?)?.toDouble() ?? (json['fat_g'] as num?)?.toDouble() ?? 0.0,
-      fiberG: (json['fiber'] as num?)?.toDouble() ?? (json['fiber_g'] as num?)?.toDouble() ?? 0.0,
-      sugarG: (json['sugar'] as num?)?.toDouble() ?? (json['sugar_g'] as num?)?.toDouble() ?? 0.0,
-      sodiumMg: (json['sodium'] as num?)?.toDouble() ?? (json['sodium_mg'] as num?)?.toDouble() ?? 0.0,
+      proteinG:
+          (json['protein'] as num?)?.toDouble() ??
+          (json['protein_g'] as num?)?.toDouble() ??
+          0.0,
+      carbsG:
+          (json['carbohydrate'] as num?)?.toDouble() ??
+          (json['carbs_g'] as num?)?.toDouble() ??
+          0.0,
+      fatG:
+          (json['fat'] as num?)?.toDouble() ??
+          (json['fat_g'] as num?)?.toDouble() ??
+          0.0,
+      fiberG:
+          (json['fiber'] as num?)?.toDouble() ??
+          (json['fiber_g'] as num?)?.toDouble() ??
+          0.0,
+      sugarG:
+          (json['sugar'] as num?)?.toDouble() ??
+          (json['sugar_g'] as num?)?.toDouble() ??
+          0.0,
+      sodiumMg:
+          (json['sodium'] as num?)?.toDouble() ??
+          (json['sodium_mg'] as num?)?.toDouble() ??
+          0.0,
       calciumMg: (json['calcium_mg'] as num?)?.toDouble() ?? 0.0,
       ironMg: (json['iron_mg'] as num?)?.toDouble() ?? 0.0,
       vitaminAIu: (json['vitamin_a_iu'] as num?)?.toDouble() ?? 0.0,
@@ -107,11 +125,18 @@ class NutritionInfoDto {
       cholesterolMg: (json['cholesterol_mg'] as num?)?.toDouble() ?? 0.0,
       saturatedFatG: (json['saturated_fat_g'] as num?)?.toDouble() ?? 0.0,
       transFatG: (json['trans_fat_g'] as num?)?.toDouble() ?? 0.0,
-      monounsaturatedFatG: (json['monounsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
-      polyunsaturatedFatG: (json['polyunsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
-      additionalNutrients: (json['additional_nutrients'] as List<dynamic>?)
-          ?.map((e) => AdditionalNutrientDto.fromJson(e as Map<String, dynamic>))
-          .toList() ?? [],
+      monounsaturatedFatG:
+          (json['monounsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
+      polyunsaturatedFatG:
+          (json['polyunsaturated_fat_g'] as num?)?.toDouble() ?? 0.0,
+      additionalNutrients:
+          (json['additional_nutrients'] as List<dynamic>?)
+              ?.map(
+                (e) =>
+                    AdditionalNutrientDto.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
       per: FoodItemDto.fromJson(json['per'] as Map<String, dynamic>? ?? {}),
     );
   }
@@ -150,48 +175,54 @@ class NutritionInfoDto {
       'trans_fat_g': transFatG,
       'monounsaturated_fat_g': monounsaturatedFatG,
       'polyunsaturated_fat_g': polyunsaturatedFatG,
-      'additional_nutrients': additionalNutrients.map((e) => e.toJson()).toList(),
+      'additional_nutrients': additionalNutrients
+          .map((e) => e.toJson())
+          .toList(),
       'per': per.toJson(),
     };
   }
 
   NutritionInfo toDomain() {
-    return sanitizeNutrition(NutritionInfo(
-      calories: calories,
-      proteinG: proteinG,
-      carbsG: carbsG,
-      fatG: fatG,
-      fiberG: fiberG,
-      sugarG: sugarG,
-      sodiumMg: sodiumMg,
-      calciumMg: calciumMg,
-      ironMg: ironMg,
-      vitaminAIu: vitaminAIu,
-      vitaminCMg: vitaminCMg,
-      vitaminDIu: vitaminDIu,
-      vitaminEMg: vitaminEMg,
-      vitaminKMg: vitaminKMg,
-      thiaminMg: thiaminMg,
-      riboflavinMg: riboflavinMg,
-      niacinMg: niacinMg,
-      vitaminB6Mg: vitaminB6Mg,
-      vitaminB12Mcg: vitaminB12Mcg,
-      folateMcg: folateMcg,
-      potassiumMg: potassiumMg,
-      phosphorusMg: phosphorusMg,
-      magnesiumMg: magnesiumMg,
-      zincMg: zincMg,
-      copperMg: copperMg,
-      manganeseMg: manganeseMg,
-      seleniumMcg: seleniumMcg,
-      cholesterolMg: cholesterolMg,
-      saturatedFatG: saturatedFatG,
-      transFatG: transFatG,
-      monounsaturatedFatG: monounsaturatedFatG,
-      polyunsaturatedFatG: polyunsaturatedFatG,
-      additionalNutrients: additionalNutrients.map((e) => e.toDomain()).toList(),
-      per: per.toDomain(),
-    ));
+    return sanitizeNutrition(
+      NutritionInfo(
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
+        fiberG: fiberG,
+        sugarG: sugarG,
+        sodiumMg: sodiumMg,
+        calciumMg: calciumMg,
+        ironMg: ironMg,
+        vitaminAIu: vitaminAIu,
+        vitaminCMg: vitaminCMg,
+        vitaminDIu: vitaminDIu,
+        vitaminEMg: vitaminEMg,
+        vitaminKMg: vitaminKMg,
+        thiaminMg: thiaminMg,
+        riboflavinMg: riboflavinMg,
+        niacinMg: niacinMg,
+        vitaminB6Mg: vitaminB6Mg,
+        vitaminB12Mcg: vitaminB12Mcg,
+        folateMcg: folateMcg,
+        potassiumMg: potassiumMg,
+        phosphorusMg: phosphorusMg,
+        magnesiumMg: magnesiumMg,
+        zincMg: zincMg,
+        copperMg: copperMg,
+        manganeseMg: manganeseMg,
+        seleniumMcg: seleniumMcg,
+        cholesterolMg: cholesterolMg,
+        saturatedFatG: saturatedFatG,
+        transFatG: transFatG,
+        monounsaturatedFatG: monounsaturatedFatG,
+        polyunsaturatedFatG: polyunsaturatedFatG,
+        additionalNutrients: additionalNutrients
+            .map((e) => e.toDomain())
+            .toList(),
+        per: per.toDomain(),
+      ),
+    );
   }
 
   static NutritionInfoDto fromDomain(NutritionInfo nutritionInfo) {
@@ -228,7 +259,9 @@ class NutritionInfoDto {
       transFatG: nutritionInfo.transFatG,
       monounsaturatedFatG: nutritionInfo.monounsaturatedFatG,
       polyunsaturatedFatG: nutritionInfo.polyunsaturatedFatG,
-      additionalNutrients: nutritionInfo.additionalNutrients.map((e) => AdditionalNutrientDto.fromDomain(e)).toList(),
+      additionalNutrients: nutritionInfo.additionalNutrients
+          .map((e) => AdditionalNutrientDto.fromDomain(e))
+          .toList(),
       per: FoodItemDto.fromDomain(nutritionInfo.per),
     );
   }
@@ -257,21 +290,11 @@ class AdditionalNutrientDto {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'unit': unit,
-      'value': value,
-    };
+    return {'id': id, 'name': name, 'unit': unit, 'value': value};
   }
 
   AdditionalNutrient toDomain() {
-    return AdditionalNutrient(
-      id: id,
-      name: name,
-      unit: unit,
-      value: value,
-    );
+    return AdditionalNutrient(id: id, name: name, unit: unit, value: value);
   }
 
   static AdditionalNutrientDto fromDomain(AdditionalNutrient nutrient) {

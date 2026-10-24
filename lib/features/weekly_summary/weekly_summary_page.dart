@@ -71,8 +71,7 @@ class _Summary extends StatelessWidget {
 
   const _Summary({required this.summary, required this.unit});
 
-  static String _duration(Duration d) =>
-      '${d.inHours}h ${(d.inMinutes % 60).toString().padLeft(2, '0')}m';
+  static String _duration(Duration d) => formatDashboardDuration(d);
 
   @override
   Widget build(BuildContext context) {
@@ -122,15 +121,27 @@ class _Summary extends StatelessWidget {
               : now.avgSleep!.inMinutes - before.avgSleep!.inMinutes,
           changeUnit: ' min',
         ),
-        _MetricCard(
-          icon: Icons.water_drop_rounded,
-          color: AppColors.water,
-          title: 'Water goal met',
-          value: '${now.waterGoalDays}/7 days',
-          detail: '${(now.waterMl / 1000).toStringAsFixed(1)} L in total',
-          change: now.waterGoalDays - before.waterGoalDays,
-          changeUnit: ' days',
-        ),
+        if (now.waterGoalDays case final goalDays?)
+          _MetricCard(
+            icon: Icons.water_drop_rounded,
+            color: AppColors.water,
+            title: 'Water goal met',
+            value: '$goalDays/7 days',
+            detail: '${(now.waterMl / 1000).toStringAsFixed(1)} L in total',
+            change: goalDays - (before.waterGoalDays ?? 0),
+            changeUnit: ' days',
+          )
+        else
+          // No goal: how often water was logged instead.
+          _MetricCard(
+            icon: Icons.water_drop_rounded,
+            color: AppColors.water,
+            title: 'Water logged',
+            value: '${now.waterDays}/7 days',
+            detail: '${(now.waterMl / 1000).toStringAsFixed(1)} L in total',
+            change: now.waterDays - before.waterDays,
+            changeUnit: ' days',
+          ),
         _MetricCard(
           icon: Icons.restaurant_rounded,
           color: AppColors.scoreNutrition,
@@ -159,7 +170,7 @@ class _Summary extends StatelessWidget {
     if (now.workouts > before.workouts) {
       return 'More active than last week. Keep it going.';
     }
-    if (now.waterGoalDays >= 5) return 'Great hydration this week.';
+    if ((now.waterGoalDays ?? 0) >= 5) return 'Great hydration this week.';
     if (now.mealDays >= 5) return 'Consistent meal logging. Nice work.';
     return 'Here\'s how your week went.';
   }

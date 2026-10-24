@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/features/subscription/data/services/store_billing.dart';
 import 'package:vital_up/features/subscription/domain/entities/pro_status.dart';
 import 'package:vital_up/features/subscription/domain/pro_limits.dart';
@@ -38,10 +42,7 @@ class _FakeRepository implements SubscriptionRepository {
   final purchased = <String>[];
   final _changes = StreamController<ProStatus>.broadcast();
 
-  _FakeRepository({
-    this.canPurchase = true,
-    this.current = ProStatus.free,
-  });
+  _FakeRepository({this.canPurchase = true, this.current = ProStatus.free});
 
   @override
   Future<void> identify(String? userId) async => identified.add(userId);
@@ -78,6 +79,9 @@ class _FakeRepository implements SubscriptionRepository {
 
   @override
   Future<int> remainingFreeScans() async => 5;
+
+  @override
+  Stream<void> get remainingScansChanges => const Stream.empty();
 }
 
 void main() {
@@ -231,6 +235,8 @@ void main() {
       Widget child, {
       _FakeRepository? repo,
       double textScale = 1.0,
+      Size size = kSmallPhone,
+      ThemeData? theme,
     }) async {
       // Signed in, like every page that shows the paywall.
       final cubit = SubscriptionCubit(
@@ -242,6 +248,8 @@ void main() {
         tester,
         BlocProvider.value(value: cubit, child: child),
         textScale: textScale,
+        size: size,
+        theme: theme,
       );
       await settle(tester);
       return cubit;
@@ -341,6 +349,60 @@ void main() {
         expect(takeAllExceptions(tester), isEmpty);
         expect(truncatedTexts(tester), isEmpty);
       });
+    }
+
+    // Whole page on a tall screen, free and Pro, light and dark, normal and
+    // largest text. `HOME_SHOTS=1` writes PNGs to build/pro_shots/.
+    for (final pro in [false, true]) {
+      for (final c in const [
+        (width: 360.0, scale: 1.0, dark: false),
+        (width: 360.0, scale: kMaxTextScale, dark: false),
+        (width: 412.0, scale: 1.0, dark: true),
+      ]) {
+        final id =
+            '${pro ? 'pro' : 'free'}_${c.width.round()}_${c.scale}_'
+            '${c.dark ? 'dark' : 'light'}';
+        testWidgets('pro page: $id', (tester) async {
+          await tester.runAsync(loadAllFonts);
+          await pump(
+            tester,
+            const ProPage(),
+            repo: _FakeRepository(
+              current: pro
+                  ? ProStatus(
+                      isPro: true,
+                      productId: 'pro:yearly',
+                      expiresAt: DateTime(2027, 11, 12),
+                    )
+                  : ProStatus.free,
+            ),
+            textScale: c.scale,
+            size: Size(c.width, 1800),
+            theme: c.dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          );
+          final errors = takeAllExceptions(tester);
+          final cut = truncatedTexts(tester);
+          if (Platform.environment['HOME_SHOTS'] == '1') {
+            await tester.runAsync(() async {
+              final view = tester.binding.renderViews.first;
+              final layer = view.debugLayer! as OffsetLayer;
+              final image = await layer.toImage(
+                Offset.zero & view.size,
+                pixelRatio: 1,
+              );
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              image.dispose();
+              File('build/pro_shots/$id.png')
+                ..createSync(recursive: true)
+                ..writeAsBytesSync(bytes!.buffer.asUint8List());
+            });
+          }
+          expect(errors, isEmpty);
+          expect(cut, isEmpty);
+        });
+      }
     }
   });
 }

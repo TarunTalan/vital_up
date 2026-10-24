@@ -31,6 +31,13 @@ const notificationLinkableRoutes = {
   'challenges',
   // Ongoing workout timer notification.
   'workout-timer',
+  // Offline map ready, feature tips.
+  'offline-maps',
+  'home-widgets',
+  'health-report',
+  'vita-diet-plan',
+  'vita-stress',
+  'activity-calendar',
 };
 
 /// The screen a notification opens, from the inbox or a tapped push.
@@ -38,7 +45,8 @@ String? notificationRoute(NotificationType type, String? route) =>
     switch (type) {
       NotificationType.friendRequest ||
       NotificationType.friendAccepted ||
-      NotificationType.cheer => 'friends',
+      NotificationType.cheer ||
+      NotificationType.friendAward => 'friends',
       NotificationType.badge || NotificationType.award => 'badges',
       NotificationType.levelUp || NotificationType.streak => 'points-history',
       NotificationType.challenge => 'challenges',
@@ -205,6 +213,7 @@ class NotificationTile extends StatelessWidget {
       padding: AppDimens.cardPaddingCompact,
       highlighted: unread,
       onTap: onTap,
+      showChevron: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

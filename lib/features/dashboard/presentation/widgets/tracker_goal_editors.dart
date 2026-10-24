@@ -16,9 +16,12 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 /// its home card, detail page or the My Goals list. Each returns true when
 /// the goal changed (or may have, for goals edited on another screen).
 
-String formatWaterGoal(double ml) => ml >= 1000
-    ? '${(ml / 1000).toStringAsFixed(ml % 1000 == 0 ? 0 : 1)} L'
-    : '${ml.round()} ml';
+/// "2 L", "2.5 L", "2.75 L": exact, never rounded to a goal not set.
+String formatWaterGoal(double ml) {
+  if (ml < 1000) return '${ml.round()} ml';
+  final litres = (ml / 1000).toStringAsFixed(2);
+  return '${litres.replaceFirst(RegExp(r'\.?0+$'), '')} L';
+}
 
 String formatMinutesGoal(double minutes) =>
     formatDashboardDuration(Duration(minutes: minutes.round()));
@@ -27,66 +30,90 @@ Future<bool> editWaterGoal(BuildContext context) async {
   final service = sl<WaterIntakeService>();
   final latest = await sl<WeightService>().latest();
   if (!context.mounted) return false;
-  // ~35 ml per kg of body weight, rounded to a glass.
   final recommended = latest == null
       ? null
-      : ((latest.weightKg * 35 / 250).round() * 250)
-            .clamp(1500, 4000)
-            .toDouble();
+      : recommendedWaterGoalMl(latest.weightKg).toDouble();
+  final goal = service.getDailyGoal();
+  var removed = false;
   final value = await showTrackerGoalSheet(
     context: context,
     metric: TrackerMetric.water,
     title: 'Daily water goal',
     description: 'How much to drink each day',
-    initial: service.getDailyGoal().toDouble(),
+    initial: (goal ?? recommended ?? 2500).toDouble(),
     min: InputLimits.waterGoalMlMin.toDouble(),
     max: InputLimits.waterGoalMlMax.toDouble(),
     step: 250,
     format: formatWaterGoal,
     recommended: recommended,
     recommendedReason: 'About 35 ml per kg of your body weight',
+    onRemove: goal == null
+        ? null
+        : () async {
+            await service.clearDailyGoal();
+            removed = true;
+          },
+    removeMessage:
+        "You can keep logging water, but days won't earn Arena points "
+        'or count toward water badges.',
   );
-  if (value == null) return false;
+  if (value == null) return removed;
   await service.setDailyGoal(value.round());
   return true;
 }
 
 Future<bool> editSleepGoal(BuildContext context) async {
   final service = sl<SleepService>();
+  final goal = service.getGoalMinutes();
+  var removed = false;
   final value = await showTrackerGoalSheet(
     context: context,
     metric: TrackerMetric.sleep,
     title: 'Nightly sleep goal',
     description: 'Hours of sleep to aim for each night',
-    initial: service.getGoalMinutes().toDouble(),
+    initial: (goal ?? SleepService.defaultGoalMinutes).toDouble(),
     min: InputLimits.sleepGoalMinMin.toDouble(),
     max: InputLimits.sleepGoalMinMax.toDouble(),
     step: 30,
     format: formatMinutesGoal,
     recommended: SleepService.defaultGoalMinutes.toDouble(),
     recommendedReason: 'Adults need 7–9 hours a night',
+    onRemove: goal == null
+        ? null
+        : () async {
+            await service.clearGoal();
+            removed = true;
+          },
   );
-  if (value == null) return false;
+  if (value == null) return removed;
   await service.setGoalMinutes(value.round());
   return true;
 }
 
 Future<bool> editScreenTimeGoal(BuildContext context) async {
   final service = sl<ScreenTimeService>();
+  final limit = service.getDailyLimitMinutes();
+  var removed = false;
   final value = await showTrackerGoalSheet(
     context: context,
     metric: TrackerMetric.screenTime,
     title: 'Daily screen time limit',
     description: 'Stay under this to meet your goal',
-    initial: service.getDailyLimitMinutes().toDouble(),
+    initial: (limit ?? 120).toDouble(),
     min: screenLimitMinMinutes.toDouble(),
     max: screenLimitMaxMinutes.toDouble(),
     step: 15,
     format: formatMinutesGoal,
     recommended: 120,
     recommendedReason: 'A common target for leisure screen time',
+    onRemove: limit == null
+        ? null
+        : () async {
+            await service.clearDailyLimit();
+            removed = true;
+          },
   );
-  if (value == null) return false;
+  if (value == null) return removed;
   await service.setDailyLimitMinutes(value.round());
   return true;
 }
@@ -98,6 +125,7 @@ Future<bool> editWeightGoal(BuildContext context) async {
   final latest = await service.latest();
   if (!context.mounted) return false;
   final start = target ?? latest?.weightKg ?? 70;
+  var removed = false;
   final value = await showTrackerGoalSheet(
     context: context,
     metric: TrackerMetric.weight,
@@ -108,8 +136,14 @@ Future<bool> editWeightGoal(BuildContext context) async {
     max: unit.maxValue.toDouble(),
     step: 0.5,
     format: (v) => '${v.toStringAsFixed(1)} ${unit.label}',
+    onRemove: target == null
+        ? null
+        : () async {
+            await service.clearTarget();
+            removed = true;
+          },
   );
-  if (value == null) return false;
+  if (value == null) return removed;
   await service.setTargetKg(unit.toKg(value));
   return true;
 }

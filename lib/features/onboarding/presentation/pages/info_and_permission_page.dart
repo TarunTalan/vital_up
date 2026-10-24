@@ -1,271 +1,265 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
-import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
+import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/widgets/app_list_group.dart';
+import 'package:vital_up/features/health_sync/health_import_service.dart';
+import 'package:vital_up/features/onboarding/data/starting_goals_writer.dart';
+import 'package:vital_up/features/onboarding/domain/entities/onboarding_data.dart';
+import 'package:vital_up/features/onboarding/domain/usecases/starting_goals.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/presentation/widgets/onboarding_widgets.dart';
 import 'package:vital_up/features/reminders/data/reminders_service.dart';
-import 'package:vital_up/utils/onboarding_components.dart';
+import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
-class InfoAndPermissionPage extends StatefulWidget {
-  final VoidCallback? onNext;
-  final VoidCallback? onBack;
-  final VoidCallback? onSkip;
+/// Step 7: what VitalUp keeps and never does, and the user's choices.
+/// The analytics and health sync switches are the real settings (shown as
+/// they are, saved at once); reminders are turned on once the answers are
+/// saved. Continue here saves everything ([submit]) and the starting
+/// goals worked out from the answers ([StartingGoals]).
+class PrivacyStep extends StatefulWidget {
+  final int revealFrom;
 
-  const InfoAndPermissionPage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const PrivacyStep({super.key, this.revealFrom = 3});
 
   @override
-  State<InfoAndPermissionPage> createState() => _InfoAndPermissionPageState();
+  State<PrivacyStep> createState() => _PrivacyStepState();
 }
 
-class _InfoAndPermissionPageState extends State<InfoAndPermissionPage> {
-  bool shareAnonymous = false;
-  bool healthReminders = false;
-  bool syncDevices = false;
-  bool showErrors = false;
+class _PrivacyStepState extends State<PrivacyStep> with OnboardingStepState {
+  bool _reminders = false;
+  bool _connecting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = context.read<SettingsCubit>();
+    if (settings.state is! SettingsLoaded) settings.loadSettings();
+  }
+
+  @override
+  Future<bool> submit() async {
+    final cubit = context.read<OnboardingCubit>();
+    await cubit.submitOnboardingDataToBackend();
+    if (!mounted) return false;
+    final state = cubit.state;
+    if (state.status != SubmissionStatus.success) {
+      showErrorSnackBar(
+        context,
+        state.errorMessage ?? "Couldn't save your details. Try again.",
+      );
+      return false;
+    }
+    // Before the finish screen, which shows them.
+    await sl<StartingGoalsWriter>().save(StartingGoals.from(state));
+    if (_reminders) _enableReminders();
+    return true;
+  }
+
+  /// Asks for notification access and turns on the starter reminders.
+  Future<void> _enableReminders() async {
+    // The system asks now; Home's notification card mustn't ask again.
+    await markPermissionAsked(homeNotificationsKey);
+    try {
+      await sl<RemindersService>().enableStarterSet();
+    } catch (e) {
+      debugPrint('Starter reminders not enabled: $e');
+    }
+  }
+
+  void _save(SettingsEntity settings) =>
+      context.read<SettingsCubit>().updateSettings(settings);
+
+  /// Same as Settings > Health sync: on only once access is allowed.
+  Future<void> _setHealthSync(SettingsEntity settings, bool on) async {
+    if (!on) {
+      _save(settings.copyWith(healthSyncEnabled: false));
+      return;
+    }
+    setState(() => _connecting = true);
+    var connected = false;
+    try {
+      connected = await sl<HealthImportService>().connect();
+    } catch (e) {
+      debugPrint('Health connect failed: $e');
+    }
+    if (!mounted) return;
+    setState(() => _connecting = false);
+    if (!connected) {
+      showErrorSnackBar(context, 'Allow health data access to turn this on.');
+      return;
+    }
+    _save(settings.copyWith(healthSyncEnabled: true));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<OnboardingCubit, OnboardingData>(
-      listenWhen: (previous, current) => previous.status != current.status,
-      listener: (context, state) {
-        if (state.status == SubmissionStatus.success) {
-          context.go('/dashboard');
-        } else if (state.status == SubmissionStatus.error) {
-          showErrorSnackBar(context, state.errorMessage ?? "Couldn't save your details. Try again.");
-        }
-      },
-      builder: (context, state) {
-        final isSubmitting = state.status == SubmissionStatus.submitting;
-        return OnboardingLayout(
-          step: 7,
-          handleSystemBack: false,
-          onBack: widget.onBack ?? () {},
-          onSkip: widget.onSkip ?? () {},
-          nextLabel: isSubmitting ? "Saving..." : "Done",
-          onNext: isSubmitting
-              ? () {}
-              : () {
-                  if (healthReminders) {
-                    sl<RemindersService>().enableStarterSet();
-                  }
-                  context.read<OnboardingCubit>().submitOnboardingDataToBackend();
-                },
-          title: "Data privacy",
-          subtitle: "We only collect what's needed.",
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildInfoBox(
-                context: context,
-                title: "What we collect",
-                items: [
-                  _InfoItem('assets/icons/onboarding/Stethoscope.svg', Icons.medical_services_rounded, "Health details you share"),
-                  _InfoItem('assets/icons/onboarding/Watch.svg', Icons.watch_rounded, "Data from connected devices"),
-                  _InfoItem('assets/icons/ui/settings.svg', Icons.settings_rounded, "Your app preferences"),
-                ],
+    var i = widget.revealFrom;
+    final v = context.vColors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OnboardingReveal(
+          index: i++,
+          child: _FactsCard(
+            title: 'What we keep',
+            facts: [
+              _Fact(
+                'Health details you share',
+                svg: 'assets/icons/onboarding/Stethoscope.svg',
+                fallback: Icons.medical_services_rounded,
               ),
-              const SizedBox(height: AppDimens.sectionGap),
-              _buildInfoBox(
-                context: context,
-                title: "What we do NOT do",
-                items: [
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never sell your data", iconSize: AppDimens.space12),
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never post without asking", iconSize: AppDimens.space12),
-                  _InfoItem('assets/icons/ui/tick.svg', Icons.check_rounded, "Never contact anyone without consent", iconSize: AppDimens.space12),
-                ],
+              _Fact(
+                'Readings from apps you connect',
+                svg: 'assets/icons/onboarding/Watch.svg',
+                fallback: Icons.watch_rounded,
               ),
-              const SizedBox(height: AppDimens.sectionGap),
-              _buildChoicesBox(context),
-              const SizedBox(height: AppDimens.sectionGap),
-              const NoteRow(
-                text: "We collect nothing without your permission.",
+              _Fact(
+                'Your app preferences',
+                svg: 'assets/icons/ui/settings.svg',
+                fallback: Icons.settings_rounded,
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInfoBox({
-    required BuildContext context,
-    required String title,
-    required List<_InfoItem> items,
-  }) {
-    final iconColor = context.vColors.preText!;
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: context.text.headlineSmall),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppDimens.space8),
-            Row(
-              children: [
-                Container(
-                  width: AppDimens.space32,
-                  height: AppDimens.space32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: context.vColors.primaryFill,
-                    shape: BoxShape.circle,
-                  ),
-                  child: SvgPicture.asset(
-                    items[i].iconPath,
-                    width: items[i].iconSize,
-                    height: items[i].iconSize,
-                    colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                    placeholderBuilder: (_) => Icon(
-                      items[i].fallbackIcon,
-                      size: items[i].iconSize,
-                      color: iconColor,
+        ),
+        const SizedBox(height: AppDimens.cardGap),
+        OnboardingReveal(
+          index: i++,
+          child: _FactsCard(
+            title: 'Our promise',
+            accent: v.success,
+            facts: const [
+              _Fact('We never sell your data', fallback: Icons.check_rounded),
+              _Fact(
+                'Nothing is posted without your say',
+                fallback: Icons.check_rounded,
+              ),
+              _Fact(
+                'We never contact anyone for you',
+                fallback: Icons.check_rounded,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDimens.sectionGap),
+        OnboardingReveal(
+          index: i++,
+          child: BlocBuilder<SettingsCubit, SettingsState>(
+            buildWhen: (a, b) => b is SettingsLoaded || a is! SettingsLoaded,
+            builder: (context, state) {
+              final settings = state is SettingsLoaded ? state.settings : null;
+              return AppListGroup(
+                title: 'Your choices',
+                children: [
+                  AppListTile(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Health reminders',
+                    subtitle: 'Gentle nudges for water, meals and sleep',
+                    trailing: Switch(
+                      value: _reminders,
+                      onChanged: (on) => setState(() => _reminders = on),
                     ),
                   ),
+                  AppListTile(
+                    icon: Icons.sync_rounded,
+                    iconColor: v.success,
+                    title: 'Health sync',
+                    subtitle:
+                        'Import weight and workouts from $healthStoreName',
+                    trailing: Switch(
+                      value: settings?.healthSyncEnabled ?? false,
+                      onChanged: settings == null || _connecting
+                          ? null
+                          : (on) => _setHealthSync(settings, on),
+                    ),
+                  ),
+                  AppListTile(
+                    icon: Icons.insights_rounded,
+                    title: 'Share usage analytics',
+                    subtitle: 'App opens and screens only. No health data.',
+                    trailing: Switch(
+                      value: settings?.analyticsEnabled ?? true,
+                      onChanged: settings == null
+                          ? null
+                          : (on) =>
+                                _save(settings.copyWith(analyticsEnabled: on)),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppDimens.cardGap),
+        OnboardingReveal(
+          index: i++,
+          child: const AppInfoNote(
+            icon: Icons.lock_outline_rounded,
+            message: 'You can change these any time in Settings.',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Fact {
+  final String text;
+  final String? svg;
+  final IconData fallback;
+
+  const _Fact(this.text, {this.svg, required this.fallback});
+}
+
+/// Static card: a title over icon rows.
+class _FactsCard extends StatelessWidget {
+  final String title;
+  final List<_Fact> facts;
+  final Color? accent;
+
+  const _FactsCard({required this.title, required this.facts, this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = accent ?? context.colors.primary;
+    final glyph = AppIconBadge.glyphColor(context, color);
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: context.text.titleSmall),
+          for (final fact in facts) ...[
+            const SizedBox(height: AppDimens.space12),
+            Row(
+              children: [
+                AppIconBadge(
+                  size: AppDimens.iconBadgeSmall,
+                  color: color,
+                  icon: fact.svg == null
+                      ? Icon(fact.fallback)
+                      : SvgPicture.asset(
+                          fact.svg!,
+                          width: AppDimens.iconXs,
+                          height: AppDimens.iconXs,
+                          colorFilter: ColorFilter.mode(glyph, BlendMode.srcIn),
+                          placeholderBuilder: (_) => Icon(fact.fallback),
+                        ),
                 ),
-                const SizedBox(width: AppDimens.space16),
-                Expanded(
-                  child: Text(items[i].text, style: context.text.bodyLarge),
-                ),
+                const SizedBox(width: AppDimens.space12),
+                Expanded(child: Text(fact.text, style: context.text.bodyLarge)),
               ],
             ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildChoicesBox(BuildContext context) {
-    final colors = context.colors;
-
-    return AppCard(
-      tint: showErrors ? context.vColors.errorFill : null,
-      borderColor: showErrors ? colors.error : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Your choices", style: context.text.headlineSmall),
-          const SizedBox(height: AppDimens.cardInnerGap),
-          _ToggleRow(
-            title: "Share anonymous data",
-            subtitle: "Help improve the app for everyone",
-            checked: shareAnonymous,
-            addTopDivider: false,
-            onChanged: (val) {
-              setState(() {
-                shareAnonymous = val;
-                showErrors = false;
-              });
-            },
-          ),
-          _ToggleRow(
-            title: "Health reminders",
-            subtitle: "Get gentle wellness notifications",
-            checked: healthReminders,
-            onChanged: (val) {
-              setState(() {
-                healthReminders = val;
-                showErrors = false;
-              });
-            },
-          ),
-          _ToggleRow(
-            title: "Sync with connected devices",
-            subtitle: "Auto-update from your wearables",
-            checked: syncDevices,
-            onChanged: (val) {
-              setState(() {
-                syncDevices = val;
-                showErrors = false;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoItem {
-  final String iconPath;
-  final IconData fallbackIcon;
-  final String text;
-  final double iconSize;
-
-  _InfoItem(this.iconPath, this.fallbackIcon, this.text, {this.iconSize = AppDimens.iconXs});
-}
-
-class _ToggleRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool checked;
-  final ValueChanged<bool> onChanged;
-  final bool addTopDivider;
-
-  const _ToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.checked,
-    required this.onChanged,
-    this.addTopDivider = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final v = context.vColors;
-
-    return Column(
-      children: [
-        if (addTopDivider)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppDimens.space8),
-            child: Divider(),
-          ),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: context.text.titleSmall),
-                  const SizedBox(height: AppDimens.space8),
-                  Text(
-                    subtitle,
-                    style: context.text.bodySmall?.copyWith(color: v.grayText),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppDimens.space16),
-            Transform.scale(
-              scale: 0.75,
-              child: Switch(
-                value: checked,
-                onChanged: (val) {
-                  HapticFeedback.lightImpact();
-                  onChanged(val);
-                },
-                activeThumbColor: AppColors.white,
-                activeTrackColor: context.colors.primary,
-                inactiveThumbColor: AppColors.white,
-                inactiveTrackColor: v.secondaryButtonBorder,
-                trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

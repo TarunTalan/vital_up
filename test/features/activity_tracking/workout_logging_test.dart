@@ -17,16 +17,12 @@ import 'package:vital_up/features/activity_tracking/presentation/bloc/workout_ti
 class _FakeNotifier implements WorkoutTimerNotifier {
   final shown = <WorkoutTimer>[];
   int cancels = 0;
-  int permissionAsks = 0;
 
   @override
   Future<void> show(WorkoutTimer timer, DateTime now) async => shown.add(timer);
 
   @override
   Future<void> cancel() async => cancels++;
-
-  @override
-  Future<void> requestPermission() async => permissionAsks++;
 }
 
 void main() {
@@ -228,7 +224,6 @@ void main() {
       expect(notifier.cancels, 1); // nothing timed: any old one goes
 
       await c.start();
-      expect(notifier.permissionAsks, 1);
       expect(notifier.shown.last.isRunning, isTrue);
 
       clock = now.add(const Duration(minutes: 5));

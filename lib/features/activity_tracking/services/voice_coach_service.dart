@@ -11,17 +11,23 @@ import 'package:vital_up/features/activity_tracking/services/workout_audio_servi
 class VoiceCoachService {
   final FlutterTts _tts = FlutterTts();
 
-  bool _initialized = false;
+  Future<void>? _ready;
   double _lastAnnouncedDistanceKm = 0.0;
   bool _targetAchievedAnnounced = false;
   bool _announced50 = false;
   bool _announced75 = false;
   bool _announced90 = false;
 
-  Map<String, String>? _defaultVoice;
+  /// Bumped by [stop]: an announcement still being prepared when the user
+  /// leaves the screen must not start speaking afterwards.
+  int _generation = 0;
 
-  Future<void> init() async {
-    if (_initialized) return;
+  /// Binds the speech engine and picks the voice once. Binding takes a
+  /// second or two on Android, so it's started at app launch and the
+  /// first cue speaks without waiting. Safe to call any number of times.
+  Future<void> init() => _ready ??= _setUp();
+
+  Future<void> _setUp() async {
     try {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.48);
@@ -47,39 +53,46 @@ class VoiceCoachService {
         }
 
         if (enUsVoices.isNotEmpty) {
-          _defaultVoice = enUsVoices.firstWhere(
-            (v) => v['name']!.toLowerCase().contains('google') || v['name']!.toLowerCase().contains('x-sfg'),
+          final voice = enUsVoices.firstWhere(
+            (v) =>
+                v['name']!.toLowerCase().contains('google') ||
+                v['name']!.toLowerCase().contains('x-sfg'),
             orElse: () => enUsVoices.first,
           );
+          await _tts.setVoice(voice);
         }
       }
+    } catch (e) {
+      debugPrint('Voice coach voice not set: $e');
+    }
+
+    _tts.setStartHandler(() => _duck(true));
+    _tts.setCompletionHandler(() => _duck(false));
+    _tts.setCancelHandler(() => _duck(false));
+    _tts.setErrorHandler((_) => _duck(false));
+  }
+
+  void _duck(bool ducked) {
+    try {
+      sl<WorkoutAudioService>().setDucked(ducked);
     } catch (_) {}
-
-    _tts.setStartHandler(() {
-      try {
-        sl<WorkoutAudioService>().setDucked(true);
-      } catch (_) {}
-    });
-    _tts.setCompletionHandler(() {
-      try {
-        sl<WorkoutAudioService>().setDucked(false);
-      } catch (_) {}
-    });
-    _tts.setErrorHandler((_) {
-      try {
-        sl<WorkoutAudioService>().setDucked(false);
-      } catch (_) {}
-    });
-
-    _initialized = true;
   }
 
+  /// Silences the coach at once, including a cue still being prepared.
   Future<void> stop() async {
-    await _tts.stop();
+    _generation++;
+    try {
+      await _tts.stop();
+    } catch (e) {
+      debugPrint('Voice coach stop failed: $e');
+    }
+    _duck(false);
   }
+
+  /// Speaks a countdown number, cutting off the previous one.
+  Future<void> announceCount(int count) => _speak('$count');
 
   Future<void> announceStart() async {
-    await _tts.stop();
     _lastAnnouncedDistanceKm = 0.0;
     _targetAchievedAnnounced = false;
     _announced50 = false;
@@ -96,16 +109,20 @@ class VoiceCoachService {
     await _speak('Activity resumed.');
   }
 
-  Future<void> announceStop(
-      {required double distanceMeters, required int elapsedSeconds}) async {
-    await _tts.stop();
-    final km = distanceMeters / 1000.0;
+  Future<void> announceStop({
+    required double distanceMeters,
+    required int elapsedSeconds,
+    DistanceUnit unit = DistanceUnit.km,
+  }) async {
+    final miles = unit == DistanceUnit.miles;
+    final distance = distanceMeters / (miles ? 1609.34 : 1000.0);
     final mins = elapsedSeconds ~/ 60;
     final secs = elapsedSeconds % 60;
     await _speak(
-        'Activity complete. '
-        'Distance: ${km.toStringAsFixed(2)} kilometres. '
-        'Duration: $mins minutes and $secs seconds.');
+      'Activity complete. '
+      'Distance: ${distance.toStringAsFixed(2)} ${miles ? 'miles' : 'kilometres'}. '
+      'Duration: $mins minutes and $secs seconds.',
+    );
   }
 
   /// Should be called on every new track point. Fires a milestone cue when
@@ -118,8 +135,7 @@ class VoiceCoachService {
     required WorkoutPrefs prefs,
   }) async {
     final intervalKm = unit == DistanceUnit.km ? 1.0 : 1.60934; // 1 mi in km
-    final threshold =
-        (_lastAnnouncedDistanceKm ~/ intervalKm + 1) * intervalKm;
+    final threshold = (_lastAnnouncedDistanceKm ~/ intervalKm + 1) * intervalKm;
     final distanceKm = distanceMeters / 1000.0;
 
     if (distanceKm >= threshold) {
@@ -148,15 +164,18 @@ class VoiceCoachService {
         if (remainingKm > 0) {
           if (unit == DistanceUnit.miles) {
             final remainingMi = remainingKm / 1.60934;
-            targetStr = '. ${remainingMi.toStringAsFixed(1)} miles remaining to target';
+            targetStr =
+                '. ${remainingMi.toStringAsFixed(1)} miles remaining to target';
           } else {
-            targetStr = '. ${remainingKm.toStringAsFixed(1)} kilometres remaining to target';
+            targetStr =
+                '. ${remainingKm.toStringAsFixed(1)} kilometres remaining to target';
           }
         }
       } else if (prefs.targetType == WorkoutTargetType.calories) {
         final remainingCals = prefs.targetValue - calories;
         if (remainingCals > 0) {
-          targetStr = '. ${remainingCals.toStringAsFixed(0)} calories remaining to target';
+          targetStr =
+              '. ${remainingCals.toStringAsFixed(0)} calories remaining to target';
         }
       }
 
@@ -176,7 +195,9 @@ class VoiceCoachService {
     double progressPct = 0.0;
     if (prefs.targetType == WorkoutTargetType.distance) {
       final distanceKm = distanceMeters / 1000.0;
-      progressPct = prefs.targetValue > 0 ? distanceKm / prefs.targetValue : 0.0;
+      progressPct = prefs.targetValue > 0
+          ? distanceKm / prefs.targetValue
+          : 0.0;
     } else if (prefs.targetType == WorkoutTargetType.calories) {
       progressPct = prefs.targetValue > 0 ? calories / prefs.targetValue : 0.0;
     }
@@ -234,7 +255,9 @@ class VoiceCoachService {
             : targetKm;
         final unitLabel = unit == DistanceUnit.km ? 'kilometre' : 'mile';
         final pluralLabel = displayVal == 1.0 ? unitLabel : '${unitLabel}s';
-        await announceTargetReached('${displayVal.toStringAsFixed(1)} $pluralLabel');
+        await announceTargetReached(
+          '${displayVal.toStringAsFixed(1)} $pluralLabel',
+        );
       }
     } else if (prefs.targetType == WorkoutTargetType.calories) {
       final targetCals = prefs.targetValue;
@@ -243,26 +266,38 @@ class VoiceCoachService {
         _announced50 = true;
         _announced75 = true;
         _announced90 = true;
-        await announceTargetReached('${targetCals.toStringAsFixed(0)} calories');
+        await announceTargetReached(
+          '${targetCals.toStringAsFixed(0)} calories',
+        );
       }
     }
   }
+
+  /// Says [text] (timed workout cues, [TimerVoiceCoach]).
+  Future<void> say(String text) => _speak(text);
 
   Future<void> announceTargetReached(String targetLabel) async {
     await _speak('Target reached. $targetLabel. Great job.');
   }
 
-  Future<void> dispose() async {
-    await _tts.stop();
-  }
+  /// The service is shared: leaving a screen only silences it.
+  Future<void> dispose() => stop();
 
+  /// Speech replaces whatever is being said (the engine's default flush
+  /// queue), so no stop or per-cue settings round trip delays it.
   Future<void> _speak(String text) async {
-    await _tts.stop();
-    await _tts.setSpeechRate(0.48);
-    await _tts.setPitch(1.0);
-    if (_defaultVoice != null) {
-      await _tts.setVoice(_defaultVoice!);
+    final generation = _generation;
+    final ready = _ready;
+    if (ready == null) {
+      await init();
+    } else {
+      await ready;
     }
-    await _tts.speak(text);
+    if (generation != _generation) return;
+    try {
+      await _tts.speak(text);
+    } catch (e) {
+      debugPrint('Voice coach speak failed: $e');
+    }
   }
 }

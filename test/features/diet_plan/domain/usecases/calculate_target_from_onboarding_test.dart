@@ -9,28 +9,31 @@ void main() {
     usecase = CalculateTargetFromOnboarding();
   });
 
-  test('Calculates TDEE correctly for a 30yo, 70kg, 175cm male, moderately active', () {
-    // Current year is dynamic in code, but assuming 30 years old logic works.
-    // To ensure exact age 30, we calculate the year 30 years ago from today.
-    final year = DateTime.now().year - 30;
-    
-    final data = OnboardingData(
-      weight: '70',
-      weightUnit: 'kg',
-      height: '175',
-      heightUnit: 'cm',
-      dob: '01/01/$year',
-      gender: 'Male',
-      activity: 'Moderate',
-    );
+  test(
+    'Calculates TDEE correctly for a 30yo, 70kg, 175cm male, moderately active',
+    () {
+      // Current year is dynamic in code, but assuming 30 years old logic works.
+      // To ensure exact age 30, we calculate the year 30 years ago from today.
+      final year = DateTime.now().year - 30;
 
-    final result = usecase(data);
-    expect(result.calories, 2556); // 1648.75 * 1.55 = 2555.56 -> 2556
-    
-    expect(result.protein, 192); // 30% of 2556 / 4
-    expect(result.carbs, 256);   // 40% of 2556 / 4
-    expect(result.fat, 85);      // 30% of 2556 / 9
-  });
+      final data = OnboardingData(
+        weight: '70',
+        weightUnit: 'kg',
+        height: '175',
+        heightUnit: 'cm',
+        dob: '01/01/$year',
+        gender: 'Male',
+        activity: 'Moderate',
+      );
+
+      final result = usecase(data);
+      expect(result.calories, 2556); // 1648.75 * 1.55 = 2555.56 -> 2556
+
+      expect(result.protein, 192); // 30% of 2556 / 4
+      expect(result.carbs, 256); // 40% of 2556 / 4
+      expect(result.fat, 85); // 30% of 2556 / 9
+    },
+  );
 
   test('Adjusts macros for diabetes', () {
     final year = DateTime.now().year - 30;
@@ -44,10 +47,10 @@ void main() {
       activity: 'Moderate',
       healthConditions: 'Diabetes, Hypertension',
     );
-    
+
     final result = usecase(data);
     expect(result.calories, 2556);
-    
+
     // Diabetes macros: 30% protein, 30% carbs, 40% fat
     expect(result.protein, 192);
     expect(result.carbs, 192);
@@ -65,7 +68,7 @@ void main() {
       gender: 'Female',
       activity: 'Sedentary',
     );
-    
+
     // BMR = 400 + 875 - 450 - 161 = 664
     // TDEE = 664 * 1.2 = 796.8
     // Should be floored to 1200
@@ -76,19 +79,35 @@ void main() {
   test('Reads height in inches and a ddMMyyyy date of birth', () {
     final year = DateTime.now().year - 30;
     final cm = OnboardingData(
-      weight: '70', weightUnit: 'kg', height: '175', heightUnit: 'cm',
-      dob: '01/01/$year', gender: 'Male', activity: 'Moderate',
+      weight: '70',
+      weightUnit: 'kg',
+      height: '175',
+      heightUnit: 'cm',
+      dob: '01/01/$year',
+      gender: 'Male',
+      activity: 'Moderate',
     );
     final inches = OnboardingData(
-      weight: '70', weightUnit: 'kg', height: '68.9', heightUnit: 'in',
-      dob: '0101$year', gender: 'Male', activity: 'Moderate',
+      weight: '70',
+      weightUnit: 'kg',
+      height: '68.9',
+      heightUnit: 'in',
+      dob: '0101$year',
+      gender: 'Male',
+      activity: 'Moderate',
     );
-    expect((usecase(inches).calories - usecase(cm).calories).abs(), lessThan(5));
+    expect(
+      (usecase(inches).calories - usecase(cm).calories).abs(),
+      lessThan(5),
+    );
   });
 
   test('Falls back to defaults for absurd weights', () {
     expect(CalculateTargetFromOnboarding.parseWeightKg('-5', 'kg'), 70);
-    expect(CalculateTargetFromOnboarding.parseWeightKg('154', 'lbs'), closeTo(69.85, 0.01));
+    expect(
+      CalculateTargetFromOnboarding.parseWeightKg('154', 'lbs'),
+      closeTo(69.85, 0.01),
+    );
     expect(CalculateTargetFromOnboarding.parseWeightKg('70,5', 'kg'), 70.5);
   });
 }

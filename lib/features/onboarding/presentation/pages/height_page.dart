@@ -1,242 +1,183 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
+import 'package:vital_up/core/widgets/value_ruler.dart';
+import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
+import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/presentation/widgets/onboarding_widgets.dart';
 import 'package:vital_up/features/profile/domain/profile_rules.dart';
-import 'package:vital_up/core/utils/responsive.dart';
-import 'package:vital_up/utils/onboarding_components.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
+import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 
-class HeightPage extends StatefulWidget {
-  const HeightPage({super.key});
+/// Step 2: height on a sliding scale, in cm or feet and inches. Saved as
+/// "170" (cm) or "5-7" (ft-in), what the rest of the app reads.
+class HeightStep extends StatefulWidget {
+  final int revealFrom;
 
-  @override
-  State<HeightPage> createState() => _HeightPageState();
-}
-
-class _HeightPageState extends State<HeightPage> {
-  bool _showErrors = false;
-  bool _latestValid = true;
+  const HeightStep({super.key, this.revealFrom = 3});
 
   @override
-  Widget build(BuildContext context) {
-    return OnboardingLayout(
-      step: 2,
-      onBack: () {
-        setState(() => _showErrors = false);
-        context.goNamed('health-personal-details');
-      },
-      onNext: () {
-        if (!_latestValid) {
-          setState(() {
-            _showErrors = true;
-          });
-        } else {
-          context.goNamed('health-weight');
-        }
-      },
-      onSkip: () {
-        setState(() => _showErrors = false);
-        context.goNamed('health-weight');
-      },
-      title: "Your height",
-      subtitle: "To tailor your health insights.",
-      nextEnabled: true,
-      child: _HeightContent(
-        onValidityChange: (valid) {
-          // Only rebuild on a real change: an unconditional setState here
-          // rebuilt the child, which reported again, every frame.
-          if (valid == _latestValid) return;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && valid != _latestValid) {
-              setState(() => _latestValid = valid);
-            }
-          });
-        },
-        showErrors: _showErrors,
-        onClearError: () {
-          setState(() {
-            _showErrors = false;
-          });
-        },
-      ),
-    );
-  }
+  State<HeightStep> createState() => _HeightStepState();
 }
 
-class _HeightContent extends StatefulWidget {
-  final ValueChanged<bool> onValidityChange;
-  final bool showErrors;
-  final VoidCallback onClearError;
+class _HeightStepState extends State<HeightStep> with OnboardingStepState {
+  static const _cmPerInch = CalculateCalorieGoal.cmPerInch;
 
-  const _HeightContent({
-    required this.onValidityChange,
-    this.showErrors = false,
-    required this.onClearError,
-  });
+  /// The feet scale runs in whole inches from 2 ft, so every label sits on
+  /// a whole foot.
+  static const _minInches = 24;
+  static final _maxInches = (InputLimits.heightCmMax / _cmPerInch).floor();
 
-  @override
-  State<_HeightContent> createState() => _HeightContentState();
-}
+  late String _unit;
 
-class _HeightContentState extends State<_HeightContent> {
-  int? _height = 120;
-  int? _inches = 0;
-  String _selectedUnit = "cm";
-  
+  /// The picked height in cm (whole cm, or a whole number of inches).
+  late double _cm;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
-    final cubit = context.read<OnboardingCubit>();
-    if (cubit.state.heightUnit.isNotEmpty) {
-      _selectedUnit = cubit.state.heightUnit;
+    final state = context.read<OnboardingCubit>().state;
+    final saved = CalculateCalorieGoal.heightInCm(
+      state.height,
+      state.heightUnit,
+    );
+    if (saved != null) {
+      _unit = state.heightUnit == 'ft' ? 'ft' : 'cm';
+    } else {
+      // Nothing picked yet: the unit set in Settings, at a typical height.
+      final settings = context.read<SettingsCubit>().state;
+      final imperial =
+          (settings is SettingsLoaded
+                  ? settings.settings
+                  : const SettingsEntity())
+              .heightUnit ==
+          'in';
+      _unit = imperial ? 'ft' : 'cm';
     }
-    if (cubit.state.height.isNotEmpty) {
-      if (_selectedUnit == "ft" && cubit.state.height.contains('-')) {
-        final parts = cubit.state.height.split('-');
-        _height = int.tryParse(parts[0]);
-        if (parts.length > 1) {
-          _inches = int.tryParse(parts[1]);
-        }
-      } else {
-        _height = int.tryParse(cubit.state.height);
-      }
+    _cm = _snapToUnit(
+      saved ??
+          switch (state.gender.toLowerCase()) {
+            'male' => 176,
+            'female' => 163,
+            _ => 170,
+          },
+    );
+  }
+
+  int get _inches => (_cm / _cmPerInch).round();
+
+  double _snapToUnit(double cm) => _unit == 'ft'
+      ? (cm / _cmPerInch).round().clamp(_minInches, _maxInches) * _cmPerInch
+      : cm.roundToDouble().clamp(
+          InputLimits.heightCmMin,
+          InputLimits.heightCmMax,
+        );
+
+  void _changeUnit(String unit) {
+    setState(() {
+      _unit = unit;
+      _cm = _snapToUnit(_cm);
+      _error = null;
+    });
+  }
+
+  @override
+  Future<bool> submit() async {
+    final error = ProfileRules.heightError(_cm);
+    if (error != null) {
+      setState(() => _error = error);
+      return false;
     }
+    final value = _unit == 'ft'
+        ? '${_inches ~/ 12}-${_inches % 12}'
+        : '${_cm.round()}';
+    await context.read<OnboardingCubit>().updateHeight(value, _unit);
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Dynamic bounds based on unit (the cm range is InputLimits').
-    final minHeight = _selectedUnit == "ft" ? 1 : InputLimits.heightCmMin.round();
-    final maxHeight = _selectedUnit == "ft" ? 8 : InputLimits.heightCmMax.round();
+    final feet = _unit == 'ft';
+    final inches = _inches;
+    final parts = feet
+        ? [('${inches ~/ 12}', 'ft'), ('${inches % 12}', 'in')]
+        : [('${_cm.round()}', 'cm')];
+    final other = feet
+        ? '${_cm.round()} cm'
+        : '${inches ~/ 12} ft ${inches % 12} in';
+    var i = widget.revealFrom;
 
-    final error = ProfileRules.heightError(_heightCm);
-    final valid = error == null;
-    widget.onValidityChange(valid);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Image
-        Expanded(
-          flex: 1,
-          child: Builder(
-            builder: (context) {
-              final physicalHeight = context.screenHeight + MediaQuery.viewInsetsOf(context).bottom;
-              final svgHeight = physicalHeight * 0.35;
-              return SvgPicture.asset(
-                'assets/icons/onboarding/height.svg',
-                height: svgHeight,
-                fit: BoxFit.contain,
-                placeholderBuilder: (context) => SizedBox(height: svgHeight),
-              );
-            }
+        OnboardingReveal(
+          index: i++,
+          child: Center(
+            child: AppSegmentedControl<String>(
+              values: const ['cm', 'ft'],
+              selected: _unit,
+              label: (u) => u == 'cm' ? 'cm' : 'ft / in',
+              onChanged: _changeUnit,
+              compact: true,
+            ),
           ),
         ),
-        const SizedBox(width: AppDimens.space12),
-        // Inputs
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_selectedUnit == "ft") ...[
-              OnboardingNumberField<int>(
-                value: _height,
-                onValueChange: (val) {
-                  setState(() => _height = val);
-                  _saveHeight();
-                },
-                min: minHeight,
-                max: maxHeight,
-                showButtons: true,
-                suffixText: "ft",
-                isError: widget.showErrors && !valid,
-              ),
-              const SizedBox(height: AppDimens.space8),
-              OnboardingNumberField<int>(
-                value: _inches,
-                onValueChange: (val) {
-                  setState(() => _inches = val);
-                  _saveHeight();
-                },
-                min: 0,
-                max: 11,
-                showButtons: true,
-                suffixText: "in",
-                isError: widget.showErrors && !valid,
-              ),
-            ] else ...[
-              OnboardingNumberField<int>(
-                value: _height,
-                onValueChange: (val) {
-                  setState(() => _height = val);
-                  _saveHeight();
-                },
-                min: minHeight,
-                max: maxHeight,
-                showButtons: true,
-                isError: widget.showErrors && !valid,
-              ),
-            ],
-            if (widget.showErrors && error != null) ...[
-              const SizedBox(height: AppDimens.space8),
-              SizedBox(
-                width: AppDimens.numberFieldWidth * 2,
-                child: Text(
-                  error,
-                  textAlign: TextAlign.center,
-                  style: context.text.bodySmall
-                      ?.copyWith(color: context.colors.error),
+        const SizedBox(height: AppDimens.sectionGap),
+        OnboardingReveal(
+          index: i++,
+          child: OnboardingReadout(parts: parts, caption: other),
+        ),
+        const SizedBox(height: AppDimens.sectionGap),
+        OnboardingReveal(
+          index: i++,
+          child: feet
+              ? ValueRuler(
+                  key: const ValueKey('ft'),
+                  value: inches.toDouble(),
+                  min: _minInches.toDouble(),
+                  max: _maxInches.toDouble(),
+                  step: 1,
+                  majorEvery: 12,
+                  midEvery: 6,
+                  color: context.colors.primary,
+                  labelFor: (v) => '${v.round() ~/ 12} ft',
+                  semanticValue: (v) =>
+                      '${v.round() ~/ 12} feet ${v.round() % 12} inches',
+                  onChanged: (v) => setState(() {
+                    _cm = v * _cmPerInch;
+                    _error = null;
+                  }),
+                )
+              : ValueRuler(
+                  key: const ValueKey('cm'),
+                  value: _cm.roundToDouble(),
+                  min: InputLimits.heightCmMin,
+                  max: InputLimits.heightCmMax,
+                  step: 1,
+                  color: context.colors.primary,
+                  semanticValue: (v) => '${v.round()} centimetres',
+                  onChanged: (v) => setState(() {
+                    _cm = v;
+                    _error = null;
+                  }),
                 ),
-              ),
-            ],
-            const SizedBox(height: AppDimens.space8),
-            UnitDropdown(
-              selectedUnit: _selectedUnit,
-              units: const ["cm", "ft"],
-              onUnitSelected: (unit) {
-                setState(() {
-                  if (_selectedUnit != unit) {
-                    if (unit == "ft" && _height != null) {
-                      final totalInches = (_height! / 2.54).round();
-                      _height = (totalInches ~/ 12).clamp(1, 8);
-                      _inches = (totalInches % 12).clamp(0, 11);
-                    } else if (unit == "cm" && _height != null) {
-                      final totalInches = (_height! * 12) + (_inches ?? 0);
-                      _height = (totalInches * 2.54).round().clamp(
-                        InputLimits.heightCmMin.round(),
-                        InputLimits.heightCmMax.round(),
-                      );
-                      _inches = 0;
-                    }
-                    _selectedUnit = unit;
-                  }
-                });
-                _saveHeight();
-              },
-            ),
-          ],
+        ),
+        OnboardingErrorText(_error, textAlign: TextAlign.center),
+        const SizedBox(height: AppDimens.sectionGap),
+        OnboardingReveal(
+          index: i++,
+          child: const AppInfoNote(
+            message:
+                'Drag the scale or tap a mark. Your height helps us work '
+                'out your BMI and daily energy needs.',
+          ),
         ),
       ],
     );
-  }
-
-  /// The entered height in cm, or null while incomplete.
-  double? get _heightCm {
-    final h = _height;
-    if (h == null) return null;
-    if (_selectedUnit != "ft") return h.toDouble();
-    return (h * 12 + (_inches ?? 0)) * 2.54;
-  }
-
-  void _saveHeight() {
-    // Out-of-range values stay on screen (with an error) but aren't saved.
-    if (_height != null && ProfileRules.heightError(_heightCm) == null) {
-      final heightStr = _selectedUnit == "ft" ? "$_height-${_inches ?? 0}" : _height.toString();
-      context.read<OnboardingCubit>().updateHeight(heightStr, _selectedUnit);
-    }
   }
 }

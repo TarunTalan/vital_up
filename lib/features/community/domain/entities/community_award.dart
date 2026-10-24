@@ -107,6 +107,41 @@ class AwardCountdown extends Equatable {
   List<Object?> get props => [period, periodStart, announcesAt, ended];
 }
 
+/// When the winners of the [period] starting [start] (an India date) are
+/// announced, in UTC: [AwardRules.lateDays] after it ends, at :05 India.
+DateTime awardAnnouncedAt(AwardPeriod period, DateTime start) {
+  final day = DateTime.utc(start.year, start.month, start.day);
+  final end = switch (period) {
+    AwardPeriod.week => DateTime.utc(day.year, day.month, day.day + 7),
+    AwardPeriod.month => DateTime.utc(day.year, day.month + 1),
+  };
+  return DateTime.utc(
+    end.year,
+    end.month,
+    end.day + AwardRules.lateDays,
+    0,
+    AwardRules.announceMinute,
+  ).subtract(AwardRules.serverOffset);
+}
+
+/// The period whose winners in [champions] were announced last (weekly
+/// most of the month, monthly in the days after its trophies land); null
+/// when there are none.
+AwardPeriod? latestChampionsPeriod(List<CommunityWinners> champions) {
+  AwardPeriod? latest;
+  DateTime? latestAt;
+  for (final c in champions) {
+    final start = c.periodStart;
+    if (start == null) continue;
+    final at = awardAnnouncedAt(c.period, start);
+    if (latestAt == null || at.isAfter(latestAt)) {
+      latest = c.period;
+      latestAt = at;
+    }
+  }
+  return latest;
+}
+
 /// The next announcement for [period] at [now]: the period that just ended
 /// while late logs are still counted, otherwise the current one.
 AwardCountdown nextAwardCountdown(AwardPeriod period, DateTime now) {
@@ -122,19 +157,7 @@ AwardCountdown nextAwardCountdown(AwardPeriod period, DateTime now) {
     AwardPeriod.month => DateTime.utc(current.year, current.month - 1),
   };
 
-  DateTime announcement(DateTime start) {
-    final end = switch (period) {
-      AwardPeriod.week => start.add(const Duration(days: 7)),
-      AwardPeriod.month => DateTime.utc(start.year, start.month + 1),
-    };
-    return DateTime.utc(
-      end.year,
-      end.month,
-      end.day + AwardRules.lateDays,
-      0,
-      AwardRules.announceMinute,
-    ).subtract(AwardRules.serverOffset);
-  }
+  DateTime announcement(DateTime start) => awardAnnouncedAt(period, start);
 
   DateTime asDate(DateTime d) => DateTime(d.year, d.month, d.day);
 

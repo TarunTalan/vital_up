@@ -11,7 +11,7 @@ class FavoriteAudio {
 
   String title = '';
   String subtitle = '';
-  String audioSource = ''; 
+  String audioSource = '';
   String? localFilePath;
   String? spotifyUri;
 

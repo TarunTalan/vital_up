@@ -4,10 +4,31 @@ import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 
 /// What an activity goal measures.
 enum GoalMetric {
-  steps('Steps', 'steps', daily: 8000, weekly: 50000, step: 500, maxDaily: 100000),
+  steps(
+    'Steps',
+    'steps',
+    daily: 8000,
+    weekly: 50000,
+    step: 500,
+    maxDaily: 100000,
+  ),
   distance('Distance', 'km', daily: 3, weekly: 15, step: 0.5, maxDaily: 100),
-  calories('Calories burned', 'kcal', daily: 300, weekly: 2000, step: 50, maxDaily: 5000),
-  activeMinutes('Active minutes', 'min', daily: 30, weekly: 150, step: 5, maxDaily: 720),
+  calories(
+    'Calories burned',
+    'kcal',
+    daily: 300,
+    weekly: 2000,
+    step: 50,
+    maxDaily: 5000,
+  ),
+  activeMinutes(
+    'Active minutes',
+    'min',
+    daily: 30,
+    weekly: 150,
+    step: 5,
+    maxDaily: 720,
+  ),
   workouts('Workouts', 'workouts', daily: 1, weekly: 4, step: 1, maxDaily: 5);
 
   final String label;
@@ -47,12 +68,12 @@ enum GoalMetric {
 
   /// Today's contribution of one tracked session to this metric.
   double fromSession(ActivitySession s) => switch (this) {
-        GoalMetric.steps => s.stepCountReliable ? s.steps.toDouble() : 0,
-        GoalMetric.distance => s.totalDistanceMeters / 1000,
-        GoalMetric.calories => s.calories.toDouble(),
-        GoalMetric.activeMinutes => s.totalDurationSeconds / 60,
-        GoalMetric.workouts => 1,
-      };
+    GoalMetric.steps => s.stepCountReliable ? s.steps.toDouble() : 0,
+    GoalMetric.distance => s.totalDistanceMeters / 1000,
+    GoalMetric.calories => s.calories.toDouble(),
+    GoalMetric.activeMinutes => s.totalDurationSeconds / 60,
+    GoalMetric.workouts => 1,
+  };
 }
 
 /// A day's steps from Health Connect ([health], null when not readable) and
@@ -88,18 +109,25 @@ class ActivityGoal extends Equatable {
   /// At most one goal per metric + period.
   String get id => '${metric.name}_${period.name}';
 
-  ActivityGoal copyWith({double? target}) =>
-      ActivityGoal(metric: metric, period: period, target: target ?? this.target);
+  ActivityGoal copyWith({double? target}) => ActivityGoal(
+    metric: metric,
+    period: period,
+    target: target ?? this.target,
+  );
 
   Map<String, dynamic> toJson() => {
-        'm': metric.name,
-        'p': period.name,
-        't': target,
-      };
+    'm': metric.name,
+    'p': period.name,
+    't': target,
+  };
 
   static ActivityGoal? fromJson(Map<String, dynamic> json) {
-    final metric = GoalMetric.values.where((m) => m.name == json['m']).firstOrNull;
-    final period = GoalPeriod.values.where((p) => p.name == json['p']).firstOrNull;
+    final metric = GoalMetric.values
+        .where((m) => m.name == json['m'])
+        .firstOrNull;
+    final period = GoalPeriod.values
+        .where((p) => p.name == json['p'])
+        .firstOrNull;
     final target = (json['t'] as num?)?.toDouble();
     if (metric == null ||
         period == null ||

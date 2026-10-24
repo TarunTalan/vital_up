@@ -22,6 +22,8 @@ extension GoalMetricStyle on GoalMetric {
   /// SVG asset when available (e.g. step.svg for steps).
   String? get svgAsset => switch (this) {
     GoalMetric.steps => 'assets/icons/trackers/step.svg',
+    GoalMetric.workouts => 'assets/icons/trackers/barbell.svg',
+    GoalMetric.calories => 'assets/icons/gamification/streak_flame.svg',
     _ => null,
   };
 
@@ -31,19 +33,62 @@ extension GoalMetricStyle on GoalMetric {
   Color get color => TrackerMetric.activity.color;
 
   /// Number only, e.g. "6,240" or "2.4".
-  String format(double value) => switch (this) {
-    GoalMetric.distance => value.toStringAsFixed(value < 10 ? 1 : 0),
-    _ => NumberFormat.decimalPattern().format(value.round()),
-  };
+  ///
+  /// Progress rounds down, so a figure never reads as the goal ("3.0 / 3.0
+  /// km", "30 of 30 min") before the goal is really met; a half-step
+  /// target keeps its decimal ("12.5 km", not "13 km").
+  String format(double value) {
+    if (!value.isFinite) return '0';
+    if (this == GoalMetric.distance) {
+      final tenths = (value * 10).floorToDouble() / 10;
+      final whole = tenths == tenths.roundToDouble();
+      return tenths.toStringAsFixed(whole && tenths >= 10 ? 0 : 1);
+    }
+    return NumberFormat.decimalPattern().format(value.floor());
+  }
 
-  /// Number with unit, e.g. "2.4 km".
-  String formatWithUnit(double value) => '${format(value)} $unit';
+  /// The unit for [value]: "1 workout", "3 workouts".
+  String unitFor(double value) =>
+      this == GoalMetric.workouts && value.floor() == 1 ? 'workout' : unit;
+
+  /// Number with unit, e.g. "2.4 km", "1 workout".
+  String formatWithUnit(double value) => '${format(value)} ${unitFor(value)}';
 
   /// Short number with unit for tight spots, e.g. "10K steps".
   String formatShortWithUnit(double value) => switch (this) {
     GoalMetric.distance => formatWithUnit(value),
-    _ => '${formatCompactCount(value)} $unit',
+    _ => '${formatCompactCount(value.floorToDouble())} ${unitFor(value)}',
   };
+}
+
+/// The metric's icon in the activity accent: its SVG when there is one,
+/// else the Material icon.
+class GoalMetricIcon extends StatelessWidget {
+  final GoalMetric metric;
+  final double size;
+
+  /// Overrides the readable-on-card tint (e.g. inside a badge).
+  final Color? color;
+
+  const GoalMetricIcon(
+    this.metric, {
+    super.key,
+    this.size = AppDimens.iconSm,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = metric.svgAsset;
+    final tint = color ?? context.iconTint(metric.color);
+    if (asset == null) return Icon(metric.icon, size: size, color: tint);
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+    );
+  }
 }
 
 /// Icon badge, name + window, progress bar and "current / target".
@@ -72,14 +117,10 @@ class GoalProgressRow extends StatelessWidget {
       children: [
         AppIconBadge(
           color: metric.color,
-          icon: metric.svgAsset != null
-              ? SvgPicture.asset(
-                  metric.svgAsset!,
-                  width: AppDimens.iconSm,
-                  height: AppDimens.iconSm,
-                  colorFilter: ColorFilter.mode(metric.color, BlendMode.srcIn),
-                )
-              : Icon(metric.icon),
+          icon: GoalMetricIcon(
+            metric,
+            color: AppIconBadge.glyphColor(context, metric.color),
+          ),
         ),
         const SizedBox(width: AppDimens.space12),
         Expanded(
@@ -140,7 +181,8 @@ class GoalProgressRow extends StatelessWidget {
                     )
                   else
                     Text(
-                      '${(fraction * 100).round()}%',
+                      // Rounded down: 99.6% isn't "100%" yet.
+                      '${(fraction * 100).floor()}%',
                       style: context.text.labelSmall?.copyWith(color: grey),
                     ),
                 ],
@@ -160,6 +202,7 @@ class GoalProgressRow extends StatelessWidget {
       ),
       borderColor: selected ? metric.color : null,
       onTap: onTap,
+      showChevron: true,
       child: row,
     );
   }

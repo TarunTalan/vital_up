@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_up/core/network/offline_errors.dart';
+import 'package:vital_up/features/subscription/data/services/ai_quota_service.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_message.dart';
 import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart';
 
@@ -13,6 +14,9 @@ import 'package:vital_up/features/vita/domain/repositories/vita_repository.dart'
 class VitaRemoteDataSource {
   final SupabaseClient _client;
 
+  /// Told how many chats are left after each answer (and 0 at the limit).
+  final AiQuotaService? _quota;
+
   static const _function = 'vita-chat';
   static const _timeout = Duration(seconds: 45);
   static const _refreshTimeout = Duration(seconds: 15);
@@ -20,7 +24,7 @@ class VitaRemoteDataSource {
   /// Last N turns sent as context (the server caps this too).
   static const maxContextMessages = 12;
 
-  VitaRemoteDataSource(this._client);
+  VitaRemoteDataSource(this._client, [this._quota]);
 
   Future<VitaMessage> chat({
     required List<VitaMessage> history,
@@ -48,17 +52,22 @@ class VitaRemoteDataSource {
       ],
     });
 
+    final left = data['remaining'];
+    if (left is num) unawaited(_quota?.report(AiQuota.vitaChat, left.toInt()));
     final text = data['text'];
     final plan = data['planInstructions'];
     return VitaMessage(
       sender: VitaSender.vita,
       text: text is String ? text.trim() : '',
       bullets: [
-        for (final b in (data['bullets'] is List ? data['bullets'] as List : const []))
+        for (final b
+            in (data['bullets'] is List ? data['bullets'] as List : const []))
           if (b is String && b.trim().isNotEmpty) b.trim(),
       ],
       action: VitaAction.fromWire(data['action']),
-      planInstructions: plan is String && plan.trim().isNotEmpty ? plan.trim() : null,
+      planInstructions: plan is String && plan.trim().isNotEmpty
+          ? plan.trim()
+          : null,
       sentAt: DateTime.now(),
     );
   }
@@ -69,6 +78,29 @@ class VitaRemoteDataSource {
 
   static String _clip(String text) =>
       text.length <= maxTurnChars ? text : text.substring(0, maxTurnChars);
+
+  /// Today's limit for [body]'s mode; the chat count drops to 0.
+  VitaException _limitReached(Map<String, dynamic> body) {
+    if (body['mode'] == 'chat') {
+      unawaited(_quota?.report(AiQuota.vitaChat, 0));
+    }
+    return VitaException(VitaException.dailyLimitReached, dailyLimit: true);
+  }
+
+  static String? _code(Object? details) {
+    final data = details is String ? _tryDecode(details) : details;
+    return data is Map && data['code'] is String
+        ? data['code'] as String
+        : null;
+  }
+
+  static Object? _tryDecode(String text) {
+    try {
+      return jsonDecode(text);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// headline / stressTip / dietNote for today.
   Future<Map<String, dynamic>> insights(Map<String, dynamic> snapshot) =>
@@ -117,10 +149,11 @@ class VitaRemoteDataSource {
       }
       throw switch (e.status) {
         401 => const VitaException(VitaException.sessionExpired),
-        429 => VitaException(
-            VitaException.dailyLimitReached,
-            dailyLimit: true,
-          ),
+        // The per-minute cap isn't the daily limit: no Pro offer for it.
+        429 when _code(e.details) == 'too_fast' => const VitaException(
+          VitaException.tooFast,
+        ),
+        429 => _limitReached(body),
         _ => const VitaException(VitaException.couldNotReply),
       };
     } on TimeoutException {

@@ -55,7 +55,11 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   }
 
   @override
-  Future<void> saveTokens(String accessToken, String refreshToken, [String? username]) async {
+  Future<void> saveTokens(
+    String accessToken,
+    String refreshToken, [
+    String? username,
+  ]) async {
     await _secureStorage.write(key: _accessTokenKey, value: accessToken);
     await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
     await _secureStorage.write(key: _isLoggedInKey, value: 'true');
@@ -66,7 +70,10 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   }
 
   @override
-  Future<void> saveGoogleAuthToken(String accessToken, String refreshToken) async {
+  Future<void> saveGoogleAuthToken(
+    String accessToken,
+    String refreshToken,
+  ) async {
     await _secureStorage.write(key: _accessTokenKey, value: accessToken);
     await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
     await _secureStorage.write(key: _isLoggedInKey, value: 'true');
@@ -129,7 +136,9 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
 
   @override
   Future<bool?> hasCompletedOnboarding(String userId) async {
-    final value = await _secureStorage.read(key: '${_onboardingCompletedKey}_$userId');
+    final value = await _secureStorage.read(
+      key: '${_onboardingCompletedKey}_$userId',
+    );
     return value == null ? null : value == 'true';
   }
 
@@ -137,7 +146,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     try {
       final parts = token.split('.');
       if (parts.length != 3) return null;
-      
+
       final normalizedPayload = base64Url.normalize(parts[1]);
       final payloadJson = utf8.decode(base64Url.decode(normalizedPayload));
       final json = jsonDecode(payloadJson);

@@ -16,6 +16,17 @@ class RemindersLocalDataSource {
   static const _keySmartSkip = 'reminders_smart_skip';
   static const _keySkipped = 'reminders_skipped_on';
 
+  /// Picks up skips written by a background isolate (widget or
+  /// notification logs): this isolate's copy of the preferences is cached
+  /// and would otherwise write over them.
+  Future<void> reload() async {
+    try {
+      await _prefs.reload();
+    } catch (e) {
+      debugPrint('Reloading reminder preferences failed: $e');
+    }
+  }
+
   /// Saved reminders merged with the built-in presets.
   List<Reminder> load() {
     final raw = _prefs.getString(_keyReminders);
@@ -32,7 +43,9 @@ class RemindersLocalDataSource {
     final reminders = <Reminder>[];
     for (final item in list) {
       try {
-        reminders.add(Reminder.fromJson(Map<String, dynamic>.from(item as Map)));
+        reminders.add(
+          Reminder.fromJson(Map<String, dynamic>.from(item as Map)),
+        );
       } catch (e) {
         debugPrint('Skipped an unreadable reminder: $e');
       }

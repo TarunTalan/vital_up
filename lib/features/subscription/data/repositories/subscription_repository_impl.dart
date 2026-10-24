@@ -63,12 +63,13 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         debugPrint('Store status unavailable: ${e.runtimeType}');
         return null;
       }),
-      _serverPro(userId, forceRefresh: forceRefresh)
-          .then<bool?>((pro) => pro)
-          .catchError((Object e) {
-            debugPrint('Server plan unavailable: ${e.runtimeType}');
-            return null;
-          }),
+      _serverPro(
+        userId,
+        forceRefresh: forceRefresh,
+      ).then<bool?>((pro) => pro).catchError((Object e) {
+        debugPrint('Server plan unavailable: ${e.runtimeType}');
+        return null;
+      }),
     ]);
     final store = results[0] as ProStatus?;
     final server = results[1] as bool?;
@@ -120,6 +121,14 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       debugPrint('Plan refresh failed: ${e.runtimeType}');
     }
   }
+
+  @override
+  Stream<void> get remainingScansChanges => _cache.changes
+      .where((key) {
+        final userId = _userId;
+        return userId != null && key == FoodCacheKeys.remainingScans(userId);
+      })
+      .map((_) {});
 
   @override
   Future<int> remainingFreeScans() async {

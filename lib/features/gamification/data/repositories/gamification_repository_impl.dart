@@ -77,9 +77,7 @@ class GamificationRepositoryImpl implements GamificationRepository {
       today.month,
       today.day - maxBackfillDays,
     );
-    var synced = DateTime.tryParse(
-      _prefs.getString(_syncedKey(userId)) ?? '',
-    );
+    var synced = DateTime.tryParse(_prefs.getString(_syncedKey(userId)) ?? '');
     // Saved while the clock was set ahead: walking from there would skip
     // every day until real time catches up.
     if (synced != null && synced.isAfter(today)) synced = today;

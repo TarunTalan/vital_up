@@ -10,9 +10,9 @@ class WaterLogCache {
   late String userId;
 
   late int amountMl;
-  
+
   @Index()
   late DateTime timestamp;
-  
+
   bool isSynced = false;
 }

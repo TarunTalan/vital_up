@@ -6,18 +6,24 @@ import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/tracker/goal_controls.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/value_ruler.dart';
 
 /// Layout of every tracker bottom sheet (log, goal, quick-log hub):
 /// metric badge + title + close, hairline, body, then a pinned action.
+/// The body scrolls when it's taller than the room; with [scrollable]
+/// false it gets the room left instead, for a body that sizes itself to
+/// fit (the sleep clock), so nothing ever hides behind the action.
 class TrackerSheet extends StatelessWidget {
   final TrackerMetric? metric;
   final String title;
   final String? subtitle;
   final Widget child;
   final Widget? action;
+  final bool scrollable;
 
   const TrackerSheet({
     super.key,
@@ -26,6 +32,7 @@ class TrackerSheet extends StatelessWidget {
     this.metric,
     this.subtitle,
     this.action,
+    this.scrollable = true,
   });
 
   @override
@@ -77,7 +84,9 @@ class TrackerSheet extends StatelessWidget {
               color: context.vColors.divider,
             ),
             const SizedBox(height: AppDimens.sectionGap),
-            Flexible(child: SingleChildScrollView(child: child)),
+            Flexible(
+              child: scrollable ? SingleChildScrollView(child: child) : child,
+            ),
             if (action != null) ...[
               const SizedBox(height: AppDimens.sectionGap),
               action!,
@@ -201,7 +210,9 @@ class TrackerPresetRow extends StatelessWidget {
 
 /// Opens the goal editor for [metric] and returns the saved value, or
 /// null if dismissed. Values move in [step]s between [min] and [max];
-/// [recommended] shows as a one-tap suggestion.
+/// [recommended] shows as a one-tap suggestion. With [onRemove] (the user
+/// has a goal) a "Remove goal" button asks first, saying [removeMessage]
+/// (what changes without the goal), runs it and closes with null.
 Future<double?> showTrackerGoalSheet({
   required BuildContext context,
   required TrackerMetric metric,
@@ -214,6 +225,8 @@ Future<double?> showTrackerGoalSheet({
   String? description,
   double? recommended,
   String? recommendedReason,
+  Future<void> Function()? onRemove,
+  String? removeMessage,
 }) {
   return showAppBottomSheet<double>(
     context: context,
@@ -228,6 +241,8 @@ Future<double?> showTrackerGoalSheet({
       description: description,
       recommended: recommended,
       recommendedReason: recommendedReason,
+      onRemove: onRemove,
+      removeMessage: removeMessage,
     ),
   );
 }
@@ -243,6 +258,8 @@ class _GoalSheet extends StatefulWidget {
   final String? description;
   final double? recommended;
   final String? recommendedReason;
+  final Future<void> Function()? onRemove;
+  final String? removeMessage;
 
   const _GoalSheet({
     required this.metric,
@@ -255,6 +272,8 @@ class _GoalSheet extends StatefulWidget {
     this.description,
     this.recommended,
     this.recommendedReason,
+    this.onRemove,
+    this.removeMessage,
   });
 
   @override
@@ -263,23 +282,103 @@ class _GoalSheet extends StatefulWidget {
 
 class _GoalSheetState extends State<_GoalSheet> {
   late double _value = widget.initial;
+  bool _removing = false;
 
+  Future<void> _remove(Future<void> Function() onRemove) async {
+    final metric = widget.metric.label.toLowerCase();
+    final confirmed = await showSmoothDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove your $metric goal?'),
+        content: Text(
+          widget.removeMessage ??
+              'You can keep logging and set a goal again any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: dialogContext.colors.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _removing = true);
+    try {
+      await onRemove();
+    } catch (e) {
+      debugPrint('Goal not removed: $e');
+      if (!mounted) return;
+      setState(() => _removing = false);
+      showErrorSnackBar(context, "Couldn't remove your goal. Try again.");
+      return;
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
+  /// From the +/- buttons and presets: the same selection click the
+  /// sliders and the ruler give per step.
   void _set(double v) {
-    HapticFeedback.selectionClick();
-    setState(() => _value = v.clamp(widget.min, widget.max).toDouble());
+    final next = v.clamp(widget.min, widget.max).toDouble();
+    if (next != _value) {
+      HapticFeedback.selectionClick();
+      setState(() => _value = next);
+    }
+  }
+
+  /// From the ruler or a goal control, which give their own sound and
+  /// vibration per step.
+  void _setQuietly(double v) {
+    final next = v.clamp(widget.min, widget.max).toDouble();
+    if (next != _value) setState(() => _value = next);
+  }
+
+  List<double> _quickPresets(TrackerMetric metric) {
+    final list = switch (metric) {
+      TrackerMetric.water => [1500.0, 2000.0, 2500.0, 3000.0],
+      TrackerMetric.sleep => [420.0, 450.0, 480.0, 510.0, 540.0],
+      TrackerMetric.screenTime => [60.0, 90.0, 120.0, 150.0, 180.0],
+      _ => const <double>[],
+    };
+    return list.where((p) => p >= widget.min && p <= widget.max).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final color = widget.metric.color;
     final recommended = widget.recommended;
+    final presets = _quickPresets(widget.metric);
     return TrackerSheet(
       metric: widget.metric,
       title: widget.title,
       subtitle: widget.description,
-      action: AppPrimaryButton(
-        label: 'Save goal',
-        onTap: () => Navigator.pop(context, _value),
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppPrimaryButton(
+            label: 'Save goal',
+            enabled: !_removing,
+            onTap: () => Navigator.pop(context, _value),
+          ),
+          if (widget.onRemove case final onRemove?) ...[
+            const SizedBox(height: AppDimens.space8),
+            TextButton(
+              onPressed: _removing ? null : () => _remove(onRemove),
+              style: TextButton.styleFrom(
+                foregroundColor: context.vColors.accentText,
+              ),
+              child: const Text('Remove goal'),
+            ),
+          ],
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -310,21 +409,85 @@ class _GoalSheetState extends State<_GoalSheet> {
             ],
           ),
           const SizedBox(height: AppDimens.space8),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: color,
-              thumbColor: color,
-              inactiveTrackColor: context.vColors.track,
+          if (widget.metric == TrackerMetric.weight) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
+              child: ValueRuler(
+                value: _value,
+                min: widget.min,
+                max: widget.max,
+                step: widget.step,
+                color: color,
+                semanticValue: widget.format,
+                onChanged: _setQuietly,
+              ),
             ),
-            child: Slider(
-              value: _value,
-              min: widget.min,
-              max: widget.max,
-              divisions: ((widget.max - widget.min) / widget.step).round(),
-              label: widget.format(_value),
-              onChanged: _set,
+          ] else if (widget.metric == TrackerMetric.water) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
+              child: WaterGoalGauge(
+                value: _value,
+                min: widget.min,
+                max: widget.max,
+                step: widget.step,
+                onChanged: _setQuietly,
+              ),
             ),
-          ),
+          ] else if (widget.metric == TrackerMetric.sleep) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space4),
+              child: SleepGoalDial(
+                value: _value,
+                min: widget.min,
+                max: widget.max,
+                step: widget.step,
+                onChanged: _setQuietly,
+              ),
+            ),
+          ] else if (widget.metric == TrackerMetric.screenTime) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
+              child: ScreenTimeGoalGauge(
+                value: _value,
+                min: widget.min,
+                max: widget.max,
+                step: widget.step,
+                onChanged: _setQuietly,
+              ),
+            ),
+          ] else ...[
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: color,
+                thumbColor: color,
+                inactiveTrackColor: context.vColors.track,
+              ),
+              child: Slider(
+                value: _value,
+                min: widget.min,
+                max: widget.max,
+                divisions: ((widget.max - widget.min) / widget.step).round(),
+                label: widget.format(_value),
+                onChanged: _set,
+              ),
+            ),
+          ],
+          if (presets.isNotEmpty) ...[
+            const SizedBox(height: AppDimens.space12),
+            Wrap(
+              spacing: AppDimens.space8,
+              runSpacing: AppDimens.space8,
+              children: [
+                for (final p in presets)
+                  GoalPresetChip(
+                    label: widget.format(p),
+                    color: color,
+                    selected: (_value - p).abs() < widget.step / 2,
+                    onTap: () => _set(p),
+                  ),
+              ],
+            ),
+          ],
           if (recommended != null) ...[
             const SizedBox(height: AppDimens.space8),
             AppCard(
@@ -371,6 +534,82 @@ class _GoalSheetState extends State<_GoalSheet> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// A quick pick in the goal sheet: a quiet outlined pill; selected, it takes
+/// a light tint of the metric's [color] and a hairline of it, with the
+/// label staying in the readable text colour.
+class GoalPresetChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const GoalPresetChip({
+    super.key,
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = context.vColors;
+    final radius = BorderRadius.circular(AppDimens.radiusPill);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: AppDimens.tintAlpha)
+              : Colors.transparent,
+          borderRadius: radius,
+          border: Border.all(
+            color: selected
+                ? color.withValues(alpha: AppDimens.tintBorderAlpha * 2)
+                : v.divider!,
+          ),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: AppDimens.goalPresetHeight,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.space16,
+                  vertical: AppDimens.space6,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: selected ? context.colors.onSurface : v.grayText,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

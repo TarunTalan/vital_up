@@ -49,7 +49,8 @@ class SleepSessionInfo extends Equatable {
 
     // 2. Stage bonus if stages data is present
     if (hasStages) {
-      final totalStages = (deepSleepMinutes ?? 0) +
+      final totalStages =
+          (deepSleepMinutes ?? 0) +
           (remSleepMinutes ?? 0) +
           (lightSleepMinutes ?? 0);
       if (totalStages > 0) {
@@ -85,14 +86,14 @@ class SleepSessionInfo extends Equatable {
 
   @override
   List<Object?> get props => [
-        bedTime,
-        wakeTime,
-        duration,
-        source,
-        deepSleepMinutes,
-        remSleepMinutes,
-        lightSleepMinutes,
-        awakeMinutes,
-        customScore,
-      ];
+    bedTime,
+    wakeTime,
+    duration,
+    source,
+    deepSleepMinutes,
+    remSleepMinutes,
+    lightSleepMinutes,
+    awakeMinutes,
+    customScore,
+  ];
 }

@@ -1,11 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
-import 'package:vital_up/core/widgets/load_error_view.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_status.dart';
 import 'package:vital_up/core/widgets/fit_text.dart';
+import 'package:vital_up/core/widgets/measured_layout_builder.dart';
 import 'package:vital_up/core/widgets/adaptive_row.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 
@@ -28,7 +30,10 @@ class TrackerIcon extends StatelessWidget {
       metric.iconAsset,
       width: size,
       height: size,
-      colorFilter: ColorFilter.mode(color ?? metric.color, BlendMode.srcIn),
+      colorFilter: ColorFilter.mode(
+        color ?? context.iconTint(metric.color),
+        BlendMode.srcIn,
+      ),
     );
   }
 }
@@ -45,7 +50,11 @@ class TrackerBadge extends StatelessWidget {
     return AppIconBadge(
       color: metric.color,
       size: size,
-      icon: TrackerIcon(metric, size: size / 2),
+      icon: TrackerIcon(
+        metric,
+        size: size / 2,
+        color: AppIconBadge.glyphColor(context, metric.color),
+      ),
     );
   }
 }
@@ -70,11 +79,33 @@ class TrackerCardHeader extends StatelessWidget {
     this.showChevron = true,
   });
 
+  /// Whether [title] fits whole between a compact (tile) badge and the
+  /// chevron in a header [width] wide.
+  static bool compactTitleFits(
+    BuildContext context,
+    String title,
+    double width,
+  ) => FitText.fits(
+    context,
+    TextSpan(
+      text: title,
+      style: context.text.titleSmall?.copyWith(color: context.colors.onSurface),
+    ),
+    width - AppDimens.iconBadgeSmall - AppDimens.space8 - AppChevron.width,
+  );
+
+  /// Height the title line adds when it moves under the badge row.
+  static double titleUnderHeight(BuildContext context) =>
+      _textHeight(context, 'Water', context.text.titleSmall) + AppDimens.space8;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 200;
+        // Side-by-side Home tiles always use the compact header (no chip),
+        // so a pair's figures line up on every device, tablets included.
+        final isCompact =
+            constraints.maxWidth < 200 || _TileScope.inTile(context);
         final titleText = title ?? metric.label;
         final titleStyle = context.text.titleSmall?.copyWith(
           color: context.colors.onSurface,
@@ -86,7 +117,17 @@ class TrackerCardHeader extends StatelessWidget {
         final chip = status != null && !isCompact
             ? TrackerStatusChip(status!, label: statusLabel, color: statusColor)
             : null;
-        final chevron = showChevron && !isCompact;
+        // Every card that opens a page shows the chevron, half-width tiles
+        // too, on the title's line. Only if a title couldn't sit whole
+        // between badge and chevron (never with today's titles down to
+        // 360dp) would it move under them; a tile pair decides that for
+        // both tiles at once, so their figures still line up.
+        final chevron = showChevron;
+        final titleUnder =
+            chevron &&
+            isCompact &&
+            (_TileScope.titleUnder(context) ??
+                !compactTitleFits(context, titleText, constraints.maxWidth));
         // The chip moves under the title when both don't fit one row
         // (large text), so the title stays whole.
         var chipBelow = false;
@@ -107,7 +148,7 @@ class TrackerCardHeader extends StatelessWidget {
               gap -
               AppDimens.space8 -
               chipWidth -
-              (chevron ? AppDimens.space4 + AppDimens.iconMd : 0);
+              (chevron ? AppChevron.width : 0);
           chipBelow = !FitText.fits(
             context,
             TextSpan(text: titleText, style: titleStyle),
@@ -115,11 +156,54 @@ class TrackerCardHeader extends StatelessWidget {
           );
         }
         final titleWidget = FitText(titleText, style: titleStyle);
+        // Tiles have no chip: a met goal shows as a check on the badge's
+        // corner, which takes no room from the title, so it shows on
+        // every phone and text size.
+        final doneMark = chip == null && status == TrackerStatus.done;
+        final badgeWidget = Semantics(
+          label: doneMark ? (statusLabel ?? status!.label) : null,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              TrackerBadge(metric, size: badge),
+              if (doneMark)
+                Positioned(
+                  right: -AppDimens.space4,
+                  bottom: -AppDimens.space4,
+                  child: _DoneMark(color: statusColor),
+                ),
+            ],
+          ),
+        );
+        if (titleUnder) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [badgeWidget, const Spacer(), const AppChevron()]),
+              const SizedBox(height: AppDimens.space8),
+              titleWidget,
+            ],
+          );
+        }
         // Half-width tiles get a smaller badge and gap so the title fits
         // whole at its normal size.
         return Row(
           children: [
-            TrackerBadge(metric, size: badge),
+            Semantics(
+              label: doneMark ? (statusLabel ?? status!.label) : null,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  TrackerBadge(metric, size: badge),
+                  if (doneMark)
+                    Positioned(
+                      right: -AppDimens.space4,
+                      bottom: -AppDimens.space4,
+                      child: _DoneMark(color: statusColor),
+                    ),
+                ],
+              ),
+            ),
             SizedBox(width: gap),
             Expanded(
               child: chipBelow
@@ -136,26 +220,37 @@ class TrackerCardHeader extends StatelessWidget {
             if (chip != null && !chipBelow) ...[
               const SizedBox(width: AppDimens.space8),
               chip,
-            ] else if (chip == null && status == TrackerStatus.done) ...[
-              const SizedBox(width: AppDimens.space8),
-              Icon(
-                Icons.check_circle_rounded,
-                size: AppDimens.iconSm,
-                color: statusColor ?? context.vColors.success,
-                semanticLabel: statusLabel ?? status!.label,
-              ),
             ],
-            if (chevron) ...[
-              const SizedBox(width: AppDimens.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: AppDimens.iconMd,
-                color: context.vColors.grayText,
-              ),
-            ],
+            // The chevron's own blank side is the gap after the title.
+            if (chevron) const AppChevron(),
           ],
         );
       },
+    );
+  }
+}
+
+/// Green check on a tile badge's corner: the tracker's goal is met (or
+/// today is logged). Ringed in the card colour so it reads on the badge.
+class _DoneMark extends StatelessWidget {
+  final Color? color;
+
+  const _DoneMark({this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: context.isDark
+            ? AppColors.cardBackdropDark
+            : AppColors.cardBackdropLight,
+      ),
+      child: Icon(
+        Icons.check_circle_rounded,
+        size: AppDimens.iconXs,
+        color: context.iconTint(color ?? context.vColors.success!),
+      ),
     );
   }
 }
@@ -173,8 +268,23 @@ double _textWidth(BuildContext context, String text, TextStyle? style) {
   return width;
 }
 
+/// Line height of [text] in [style] at the current text size.
+double _textHeight(BuildContext context, String text, TextStyle? style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final height = painter.height;
+  painter.dispose();
+  return height;
+}
+
 /// Home card shell for a tracker: tapping anywhere opens its detail page;
-/// [actions] (quick logs) sit at the bottom. A met goal mutes the card a
+/// [actions] (quick logs) sit at the bottom. In a fixed-height slot (Home
+/// tile pairs) [child] is centred in the room between header and actions;
+/// otherwise the card takes its content's height, with no empty bands. A met goal mutes the card a
 /// little, adds a check to the header and turns filled actions into
 /// outlined ones, so only unfinished trackers carry a call to action.
 class TrackerCard extends StatelessWidget {
@@ -213,29 +323,40 @@ class TrackerCard extends StatelessWidget {
         child: AppCard(
           width: double.infinity,
           onTap: onOpen,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TrackerCardHeader(
-                metric: metric,
-                title: title,
-                status: status,
-                statusLabel: statusLabel,
-                statusColor: statusColor,
-                showChevron: onOpen != null,
-              ),
-              if (child != null) ...[
-                const SizedBox(height: AppDimens.cardInnerGap),
-                child!,
-              ],
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: AppDimens.cardInnerGap),
-                _GoalMetScope(
-                  goalMet: done,
-                  child: TrackerActionRow(actions: actions),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TrackerCardHeader(
+                  metric: metric,
+                  title: title,
+                  status: status,
+                  statusLabel: statusLabel,
+                  statusColor: statusColor,
+                  showChevron: onOpen != null,
                 ),
+                if (child != null) ...[
+                  const SizedBox(height: AppDimens.cardInnerGap),
+                  if (constraints.hasBoundedHeight)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [child!],
+                      ),
+                    )
+                  else
+                    child!,
+                ],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: AppDimens.cardInnerGap),
+                  _GoalMetScope(
+                    goalMet: done,
+                    child: TrackerActionRow(actions: actions),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -257,34 +378,67 @@ class _GoalMetScope extends InheritedWidget {
   bool updateShouldNotify(_GoalMetScope old) => old.goalMet != goalMet;
 }
 
-/// Lays quick actions out in equal-width columns.
+/// Lays quick actions out in equal-width columns; when a label wouldn't
+/// show whole in its column (narrow phone, large text) they stack full
+/// width instead.
 class TrackerActionRow extends StatelessWidget {
   final List<Widget> actions;
 
   const TrackerActionRow({super.key, required this.actions});
 
+  static const double _gap = AppDimens.space8;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppDimens.space8),
-          Expanded(child: actions[i]),
-        ],
-      ],
+    if (actions.length < 2) return _row();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final column =
+            (constraints.maxWidth - _gap * (actions.length - 1)) /
+            actions.length;
+        final fits = actions.every(
+          (a) =>
+              a is! TrackerQuickAction ||
+              TrackerQuickAction.widthFor(context, a.label) <= column,
+        );
+        return fits ? _row() : _column();
+      },
     );
   }
+
+  Widget _column() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < actions.length; i++) ...[
+        if (i > 0) const SizedBox(height: _gap),
+        actions[i],
+      ],
+    ],
+  );
+
+  Widget _row() => Row(
+    children: [
+      for (var i = 0; i < actions.length; i++) ...[
+        if (i > 0) const SizedBox(width: _gap),
+        Expanded(child: actions[i]),
+      ],
+    ],
+  );
 }
 
 /// Compact tinted button for one-tap logging on cards and sheets
 /// ("+250 ml", "Log sleep"). [filled] marks the card's main action; on a
-/// card whose goal is met it shows outlined instead.
+/// card whose goal is met it shows outlined instead. Every action uses the
+/// brand colour so buttons read the same on every card; the metric's
+/// accent stays on its icon, figures and bars.
 class TrackerQuickAction extends StatelessWidget {
   final String label;
   final IconData? icon;
   final String? svgAsset;
-  final Color
-  color; // We will keep the property for compatibility, but override it visually if we want.
+
+  /// The metric's accent. Kept for callers; actions draw in the brand
+  /// colour (see above).
+  final Color color;
   final VoidCallback? onTap;
   final bool filled;
   final String? semanticLabel;
@@ -300,13 +454,34 @@ class TrackerQuickAction extends StatelessWidget {
     this.semanticLabel,
   });
 
+  /// Width that shows [label] whole at its full size, with the icon
+  /// (or without it, [withIcon] false).
+  static double widthFor(
+    BuildContext context,
+    String label, {
+    bool withIcon = true,
+  }) =>
+      _textWidth(
+        context,
+        label,
+        context.text.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+      ) +
+      (withIcon ? AppDimens.iconSm + AppDimens.space6 : 0) +
+      AppDimens.space8 * 2 +
+      AppDimens.borderThin * 2 +
+      // Rounding headroom so the label never lands a hair too wide.
+      AppDimens.space2;
+
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppDimens.radiusButton);
     final filled = this.filled && !_GoalMetScope.of(context);
-    final actionColor =
-        context.colors.primary; // Always use primary for actions
-    final fg = filled ? context.vColors.buttonText! : actionColor;
+    final actionColor = context.colors.primary;
+    // Brand cyan is too light as text on light mode: outlined labels use
+    // the readable shade.
+    final fg = filled
+        ? context.vColors.buttonText!
+        : context.vColors.accentText ?? actionColor;
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
@@ -335,30 +510,54 @@ class TrackerQuickAction extends StatelessWidget {
                 horizontal: AppDimens.space8,
                 vertical: AppDimens.space8,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (svgAsset != null)
-                    SvgPicture.asset(
-                      svgAsset!,
-                      width: AppDimens.iconSm,
-                      height: AppDimens.iconSm,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    )
-                  else if (icon != null)
-                    Icon(icon, size: AppDimens.iconSm, color: fg),
-                  const SizedBox(width: AppDimens.space6),
-                  Flexible(
-                    child: FitText(
+              // In a narrow button the icon gives way so the label shows
+              // whole at its full size.
+              child: MeasuredLayoutBuilder(
+                measures: LayoutMeasures(
+                  maxWidth: () =>
+                      widthFor(context, label) - AppDimens.space8 * 2,
+                  minWidth: () =>
+                      widthFor(context, label, withIcon: false) -
+                      AppDimens.space8 * 2,
+                  heightFor: (_) => math.max(
+                    AppDimens.iconSm,
+                    _textHeight(
+                      context,
                       label,
-                      maxLines: 1,
-                      style: context.text.labelMedium?.copyWith(
-                        color: fg,
+                      context.text.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
+                ),
+                builder: (context, constraints) => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (constraints.maxWidth + AppDimens.space8 * 2 >=
+                        widthFor(context, label)) ...[
+                      if (svgAsset != null)
+                        SvgPicture.asset(
+                          svgAsset!,
+                          width: AppDimens.iconSm,
+                          height: AppDimens.iconSm,
+                          colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                        )
+                      else if (icon != null)
+                        Icon(icon, size: AppDimens.iconSm, color: fg),
+                      const SizedBox(width: AppDimens.space6),
+                    ],
+                    Flexible(
+                      child: FitText(
+                        label,
+                        maxLines: 1,
+                        style: context.text.labelMedium?.copyWith(
+                          color: fg,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -368,11 +567,17 @@ class TrackerQuickAction extends StatelessWidget {
   }
 }
 
-/// "value / goal unit" readout with a progress bar and a hint line —
-/// today's progress, the same on every card.
+/// Figure with its goal on the line below ("of 2.5 L"), a progress bar
+/// and a hint line: today's progress, the same on every card and in the
+/// Today summary. The figure keeps one size everywhere; it never shares a
+/// line with the goal, so side-by-side tiles always read alike.
 class TrackerProgress extends StatelessWidget {
   final String value;
   final String? goal;
+
+  /// Word before the goal: "of 2.5 L", or "Goal 70.0 kg" for a target;
+  /// empty for a plain caption in the goal's place ("today" without one).
+  final String goalPrefix;
   final double? fraction;
   final Color color;
   final String? caption;
@@ -382,6 +587,7 @@ class TrackerProgress extends StatelessWidget {
     required this.value,
     required this.color,
     this.goal,
+    this.goalPrefix = 'of',
     this.fraction,
     this.caption,
   });
@@ -389,37 +595,15 @@ class TrackerProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grey = context.vColors.grayText;
-    final valueStyle = AppTextStyles.metric.copyWith(
-      color: context.colors.onSurface,
-    );
-    final goalStyle = context.text.bodyMedium?.copyWith(color: grey);
-    final inline = TextSpan(
-      children: [
-        TextSpan(text: value, style: valueStyle),
-        if (goal != null) TextSpan(text: '  / $goal', style: goalStyle),
-      ],
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // The figure keeps the same size on every card: when "value / goal"
-        // doesn't fit one line, the goal moves to its own line instead of
-        // shrinking the figure.
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (goal == null ||
-                FitText.fits(context, inline, constraints.maxWidth)) {
-              return Text.rich(inline, maxLines: 1);
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FitText(value, style: valueStyle),
-                FitText('of $goal', style: goalStyle),
-              ],
-            );
-          },
-        ),
+        FitText.rich(figureSpan(context, value), semanticsLabel: value),
+        if (goal != null)
+          FitText(
+            goalPrefix.isEmpty ? goal! : '$goalPrefix $goal',
+            style: context.text.bodyMedium?.copyWith(color: grey),
+          ),
         if (fraction != null) ...[
           const SizedBox(height: AppDimens.space8),
           TweenAnimationBuilder<double>(
@@ -430,12 +614,32 @@ class TrackerProgress extends StatelessWidget {
           ),
         ],
         if (caption != null) ...[
-          const SizedBox(height: AppDimens.space6),
+          const SizedBox(height: AppDimens.space8),
           Text(caption!, style: context.text.bodySmall?.copyWith(color: grey)),
         ],
       ],
     );
   }
+}
+
+/// A figure in the metric style with its units smaller and grey: "72.4"
+/// big and "kg" small, "7h 12m" with small h and m. Reads cleaner and
+/// takes less room, so half-width tiles keep their figures whole.
+TextSpan figureSpan(BuildContext context, String value) {
+  final number = AppTextStyles.metric.copyWith(color: context.colors.onSurface);
+  final unit = context.text.bodyLarge?.copyWith(
+    color: context.vColors.grayText,
+  );
+  return TextSpan(
+    style: number,
+    children: [
+      for (final m in RegExp(r'[0-9.,:]+|[^0-9.,:]+').allMatches(value))
+        TextSpan(
+          text: m[0],
+          style: RegExp(r'^[0-9.,:]+$').hasMatch(m[0]!) ? null : unit,
+        ),
+    ],
+  );
 }
 
 /// Small labelled figure ("Avg 7h 10m") used in rows of two or three.
@@ -556,6 +760,234 @@ class TrackerRing extends StatelessWidget {
   }
 }
 
+/// Progress ring with a figure and a one-word caption inside ("760",
+/// "kcal left"): the hero of the Home Nutrition and Activity cards. The
+/// ring grows with the text size, so its figure never has to shrink.
+class TrackerHeroRing extends StatelessWidget {
+  final double? fraction;
+  final Color color;
+  final String value;
+  final String caption;
+
+  const TrackerHeroRing({
+    super.key,
+    required this.fraction,
+    required this.color,
+    required this.value,
+    required this.caption,
+  });
+
+  /// Outer size at the current text size: it grows like the big figures
+  /// (the metric style), less than body text.
+  static double sizeOf(BuildContext context) =>
+      AppDimens.trackerRing * metricGrowth(context);
+
+  @override
+  Widget build(BuildContext context) {
+    final f = fraction;
+    return Semantics(
+      label: '$value $caption',
+      excludeSemantics: true,
+      child: SizedBox.square(
+        dimension: sizeOf(context),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(
+                begin: 0,
+                end: f != null && f.isFinite ? f.clamp(0.0, 1.0) : 0.0,
+              ),
+              duration: AppDurations.slow,
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => CircularProgressIndicator(
+                value: v,
+                strokeWidth: AppDimens.trackerRingStroke,
+                color: color,
+                backgroundColor: context.vColors.track,
+                strokeCap: StrokeCap.round,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(
+                AppDimens.trackerRingStroke + AppDimens.space4,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FitText(
+                    value,
+                    textAlign: TextAlign.center,
+                    // Same weight as the Today card's figures.
+                    style: context.text.titleMedium?.copyWith(
+                      color: context.colors.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  FitText(
+                    caption,
+                    textAlign: TextAlign.center,
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.vColors.grayText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A [TrackerHeroRing] with its [details] (macros, goal figure) beside it,
+/// or centred above them only when the details would get too narrow (a
+/// narrow phone at large text), never just because text is large.
+class TrackerHeroLayout extends StatelessWidget {
+  final Widget ring;
+  final Widget details;
+
+  const TrackerHeroLayout({
+    super.key,
+    required this.ring,
+    required this.details,
+  });
+
+  /// Narrowest the details may get beside the ring: "of 10,000 steps"
+  /// at full size.
+  static const double _minDetailsWidth = 124;
+
+  @override
+  Widget build(BuildContext context) {
+    const gap = AppDimens.space16;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final beside =
+            constraints.maxWidth - TrackerHeroRing.sizeOf(context) - gap >=
+            context.textScaled(_minDetailsWidth);
+        if (beside) {
+          return Row(
+            children: [
+              ring,
+              const SizedBox(width: gap),
+              Expanded(child: details),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(child: ring),
+            const SizedBox(height: AppDimens.space16),
+            details,
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One quiet grey line of facts under a card's hero ("1,240 of 2,000 kcal
+/// · 2 of 4 meals"). It wraps only between facts, never inside one.
+class TrackerSummaryLine extends StatelessWidget {
+  final List<String> parts;
+  final TextAlign? textAlign;
+
+  const TrackerSummaryLine({super.key, required this.parts, this.textAlign});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      parts.map((p) => p.replaceAll(' ', '\u00a0')).join('  ·  '),
+      textAlign: textAlign,
+      style: context.text.bodySmall?.copyWith(color: context.vColors.grayText),
+    );
+  }
+}
+
+/// One named figure with a bar: "Protein ... 68 / 150g" over its
+/// progress. Macros and secondary activity goals both use it, so every
+/// bar row on Home reads the same: name in body text, figure in small grey
+/// (it drops under the name when both don't fit), standard bar.
+class TrackerBarRow extends StatelessWidget {
+  final String name;
+  final String figure;
+  final double fraction;
+  final Color color;
+
+  /// The goal is met: a green check before the figure.
+  final bool done;
+
+  const TrackerBarRow({
+    super.key,
+    required this.name,
+    required this.figure,
+    required this.fraction,
+    required this.color,
+    this.done = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grey = context.vColors.grayText;
+    return Semantics(
+      label: '$name $figure${done ? ', goal met' : ''}',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppDimens.space8,
+            children: [
+              Text(
+                name,
+                style: context.text.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    if (done)
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            right: AppDimens.space4,
+                          ),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: AppDimens.iconXs,
+                            color: context.iconTint(context.vColors.success!),
+                          ),
+                        ),
+                      ),
+                    TextSpan(text: figure),
+                  ],
+                ),
+                style: context.text.bodySmall?.copyWith(color: grey),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimens.space6),
+          TweenAnimationBuilder<double>(
+            tween: Tween(
+              begin: 0,
+              end: fraction.isFinite ? fraction.clamp(0.0, 1.0) : 0.0,
+            ),
+            duration: AppDurations.slow,
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) => AppProgressBar(value: v, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Section heading on tracker pages with an optional trailing action.
 class TrackerSectionTitle extends StatelessWidget {
   final String title;
@@ -573,7 +1005,15 @@ class TrackerSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: context.text.headlineSmall)),
+        Expanded(
+          child: Text(
+            title,
+            style: context.text.titleMedium?.copyWith(
+              color: context.colors.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
@@ -591,95 +1031,6 @@ class TrackerSectionTitle extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// One logged entry: leading icon badge, title/subtitle, trailing value.
-/// With [onDelete] it swipes left to delete.
-class TrackerLogTile extends StatelessWidget {
-  final Object id;
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String? subtitle;
-  final String? trailing;
-  final VoidCallback? onTap;
-  final Future<void> Function()? onDelete;
-
-  const TrackerLogTile({
-    super.key,
-    required this.id,
-    required this.icon,
-    required this.color,
-    required this.title,
-    this.trailing,
-    this.subtitle,
-    this.onTap,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tile = AppCard(
-      width: double.infinity,
-      sheen: false,
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space16,
-        vertical: AppDimens.space12,
-      ),
-      child: Row(
-        children: [
-          AppIconBadge(
-            color: color,
-            icon: Icon(icon, size: AppDimens.iconMd, color: color),
-          ),
-          const SizedBox(width: AppDimens.space12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall,
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.vColors.grayText,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppDimens.space8),
-            Text(trailing!, style: context.text.titleSmall),
-          ],
-        ],
-      ),
-    );
-    if (onDelete == null) return tile;
-    return Dismissible(
-      key: ValueKey(id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppDimens.space20),
-        decoration: BoxDecoration(
-          color: context.vColors.errorFill,
-          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        ),
-        child: Icon(Icons.delete_outline_rounded, color: context.colors.error),
-      ),
-      onDismissed: (_) => onDelete!(),
-      child: tile,
     );
   }
 }
@@ -749,7 +1100,9 @@ class TrackerLoading extends StatelessWidget {
   }
 }
 
-/// Card shell while loading, or "couldn't load" + Retry on failure.
+/// Card shell while loading, or "Couldn't load" + Retry on failure: the
+/// same on full-width cards and half-width tiles, shaped like a loaded
+/// card (header, prompt, one button).
 class TrackerCardPlaceholder extends StatelessWidget {
   final TrackerMetric metric;
   final VoidCallback? onRetry;
@@ -764,43 +1117,21 @@ class TrackerCardPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Fixed-height Home tiles: same shape as a loaded tile, with Retry
-        // as the card's one button, so the error view can't overflow.
-        if (constraints.hasBoundedHeight) {
-          return TrackerCard(
-            metric: metric,
-            title: title,
-            actions: [
-              if (onRetry != null)
-                TrackerQuickAction(
-                  label: 'Retry',
-                  icon: Icons.refresh_rounded,
-                  color: metric.color,
-                  onTap: onRetry,
-                ),
-            ],
-            child: Expanded(
-              child: Center(
-                child: onRetry == null
-                    ? TrackerLoading(color: metric.color)
-                    : TrackerPrompt(
-                        title: "Couldn't load",
-                        color: metric.color,
-                      ),
-              ),
-            ),
-          );
-        }
-        return TrackerCard(
-          metric: metric,
-          title: title,
-          child: onRetry == null
-              ? TrackerLoading(color: metric.color)
-              : LoadErrorView(onRetry: onRetry!),
-        );
-      },
+    return TrackerCard(
+      metric: metric,
+      title: title,
+      actions: [
+        if (onRetry != null)
+          TrackerQuickAction(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            color: metric.color,
+            onTap: onRetry,
+          ),
+      ],
+      child: onRetry == null
+          ? TrackerLoading(color: metric.color)
+          : TrackerPrompt(title: "Couldn't load", color: metric.color),
     );
   }
 }
@@ -881,38 +1212,98 @@ class TrackerPrompt extends StatelessWidget {
   }
 }
 
+/// Marks tracker cards laid out as side-by-side Home tiles.
+class _TileScope extends InheritedWidget {
+  /// Both tiles' titles sit under their badge row ([TrackerCardHeader]).
+  final bool titlesUnder;
+
+  const _TileScope({required this.titlesUnder, required super.child});
+
+  static bool inTile(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_TileScope>() != null;
+
+  /// The pair's decision, or null outside a pair.
+  static bool? titleUnder(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_TileScope>()?.titlesUnder;
+
+  @override
+  bool updateShouldNotify(_TileScope old) => false;
+}
+
+/// How much the metric style (big card figures) has grown with the
+/// system text size: less than body text ([AppTextScaler]).
+double metricGrowth(BuildContext context) {
+  final size = AppTextStyles.metric.fontSize!;
+  return MediaQuery.textScalerOf(context).scale(size) / size;
+}
+
 /// Two half-width tracker tiles side by side at a shared height, which
 /// grows with the system text size so tile content never clips (never
-/// below the base height: icons, padding and buttons don't shrink). With
-/// large text the two stack as full-width tiles, so titles and figures
-/// stay whole instead of ending in "...".
+/// below the base height: icons, padding and buttons don't shrink). Only
+/// when a tile would get narrower than [AppDimens.dashboardTileMinWidth]
+/// grown like the tiles' figures do the two stack as full-width tiles at
+/// their own height, so figures keep their full size. The layout changes
+/// with the room there is, not at one text size for the whole page.
 class TrackerTilePair extends StatelessWidget {
   final Widget left;
   final Widget right;
 
-  const TrackerTilePair({super.key, required this.left, required this.right});
+  /// The tiles' titles, to decide whether they fit beside the chevron.
+  /// Defaults to the trackers shown as Home tiles.
+  final List<String> titles;
+
+  const TrackerTilePair({
+    super.key,
+    required this.left,
+    required this.right,
+    this.titles = defaultTitles,
+  });
+
+  static const defaultTitles = ['Water', 'Weight', 'Sleep', 'Mood'];
 
   @override
   Widget build(BuildContext context) {
-    final height = context.textScaled(AppDimens.dashboardTileHeight);
-    if (context.isLargeText) {
-      return Column(
-        children: [
-          SizedBox(height: height, child: left),
-          const SizedBox(height: AppDimens.cardGap),
-          SizedBox(height: height, child: right),
-        ],
-      );
-    }
-    return SizedBox(
-      height: height,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: AppDimens.cardGap),
-          Expanded(child: right),
-        ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - AppDimens.cardGap) / 2;
+        // Tiles need room for their figures, and the metric style grows
+        // less than body text with the system size.
+        if (tileWidth <
+            AppDimens.dashboardTileMinWidth * metricGrowth(context)) {
+          return Column(
+            children: [
+              left,
+              const SizedBox(height: AppDimens.cardGap),
+              right,
+            ],
+          );
+        }
+        // Header width: the tile less its padding.
+        final headerWidth = tileWidth - AppDimens.cardPadding.horizontal;
+        final under = titles.any(
+          (t) => !TrackerCardHeader.compactTitleFits(context, t, headerWidth),
+        );
+        return _row(context, titlesUnder: under);
+      },
+    );
+  }
+
+  Widget _row(BuildContext context, {required bool titlesUnder}) {
+    final height =
+        context.textScaled(AppDimens.dashboardTileHeight) +
+        (titlesUnder ? TrackerCardHeader.titleUnderHeight(context) : 0);
+    return _TileScope(
+      titlesUnder: titlesUnder,
+      child: SizedBox(
+        height: height,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: AppDimens.cardGap),
+            Expanded(child: right),
+          ],
+        ),
       ),
     );
   }

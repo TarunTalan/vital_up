@@ -52,14 +52,19 @@ class WaterIntakeCard extends StatelessWidget {
             showErrorSnackBar(context, notice);
             return;
           }
+          // Captured now: Undo takes back this drink, even after more adds.
+          final cubit = context.read<WaterIntakeCubit>();
+          final logId = loaded.addedLogId;
           showSuccessSnackBar(
             context,
             'Added ${loaded.addedMl} ml of water',
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: context.colors.primary,
-              onPressed: context.read<WaterIntakeCubit>().undoLast,
-            ),
+            action: logId == null
+                ? null
+                : SnackBarAction(
+                    label: 'Undo',
+                    textColor: context.colors.primary,
+                    onPressed: () => cubit.undo(logId),
+                  ),
           );
         },
         builder: (context, state) {
@@ -74,34 +79,41 @@ class WaterIntakeCard extends StatelessWidget {
           final goal = state.dailyGoalMl;
           return TrackerCard(
             metric: _metric,
-            status: TrackerStatus.of(
-              value: current.toDouble(),
-              goal: goal.toDouble(),
-              paceFraction: TrackerStatus.dayPace(),
-            ),
+            // No goal: nothing to be behind on, only whether water was
+            // logged today ("Logged" with the done check).
+            status: goal == null
+                ? (current > 0 ? TrackerStatus.done : TrackerStatus.notLogged)
+                : TrackerStatus.of(
+                    value: current.toDouble(),
+                    goal: goal.toDouble(),
+                    paceFraction: TrackerStatus.dayPace(),
+                  ),
+            statusLabel: goal == null && current > 0 ? 'Logged' : null,
             onOpen: () => _open(context),
             actions: [
               TrackerQuickAction(
                 label: 'Log water',
-                icon: Icons.water_drop_rounded,
+                icon: _metric.logIcon,
+                svgAsset: _metric.logIconAsset,
                 color: _metric.color,
                 filled: true,
                 semanticLabel: 'Log water',
                 onTap: () => showWaterLogSheet(context, onAdd: cubit.addWater),
               ),
             ],
-            child: Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TrackerProgress(
-                    value: WaterTrendsPage.formatMl(current.toDouble()),
-                    goal: WaterTrendsPage.formatMl(goal.toDouble()),
-                    fraction: safeFraction(current, goal),
-                    color: _metric.color,
-                  ),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TrackerProgress(
+                  value: WaterTrendsPage.formatMl(current.toDouble()),
+                  goal: goal == null
+                      ? 'today'
+                      : WaterTrendsPage.formatMl(goal.toDouble()),
+                  goalPrefix: goal == null ? '' : 'of',
+                  fraction: safeFraction(current, goal),
+                  color: _metric.color,
+                ),
+              ],
             ),
           );
         },

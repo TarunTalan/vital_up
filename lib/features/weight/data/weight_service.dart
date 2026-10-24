@@ -45,6 +45,26 @@ enum WeightUnit {
   int get maxValue => fromKg(WeightService.maxKg).floor();
 }
 
+/// Within this many kg of the goal weight counts as reached (card, page
+/// and log sheet alike).
+const weightGoalReachedKg = 0.5;
+
+/// How far from the first weigh-in toward the goal the latest one is
+/// (0-1), or null without a goal or with nothing to measure from. Full
+/// only when the latest weight is at the goal: starting near the goal and
+/// moving away is not progress.
+double? weightGoalProgress({
+  required double? firstKg,
+  required double? latestKg,
+  required double? goalKg,
+}) {
+  if (firstKg == null || latestKg == null || goalKg == null) return null;
+  if ((latestKg - goalKg).abs() <= weightGoalReachedKg) return 1;
+  final total = (firstKg - goalKg).abs();
+  if (total <= weightGoalReachedKg) return 0;
+  return (1 - (latestKg - goalKg).abs() / total).clamp(0.0, 1.0);
+}
+
 /// Characters allowed in the weight field ("771.6").
 const weightInputMaxLength = 6;
 
@@ -89,7 +109,9 @@ class WeightService {
   ]);
 
   /// Pre-cache builds kept the goal here (not per user); read as a fallback.
-  static const _keyTargetKg = 'weight_target_kg';
+  /// Legacy device-wide goal weight; cleared on sign-out.
+  static const legacyTargetKey = 'weight_target_kg';
+  static const _keyTargetKg = legacyTargetKey;
 
   /// Goal weight (kg) in [CacheStore]; onboarding writes it too.
   static String targetCacheKey(String userId) => 'weight:target:$userId';
@@ -184,6 +206,17 @@ class WeightService {
         .findFirst();
   }
 
+  /// The oldest entry: where progress toward the goal is measured from.
+  Future<WeightLogCache?> first() async {
+    final userId = _userId;
+    if (userId == null) return null;
+    return _isar.weightLogCaches
+        .filter()
+        .userIdEqualTo(userId)
+        .sortByTimestamp()
+        .findFirst();
+  }
+
   /// Whether an entry already exists at exactly [at] (imports).
   Future<bool> existsAt(DateTime at) async {
     final userId = _userId;
@@ -260,6 +293,28 @@ class WeightService {
       );
     } catch (e) {
       debugPrint('Goal weight not synced: $e');
+    }
+  }
+
+  /// Removes the goal weight here and on the profile (queued offline).
+  Future<void> clearTarget() async {
+    await _prefs.remove(_keyTargetKg);
+    final userId = _userId;
+    if (userId == null) return;
+    await _cache.write(targetCacheKey(userId), null);
+    try {
+      await _pendingWrites.sendOrQueue(
+        _client,
+        PendingWrite.update(
+          'user_health_data',
+          values: {'target_weight': null},
+          match: {'id': userId},
+          userId: userId,
+          key: 'health:target_weight:$userId',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Goal weight removal not synced: $e');
     }
   }
 

@@ -181,7 +181,8 @@ class AppColors {
   static const Color trackMood = Color(0xFF26C6A6);
   static const Color trackWater = water;
   static const Color trackSleep = sleep;
-  static const Color trackWeight = teal;
+  // A lighter shade of [teal]: brand teal is too dark to see on dark cards.
+  static const Color trackWeight = Color(0xFF1C9AAF);
   static const Color trackScreenTime = info;
 
   /// Sleep stage segments (deep / REM; light and awake reuse teal / warning).
@@ -229,37 +230,55 @@ class AppColors {
   /// BPM heart pulse glow.
   static const Color heartGlow = Color(0xFFFF3DBF);
   static const Color heartGlowSoft = Color(0xFFFF6FD8);
+
+  /// What a glass card looks like over the app background, for contrast
+  /// checks (glass fill blended over the light / dark page).
+  static const Color cardBackdropLight = Color(0xFFF1F2F3);
+  static const Color cardBackdropDark = Color(0xFF2C2C2C);
+
+  /// Icons and other non-text marks need 3:1 against what's behind them
+  /// (WCAG 1.4.11).
+  static const double iconContrast = 3.0;
+
+  /// [color] with its hue kept but darkened (on a light [background]) or
+  /// lightened (on a dark one) just enough to reach [minContrast]. Colours
+  /// that already reach it come back unchanged.
+  static Color readableOn(
+    Color color,
+    Color background, {
+    double minContrast = iconContrast,
+  }) {
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance(), lb = b.computeLuminance();
+      final hi = la > lb ? la : lb, lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    if (ratio(color, background) >= minContrast) return color;
+    final darken = background.computeLuminance() > 0.5;
+    var hsl = HSLColor.fromColor(color);
+    for (var i = 0; i < 50; i++) {
+      final l = (hsl.lightness + (darken ? -0.02 : 0.02)).clamp(0.0, 1.0);
+      hsl = hsl.withLightness(l);
+      final c = hsl.toColor().withValues(alpha: color.a);
+      if (ratio(c, background) >= minContrast || l == 0 || l == 1) return c;
+    }
+    return hsl.toColor();
+  }
 }
 
 /// Vita health coach — Figma section "Health coach" (1893:14544).
 class VitaColors {
   VitaColors._();
 
-  /// "Meet **Vita**" highlight and home tile labels — Figma #17B0CA.
+  /// Vita's brand cyan, for fills, badges and icons only (about 2:1 as
+  /// text on light: text uses `vColors.accentText`).
   static const Color accent = Color(0xFF17B0CA);
 
-  /// Bot chat bubble — Figma #E8F9FC fill, #B8ECF5 border, teal text.
-  static const Color botBubble = Color(0xFFE8F9FC);
-  static const Color botBubbleBorder = AppColors.highlight;
-  static const Color botText = AppColors.teal;
-
-  /// User chat bubble and quick-reply chips — teal fill, lighter text.
+  /// The user's chat bubble: deep teal under near-white text (5:1). Vita's
+  /// own bubbles are glass cards, so both follow the theme.
   static const Color userBubble = AppColors.teal;
   static const Color userText = AppColors.lighter;
-
-  /// Composer placeholder + idle send button — Figma #A2B8C8.
-  static const Color composerMuted = Color(0xFFA2B8C8);
-
-  /// Calorie pill on diet plan cards — highlight fill, Figma #0B5865 text.
-  static const Color pillFill = AppColors.highlight;
-  static const Color pillText = Color(0xFF0B5865);
-
-  /// Vita avatar placeholders — Figma #E3E3E3 (large) / #C7C5C5 (insight).
-  static const Color avatar = AppColors.lightText;
-  static const Color avatarInsight = Color(0xFFC7C5C5);
-
-  /// Health analysis icon badge — rgba(0,191,165,0.2).
-  static const Color signalBadge = Color(0x3300BFA5);
 }
 
 /// Fixed accents for activity tracking (map markers, soundtrack icons).

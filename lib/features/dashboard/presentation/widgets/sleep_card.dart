@@ -19,6 +19,7 @@ import '../cubit/sleep_state.dart';
 import '../cubit/trend_cubit.dart';
 import 'dashboard_card_header.dart';
 import 'tracker_log_sheets.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 const _metric = TrackerMetric.sleep;
 
@@ -35,7 +36,7 @@ class SleepCard extends StatelessWidget {
   const SleepCard({super.key});
 
   Future<void> _refresh(BuildContext context) async {
-    context.read<SleepCubit>().loadSleepData();
+    context.read<SleepCubit>().loadSleepData(silent: true);
     await context.read<TrendCubit<SleepSessionInfo>>().load();
   }
 
@@ -69,13 +70,14 @@ class SleepCard extends StatelessWidget {
             estimate,
           ),
           SleepInBed(:final since) => _inBed(context, cubit, since),
-          SleepNeedsManualEntry(:final canDetect) => _prompt(
+          SleepNeedsManualEntry(:final canDetect, :final canConnect) => _prompt(
             context,
             title: 'How did you sleep?',
             action: _logAction(
               context,
               cubit,
               offerAutoDetect: !canDetect,
+              offerConnect: canConnect,
               filled: true,
             ),
           ),
@@ -130,12 +132,10 @@ class SleepCard extends StatelessWidget {
       status: status,
       onOpen: () => _open(context),
       actions: [action],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [TrackerPrompt(title: title, color: _metric.color)],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [TrackerPrompt(title: title, color: _metric.color)],
       ),
     );
   }
@@ -147,16 +147,21 @@ class SleepCard extends StatelessWidget {
     SleepCubit cubit, {
     bool offerAutoDetect = false,
     bool offerHealthConnect = false,
+    bool offerConnect = false,
     bool filled = false,
   }) {
     return TrackerQuickAction(
       label: _metric.logLabel,
       icon: _metric.logIcon,
+      svgAsset: _metric.logIconAsset,
       color: _metric.color,
       filled: filled,
       onTap: () async {
         final evening = _isEvening;
-        if (!evening && !offerAutoDetect && !offerHealthConnect) {
+        if (!evening &&
+            !offerAutoDetect &&
+            !offerHealthConnect &&
+            !offerConnect) {
           return _log(context);
         }
         final choice = await _showChoices(
@@ -183,11 +188,18 @@ class SleepCard extends StatelessWidget {
                 'Turn on auto-detect',
                 'Estimate sleep from when your phone is idle',
               ),
+            if (offerConnect)
+              _SleepOption(
+                _SleepChoice.connect,
+                Icons.health_and_safety_rounded,
+                'Connect $healthStoreName',
+                'Bring in sleep from your watch or other apps',
+              ),
             if (offerHealthConnect)
-              const _SleepOption(
+              _SleepOption(
                 _SleepChoice.healthConnect,
                 Icons.health_and_safety_rounded,
-                'Sync with Health Connect',
+                'Sync with $healthStoreName',
                 'Bring in sleep from your watch or other apps',
               ),
           ],
@@ -207,6 +219,10 @@ class SleepCard extends StatelessWidget {
             await sl<ScreenTimeService>().openSettings();
           case _SleepChoice.healthConnect:
             await cubit.installHealthConnect();
+          case _SleepChoice.connect:
+            if (!await cubit.connectHealth() && context.mounted) {
+              showErrorSnackBar(context, 'Allow sleep access to bring it in.');
+            }
           case _SleepChoice.confirm || null:
         }
       },
@@ -232,9 +248,15 @@ class SleepCard extends StatelessWidget {
         ),
       );
     }
+    // "Good morning" only in the morning; in bed late at night it says
+    // since when instead.
+    final hour = DateTime.now().hour;
+    final greeting = hour >= 4 && hour < 12
+        ? 'Good morning'
+        : 'In bed since ${DateFormat.jm().format(since)}';
     return _prompt(
       context,
-      title: 'Good morning',
+      title: greeting,
       status: null,
       action: TrackerQuickAction(
         label: "I'm up",
@@ -244,7 +266,7 @@ class SleepCard extends StatelessWidget {
         onTap: () async {
           final choice = await _showChoices(
             context,
-            title: 'Good morning',
+            title: greeting,
             subtitle: 'In bed since ${DateFormat.jm().format(since)}',
             options: const [
               _SleepOption(
@@ -253,9 +275,9 @@ class SleepCard extends StatelessWidget {
                 "I'm up now",
                 'Save your sleep until now',
               ),
-              _SleepOption(
+              _SleepOption.asset(
                 _SleepChoice.enterTimes,
-                Icons.edit_rounded,
+                TrackerIcons.edit,
                 'Adjust times',
                 'Change when you fell asleep or woke up',
               ),
@@ -319,9 +341,9 @@ class SleepCard extends StatelessWidget {
                 'Looks right',
                 'Save it as last night',
               ),
-              _SleepOption(
+              _SleepOption.asset(
                 _SleepChoice.enterTimes,
-                Icons.edit_rounded,
+                TrackerIcons.edit,
                 'Adjust times',
                 'Change when you fell asleep or woke up',
               ),
@@ -346,7 +368,8 @@ class SleepCard extends StatelessWidget {
     SleepSessionInfo session,
   ) {
     final goalMinutes = sl<SleepService>().getGoalMinutes();
-    final goalMet = session.duration.inMinutes >= goalMinutes;
+    final goalMet =
+        goalMinutes != null && session.duration.inMinutes >= goalMinutes;
     // A saved night is finished, not "on track": logged like weight and
     // mood, with "Goal met" when it reached the goal.
     return _night(
@@ -366,6 +389,7 @@ class SleepCard extends StatelessWidget {
           : TrackerQuickAction(
               label: 'Edit',
               icon: Icons.edit_rounded,
+              svgAsset: TrackerIcons.edit,
               color: _metric.color,
               onTap: () => _log(context, initial: session),
             ),
@@ -388,19 +412,20 @@ class SleepCard extends StatelessWidget {
       statusLabel: statusLabel,
       onOpen: () => _open(context),
       actions: [action],
-      child: Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TrackerProgress(
-              value: formatDashboardDuration(session.duration),
-              goal: formatDashboardDuration(Duration(minutes: goalMinutes)),
-              fraction: safeFraction(minutes, goalMinutes),
-              color: _metric.color,
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TrackerProgress(
+            value: formatDashboardDuration(session.duration),
+            goal: goalMinutes == null
+                ? 'last night'
+                : formatDashboardDuration(Duration(minutes: goalMinutes)),
+            goalPrefix: goalMinutes == null ? '' : 'of',
+            fraction: safeFraction(minutes, goalMinutes),
+            color: _metric.color,
+          ),
+        ],
       ),
     );
   }
@@ -423,6 +448,7 @@ class SleepCard extends StatelessWidget {
             for (final o in options)
               AppListTile(
                 icon: o.icon,
+                svgAsset: o.svgAsset,
                 iconColor: _metric.color,
                 title: o.title,
                 subtitle: o.subtitle,
@@ -435,16 +461,32 @@ class SleepCard extends StatelessWidget {
   }
 }
 
-enum _SleepChoice { enterTimes, goToBed, autoDetect, healthConnect, confirm }
+enum _SleepChoice {
+  enterTimes,
+  goToBed,
+  autoDetect,
+  connect,
+  healthConnect,
+  confirm,
+}
 
 /// One row in the sleep choices sheet.
 class _SleepOption {
   final _SleepChoice choice;
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String title;
   final String subtitle;
 
-  const _SleepOption(this.choice, this.icon, this.title, this.subtitle);
+  const _SleepOption(this.choice, this.icon, this.title, this.subtitle)
+    : svgAsset = null;
+
+  const _SleepOption.asset(
+    this.choice,
+    this.svgAsset,
+    this.title,
+    this.subtitle,
+  ) : icon = null;
 }
 
 /// Deep / REM / light / awake split of one night.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:android_intent_plus/android_intent.dart';
@@ -14,14 +15,32 @@ class ScreenTimeService {
 
   ScreenTimeService([this._prefs]);
 
+  /// Screen time needs Android's Usage Access. iOS gives apps no usage
+  /// figures (its Screen Time API only draws them in a sandboxed view), so
+  /// every screen time card, goal and FAQ is hidden there.
+  static bool get isSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   static const _limitKey = 'daily_screen_time_limit_min';
   static const defaultLimitMinutes = 240;
 
-  /// Daily screen time limit (the "goal" — less is better).
-  int getDailyLimitMinutes() => sanitizeScreenLimit(
-    _prefs?.getInt(_limitKey),
-    fallback: defaultLimitMinutes,
-  );
+  /// Saved in place of minutes when there's no limit. New accounts start
+  /// there (onboarding); installs that never saved one keep the 4 h
+  /// default they always had.
+  static const _noLimit = 0;
+
+  /// Daily screen time limit (the "goal" — less is better); null when the
+  /// user has none.
+  int? getDailyLimitMinutes() {
+    final raw = _prefs?.getInt(_limitKey);
+    if (raw == _noLimit) return null;
+    return sanitizeScreenLimit(raw, fallback: defaultLimitMinutes);
+  }
+
+  /// Whether a limit (or "no limit") was ever saved here.
+  bool get hasSavedLimit => _prefs?.containsKey(_limitKey) ?? false;
+
+  Future<void> clearDailyLimit() async => _prefs?.setInt(_limitKey, _noLimit);
 
   Future<void> setDailyLimitMinutes(int minutes) async => _prefs?.setInt(
     _limitKey,
@@ -76,6 +95,7 @@ class ScreenTimeService {
   };
 
   Future<bool> hasPermission() async {
+    if (!isSupported) return false;
     try {
       final bool hasPermission = await _channel.invokeMethod(
         'checkUsageStatsPermission',
@@ -121,59 +141,162 @@ class ScreenTimeService {
     }
   }
 
-  /// Finished days don't change: kept so a reload only queries today
-  /// instead of 7 native usage queries each time.
-  final Map<DateTime, DailyScreenTime> _finishedDays = {};
+  /// Android keeps raw usage events for about 10 days, so each finished
+  /// day is saved on the device as it's read (pref [savedDaysKey], last
+  /// [keepDays] days): history keeps growing past the system's window, and
+  /// a reload only queries the days that can still change.
+  static const savedDaysKey = 'screen_time_days_v1';
+
+  /// How long saved days are kept.
+  static const keepDays = 400;
+
+  /// Apps kept per saved day.
+  static const _savedApps = 10;
+
+  /// Read from prefs at the start of each load ([_reloadSaved]), so a
+  /// sign-out wipe of [savedDaysKey] is never written back.
+  Map<String, DailyScreenTime>? _saved;
+  bool _savedChanged = false;
+
+  void _reloadSaved() {
+    _saved = null;
+    _savedChanged = false;
+  }
+
+  static String _dayKey(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-'
+      '${day.month.toString().padLeft(2, '0')}-'
+      '${day.day.toString().padLeft(2, '0')}';
+
+  Map<String, DailyScreenTime> _savedDays() {
+    final loaded = _saved;
+    if (loaded != null) return loaded;
+    final days = <String, DailyScreenTime>{};
+    try {
+      final raw = _prefs?.getString(savedDaysKey);
+      if (raw != null) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        map.forEach((key, value) {
+          final parts = key.split('-').map(int.tryParse).toList();
+          if (parts.length != 3 || parts.contains(null)) return;
+          final entry = value as Map<String, dynamic>;
+          final ms = (entry['ms'] as num?)?.toInt() ?? 0;
+          if (ms <= 0) return;
+          days[key] = DailyScreenTime(
+            date: DateTime(parts[0]!, parts[1]!, parts[2]!),
+            duration: Duration(milliseconds: ms),
+            topApps: [
+              for (final app in (entry['apps'] as List? ?? const []))
+                if (app is Map && (app['ms'] as num? ?? 0) > 0)
+                  AppUsageInfo(
+                    appName: '${app['n'] ?? ''}',
+                    packageName: '${app['p'] ?? ''}',
+                    usageDuration: Duration(
+                      milliseconds: (app['ms'] as num).toInt(),
+                    ),
+                  ),
+            ],
+          );
+        });
+      }
+    } catch (e) {
+      // A damaged copy only costs the days the system no longer has.
+      debugPrint('Saved screen time unreadable: $e');
+    }
+    return _saved = days;
+  }
+
+  Future<void> _writeSavedDays() async {
+    if (!_savedChanged) return;
+    _savedChanged = false;
+    final days = _savedDays();
+    final now = DateTime.now();
+    final oldest = DateTime(now.year, now.month, now.day - keepDays);
+    days.removeWhere((_, d) => d.date.isBefore(oldest));
+    try {
+      await _prefs?.setString(
+        savedDaysKey,
+        jsonEncode({
+          for (final e in days.entries)
+            e.key: {
+              'ms': e.value.duration.inMilliseconds,
+              'apps': [
+                for (final app in e.value.topApps.take(_savedApps))
+                  {
+                    'n': app.appName,
+                    'p': app.packageName,
+                    'ms': app.usageDuration.inMilliseconds,
+                  },
+              ],
+            },
+        }),
+      );
+    } catch (e) {
+      debugPrint('Saving screen time failed: $e');
+    }
+  }
+
+  /// [day]'s screen time: the saved copy of a finished day, else the
+  /// system's figures (saved once the day has ended a while ago). Call
+  /// [_writeSavedDays] after a batch.
+  Future<DailyScreenTime> _day(DateTime day, DateTime now) async {
+    final key = _dayKey(day);
+    final saved = _savedDays()[key];
+    if (saved != null) return saved;
+    final end = isSameDay(day, now) ? now : nextDay(day);
+    try {
+      final apps = [
+        for (final app in await _fetchAppUsage(day, end))
+          if (app.usageDuration.inMinutes > 0) app,
+      ]..sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
+      final daily = DailyScreenTime(
+        date: day,
+        duration: apps.fold(Duration.zero, (sum, a) => sum + a.usageDuration),
+        topApps: apps,
+      );
+      // The system can report the last events late: only keep a day that
+      // ended a while ago, and only one with usage (an empty one may just
+      // be past the system's window).
+      if (now.difference(end) > const Duration(hours: 1) &&
+          daily.duration > Duration.zero) {
+        _savedDays()[key] = daily;
+        _savedChanged = true;
+      }
+      return daily;
+    } catch (_) {
+      return DailyScreenTime(date: day, duration: Duration.zero);
+    }
+  }
+
+  /// Every day with screen time, newest first: the days the system still
+  /// has (about 10) plus every saved one before them.
+  Future<List<DailyScreenTime>> history() async {
+    _reloadSaved();
+    final now = DateTime.now();
+    final byDay = <String, DailyScreenTime>{};
+    for (final day in lastNDays(systemDays, now: now)) {
+      byDay[_dayKey(day)] = await _day(day, now);
+    }
+    await _writeSavedDays();
+    for (final e in _savedDays().entries) {
+      byDay.putIfAbsent(e.key, () => e.value);
+    }
+    return byDay.values.where((d) => d.duration > Duration.zero).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// Days of usage events Android keeps.
+  static const systemDays = 10;
 
   /// Fetches weekly history and aggregates statistics (average, lowest, highest, change vs yesterday)
   Future<ScreenTimeWeeklySummary> getWeeklySummary() async {
+    _reloadSaved();
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final List<DailyScreenTime> history = [];
-    _finishedDays.removeWhere(
-      (day, _) => day.isBefore(DateTime(now.year, now.month, now.day - 7)),
-    );
-
-    // Query past 7 days from oldest (6 days ago) to today
-    for (int i = 6; i >= 0; i--) {
-      // Calendar days, not 24h steps, so DST changes don't shift them.
-      final day = DateTime(todayStart.year, todayStart.month, todayStart.day - i);
-      final dayEnd = i == 0 ? now : nextDay(day);
-      final cached = _finishedDays[day];
-      if (cached != null) {
-        history.add(cached);
-        continue;
-      }
-
-      try {
-        final usage = await _fetchAppUsage(day, dayEnd);
-        var totalMs = 0;
-        final validApps = <AppUsageInfo>[];
-
-        for (final app in usage) {
-          if (app.usageDuration.inMinutes > 0) {
-            totalMs += app.usageDuration.inMilliseconds;
-            validApps.add(app);
-          }
-        }
-        validApps.sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
-
-        final daily = DailyScreenTime(
-          date: day,
-          duration: Duration(milliseconds: totalMs),
-          topApps: validApps,
-        );
-        history.add(daily);
-        // The system can report the last events late: only trust a day
-        // that ended a while ago.
-        if (now.difference(dayEnd) > const Duration(hours: 1)) {
-          _finishedDays[day] = daily;
-        }
-      } catch (_) {
-        // Fallback for empty day
-        history.add(DailyScreenTime(date: day, duration: Duration.zero));
-      }
-    }
+    // Calendar days, not 24h steps, so DST changes don't shift them.
+    final history = [
+      for (final day in lastNDays(7, now: now)) await _day(day, now),
+    ];
+    await _writeSavedDays();
 
     final todayDaily = history.last;
     final yesterdayDaily = history.length > 1
@@ -228,30 +351,11 @@ class ScreenTimeService {
   /// each day's breakdown (newest first) as the logs.
   Future<TrendData<DailyScreenTime>> trend(TrendRange range) async {
     final now = DateTime.now();
-    final days = lastNDays(range.days, now: now);
-    final history = <DailyScreenTime>[];
-    for (final day in days) {
-      final end = isSameDay(day, now) ? now : nextDay(day);
-      try {
-        final usage = await _fetchAppUsage(day, end);
-        final apps = [
-          for (final app in usage)
-            if (app.usageDuration.inMinutes > 0) app,
-        ]..sort((a, b) => b.usageDuration.compareTo(a.usageDuration));
-        history.add(
-          DailyScreenTime(
-            date: day,
-            duration: apps.fold(
-              Duration.zero,
-              (sum, a) => sum + a.usageDuration,
-            ),
-            topApps: apps,
-          ),
-        );
-      } catch (_) {
-        history.add(DailyScreenTime(date: day, duration: Duration.zero));
-      }
-    }
+    _reloadSaved();
+    final history = [
+      for (final day in lastNDays(range.days, now: now)) await _day(day, now),
+    ];
+    await _writeSavedDays();
     final series = TrendSeries(
       [
         for (final d in history)
@@ -262,7 +366,7 @@ class ScreenTimeService {
                 : d.duration.inMinutes.toDouble(),
           ),
       ],
-      goal: getDailyLimitMinutes().toDouble(),
+      goal: getDailyLimitMinutes()?.toDouble(),
       direction: GoalDirection.down,
     );
     return TrendData(series, history.reversed.toList());

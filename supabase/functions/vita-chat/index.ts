@@ -2,19 +2,38 @@
 //
 // POST { mode: "chat", messages: [{ role, text }], snapshot }
 //   -> { text, bullets: string[], action: "view_diet_plan" | "update_diet_plan" | "view_analysis" | "view_stress_guide" | null,
-//        planInstructions: string | null }
+//        planInstructions: string | null, offTopic?: true, remaining? }  (offTopic: the reply is SCOPE_REFUSAL)
 // POST { mode: "insights", snapshot }
-//   -> { headline, stressTip, dietNote }
+//   -> { headline, stressTip, dietNote, remaining? }
+// remaining: uses of this mode left today after this one (for the app's
+// "12 of 15 messages left" line); absent when nothing was counted.
 //
 // `snapshot` is a compact summary of the user's on-device health data (meals,
 // sleep, water, screen time, activity, vitals, stress estimate, profile, diet
 // plan) built by the app. Numbers are computed on the device; the model only
 // writes coaching text, so it must never invent figures beyond the snapshot.
+//
+// Vita answers health, wellbeing and VitalUp questions only (guard.ts).
+// Obvious jailbreaks and coding jobs get SCOPE_REFUSAL without a model call
+// (not counted against the daily quota); anything the model marks off topic
+// gets the same text. A chat only counts when the user gets a real answer:
+// the use is taken before the model call (so parallel requests can't pass
+// the cap) and given back for errors, off-topic and replaced replies, up to
+// the daily chat limit in refunds. Every request also passes
+// a per-minute cap, and prompts are size-capped, so the most one account can
+// spend is its daily quota of small calls.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { envList, extractJson, GEMINI_DEFAULT_MODELS, geminiGenerate, groqGenerate } from "../_shared/llm.ts";
-import { type AiFeature, consumeDailyQuota, dailyLimit, quotaUpgradeInfo, refundDailyQuota } from "../_shared/quota.ts";
+import {
+  type AiFeature,
+  burstAllowed,
+  consumeDailyQuota,
+  dailyLimit,
+  quotaUpgradeInfo,
+  refundDailyQuota,
+} from "../_shared/quota.ts";
 import {
   bearerToken,
   boundedJson,
@@ -29,6 +48,17 @@ import {
   requireEnum,
   requireMethod,
 } from "../_shared/validate.ts";
+import {
+  asksAboutApp,
+  buildTurns,
+  insightTurns,
+  newCanary,
+  precheckMessage,
+  replyLeaks,
+  SCOPE_REFUSAL,
+  systemInstruction,
+  type Turn,
+} from "./guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,32 +72,16 @@ const MAX_TURN_CHARS = 2000;
 /** Vita's own earlier replies (text + bullets) can run longer than a user message. */
 const MAX_VITA_TURN_CHARS = MAX_TURN_CHARS;
 /** Raw snapshot JSON accepted before bounding (the app's is a few KB). */
-const MAX_RAW_SNAPSHOT_CHARS = 100_000;
-/** Whole conversation in the prompt; oldest turns are dropped to fit. */
-const MAX_TRANSCRIPT_CHARS = 12000;
+const MAX_RAW_SNAPSHOT_CHARS = 40_000;
+/** Whole conversation in the prompt (~1.5K tokens); oldest turns are dropped to fit. */
+const MAX_TRANSCRIPT_CHARS = 6000;
 const MAX_SNAPSHOT_CHARS = 12000;
-const MAX_BODY_BYTES = 256 * KB;
+const MAX_BODY_BYTES = 160 * KB;
 const SNAPSHOT_BOUNDS = { maxDepth: 6, maxKeys: 60, maxItems: 60, maxString: 500 };
 const ACTIONS = new Set(["view_diet_plan", "update_diet_plan", "view_analysis", "view_stress_guide"]);
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-const PERSONA = `You are Vita, the friendly AI health companion inside the VitalUp app.
-You coach users on diet (Indian cuisine aware), sleep, stress, hydration and activity
-using ONLY the health snapshot provided. Rules:
-- Be warm, concise and practical. 1-3 short sentences, optionally up to 4 short bullet points.
-- Quote numbers only if they appear in the snapshot; never invent data. If data is missing, say so briefly and suggest logging it.
-- Stress scores are estimates (from check-ins, wearable HRV or lifestyle signals) - never present them as a diagnosis.
-- You are not a doctor. For symptoms, medication changes or anything concerning, recommend a qualified healthcare professional.
-- For emergencies (chest pain, self-harm thoughts, severe symptoms) tell the user to contact local emergency services immediately.
-- Respect allergies, dietary preference and health conditions from the profile.
-- Stay on health and wellbeing topics; politely steer back if asked about unrelated things.`;
-
-interface Turn {
-  role: "user" | "vita";
-  text: string;
-}
 
 /**
  * Validated, sanitised chat history. Oversized or malformed input is
@@ -105,52 +119,8 @@ function snapshotJson(value: unknown): string {
   return text.length <= MAX_SNAPSHOT_CHARS ? text : text.slice(0, MAX_SNAPSHOT_CHARS);
 }
 
-function chatPrompt(messages: Turn[], snapshot: string): string {
-  const transcript = messages
-    .map((m) => `${m.role === "user" ? "User" : "Vita"}: ${m.text}`)
-    .join("\n");
-  return `${PERSONA}
-
-HEALTH SNAPSHOT (JSON):
-${snapshot}
-
-CONVERSATION:
-${transcript}
-
-Reply to the user's last message as Vita. Respond with ONLY valid JSON:
-{
-  "text": "string - main reply, plain text, may include at most one emoji",
-  "bullets": ["optional short points, max 4, [] if none"],
-  "action": "view_diet_plan" | "update_diet_plan" | "view_analysis" | "view_stress_guide" | null,
-  "planInstructions": "string or null - only with update_diet_plan"
-}
-Use "action" only when it clearly helps:
-- update_diet_plan: the user asked to change the diet plan in activeDietPlan
-  (swap a dish, lighter dinner, more protein, no rice...) and the change is clear.
-  In "text" briefly confirm what you will change. Set "planInstructions" to one
-  concise instruction for the meal planner, e.g. "Replace paneer at lunch with
-  chicken; keep other meals". Include relevant allergies/dietary preference from
-  the profile. If the request is vague, ask one short clarifying question with
-  action null instead. If there is no activeDietPlan, suggest creating one with
-  view_diet_plan.
-- view_diet_plan: other diet plan questions or creating a plan.
-- view_analysis: overall health report.
-- view_stress_guide: stress or relaxation.`;
-}
-
-function insightsPrompt(snapshot: string): string {
-  return `${PERSONA}
-
-HEALTH SNAPSHOT (JSON):
-${snapshot}
-
-Write today's personalised insights. Respond with ONLY valid JSON:
-{
-  "headline": "one sentence (max 140 chars) - the most useful observation across all the data",
-  "stressTip": "1-2 sentences linking today's stress estimate/triggers to one concrete technique to try today",
-  "dietNote": "1 sentence on why the active diet plan suits the user's current data (or a suggestion to create one if there is no plan)"
-}`;
-}
+/** Vita's reply to anything outside its scope. */
+const refusal = () => ({ text: SCOPE_REFUSAL, bullets: [], action: null, planInstructions: null, offTopic: true });
 
 let serviceClient: ReturnType<typeof createClient> | null = null;
 
@@ -198,8 +168,19 @@ serve(async (req) => {
       return json({ error: "messages must end with a user message" }, 400);
     }
 
-    // Per-user daily fair-use cap: all users share one free-tier LLM quota.
     const feature: AiFeature = mode === "chat" ? "vita_chat" : "vita_insights";
+    const perMinute = mode === "chat"
+      ? dailyLimit("VITA_CHAT_PER_MINUTE", 6)
+      : dailyLimit("VITA_INSIGHTS_PER_MINUTE", 3);
+    if (!(await burstAllowed(client, user.id, feature, perMinute))) {
+      return json({ error: "Too many requests. Wait a minute.", code: "too_fast" }, 429);
+    }
+
+    if (mode === "chat" && precheckMessage(history[history.length - 1].text)) {
+      return json(refusal());
+    }
+
+    // Per-user daily fair-use cap: all users share one free-tier LLM quota.
     const limit = mode === "chat"
       ? dailyLimit("VITA_CHAT_DAILY_LIMIT", 15)
       : dailyLimit("VITA_INSIGHTS_DAILY_LIMIT", 3);
@@ -213,9 +194,24 @@ serve(async (req) => {
         429,
       );
     }
-    const refund = () => refundDailyQuota(client, user.id, feature);
+    // Chats: every unanswered request is given back (up to [limit] a day);
+    // insights keep the shared default.
+    const refund = () => refundDailyQuota(client, user.id, feature, mode === "chat" ? limit : undefined);
+    const left = quota.remaining === null ? {} : { remaining: quota.remaining };
+    /** Refusal text in place of an answer: the chat isn't counted. */
+    const refusedReply = async () => {
+      const refunded = await refund();
+      const remaining = quota.remaining !== null && quota.remaining >= 0 && refunded
+        ? { remaining: quota.remaining + 1 }
+        : left;
+      return json({ ...refusal(), ...remaining });
+    };
 
-    const prompt = mode === "chat" ? chatPrompt(history, snapshotText) : insightsPrompt(snapshotText);
+    const canary = newCanary();
+    // App how-to questions get the app guide (Help & support sends them here).
+    const appGuide = mode === "chat" && asksAboutApp(history[history.length - 1].text);
+    const system = systemInstruction(mode, canary, { appGuide });
+    const turns = mode === "chat" ? buildTurns(history, snapshotText) : insightTurns(snapshotText);
     const geminiKey = Deno.env.get("VITA_GEMINI_API_KEY") ?? Deno.env.get("FOOD_RECOMMEND_GEMINI_API_KEY");
     const groqKey = Deno.env.get("VITA_GROQ_API_KEY") ?? Deno.env.get("FOOD_RECOMMEND_GROQ_API_KEY");
     const geminiModels = envList("VITA_GEMINI_MODELS", GEMINI_DEFAULT_MODELS);
@@ -225,7 +221,9 @@ serve(async (req) => {
     try {
       try {
         if (!geminiKey) throw new Error("Gemini key is not set");
-        raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
+        raw = await geminiGenerate(geminiKey, [], {
+          system,
+          turns,
           models: geminiModels,
           signal: AbortSignal.timeout(20000),
           json: true,
@@ -235,7 +233,9 @@ serve(async (req) => {
       } catch (geminiErr) {
         if (!groqKey) throw geminiErr;
         console.error("Gemini failed, falling back to Groq:", (geminiErr as Error).message);
-        raw = await groqGenerate(groqKey, prompt, {
+        raw = await groqGenerate(groqKey, "", {
+          system,
+          turns,
           models: groqModels,
           capability: "text",
           signal: AbortSignal.timeout(15000),
@@ -249,6 +249,7 @@ serve(async (req) => {
       if (!isObject(parsed)) throw new Error("Model output is not a JSON object");
       if (mode === "chat") {
         const text = cleanText(parsed.text, 1200, { multiline: true });
+        if (parsed.offTopic === true) return await refusedReply();
         if (!text) throw new Error("Empty reply");
         const bullets = Array.isArray(parsed.bullets)
           ? parsed.bullets.map((b: unknown) => cleanText(b, 200)).filter(Boolean).slice(0, 4)
@@ -257,14 +258,19 @@ serve(async (req) => {
         const planInstructions = action === "update_diet_plan" ? cleanText(parsed.planInstructions, LIMITS.note) : "";
         // An update without instructions would only regenerate at random.
         if (action === "update_diet_plan" && !planInstructions) action = "view_diet_plan";
-        return json({ text, bullets, action, planInstructions: planInstructions || null });
+        if ([text, ...bullets, planInstructions].some((t) => replyLeaks(t, canary))) {
+          console.warn("vita-chat reply replaced: leaked instructions or code");
+          return await refusedReply();
+        }
+        return json({ text, bullets, action, planInstructions: planInstructions || null, ...left });
       }
 
       const headline = cleanText(parsed.headline, 200);
       const stressTip = cleanText(parsed.stressTip, 400);
       const dietNote = cleanText(parsed.dietNote, 400);
       if (!headline && !stressTip && !dietNote) throw new Error("Empty insights");
-      return json({ headline, stressTip, dietNote });
+      if ([headline, stressTip, dietNote].some((t) => replyLeaks(t, canary))) throw new Error("Insights leaked");
+      return json({ headline, stressTip, dietNote, ...left });
     } catch (e) {
       console.error(`vita-chat ${mode} failed:`, e, raw.slice(0, 300));
       await refund();

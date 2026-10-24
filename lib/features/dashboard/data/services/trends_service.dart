@@ -33,7 +33,10 @@ class TrendsService {
   }
 
   /// Millilitres per day; days with no logs are 0 (water is always tracked).
-  Future<TrendData<WaterLogCache>> water(String userId, TrendRange range) async {
+  Future<TrendData<WaterLogCache>> water(
+    String userId,
+    TrendRange range,
+  ) async {
     final (from, to) = window(range.days);
     final logs = await _water.getLogsBetween(userId, from, to);
     final series = TrendSeries.sum<WaterLogCache>(
@@ -41,7 +44,7 @@ class TrendsService {
       items: logs,
       dateOf: (l) => l.timestamp,
       valueOf: (l) => l.amountMl.toDouble(),
-      goal: _water.getDailyGoal().toDouble(),
+      goal: _water.getDailyGoal()?.toDouble(),
       zeroWhenEmpty: true,
     );
     return TrendData(series, logs.reversed.toList());
@@ -56,7 +59,10 @@ class TrendsService {
       items: sessions,
       dateOf: (s) => s.wakeTime,
       valueOf: (s) => s.duration.inMinutes / 60,
-      goal: _sleep.getGoalMinutes() / 60,
+      goal: switch (_sleep.getGoalMinutes()) {
+        null => null,
+        final minutes => minutes / 60,
+      },
     );
     return TrendData(series, sessions);
   }
@@ -85,16 +91,15 @@ class TrendsService {
   /// Check-in level (1–5) per day; days without a check-in are gaps.
   Future<TrendData<StressCheckIn>> stress(TrendRange range) async {
     final (from, _) = window(range.days);
-    final checkIns =
-        _vita.getStressCheckIns().where((c) => !c.date.isBefore(from)).toList();
+    final checkIns = _vita
+        .getStressCheckIns()
+        .where((c) => !c.date.isBefore(from))
+        .toList();
     final byDay = {for (final c in checkIns) startOfDay(c.date): c};
-    final series = TrendSeries(
-      [
-        for (final day in lastNDays(range.days))
-          DailyPoint(day, byDay[day]?.level.toDouble()),
-      ],
-      direction: GoalDirection.down,
-    );
+    final series = TrendSeries([
+      for (final day in lastNDays(range.days))
+        DailyPoint(day, byDay[day]?.level.toDouble()),
+    ], direction: GoalDirection.down);
     return TrendData(series, checkIns.reversed.toList());
   }
 }

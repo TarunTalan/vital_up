@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
 import 'package:vital_up/core/database/collections/water_log_cache.dart';
 import 'package:vital_up/core/di/injection_container.dart';
+import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
-import 'package:vital_up/core/widgets/tracker/tracker_widgets.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:vital_up/features/auth/presentation/cubit/auth_state.dart';
 import 'package:vital_up/features/dashboard/data/services/trends_service.dart';
@@ -20,8 +20,17 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_she
 class WaterTrendsPage extends StatelessWidget {
   const WaterTrendsPage({super.key});
 
-  static String formatMl(double ml) =>
-      ml >= 1000 ? '${(ml / 1000).toStringAsFixed(1)} L' : '${ml.round()} ml';
+  /// "250 ml", "1.25 L", "2.5 L". Litres show a second decimal only
+  /// when there is one, never rounded up, so 2,960 ml reads "2.96 L", not
+  /// "3.0 L of 3.0 L" before the goal is reached, and 1,250 ml isn't
+  /// undersold as "1.2 L".
+  static String formatMl(double ml) {
+    if (!ml.isFinite || ml < 1000) {
+      return '${(ml.isFinite ? ml : 0).floor()} ml';
+    }
+    final litres = ((ml / 10).floor() / 100).toStringAsFixed(2);
+    return '${litres.endsWith('0') ? litres.substring(0, litres.length - 1) : litres} L';
+  }
 
   static ({int ml, String label, IconData icon})? _presetFor(int ml) {
     for (final p in waterPresets) {
@@ -83,13 +92,15 @@ class WaterTrendsPage extends StatelessWidget {
               DateTime(2000),
               nextDay(startOfDay(DateTime.now())),
             )).reversed.toList(),
-            logBuilder: (context, log) => TrackerLogTile(
-              id: log.id,
-              icon: _presetFor(log.amountMl)?.icon ?? metric.icon,
+            daySummary: (logs) =>
+                formatMl(logs.fold<double>(0, (s, l) => s + l.amountMl)),
+            logBuilder: (context, log) => LogHistoryCard(
+              icon: Icon(_presetFor(log.amountMl)?.icon ?? metric.icon),
               color: metric.color,
               title: _presetFor(log.amountMl)?.label ?? 'Water',
-              subtitle: DateFormat('EEE d MMM · h:mm a').format(log.timestamp),
-              trailing: '${log.amountMl} ml',
+              subtitle: DateFormat.jm().format(log.timestamp),
+              value: formatMl(log.amountMl.toDouble()),
+              deleteNoun: 'drink',
               onDelete: () => deleteTrackerLog(
                 context,
                 context.read<TrendCubit<WaterLogCache>>(),

@@ -10,9 +10,9 @@ class HeartRateLogCache {
   late String userId;
 
   late int bpm;
-  
+
   @Index()
   late DateTime timestamp;
-  
+
   bool isSynced = false;
 }

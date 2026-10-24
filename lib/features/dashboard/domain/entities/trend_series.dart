@@ -27,6 +27,13 @@ enum TrendRange {
     month => 'Last 4 weeks',
     halfYear => 'Last 6 months',
   };
+
+  /// What each bar is, under the caption.
+  String get detail => switch (this) {
+    week => 'Each day',
+    month => 'Average a day, by week',
+    halfYear => 'Average a day, by month',
+  };
 }
 
 /// One day's value; null means nothing was logged (drawn as a gap, ignored
@@ -61,7 +68,11 @@ class TrendSeries extends Equatable {
 
   static const nearTolerance = 0.1;
 
-  const TrendSeries(this.points, {this.goal, this.direction = GoalDirection.up});
+  const TrendSeries(
+    this.points, {
+    this.goal,
+    this.direction = GoalDirection.up,
+  });
 
   /// Sums [values] per day over the last [days] days; days without an entry
   /// are null.
@@ -82,9 +93,9 @@ class TrendSeries extends Equatable {
             day,
             // A NaN / infinite entry (bad import) counts as nothing.
             buckets[day]?.fold<double>(0, (sum, i) {
-              final v = valueOf(i);
-              return v.isFinite ? sum + v : sum;
-            }) ??
+                  final v = valueOf(i);
+                  return v.isFinite ? sum + v : sum;
+                }) ??
                 (zeroWhenEmpty ? 0 : null),
           ),
       ],
@@ -93,10 +104,8 @@ class TrendSeries extends Equatable {
     );
   }
 
-  Iterable<double> get _values => points
-      .map((p) => p.value)
-      .whereType<double>()
-      .where((v) => v.isFinite);
+  Iterable<double> get _values =>
+      points.map((p) => p.value).whereType<double>().where((v) => v.isFinite);
 
   double? get today => points.isEmpty ? null : points.last.value;
 
@@ -113,8 +122,8 @@ class TrendSeries extends Equatable {
       GoalDirection.up => values.reduce((a, b) => a > b ? a : b),
       GoalDirection.down => values.reduce((a, b) => a < b ? a : b),
       GoalDirection.near when goal != null => values.reduce(
-          (a, b) => (a - goal!).abs() <= (b - goal!).abs() ? a : b,
-        ),
+        (a, b) => (a - goal!).abs() <= (b - goal!).abs() ? a : b,
+      ),
       GoalDirection.near => values.reduce((a, b) => a > b ? a : b),
     };
   }
@@ -171,8 +180,9 @@ class TrendSeries extends Equatable {
         ? DateTime(firstDay.year, firstDay.month)
         : null;
     final keys = byMonth.keys.where((m) => m != partial).toList()..sort();
-    final kept =
-        keys.length > months ? keys.sublist(keys.length - months) : keys;
+    final kept = keys.length > months
+        ? keys.sublist(keys.length - months)
+        : keys;
     return TrendSeries(
       [
         for (final m in kept)
@@ -192,11 +202,13 @@ class TrendSeries extends Equatable {
     final g = goal;
     if (g == null) return 0;
     return _values
-        .where((v) => switch (direction) {
-              GoalDirection.up => v >= g,
-              GoalDirection.down => v <= g,
-              GoalDirection.near => (v - g).abs() <= g * nearTolerance,
-            })
+        .where(
+          (v) => switch (direction) {
+            GoalDirection.up => v >= g,
+            GoalDirection.down => v <= g,
+            GoalDirection.near => (v - g).abs() <= g * nearTolerance,
+          },
+        )
         .length;
   }
 

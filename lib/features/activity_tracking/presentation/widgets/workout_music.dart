@@ -9,7 +9,6 @@ import 'package:vital_up/core/preferences/workout_prefs_notifier.dart';
 import 'package:vital_up/features/activity_tracking/presentation/pages/workout_audio_page.dart';
 import 'package:vital_up/features/activity_tracking/presentation/widgets/workout_music_player.dart';
 import 'package:vital_up/features/activity_tracking/services/local_audio_query_service.dart';
-import 'package:vital_up/features/activity_tracking/services/voice_coach_service.dart';
 import 'package:vital_up/features/activity_tracking/services/workout_audio_service.dart';
 
 /// Workout music shared by the GPS and timer screens: the track picked in
@@ -29,7 +28,6 @@ class WorkoutMusic {
   ];
 
   final WorkoutPrefsNotifier prefs;
-  final VoiceCoachService voiceCoach;
 
   /// Shown when the user's music app can't be opened.
   final void Function(String message) onError;
@@ -37,7 +35,7 @@ class WorkoutMusic {
   /// Whether the current track is a favourite.
   final ValueNotifier<bool> favorite = ValueNotifier(false);
 
-  WorkoutMusic(this.prefs, {required this.voiceCoach, required this.onError});
+  WorkoutMusic(this.prefs, {required this.onError});
 
   bool get usesExternalPlayer =>
       prefs.value.preferredPlayerPackage != 'builtIn';
@@ -86,7 +84,6 @@ class WorkoutMusic {
 
   void pause() {
     if (!usesExternalPlayer) sl<WorkoutAudioService>().pause();
-    voiceCoach.stop();
   }
 
   void resume() {
@@ -114,7 +111,6 @@ class WorkoutMusic {
   void discard() {
     prefs.setBackgroundAudioTrack('None');
     stop();
-    voiceCoach.stop();
   }
 
   Future<void> cycleTrack({required bool next}) async {
@@ -143,7 +139,6 @@ class WorkoutMusic {
         ? (next ? 0 : queue.length - 1)
         : (current + (next ? 1 : -1) + queue.length) % queue.length;
     await prefs.setBackgroundAudioTrack(queue[target], queueType: queueType);
-    voiceCoach.stop();
     play();
   }
 

@@ -60,13 +60,13 @@ void main() {
       expect(calories.progress, 71);
 
       final water = tiles[WidgetMetric.water]!;
-      expect(water.value, '1.3 L'); // Same rounding as Home.
+      expect(water.value, '1.25 L'); // Same rounding as Home.
       expect(water.detail, 'of 2.5 L');
       expect(water.progress, 50);
 
       final sleep = tiles[WidgetMetric.sleep]!;
       expect(sleep.value, '7h 10m');
-      expect(sleep.detail, 'of 8h 0m');
+      expect(sleep.detail, 'of 8h');
     });
 
     test('says what is missing instead of showing zero', () {

@@ -1,11 +1,12 @@
 import 'dart:async';
 
-import 'package:background_downloader/background_downloader.dart' show TaskStatus;
+import 'package:background_downloader/background_downloader.dart'
+    show TaskStatus;
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
-import 'package:vital_up/features/reminders/data/reminder_scheduler.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/core/utils/responsive.dart';
@@ -74,19 +75,16 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
     final active = await _downloader.activeDownloads();
     if (!mounted) return;
     setState(() => _downloadProgress.addAll(active));
-    _downloadChanges = _downloader.changes.listen(
-      (change) {
-        if (!mounted) return;
-        final progress = change.progress;
-        if (progress == null) {
-          setState(() => _downloadProgress.remove(change.trackId));
-          _loadFavoritesAndDownloads();
-        } else if (_downloadProgress.containsKey(change.trackId)) {
-          setState(() => _downloadProgress[change.trackId] = progress);
-        }
-      },
-      onError: (Object e) => debugPrint('Download updates failed: $e'),
-    );
+    _downloadChanges = _downloader.changes.listen((change) {
+      if (!mounted) return;
+      final progress = change.progress;
+      if (progress == null) {
+        setState(() => _downloadProgress.remove(change.trackId));
+        _loadFavoritesAndDownloads();
+      } else if (_downloadProgress.containsKey(change.trackId)) {
+        setState(() => _downloadProgress[change.trackId] = progress);
+      }
+    }, onError: (Object e) => debugPrint('Download updates failed: $e'));
     _loadFavoritesAndDownloads();
   }
 
@@ -177,10 +175,21 @@ class _WorkoutAudioPageState extends State<WorkoutAudioPage> {
   ) async {
     // One download per track: a second tap would write the same file.
     if (_downloadProgress.containsKey(trackId)) return;
+    // Progress shows in the tray, so the download can be left running: the
+    // card offers notifications once (the download runs either way).
+    await ensurePermission(
+      context,
+      const PermissionAsk(
+        main: AppPermission.notifications,
+        title: 'Follow your downloads',
+        message:
+            'See download progress in your notifications, so you can leave '
+            'this screen while tracks download.',
+        onceKey: 'audio_downloads',
+      ),
+    );
+    if (!mounted || _downloadProgress.containsKey(trackId)) return;
     setState(() => _downloadProgress[trackId] = 0.01);
-    // Progress shows in the tray, so the download can be left running.
-    await sl<ReminderScheduler>().requestPermission();
-    if (!mounted) return;
     try {
       await _downloader.downloadTrack(
         trackId: trackId,

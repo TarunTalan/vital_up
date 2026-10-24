@@ -80,10 +80,7 @@ void main() {
     });
 
     test('future-dated entries fall back to now', () {
-      expect(
-        historyCutoff([DateTime(2027, 6, 1)], now),
-        DateTime(2026, 7, 20),
-      );
+      expect(historyCutoff([DateTime(2027, 6, 1)], now), DateTime(2026, 7, 20));
     });
 
     test('empty history uses now', () {

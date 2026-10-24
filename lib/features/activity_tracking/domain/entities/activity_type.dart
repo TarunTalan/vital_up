@@ -67,28 +67,32 @@ extension ActivityTypeLabel on ActivityType {
   /// Doppler-derived speed (not position-derived) so thresholds can be generous.
   /// Workouts without a route allow no distance, except swimming (pool and
   /// open-water distance from a watch).
+  ///
+  /// Generous on purpose: a fix above it is dropped, so someone who breaks
+  /// into a jog with Walking picked must not lose that part of the route.
   double get maxReasonableSpeedMetersPerSecond {
     return switch (this) {
-      ActivityType.walk => 3.6, // ~13 km/h — brisk walk / slight jog
+      ActivityType.walk => 5.0, // ~18 km/h — walk breaking into a jog
       ActivityType.run => 10.0, // ~36 km/h — elite sprint upper bound
       ActivityType.cycle => 22.0, // ~80 km/h — downhill / velodrome sprint
-      ActivityType.trekking => 3.5, // ~12.6 km/h — trekking speed
-      ActivityType.climbing => 2.0, // ~7.2 km/h — climbing speed
+      ActivityType.trekking => 5.0, // ~18 km/h — jogging down a trail
+      ActivityType.climbing => 3.0, // ~11 km/h — scrambling / descending
       ActivityType.swimming => 2.5, // ~9 km/h — above elite freestyle
       _ => 0,
     };
   }
 
-  /// MET (Metabolic Equivalent of Task) value for this activity at moderate intensity.
-  /// Used for duration-based calorie fallback when distance < 10 m, and for
-  /// every workout without a route (2011 Compendium of Physical Activities).
+  /// MET (Metabolic Equivalent of Task) value for this activity at moderate
+  /// intensity (2011 Compendium of Physical Activities). Every workout
+  /// without a route uses it; of the GPS types only climbing does (its
+  /// effort is vertical, not distance), see `estimateGpsCalories`.
   double get met {
     return switch (this) {
-      ActivityType.walk => 3.8,
+      ActivityType.walk => 3.5,
       ActivityType.run => 9.8,
       ActivityType.cycle => 7.5,
-      ActivityType.trekking => 7.3,
-      ActivityType.climbing => 9.0,
+      ActivityType.trekking => 6.0,
+      ActivityType.climbing => 8.0,
       ActivityType.strength => 5.0,
       ActivityType.yoga => 2.5,
       ActivityType.hiit => 8.0,
@@ -99,19 +103,30 @@ extension ActivityTypeLabel on ActivityType {
     };
   }
 
-  /// Metabolic cost in kcal per kg per km, used in distance-based calorie calc.
-  /// Values sourced from Margaria-Cavagna running economy and cycling studies.
-  /// Zero for workouts without a route: their calories come from [met].
+  /// Energy for moving one km on the flat, on top of resting, in kcal per
+  /// kg (ACSM metabolic equations: walking 0.1 and running 0.2 ml O2 per
+  /// kg per metre, 5 kcal per litre O2). Zero where calories come from
+  /// [met] alone: workouts without a route, and climbing.
   double get kcalPerKgPerKm {
     return switch (this) {
-      ActivityType.walk => 0.72, // Walking economy ~0.7–0.75 kcal/(kg·km)
-      ActivityType.run => 1.04, // Running economy ~1.0–1.05 kcal/(kg·km)
-      ActivityType.cycle =>
-        0.38, // Cycling ~0.35–0.42 kcal/(kg·km) at moderate pace
-      ActivityType.trekking =>
-        0.90, // Trekking ~0.90 kcal/(kg·km) due to elevation
-      ActivityType.climbing =>
-        1.80, // Climbing ~1.80 kcal/(kg·km) due to steepness
+      ActivityType.walk => 0.5, // 5 km/h -> 3.5 MET
+      ActivityType.run => 1.0, // 10 km/h -> 11 MET
+      // Fits the Compendium's speed bands (19-22 km/h: 8 MET).
+      ActivityType.cycle => 0.35,
+      // Walking on trails costs about 1.5x the road (Pandolf terrain factor).
+      ActivityType.trekking => 0.75,
+      _ => 0,
+    };
+  }
+
+  /// Energy for climbing one metre, in kcal per kg (ACSM grade terms:
+  /// walking 1.8 and running 0.9 ml O2 per kg per vertical metre; cycling
+  /// is the lift work at ~24% efficiency).
+  double get kcalPerKgPerClimbMeter {
+    return switch (this) {
+      ActivityType.walk || ActivityType.trekking => 0.009,
+      ActivityType.run => 0.0045,
+      ActivityType.cycle => 0.0098,
       _ => 0,
     };
   }

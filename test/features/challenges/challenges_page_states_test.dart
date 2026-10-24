@@ -118,8 +118,8 @@ void main() {
 
     expect(find.text('INVITES (1)'), findsOneWidget);
     expect(find.text('ACTIVE (1)'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('HISTORY (1)'), 200);
-    expect(find.text('HISTORY (1)'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('FINISHED (1)'), 200);
+    expect(find.text('FINISHED (1)'), findsOneWidget);
   });
 
   testWidgets('fits a small phone at the largest text size', (tester) async {

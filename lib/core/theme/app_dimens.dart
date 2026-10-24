@@ -120,6 +120,20 @@ class AppDimens {
   /// Figma progress bar.
   static const double progressHeight = 8.0;
 
+  /// Goal editors (`goal_controls.dart`): slider knob, the halo it grows
+  /// while dragged, and the sleep dial's ring.
+  static const double goalKnob = 26.0;
+  static const double goalKnobHalo = 8.0;
+  static const double goalDialStroke = 12.0;
+  static const double goalDialMaxSize = 240.0;
+  static const double goalPresetHeight = 40.0;
+
+  /// VitalUp Pro: the hero badge, the soft glow behind it, and the width a
+  /// plan tile needs to sit beside the other one (scaled with text).
+  static const double proBadge = 64.0;
+  static const double proGlow = 120.0;
+  static const double proPlanTileMinWidth = 150.0;
+
   /// Dialog / sheet drag handle.
   static const double sheetHandleWidth = 40.0;
   static const double sheetHandleHeight = 4.0;
@@ -196,6 +210,12 @@ class AppDimens {
   /// Dashboard: height of a half-width tracker tile at 1x text scale.
   static const double dashboardTileHeight = 216.0;
 
+  /// Narrowest a half-width Home tile may be at normal text: room for the
+  /// longest tile figure ("229.9 lbs") and goal line ("Goal 209.9 lbs") at
+  /// full size. Grown like the metric style with the text size; narrower,
+  /// the pair stacks (360dp keeps pairs to 1.3, 384dp to 1.4).
+  static const double dashboardTileMinWidth = 132.0;
+
   /// Dashboard trend charts: 7-day mini chart on cards, full chart on the
   /// detail pages.
   static const double miniChartHeight = 64.0;
@@ -212,6 +232,14 @@ class AppDimens {
 
   /// Trackers: progress ring on detail heroes, status chip, quick-log tiles,
   /// stage/legend dots and the alpha used for tinted fills and borders.
+  // Value ruler (sliding scale picker, e.g. the weight sheet).
+  static const double rulerTickSpacing = 10.0;
+  static const double rulerTickMajor = 32.0;
+  static const double rulerTickMid = 20.0;
+  static const double rulerTickMinor = 12.0;
+  static const double rulerIndicatorWidth = 4.0;
+  static const double rulerIndicatorHeight = 44.0;
+
   static const double trackerRing = 96.0;
   static const double trackerRingStroke = 10.0;
   static const double trackerTile = 96.0;
@@ -358,41 +386,22 @@ class AppDurations {
 class VitaDimens {
   VitaDimens._();
 
-  static const double avatarLarge = 100.0;
+  /// Vita's badge on the Vita tab and beside chat replies.
+  static const double avatarLarge = 64.0;
   static const double avatarSmall = 32.0;
 
-  /// List/info cards on the Vita sub-pages (p-20).
-  static const EdgeInsets cardPadding = EdgeInsets.all(20.0);
+  /// Chat bubbles: rounded on three corners (the fourth points at the
+  /// sender); widths as a share of the chat column.
+  static const double bubbleRadius = 20.0;
+  static const double botBubbleFraction = 0.86;
+  static const double userBubbleFraction = 0.8;
+  static const double bubbleLineHeight = 1.45;
 
-  /// Home feature tiles.
-  static const double tileHeight = 48.0;
-  static const double tileGapX = 9.0;
-  static const double tileGapY = 12.0;
-  static const double homeGap = 23.0;
+  /// Between messages; a reply's avatar row sits 8dp under its bubble.
+  static const double messageGap = 16.0;
 
-  /// Chat bubbles: 28 radius on three corners; widths as a fraction of the
-  /// 371dp chat column (bot 314, user 295).
-  static const double bubbleRadius = 28.0;
-  static const double botBubbleFraction = 314 / 371;
-  static const double userBubbleFraction = 295 / 371;
-  static const double bubbleLineHeight = 23 / 16;
-  static const double messageGap = 28.0;
-  static const double chatSectionGap = 42.0;
-
-  static const double composerHeight = 100.0;
-  static const double sendButton = 52.0;
-
-  /// Health analysis signal badge.
-  static const double signalBadge = 40.0;
-  static const double signalBadgeRadius = 13.0;
-
-  /// Diet plan calorie pill + indented meal items.
-  static const double pillRadius = 30.0;
-  static const EdgeInsets pillPadding = EdgeInsets.symmetric(
-    horizontal: 10,
-    vertical: 8,
-  );
-  static const double mealItemIndent = 17.0;
+  static const double composerHeight = 80.0;
+  static const double sendButton = 48.0;
 }
 
 /// Map annotation sizes for the activity tracking map.

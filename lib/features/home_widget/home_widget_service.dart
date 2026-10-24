@@ -137,7 +137,7 @@ class HomeWidgetService {
         safe(_mealLogs(now)),
         safe(_calorieGoal()),
         safe(_water.getTodayLogs(user.id)),
-        safe(_sleep.getSleepDataForLastNight(requestPermission: false)),
+        safe(_sleep.getSleepDataForLastNight()),
         safe(_todayMood()),
         safe(_weight.latest()),
         safe(_weight.unit()),
@@ -286,6 +286,17 @@ class HomeWidgetService {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => open(route));
     return '/dashboard';
+  }
+
+  /// Opens [route] above Home now, or once Home shows (start-up, sign-in).
+  /// For launcher shortcuts, which arrive outside the router.
+  static void openWhenReady(String route) {
+    if (!_ready) {
+      _pending = route;
+      _pendingAt = DateTime.now();
+      return;
+    }
+    open(route);
   }
 
   /// Home is showing: open a route that arrived during start-up.

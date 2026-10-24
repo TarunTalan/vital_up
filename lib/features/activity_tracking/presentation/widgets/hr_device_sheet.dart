@@ -77,9 +77,9 @@ class HeartRateManager {
         }
       });
 
-      final services = await device
-          .discoverServices()
-          .timeout(const Duration(seconds: 15));
+      final services = await device.discoverServices().timeout(
+        const Duration(seconds: 15),
+      );
       BluetoothCharacteristic? hrm;
       for (final service in services) {
         if (service.uuid.toString().toLowerCase() != _kHeartRateServiceUuid) {
@@ -94,13 +94,10 @@ class HeartRateManager {
       if (hrm == null) throw const NoHeartRateServiceException();
 
       await hrm.setNotifyValue(true);
-      _valueSubscription = hrm.lastValueStream.listen(
-        (data) {
-          final bpm = parseHeartRateMeasurement(data);
-          if (bpm != null) _emit(bpm);
-        },
-        onError: (Object e) => debugPrint('Heart rate stream error: $e'),
-      );
+      _valueSubscription = hrm.lastValueStream.listen((data) {
+        final bpm = parseHeartRateMeasurement(data);
+        if (bpm != null) _emit(bpm);
+      }, onError: (Object e) => debugPrint('Heart rate stream error: $e'));
     } catch (_) {
       // Leave nothing half-connected behind a failed attempt.
       await disconnect();
@@ -199,19 +196,16 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
         return;
       }
 
-      _scanSub = FlutterBluePlus.scanResults.listen(
-        (results) {
-          if (!mounted) return;
-          setState(() {
-            for (final r in results) {
-              if (!_results.any((e) => e.device.remoteId == r.device.remoteId)) {
-                _results.add(r);
-              }
+      _scanSub = FlutterBluePlus.scanResults.listen((results) {
+        if (!mounted) return;
+        setState(() {
+          for (final r in results) {
+            if (!_results.any((e) => e.device.remoteId == r.device.remoteId)) {
+              _results.add(r);
             }
-          });
-        },
-        onError: (Object e) => debugPrint('Heart rate scan error: $e'),
-      );
+          }
+        });
+      }, onError: (Object e) => debugPrint('Heart rate scan error: $e'));
 
       // Filter to devices advertising the Heart Rate Service
       await FlutterBluePlus.startScan(
@@ -430,10 +424,7 @@ class _HrDeviceSheetState extends State<HrDeviceSheet> {
                                       strokeWidth: AppDimens.borderThick,
                                     ),
                                   )
-                                : Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: v.grayText,
-                                  ),
+                                : const AppChevron(),
                             onTap: _connectingId != null
                                 ? null
                                 : () => _connect(r),

@@ -7,6 +7,7 @@ import 'package:vital_up/core/utils/input_rules.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_session.dart';
 import 'package:vital_up/features/activity_tracking/domain/entities/activity_type.dart';
 import 'package:vital_up/features/activity_tracking/domain/repositories/activity_repository.dart';
+import 'package:vital_up/features/dashboard/data/services/sleep_service.dart';
 import 'package:vital_up/features/settings/domain/repositories/settings_repository.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/core/utils/date_range_utils.dart';
@@ -33,7 +34,9 @@ class HealthImportService {
     Health? health,
   }) : _health = health ?? Health();
 
-  static const _keyLastImport = 'health_import_last';
+  /// Device-wide; cleared on sign-out so the next account imports fully.
+  static const lastImportKey = 'health_import_last';
+  static const _keyLastImport = lastImportKey;
   static const _firstImport = Duration(days: 30);
   static const _minInterval = Duration(hours: 1);
 
@@ -68,10 +71,25 @@ class HealthImportService {
               HealthConnectSdkStatus.sdkAvailable) {
         return false;
       }
-      final granted = await _health.requestAuthorization(
-        types,
-        permissions: List.filled(types.length, HealthDataAccess.READ),
+      // Health Connect grants each type on its own: ask for sleep and steps
+      // in the same screen, or Home's sleep card would prompt again right
+      // after (steps are only read, never asked for, anywhere else).
+      final asked = [
+        ...types,
+        ...SleepService.healthTypes,
+        HealthDataType.STEPS,
+      ];
+      await _health.requestAuthorization(
+        asked,
+        permissions: List.filled(asked.length, HealthDataAccess.READ),
       );
+      // Sync needs weight and workouts; sleep and steps may be left unticked.
+      final granted =
+          await _health.hasPermissions(
+            types,
+            permissions: List.filled(types.length, HealthDataAccess.READ),
+          ) ??
+          true;
       if (granted) await import(force: true);
       return granted;
     } catch (e) {
@@ -156,7 +174,9 @@ class HealthImportService {
   /// Weights outside the range VitalUp accepts when typed are bad readings
   /// (a bag on the scale, a unit mix-up) and are not imported.
   static bool isPlausibleWeightKg(double kg) =>
-      kg.isFinite && kg >= InputLimits.weightKgMin && kg <= InputLimits.weightKgMax;
+      kg.isFinite &&
+      kg >= InputLimits.weightKgMin &&
+      kg <= InputLimits.weightKgMax;
 
   /// The VitalUp workout type for a health-store workout without a route,
   /// or null for sessions that aren't exercise (breathing, cool-down).
@@ -241,10 +261,9 @@ class HealthImportService {
         : (w.totalDistance ?? 0).toDouble();
     // Faster than the activity allows on average means a bad distance.
     final maxMeters = seconds * type.maxReasonableSpeedMetersPerSecond;
-    final meters =
-        rawMeters.isFinite && rawMeters > 0 && rawMeters <= maxMeters
-            ? rawMeters
-            : 0.0;
+    final meters = rawMeters.isFinite && rawMeters > 0 && rawMeters <= maxMeters
+        ? rawMeters
+        : 0.0;
     final rawKcal = w.totalEnergyBurnedUnit == HealthDataUnit.SMALL_CALORIE
         ? (w.totalEnergyBurned ?? 0) ~/ 1000
         : w.totalEnergyBurned ?? 0;

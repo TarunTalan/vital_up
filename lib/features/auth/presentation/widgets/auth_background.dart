@@ -23,15 +23,10 @@ class AuthBackground extends StatelessWidget {
     return Stack(
       children: [
         // 1. Solid light base — fills transparent parts of bg.png
-        Positioned.fill(
-          child: ColoredBox(color: bgColor),
-        ),
+        Positioned.fill(child: ColoredBox(color: bgColor)),
         // 2. Background image on top of the solid base
         Positioned.fill(
-          child: Image.asset(
-            'assets/images/bg.png',
-            fit: BoxFit.cover,
-          ),
+          child: Image.asset('assets/images/bg.png', fit: BoxFit.cover),
         ),
         // 3. Screen content
         child,
@@ -41,7 +36,4 @@ class AuthBackground extends StatelessWidget {
 }
 
 /// Kept for API compatibility — callers may pass a style without effect.
-enum AuthBackgroundStyle {
-  blobs,
-  ellipses,
-}
+enum AuthBackgroundStyle { blobs, ellipses }

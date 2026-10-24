@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vital_up/core/permissions/permission_card.dart';
+import 'package:vital_up/features/activity_tracking/services/timer_voice_coach.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -62,11 +64,12 @@ void openWorkoutTimer(BuildContext context) {
 }
 
 /// Times a workout without a route (gym, yoga, a match). No map and no GPS:
-/// the timer runs off the clock, so closing the app doesn't stop it.
-/// Like a GPS workout, the screen can't be left until the workout is
-/// finished or discarded, and its controls start locked (slide to unlock)
-/// so a pocket tap can't pause or finish it. Opening this page again shows
-/// the workout being timed.
+/// the timer runs off the clock, so closing the app doesn't stop it, and
+/// neither does leaving this screen: Back (or the down arrow) leaves it
+/// running, with the tray notification and Home's `ActiveWorkoutBar` to
+/// come back. Its controls start locked (slide to unlock) so a pocket tap
+/// can't pause or finish it. Opening this page again shows the workout
+/// being timed.
 class WorkoutTimerPage extends StatelessWidget {
   /// Type to start with; ignored while a workout is already being timed.
   final ActivityType type;
@@ -150,9 +153,11 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
   /// The 3-2-1 before a workout starts, as on the GPS screen.
   bool _countingDown = false;
 
+  /// A workout is being timed: leaving keeps it (and its music) going.
+  bool _timing = false;
+
   late final WorkoutMusic _music = WorkoutMusic(
     _prefs,
-    voiceCoach: sl<VoiceCoachService>(),
     onError: (message) {
       if (mounted) showErrorSnackBar(context, message);
     },
@@ -164,6 +169,9 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     _units.load();
     _prefs.load().then((_) => _music.refreshFavorite());
     _loadGoalTarget();
+    sl<VoiceCoachService>().init();
+    // Opened before Home (a notification or shortcut at launch).
+    if (sl.isRegistered<TimerVoiceCoach>()) sl<TimerVoiceCoach>().start();
     _bpmSubscription = _heartRate.bpmStream.listen((bpm) {
       if (mounted) setState(() => _bpm = bpm);
     });
@@ -171,10 +179,14 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
 
   @override
   void dispose() {
-    // Music is for this workout only, as on the GPS screen.
-    _prefs.setBackgroundAudioTrack('None');
-    _music.stop();
+    // Music is for this workout only, as on the GPS screen; left running,
+    // the workout keeps it (the timer's end here stops it).
+    if (!_timing) {
+      _prefs.setBackgroundAudioTrack('None');
+      _music.stop();
+    }
     _music.dispose();
+    sl<VoiceCoachService>().stop();
     _bpmSubscription?.cancel();
     _heartRate.dispose();
     _units.dispose();
@@ -204,6 +216,21 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
         ? null
         : (type: p.timerTargetType, value: p.timerTargetValue);
   }
+
+  /// The first Start offers notifications with the card (the timer and its
+  /// Pause / Resume in the tray), before any countdown; the timer starts
+  /// either way.
+  Future<void> _offerNotifications() => ensurePermission(
+    context,
+    const PermissionAsk(
+      main: AppPermission.notifications,
+      title: 'Your timer, always at hand',
+      message:
+          'See the time and pause or resume from your notifications, '
+          'even with VitalUp closed.',
+      onceKey: 'workout_timer',
+    ),
+  );
 
   /// Starts the timer; today's goal becomes the target unless one is set.
   void _start(WorkoutTimerCubit cubit) {
@@ -244,7 +271,11 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
 
   Future<void> _finish(BuildContext context) async {
     final cubit = context.read<WorkoutTimerCubit>();
-    // Stop the clock while the user picks the intensity.
+    // Stop the clock while the user picks the intensity (not a pause the
+    // voice coach announces).
+    if (sl.isRegistered<TimerVoiceCoach>()) {
+      sl<TimerVoiceCoach>().skipNextChange();
+    }
     await cubit.pause();
     if (!context.mounted) return;
     final intensity = await showAppBottomSheet<WorkoutIntensity>(
@@ -253,7 +284,17 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
     );
     if (intensity == null || !context.mounted) return;
     final outcome = await cubit.finish(intensity, target: _target);
-    if (outcome == WorkoutSaveOutcome.saved) _prefs.clearTimerTarget();
+    if (outcome == WorkoutSaveOutcome.saved) {
+      final saved = cubit.lastSaved;
+      if (saved != null && _prefs.value.voiceCoachEnabled) {
+        final minutes = saved.totalDurationSeconds ~/ 60;
+        sl<VoiceCoachService>().say(
+          'Workout complete. $minutes ${minutes == 1 ? 'minute' : 'minutes'}, '
+          'about ${saved.calories} calories.',
+        );
+      }
+      _prefs.clearTimerTarget();
+    }
     if (!context.mounted) return;
     switch (outcome) {
       case WorkoutSaveOutcome.saved:
@@ -346,22 +387,35 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
       builder: (context, state) {
         final cubit = context.read<WorkoutTimerCubit>();
         final locked = _locked && state.isStarted;
+        _timing = state.isStarted;
         return PopScope(
-          canPop: !state.isStarted,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) {
-              showErrorSnackBar(context, 'Finish the workout before leaving.');
+            if (didPop && state.isStarted) {
+              showSuccessSnackBar(
+                context,
+                'Your ${state.type.label.toLowerCase()} timer keeps running',
+              );
             }
           },
           child: Stack(
             children: [
               AppScaffold(
-                // The GPS view's top: back and history while idle,
-                // nothing during a workout.
+                // The GPS view's top: back and history while idle; during
+                // a workout, a down arrow that leaves it running.
                 header: SafeArea(
                   bottom: false,
                   child: state.isStarted
-                      ? const SizedBox(height: AppDimens.space12)
+                      ? Padding(
+                          padding: EdgeInsets.all(context.gutter),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: RoundIconButton(
+                              icon: Icons.keyboard_arrow_down_rounded,
+                              tooltip: 'Leave it running',
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        )
                       : Padding(
                           padding: EdgeInsets.all(context.gutter),
                           child: Row(
@@ -415,8 +469,10 @@ class _WorkoutTimerViewState extends State<_WorkoutTimerView> {
                             isLocked: locked,
                             onLockToggle: (value) =>
                                 setState(() => _locked = value),
-                            onStart: () {
+                            onStart: () async {
                               HapticFeedback.mediumImpact();
+                              await _offerNotifications();
+                              if (!mounted || cubit.state.isStarted) return;
                               setState(() => _locked = true);
                               if (_prefs.value.countdownDurationSeconds > 0) {
                                 setState(() => _countingDown = true);

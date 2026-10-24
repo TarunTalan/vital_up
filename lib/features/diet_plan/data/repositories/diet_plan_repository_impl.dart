@@ -51,7 +51,10 @@ class DietPlanRepositoryImpl implements DietPlanRepository {
   @override
   Future<MealPlan?> getActiveMealPlan() async {
     final isar = isarService.isar;
-    final cached = await isar.mealPlanModels.where().dateKeyEqualTo(activePlanKey).findFirst();
+    final cached = await isar.mealPlanModels
+        .where()
+        .dateKeyEqualTo(activePlanKey)
+        .findFirst();
     return cached?.toEntity();
   }
 

@@ -1,36 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
+import 'package:vital_up/core/widgets/app_card.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
+import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
+import 'package:vital_up/core/widgets/value_ruler.dart';
 import 'package:vital_up/features/onboarding/domain/entities/weight_goal.dart';
 import 'package:vital_up/features/onboarding/domain/usecases/calculate_calorie_goal.dart';
 import 'package:vital_up/features/onboarding/presentation/cubit/onboarding_cubit.dart';
+import 'package:vital_up/features/onboarding/presentation/widgets/onboarding_widgets.dart';
 import 'package:vital_up/features/profile/domain/profile_rules.dart';
-import 'package:vital_up/utils/onboarding_components.dart';
+import 'package:vital_up/features/weight/data/weight_service.dart';
 
-class GoalsPage extends StatefulWidget {
-  final VoidCallback? onNext;
-  final VoidCallback? onBack;
-  final VoidCallback? onSkip;
+/// Step 5: the main goal, and for losing or gaining, a target weight (on
+/// the weight scale, in the unit picked on the weight step) and a weekly
+/// pace with the time it would take.
+class GoalStep extends StatefulWidget {
+  final int revealFrom;
 
-  const GoalsPage({
-    super.key,
-    this.onNext,
-    this.onBack,
-    this.onSkip,
-  });
+  const GoalStep({super.key, this.revealFrom = 3});
 
   @override
-  State<GoalsPage> createState() => _GoalsPageState();
+  State<GoalStep> createState() => _GoalStepState();
 }
 
-class _GoalsPageState extends State<GoalsPage> {
-  GoalType _goal = GoalType.lose;
-  WeeklyPace _pace = WeeklyPace.normal;
-  int? _targetWeight;
-  String _unit = 'kg';
+class _GoalStepState extends State<GoalStep> with OnboardingStepState {
+  /// How far the suggested target sits from today's weight.
+  static const _suggestLoseKg = 5.0;
+  static const _suggestGainKg = 3.0;
+
+  /// Typical weight to start the scale from when none was given.
+  static const _fallbackKg = 70.0;
+
+  late GoalType _goal;
+  late WeeklyPace _pace;
+
+  /// The target in [_unit], to 0.5.
+  late double _target;
+  late final String _code;
   bool _showErrors = false;
 
-  static const _units = ['kg', 'lb'];
+  WeightUnit get _unit => WeightUnit.fromCode(_code);
+
+  double? get _currentKg {
+    final state = context.read<OnboardingCubit>().state;
+    return CalculateCalorieGoal.weightInKg(state.weight, state.weightUnit);
+  }
 
   @override
   void initState() {
@@ -38,277 +53,245 @@ class _GoalsPageState extends State<GoalsPage> {
     final state = context.read<OnboardingCubit>().state;
     _goal = GoalType.fromId(state.goalType) ?? GoalType.lose;
     _pace = WeeklyPace.fromId(state.weeklyPace) ?? WeeklyPace.normal;
-
-    final savedUnit = state.targetWeight.isNotEmpty
-        ? state.targetWeightUnit
-        : state.weightUnit;
-    _unit = _isPounds(savedUnit) ? 'lb' : 'kg';
-
-    _targetWeight = state.targetWeight.isNotEmpty
-        ? double.tryParse(state.targetWeight)?.round()
-        : _currentWeightIn(_unit)?.round();
+    // The weight step's unit, so both read alike.
+    _code = WeightUnit.fromCode(state.weightUnit) == WeightUnit.lbs
+        ? 'lb'
+        : 'kg';
+    final savedKg = CalculateCalorieGoal.weightInKg(
+      state.targetWeight,
+      state.targetWeightUnit,
+    );
+    _target = _inUnit(
+      savedKg != null && _errorFor(_goal, savedKg) == null
+          ? savedKg
+          : _suggestedKg(_goal),
+    );
   }
 
-  bool _isPounds(String unit) => unit.toLowerCase().startsWith('lb');
+  static double _half(double v) => (v * 2).round() / 2;
 
-  double? get _currentKg {
-    final state = context.read<OnboardingCubit>().state;
-    return CalculateCalorieGoal.weightInKg(state.weight, state.weightUnit);
+  double _inUnit(double kg) => _half(
+    _unit
+        .fromKg(kg)
+        .clamp(_unit.minValue.toDouble(), _unit.maxValue.toDouble()),
+  );
+
+  double get _targetKg => _unit.toKg(_target);
+
+  /// A target that fits [goal]: a little under today's weight to lose, a
+  /// little over to build muscle.
+  double _suggestedKg(GoalType goal) {
+    final current = _currentKg ?? _fallbackKg;
+    return switch (goal) {
+      GoalType.lose => current - _suggestLoseKg,
+      GoalType.buildMuscle => current + _suggestGainKg,
+      GoalType.maintain => current,
+    };
   }
 
-  double? _currentWeightIn(String unit) {
-    final kg = _currentKg;
-    if (kg == null) return null;
-    return _isPounds(unit) ? kg / CalculateCalorieGoal.kgPerLb : kg;
-  }
-
-  double? get _targetKg => _targetWeight == null
-      ? null
-      : CalculateCalorieGoal.weightInKg('$_targetWeight', _unit);
-
-  /// Validation message for the current inputs, or null when valid.
-  String? get _error {
-    if (_goal == GoalType.maintain) return null;
-    final target = _targetKg;
-    if (target == null) return 'Enter your target weight.';
-    final rangeError = ProfileRules.weightError(target);
-    if (rangeError != null) return rangeError;
+  /// Why [targetKg] doesn't fit [goal], or null when it does.
+  String? _errorFor(GoalType goal, double targetKg) {
+    if (goal == GoalType.maintain) return null;
+    final range = ProfileRules.weightError(targetKg);
+    if (range != null) return range;
     final current = _currentKg;
     if (current == null) return null;
-    if (_goal == GoalType.lose && target >= current) {
+    if (goal == GoalType.lose && targetKg >= current) {
       return 'Pick a target below your current weight.';
     }
-    if (_goal == GoalType.buildMuscle && target < current) {
+    if (goal == GoalType.buildMuscle && targetKg < current) {
       return 'Pick a target at or above your current weight.';
     }
     return null;
   }
 
-  String _paceAmount(WeeklyPace pace) {
-    if (_isPounds(_unit)) {
-      final lb = pace.kgPerWeek * 2;
-      return '${lb == lb.roundToDouble() ? lb.toInt() : lb} lb / week';
-    }
-    return '${pace.kgPerWeek} kg / week';
-  }
-
-  String _summary() {
-    if (_goal == GoalType.maintain) {
-      return "We'll set a daily calorie goal that keeps you at your current weight, based on your height, age and activity level.";
-    }
-    const calorieNote =
-        "We'll calculate your daily calorie goal once you tell us your activity level.";
-    final current = _currentKg;
-    final target = _targetKg;
-    if (current == null || target == null || _error != null) {
-      return calorieNote;
-    }
-    final weeks = ((target - current).abs() / _pace.kgPerWeek).ceil();
-    if (weeks == 0) return calorieNote;
-    final timeframe = weeks < 8
-        ? '$weeks ${weeks == 1 ? 'week' : 'weeks'}'
-        : '${(weeks / CalculateCalorieGoal.weeksPerMonth).round()} months';
-    return "At this pace you'll reach $_targetWeight $_unit in about $timeframe. $calorieNote";
-  }
-
-  void _changeUnit(String unit) {
-    if (unit == _unit) return;
+  void _pickGoal(GoalType goal) {
     setState(() {
-      final w = _targetWeight;
-      if (w != null) {
-        _targetWeight = _isPounds(unit)
-            ? (w / CalculateCalorieGoal.kgPerLb).round()
-            : (w * CalculateCalorieGoal.kgPerLb).round();
+      _goal = goal;
+      _showErrors = false;
+      // Keep the picked target when it still fits the new goal.
+      if (_errorFor(goal, _targetKg) != null) {
+        _target = _inUnit(_suggestedKg(goal));
       }
-      _unit = unit;
     });
   }
 
-  void _save() {
-    final state = context.read<OnboardingCubit>().state;
-    final isMaintain = _goal == GoalType.maintain;
+  /// "0.5 kg a week · about 3 months".
+  String _paceLine() {
+    final perWeek = _unit.fromKg(_pace.kgPerWeek);
+    final amount =
+        '${perWeek == perWeek.roundToDouble() ? perWeek.round() : perWeek.toStringAsFixed(1)} '
+        '$_code a week';
     final current = _currentKg;
-    final target = _targetKg;
+    if (current == null || _errorFor(_goal, _targetKg) != null) return amount;
+    final weeks = ((_targetKg - current).abs() / _pace.kgPerWeek).ceil();
+    if (weeks == 0) return amount;
+    final time = weeks < 8
+        ? '$weeks ${weeks == 1 ? 'week' : 'weeks'}'
+        : '${(weeks / CalculateCalorieGoal.weeksPerMonth).round()} months';
+    return '$amount · about $time';
+  }
 
-    final months = (isMaintain || current == null || target == null)
+  String get _note => _goal == GoalType.maintain
+      ? "We'll set a daily calorie goal that keeps your weight steady, "
+            'from your height, age and activity.'
+      : "Your daily calorie goal comes next, once we know how active you "
+            'are. A steady pace is easier to keep.';
+
+  @override
+  Future<bool> submit() async {
+    final maintain = _goal == GoalType.maintain;
+    if (!maintain && _errorFor(_goal, _targetKg) != null) {
+      setState(() => _showErrors = true);
+      return false;
+    }
+    final cubit = context.read<OnboardingCubit>();
+    final state = cubit.state;
+    final current = _currentKg;
+    final months = (maintain || current == null)
         ? 0
         : CalculateCalorieGoal.monthsToTarget(
             currentKg: current,
-            targetKg: target,
+            targetKg: _targetKg,
             pace: _pace,
           );
-
-    context.read<OnboardingCubit>().updateGoals(
-          goalType: _goal.id,
-          weeklyPace: isMaintain ? '' : _pace.id,
-          targetWeight: isMaintain ? state.weight : '${_targetWeight ?? ''}',
-          targetWeightUnit: isMaintain ? state.weightUnit : _unit,
-          goalDurationMonths: '$months',
-        );
+    final target = _target == _target.roundToDouble()
+        ? '${_target.round()}'
+        : _target.toStringAsFixed(1);
+    await cubit.updateGoals(
+      goalType: _goal.id,
+      weeklyPace: maintain ? '' : _pace.id,
+      targetWeight: maintain ? state.weight : target,
+      targetWeightUnit: maintain ? state.weightUnit : _code,
+      goalDurationMonths: '$months',
+    );
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
     final showTarget = _goal != GoalType.maintain;
-    final error = _showErrors ? _error : null;
-    final isPounds = _isPounds(_unit);
+    final error = _showErrors ? _errorFor(_goal, _targetKg) : null;
+    var i = widget.revealFrom;
 
-    return OnboardingLayout(
-      step: 5,
-      onBack: widget.onBack ?? () {},
-      onSkip: widget.onSkip ?? () {},
-      onNext: () {
-        if (_error != null) {
-          setState(() => _showErrors = true);
-          return;
-        }
-        _save();
-        widget.onNext?.call();
-      },
-      title: 'Your goal',
-      subtitle: "We'll use this to personalise your nutrition plan.",
-      nextEnabled: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── 1. Primary objective ──────────────────────────
-          const _SectionLabel('What is your main goal?'),
-          for (final goal in GoalType.values)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppDimens.space16),
-              child: OnboardingOptionTile(
-                label: _goalLabel(goal),
-                isSelected: _goal == goal,
-                leading: Icon(
-                  _goalIcon(goal),
-                  size: AppDimens.iconXl,
-                  color: context.colors.onSurface,
-                ),
-                onTap: () => setState(() {
-                  _goal = goal;
-                  _showErrors = false;
-                }),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final goal in GoalType.values)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppDimens.cardGap),
+            child: OnboardingReveal(
+              index: i++,
+              child: OnboardingChoiceTile(
+                title: _goalLabel(goal),
+                subtitle: _goalSubtitle(goal),
+                icon: Icon(_goalIcon(goal)),
+                selected: _goal == goal,
+                onTap: () => _pickGoal(goal),
               ),
             ),
-
-          AnimatedSize(
+          ),
+        AnimatedSize(
+          duration: AppDurations.slow,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
             duration: AppDurations.medium,
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
             child: showTarget
                 ? Column(
+                    key: const ValueKey('target'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: AppDimens.space16),
-
-                      // ── 2. Target weight ──────────────────
-                      const _SectionLabel('Target weight'),
-                      Center(
-                        child: OnboardingNumberField<int>(
-                          value: _targetWeight,
-                          min: isPounds ? 66 : 30,
-                          max: isPounds ? 550 : 250,
-                          isError: error != null,
-                          onValueChange: (v) => setState(() {
-                            _targetWeight = v;
-                            _showErrors = false;
-                          }),
+                      const SizedBox(height: AppDimens.space12),
+                      AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const OnboardingSectionLabel('Target weight'),
+                            OnboardingReadout(
+                              parts: [(_target.toStringAsFixed(1), _code)],
+                              caption: _currentKg == null
+                                  ? null
+                                  : 'Now ${_unit.fromKg(_currentKg!).toStringAsFixed(1)} $_code',
+                            ),
+                            const SizedBox(height: AppDimens.space16),
+                            ValueRuler(
+                              value: _target,
+                              min: _unit.minValue.toDouble(),
+                              max: _unit.maxValue.toDouble(),
+                              step: 0.5,
+                              majorEvery: 10,
+                              midEvery: 2,
+                              color: TrackerMetric.weight.color,
+                              semanticValue: (v) =>
+                                  '${v.toStringAsFixed(1)} $_code',
+                              onChanged: (v) => setState(() {
+                                _target = v;
+                                _showErrors = false;
+                              }),
+                            ),
+                            OnboardingErrorText(
+                              error,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: AppDimens.sectionGap),
+                            const OnboardingSectionLabel('Weekly pace'),
+                            AppSegmentedControl<WeeklyPace>(
+                              values: WeeklyPace.values,
+                              selected: _pace,
+                              label: _paceName,
+                              onChanged: (p) => setState(() => _pace = p),
+                            ),
+                            const SizedBox(height: AppDimens.space8),
+                            AnimatedSwitcher(
+                              duration: AppDurations.fast,
+                              child: Text(
+                                _paceLine(),
+                                key: ValueKey(_paceLine()),
+                                textAlign: TextAlign.center,
+                                style: context.text.bodyMedium?.copyWith(
+                                  color: context.vColors.grayText,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: AppDimens.space8),
-                      Center(
-                        child: UnitDropdown(
-                          selectedUnit: _unit,
-                          units: _units,
-                          onUnitSelected: _changeUnit,
-                        ),
-                      ),
-                      if (error != null) ...[
-                        const SizedBox(height: AppDimens.space8),
-                        Text(
-                          error,
-                          textAlign: TextAlign.center,
-                          style: context.text.bodySmall
-                              ?.copyWith(color: context.colors.error),
-                        ),
-                      ],
-                      const SizedBox(height: AppDimens.space32),
-
-                      // ── 3. Weekly pace ────────────────────
-                      const _SectionLabel('Weekly pace'),
-                      for (final pace in WeeklyPace.values)
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppDimens.space16),
-                          child: OnboardingOptionTile(
-                            label: '${_paceName(pace)}  ·  ${_paceAmount(pace)}',
-                            isSelected: _pace == pace,
-                            leading: _PaceDot(color: _paceColor(context, pace)),
-                            onTap: () => setState(() => _pace = pace),
-                          ),
-                        ),
                     ],
                   )
-                : const SizedBox(width: double.infinity),
+                : const SizedBox(key: ValueKey('none'), width: double.infinity),
           ),
-
-          const SizedBox(height: AppDimens.space16),
-          NoteRow(text: _summary()),
-        ],
-      ),
+        ),
+        const SizedBox(height: AppDimens.cardGap),
+        OnboardingReveal(
+          index: i++,
+          child: AppInfoNote(message: _note),
+        ),
+      ],
     );
   }
 
   static String _goalLabel(GoalType goal) => switch (goal) {
-        GoalType.lose => 'Lose weight',
-        GoalType.maintain => 'Maintain weight',
-        GoalType.buildMuscle => 'Build muscle',
-      };
+    GoalType.lose => 'Lose weight',
+    GoalType.maintain => 'Maintain weight',
+    GoalType.buildMuscle => 'Build muscle',
+  };
+
+  static String _goalSubtitle(GoalType goal) => switch (goal) {
+    GoalType.lose => 'A gentle calorie deficit',
+    GoalType.maintain => 'Eat for the weight you are',
+    GoalType.buildMuscle => 'A small surplus to grow stronger',
+  };
 
   static IconData _goalIcon(GoalType goal) => switch (goal) {
-        GoalType.lose => Icons.trending_down_rounded,
-        GoalType.maintain => Icons.balance_rounded,
-        GoalType.buildMuscle => Icons.fitness_center_rounded,
-      };
+    GoalType.lose => Icons.trending_down_rounded,
+    GoalType.maintain => Icons.balance_rounded,
+    GoalType.buildMuscle => Icons.fitness_center_rounded,
+  };
 
   static String _paceName(WeeklyPace pace) => switch (pace) {
-        WeeklyPace.relaxed => 'Relaxed',
-        WeeklyPace.normal => 'Normal',
-        WeeklyPace.aggressive => 'Aggressive',
-      };
-
-  static Color _paceColor(BuildContext context, WeeklyPace pace) =>
-      switch (pace) {
-        WeeklyPace.relaxed => context.vColors.success!,
-        WeeklyPace.normal => context.vColors.warning!,
-        WeeklyPace.aggressive => context.colors.error,
-      };
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimens.space12),
-      child: Text(text, style: context.text.titleSmall),
-    );
-  }
-}
-
-/// Traffic-light indicator for the pace options.
-class _PaceDot extends StatelessWidget {
-  final Color color;
-  const _PaceDot({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: AppDimens.space12,
-      height: AppDimens.space12,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
-  }
+    WeeklyPace.relaxed => 'Relaxed',
+    WeeklyPace.normal => 'Steady',
+    WeeklyPace.aggressive => 'Fast',
+  };
 }

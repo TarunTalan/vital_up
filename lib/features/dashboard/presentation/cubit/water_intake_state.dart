@@ -14,12 +14,18 @@ class WaterIntakeLoading extends WaterIntakeState {}
 
 class WaterIntakeLoaded extends WaterIntakeState {
   final int currentIntakeMl;
-  final int dailyGoalMl;
+
+  /// Null when the user has no water goal.
+  final int? dailyGoalMl;
   final List<WaterLogCache> todayLogs;
 
   /// Set only on the state right after a drink was saved (for the Undo
   /// snackbar); reloads and other updates leave it null.
   final int? addedMl;
+
+  /// The entry that add saved, so its Undo removes that drink and not
+  /// whichever was logged last.
+  final int? addedLogId;
 
   /// One-off message for the user (an add or undo that failed).
   final String? notice;
@@ -29,6 +35,7 @@ class WaterIntakeLoaded extends WaterIntakeState {
     required this.dailyGoalMl,
     required this.todayLogs,
     this.addedMl,
+    this.addedLogId,
     this.notice,
   });
 
@@ -38,6 +45,7 @@ class WaterIntakeLoaded extends WaterIntakeState {
     dailyGoalMl,
     todayLogs,
     addedMl,
+    addedLogId,
     notice,
   ];
 }

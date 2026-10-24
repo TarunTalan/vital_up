@@ -18,6 +18,17 @@ class WaterIntakeService {
   static const _dailyGoalKey = 'daily_water_goal';
   static const _defaultGoalMl = 2500;
 
+  /// Saved in place of ml when the user removed their goal.
+  static const _noGoal = 0;
+
+  /// The daily goal in ml from [prefs], null when the user has none; for
+  /// background isolates, which have no service instance.
+  static int? dailyGoalFrom(SharedPreferences prefs) {
+    final raw = prefs.getInt(_dailyGoalKey);
+    if (raw == _noGoal) return null;
+    return sanitizeWaterGoal(raw, fallback: _defaultGoalMl);
+  }
+
   WaterIntakeService(
     this._isarService,
     this._prefs, [
@@ -27,9 +38,16 @@ class WaterIntakeService {
 
   Isar get _isar => _isarService.isar;
 
-  /// The daily goal in ml; the default when unset or out of range.
-  int getDailyGoal() =>
-      sanitizeWaterGoal(_prefs.getInt(_dailyGoalKey), fallback: _defaultGoalMl);
+  /// The daily goal in ml; the default when unset or out of range, null
+  /// when the user removed it.
+  int? getDailyGoal() => dailyGoalFrom(_prefs);
+
+  /// Whether the user (or onboarding) ever saved a goal here.
+  bool get hasSavedGoal => _prefs.containsKey(_dailyGoalKey);
+
+  /// No daily goal: water is still logged, but nothing is "met" (no Arena
+  /// points or water badge days).
+  Future<void> clearDailyGoal() => _prefs.setInt(_dailyGoalKey, _noGoal);
 
   /// Saves the daily goal, kept within the allowed range.
   Future<void> setDailyGoal(int goal) async {
@@ -59,8 +77,9 @@ class WaterIntakeService {
     if (_events != null) {
       final today = await getTodayLogs(userId);
       final total = today.fold<int>(0, (sum, l) => sum + l.amountMl);
+      final goal = getDailyGoal();
       _events.logged(
-        HabitLogged(Habit.water, goalReached: total >= getDailyGoal()),
+        HabitLogged(Habit.water, goalReached: goal != null && total >= goal),
       );
     }
     return log;

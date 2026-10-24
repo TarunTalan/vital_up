@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vital_up/features/community/domain/entities/community.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/utils/load_timeout.dart';
 import 'package:vital_up/core/widgets/load_error_view.dart';
@@ -58,6 +59,9 @@ class _FakeGame implements GamificationRepository {
 }
 
 class _NoAwards implements CommunityRepository {
+  @override
+  Future<(List<Community>, CommunitySettings)?> savedHub() async => null;
+
   @override
   Future<List<CommunityAward>> getPlayerAwards([String? userId]) async =>
       const [];
@@ -222,7 +226,7 @@ void main() {
       pending.complete(_badges);
       await settle(tester);
       expect(find.byType(VitalUpLoader), findsNothing);
-      expect(find.text('1 of 3 earned'), findsOneWidget);
+      expect(find.text('1 of 3 badges'), findsOneWidget);
     });
 
     testWidgets('a failed load shows the error, and retry loads', (
@@ -239,7 +243,7 @@ void main() {
       await settle(tester);
 
       expect(game.badgeCalls, 2);
-      expect(find.text('1 of 3 earned'), findsOneWidget);
+      expect(find.text('1 of 3 badges'), findsOneWidget);
     });
 
     testWidgets('no badges at all says so calmly', (tester) async {
@@ -260,7 +264,7 @@ void main() {
       await pumpPage(tester, const BadgesPage());
       await settle(tester);
 
-      expect(find.text('0 of 2 earned'), findsOneWidget);
+      expect(find.text('0 of 2 badges'), findsOneWidget);
       expect(find.textContaining('No badges yet.'), findsOneWidget);
       expect(find.text('Marathon Walker'), findsWidgets);
     });
@@ -274,7 +278,7 @@ void main() {
       expect(takeAllExceptions(tester), isEmpty);
       // Every label, figure and button shows whole.
       expect(truncatedTexts(tester), isEmpty);
-      expect(find.text('1 of 3 earned'), findsOneWidget);
+      expect(find.text('1 of 3 badges'), findsOneWidget);
     });
   });
 }

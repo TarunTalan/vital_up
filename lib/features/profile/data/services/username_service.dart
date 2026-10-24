@@ -113,7 +113,10 @@ class UsernameService {
   /// Whether [username] is free for the caller (their own counts as free).
   Future<bool> isAvailable(String username) async =>
       await _client
-              .rpc('username_available', params: {'p_username': username.trim()})
+              .rpc(
+                'username_available',
+                params: {'p_username': username.trim()},
+              )
               .timeout(_timeout)
           as bool;
 

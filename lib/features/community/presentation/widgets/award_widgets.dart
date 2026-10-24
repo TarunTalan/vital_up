@@ -6,8 +6,11 @@ import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/responsive.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
+import 'package:vital_up/core/widgets/app_segmented_control.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_list_group.dart';
+import 'package:vital_up/core/widgets/app_page_header.dart';
+import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/core/widgets/app_section_header.dart';
 import 'package:vital_up/core/widgets/user_avatar.dart';
 import 'package:vital_up/features/community/domain/entities/community.dart';
@@ -113,6 +116,10 @@ class AwardWinnerRow extends StatelessWidget {
                   color: context.vColors.grayText,
                 ),
               ),
+              if (onTap != null) ...[
+                const SizedBox(width: AppDimens.space4),
+                const AppChevron(),
+              ],
             ],
           ),
         ),
@@ -200,24 +207,46 @@ String awardCountdownMessage(AwardCountdown next, DateTime now) {
   return next.ended ? '$when. Late logs still count.' : when;
 }
 
-/// Arena card for last month's winners: Global first and largest, then
-/// the caller's city. Before any winners it explains the trophies. Always
-/// shows when the next ones are announced.
-class MonthlyChampionsCard extends StatelessWidget {
+/// Arena card for the latest winners: last week's medals and last month's
+/// trophies for everyone and the caller's city (Week / Month when both
+/// have winners; opens on the one announced last). Global first and
+/// larger. Shows when the next ones are announced.
+class ChampionsCard extends StatefulWidget {
   final List<CommunityWinners> champions;
-  final void Function(AwardWinner winner)? onOpenPlayer;
 
-  const MonthlyChampionsCard({
+  /// Opens a community's leaderboard (its top 3, each a tap from their
+  /// profile).
+  final void Function(Community community)? onOpenCommunity;
+
+  const ChampionsCard({
     super.key,
     required this.champions,
-    this.onOpenPlayer,
+    this.onOpenCommunity,
   });
 
   @override
+  State<ChampionsCard> createState() => _ChampionsCardState();
+}
+
+class _ChampionsCardState extends State<ChampionsCard> {
+  /// Chosen by the user; until then the latest announced.
+  AwardPeriod? _picked;
+
+  @override
   Widget build(BuildContext context) {
-    final groups = [
-      for (final c in champions)
+    final withWinners = [
+      for (final c in widget.champions)
         if (c.winners.isNotEmpty) c,
+    ];
+    final periods = {for (final c in withWinners) c.period};
+    final period =
+        (_picked != null && periods.contains(_picked) ? _picked : null) ??
+        latestChampionsPeriod(withWinners) ??
+        AwardPeriod.month;
+    final month = period == AwardPeriod.month;
+    final groups = [
+      for (final c in withWinners)
+        if (c.period == period) c,
     ];
     final grey = context.vColors.grayText;
     final start = groups.firstOrNull?.periodStart;
@@ -228,18 +257,28 @@ class MonthlyChampionsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AwardIcon(AwardIcons.trophy, size: AppDimens.iconBadge),
+              // A crown: the rows below carry the medals and trophies.
+              AppIconBadge(
+                color: AppColors.rankGold,
+                icon: GameIcon(
+                  GamificationIcons.crown,
+                  fallback: Icons.workspace_premium_rounded,
+                  size: AppDimens.iconMd,
+                  color: AppIconBadge.glyphColor(context, AppColors.rankGold),
+                ),
+              ),
               const SizedBox(width: AppDimens.space12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Monthly champions', style: context.text.titleMedium),
+                    Text('Champions', style: context.text.titleSmall),
                     const SizedBox(height: AppDimens.space2),
                     Text(
                       start == null
-                          ? 'Top 3 each month win a trophy'
-                          : awardPeriodLabel(AwardPeriod.month, start),
+                          ? 'Top 3 win medals each week, trophies each month'
+                          : '${month ? 'Trophies' : 'Medals'} · '
+                                '${awardPeriodLabel(period, start)}',
                       style: context.text.bodySmall?.copyWith(color: grey),
                     ),
                   ],
@@ -248,28 +287,95 @@ class MonthlyChampionsCard extends StatelessWidget {
               const AwardRulesButton(),
             ],
           ),
-          for (final g in groups) ...[
+          if (periods.length > 1) ...[
             const SizedBox(height: AppDimens.space12),
-            Text(
-              g.community.type == CommunityType.global
-                  ? 'Everyone on VitalUp'
-                  : g.community.name,
-              style: context.text.labelLarge?.copyWith(color: grey),
+            AppSegmentedControl<AwardPeriod>(
+              values: const [AwardPeriod.week, AwardPeriod.month],
+              selected: period,
+              label: (p) => p == AwardPeriod.week ? 'Last week' : 'Last month',
+              onChanged: (p) => setState(() => _picked = p),
             ),
-            const SizedBox(height: AppDimens.space4),
-            for (final w in g.winners)
-              AwardWinnerRow(
-                winner: w,
-                period: AwardPeriod.month,
-                large: g.community.type == CommunityType.global,
-                onTap: onOpenPlayer == null || w.isMe
-                    ? null
-                    : () => onOpenPlayer!(w),
-              ),
           ],
+          const SizedBox(height: AppDimens.space4),
+          for (final g in groups)
+            _ChampionRow(
+              group: g,
+              period: period,
+              onTap: widget.onOpenCommunity == null
+                  ? null
+                  : () => widget.onOpenCommunity!(g.community),
+            ),
           const SizedBox(height: AppDimens.space12),
-          const AwardCountdownLine(period: AwardPeriod.month),
+          AwardCountdownLine(period: period),
         ],
+      ),
+    );
+  }
+}
+
+/// One community in [ChampionsCard]: its winner ("1st @mike · 1,220
+/// pts", "and 1 more" on a tie), your own place when you placed, and a
+/// chevron to its leaderboard.
+class _ChampionRow extends StatelessWidget {
+  final CommunityWinners group;
+  final AwardPeriod period;
+  final VoidCallback? onTap;
+
+  const _ChampionRow({required this.group, required this.period, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final winners = group.winners;
+    final firsts = winners.where((w) => w.place == winners.first.place);
+    final top = firsts.first;
+    final me = winners.where((w) => w.isMe).firstOrNull;
+    final grey = context.vColors.grayText;
+    final who = top.isMe ? 'You' : '@${top.username}';
+    final ties = firsts.length - 1;
+    final line = [
+      '${awardPlaceLabel(top.place)} $who${ties > 0 ? ' and $ties more' : ''}',
+      '${_points.format(top.points)} pts',
+      if (me != null && !firsts.contains(me))
+        'You ${awardPlaceLabel(me.place)}',
+    ].join(' · ');
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimens.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppDimens.space8),
+        child: Row(
+          children: [
+            AwardIcon(
+              AwardIcons.forPlace(period, top.place),
+              size: AppDimens.iconXl,
+            ),
+            const SizedBox(width: AppDimens.space12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    group.community.type == CommunityType.global
+                        ? 'Everyone on VitalUp'
+                        : group.community.name,
+                    style: context.text.titleSmall?.copyWith(
+                      color: context.colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space2),
+                  Text(
+                    line,
+                    style: context.text.bodySmall?.copyWith(color: grey),
+                  ),
+                ],
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: AppDimens.space8),
+              const AppChevron(),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -328,9 +434,7 @@ class LeaderboardAwardsCard extends StatelessWidget {
               AwardWinnerRow(
                 winner: w,
                 period: period,
-                onTap: onOpenPlayer == null || w.isMe
-                    ? null
-                    : () => onOpenPlayer!(w),
+                onTap: onOpenPlayer == null ? null : () => onOpenPlayer!(w),
               ),
           ],
         ],
@@ -351,39 +455,35 @@ class AwardRulesSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const rules = [
+    final grey = context.vColors.grayText;
+    Widget glyph(IconData icon) => AppIconBadge(
+      icon: Icon(icon),
+      color: context.colors.primary,
+      size: AppDimens.iconXl,
+    );
+    final rules = <(Widget, String, String)>[
       (
-        AwardIcons.trophy,
-        'Monthly trophies',
-        'The top 3 of each leaderboard for the month win a trophy. '
-            'Global champions rank highest, then your city, then the '
-            'communities you joined.',
-      ),
-      (
-        AwardIcons.gold,
+        const AwardIcon(AwardIcons.gold, size: AppDimens.iconXl),
         'Weekly medals',
-        'The top 3 of each leaderboard from Monday to Sunday win gold, '
-            'silver and bronze medals.',
+        'The top 3 in each community win gold, silver and bronze.',
       ),
       (
-        AwardIcons.starTrophy,
-        'When winners are announced',
-        'Results are final ${AwardRules.lateDays} days after the period '
-            'ends, so logs you sync late still count: Thursday for the '
-            'week, the 4th for the month (just after midnight India time).',
+        const AwardIcon(AwardIcons.trophy, size: AppDimens.iconXl),
+        'Monthly trophies',
+        'The top 3 each month win trophies, the biggest honour.',
       ),
       (
-        AwardIcons.silver,
+        glyph(Icons.how_to_reg_rounded),
         'Who can win',
-        'You need points that period and "Show me on leaderboards" turned '
-            'on. A leaderboard needs at least ${AwardRules.minPlayers} '
-            'players with points. Tied players share the place.',
+        'Anyone with points that period and "Show me on leaderboards" on. '
+            'A community needs ${AwardRules.minPlayers} players; ties share '
+            'a place.',
       ),
       (
-        AwardIcons.bronze,
+        glyph(Icons.visibility_rounded),
         'Where they show',
-        "You'll get a notification. Your awards appear with your badges "
-            'and on your profile for other players.',
+        'In your Achievements and on your profile. Arena shows the latest '
+            'champions, and you and your friends get a note when you win.',
       ),
     ];
 
@@ -402,17 +502,16 @@ class AwardRulesSheet extends StatelessWidget {
             Text('How awards work', style: context.text.titleLarge),
             const SizedBox(height: AppDimens.space4),
             Text(
-              'Awards are extra. Points still come from logging your habits.',
-              style: context.text.bodyMedium?.copyWith(
-                color: context.vColors.grayText,
-              ),
+              'Recognition for the top players. Results wait a few days '
+              'so late logs still count.',
+              style: context.text.bodyMedium?.copyWith(color: grey),
             ),
-            for (final (asset, title, body) in rules) ...[
+            for (final (icon, title, body) in rules) ...[
               const SizedBox(height: AppDimens.space16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AwardIcon(asset, size: AppDimens.iconXl),
+                  icon,
                   const SizedBox(width: AppDimens.space12),
                   Expanded(
                     child: Column(
@@ -443,11 +542,13 @@ class AwardRulesSheet extends StatelessWidget {
   }
 }
 
-/// A player's best award and their trophy / medal counts.
+/// A player's best award and their trophy / medal counts. With
+/// [onSeeAll] (more than one award) the card opens the full list.
 class AwardsSummaryCard extends StatelessWidget {
   final List<CommunityAward> awards;
+  final VoidCallback? onSeeAll;
 
-  const AwardsSummaryCard({super.key, required this.awards});
+  const AwardsSummaryCard({super.key, required this.awards, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -483,8 +584,11 @@ class AwardsSummaryCard extends StatelessWidget {
         ),
     ];
 
+    final seeAll = awards.length > 1 ? onSeeAll : null;
     return AppCard(
       padding: AppDimens.cardPaddingCompact,
+      onTap: seeAll,
+      showChevron: seeAll != null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -541,44 +645,9 @@ class AwardsSummaryCard extends StatelessWidget {
   }
 }
 
-/// Loads [userId]'s awards (the caller when null) and shows
-/// [AwardsSummaryCard] with [spacing] above it; nothing when they have
-/// none or loading fails.
-class PlayerAwardsSummary extends StatefulWidget {
-  final String? userId;
-  final double spacing;
-
-  const PlayerAwardsSummary({
-    super.key,
-    this.userId,
-    this.spacing = AppDimens.space12,
-  });
-
-  @override
-  State<PlayerAwardsSummary> createState() => _PlayerAwardsSummaryState();
-}
-
-class _PlayerAwardsSummaryState extends State<PlayerAwardsSummary> {
-  late final Future<List<CommunityAward>> _awards = _loadAwards(widget.userId);
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<CommunityAward>>(
-      future: _awards,
-      builder: (context, snap) {
-        final awards = snap.data;
-        if (awards == null || awards.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: EdgeInsets.only(top: widget.spacing),
-          child: AwardsSummaryCard(awards: awards),
-        );
-      },
-    );
-  }
-}
-
-/// Loads the caller's awards for the Badges page; nothing until they have
-/// one, with [spacing] below when shown.
+/// Achievements page: the caller's community awards as one card (best award and
+/// counts) under an "Awards" header; with more than one it opens
+/// [PlayerAwardsPage]. Nothing until they have one; [spacing] above it.
 class MyCommunityAwards extends StatefulWidget {
   final double spacing;
 
@@ -599,8 +668,26 @@ class _MyCommunityAwardsState extends State<MyCommunityAwards> {
         final awards = snap.data;
         if (awards == null || awards.isEmpty) return const SizedBox.shrink();
         return Padding(
-          padding: EdgeInsets.only(bottom: widget.spacing),
-          child: CommunityAwardsSection(awards: awards),
+          padding: EdgeInsets.only(top: widget.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppSectionHeader(
+                'Awards',
+                count: awards.length,
+                actionLabel: 'How it works',
+                onAction: () => showAwardRulesSheet(context),
+              ),
+              AwardsSummaryCard(
+                awards: awards,
+                onSeeAll: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PlayerAwardsPage(awards: awards),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -616,63 +703,108 @@ Future<List<CommunityAward>> _loadAwards(String? userId) =>
       return const <CommunityAward>[];
     });
 
-/// Badges page section: every award, most important first.
-class CommunityAwardsSection extends StatelessWidget {
+/// Every award of one player ([username]; the caller's own when null):
+/// the summary card, then one section per week or month, newest first,
+/// each with its awards in order of importance.
+class PlayerAwardsPage extends StatelessWidget {
+  final String? username;
   final List<CommunityAward> awards;
 
-  const CommunityAwardsSection({super.key, required this.awards});
+  const PlayerAwardsPage({super.key, this.username, required this.awards});
 
   @override
   Widget build(BuildContext context) {
-    if (awards.isEmpty) return const SizedBox.shrink();
+    final name = username;
+    return AppScaffold(
+      header: AppPageHeader(
+        title: name == null ? 'Your awards' : 'Awards',
+        subtitle: name == null ? null : '@$name',
+        action: AppHeaderAction(
+          tooltip: 'How awards work',
+          icon: const Icon(Icons.info_outline_rounded),
+          onTap: () => showAwardRulesSheet(context),
+        ),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AwardsSummaryCard(awards: awards),
+          AwardsByPeriod(awards: awards),
+        ],
+      ),
+    );
+  }
+}
+
+/// [awards] in one section per period ("Week of 12 Oct (8)"),
+/// newest first and a month before the weeks in it; rows show the place,
+/// community, prize and points.
+class AwardsByPeriod extends StatelessWidget {
+  final List<CommunityAward> awards;
+
+  const AwardsByPeriod({super.key, required this.awards});
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <(AwardPeriod, DateTime), List<CommunityAward>>{};
+    for (final a in sortByPrestige(awards)) {
+      groups.putIfAbsent((a.period, a.periodStart), () => []).add(a);
+    }
+    final keys = groups.keys.toList()
+      ..sort((x, y) {
+        final byStart = y.$2.compareTo(x.$2);
+        if (byStart != 0) return byStart;
+        return x.$1 == AwardPeriod.month ? -1 : 1;
+      });
     final grey = context.vColors.grayText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppSectionHeader(
-          'Community awards',
-          count: awards.length,
-          actionLabel: 'How it works',
-          onAction: () => showAwardRulesSheet(context),
-        ),
-        AppListGroup(
-          children: [
-            for (final a in sortByPrestige(awards))
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.space16,
-                  vertical: AppDimens.space10,
-                ),
-                child: Row(
-                  children: [
-                    AwardIcon(a.asset, size: AppDimens.iconBadge),
-                    const SizedBox(width: AppDimens.space12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(a.title, style: context.text.titleSmall),
-                          const SizedBox(height: AppDimens.space2),
-                          Text(
-                            '${awardPrizeName(a.period, a.place)} · '
-                            '${a.periodLabel}',
-                            style: context.text.bodySmall?.copyWith(
-                              color: grey,
+        for (final key in keys) ...[
+          const SizedBox(height: AppDimens.sectionGap),
+          // The rows' icons tell medals from trophies.
+          AppSectionHeader(
+            awardPeriodLabel(key.$1, key.$2),
+            count: groups[key]!.length,
+          ),
+          AppListGroup(
+            children: [
+              for (final a in groups[key]!)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space16,
+                    vertical: AppDimens.space10,
+                  ),
+                  child: Row(
+                    children: [
+                      AwardIcon(a.asset, size: AppDimens.iconXl),
+                      const SizedBox(width: AppDimens.space12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(a.title, style: context.text.titleSmall),
+                            const SizedBox(height: AppDimens.space2),
+                            Text(
+                              awardPrizeName(a.period, a.place),
+                              style: context.text.bodySmall?.copyWith(
+                                color: grey,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-                    Text(
-                      '${_points.format(a.points)} pts',
-                      style: context.text.bodySmall?.copyWith(color: grey),
-                    ),
-                  ],
+                      const SizedBox(width: AppDimens.space8),
+                      Text(
+                        '${_points.format(a.points)} pts',
+                        style: context.text.bodySmall?.copyWith(color: grey),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ],
     );
   }
