@@ -62,6 +62,7 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_trends_page.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 /// Flip to true to turn the overflow / truncation reports into failures.
 const _strict = true;
@@ -299,9 +300,9 @@ class _Scenario {
     this.profile = const ProfileLoaded(
       ProfileEntity(
         id: 'u1',
-        username: 'sam_lee',
+        username: 'tarun_talan',
         email: '',
-        fullName: 'Sam Lee',
+        fullName: 'Tarun Talan',
       ),
     ),
   });
@@ -736,6 +737,30 @@ Widget _page(_Scenario s) => _providers(
   ),
 );
 
+/// The Home tab as the README shows it: the feed under the floating nav.
+Widget _readmePage(_Scenario s) => _providers(
+  s,
+  Builder(
+    builder: (context) => Scaffold(
+      extendBody: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      bottomNavigationBar: readmeNavBar(0),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/bg.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: context.pagePadding.copyWith(top: AppDimens.sectionGap),
+          child: ResponsiveCenter(child: homeFeed()),
+        ),
+      ),
+    ),
+  ),
+);
+
 // ---------------------------------------------------------------------------
 // Fonts, images and capture
 // ---------------------------------------------------------------------------
@@ -804,6 +829,18 @@ void main() {
   tearDown(() async {
     await sl.reset();
   });
+
+  for (final dark in [false, true]) {
+    testWidgets('readme: home ${dark ? 'dark' : 'light'}', (tester) async {
+      final s = _typical();
+      sl.registerSingleton<SleepService>(_FakeSleepService(s.sleepGoalMinutes));
+      sl.registerSingleton<WeightService>(
+        _FakeWeightService(s.weightUnit, s.weight?.logs ?? const []),
+      );
+      await pumpReadmePage(tester, _readmePage(s), dark: dark);
+      await captureReadmeShot(tester, dark ? 'home_dark' : 'home');
+    }, skip: !readmeShots);
+  }
 
   for (final scenario in [
     _typical,

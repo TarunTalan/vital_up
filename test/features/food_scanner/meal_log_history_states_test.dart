@@ -18,6 +18,7 @@ import 'package:vital_up/features/food_scanner/presentation/bloc/meal_log_bloc.d
 import 'package:vital_up/features/food_scanner/presentation/pages/meal_log_history_page.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 class _FakeRepo implements MealLogRepository {
   final results = <Future<Either<Failure, List<MealLogEntry>>> Function()>[];
@@ -164,6 +165,66 @@ void main() {
     expect(find.text('25 g'), findsWidgets);
     expect(find.text('Protein'), findsWidgets);
   });
+
+  testWidgets('readme: meal history', (tester) async {
+    MealLogEntry meal(
+      String id,
+      MealType type,
+      DateTime at,
+      List<(String, double, double, double, double)> items,
+    ) {
+      final foods = [for (final i in items) _food(i.$1)];
+      return MealLogEntry(
+        id: id,
+        capturedAt: at,
+        imagePath: '',
+        items: foods,
+        nutrition: [
+          for (final (n, i) in items.indexed)
+            NutritionInfo(
+              calories: i.$2,
+              proteinG: i.$3,
+              carbsG: i.$4,
+              fatG: i.$5,
+              fiberG: 3,
+              sugarG: 4,
+              sodiumMg: 300,
+              per: foods[n],
+            ),
+        ],
+        totalCalories: items.fold(0.0, (s, i) => s + i.$2),
+        mealType: type,
+        userConfirmed: true,
+      );
+    }
+
+    DateTime day(int back, int h, int m) =>
+        DateTime(_now.year, _now.month, _now.day - back, h, m);
+    repo.results.add(
+      () async => Right([
+        meal('d1', MealType.dinner, day(1, 20, 10), [
+          ('Grilled paneer tikka', 360, 24, 12, 22),
+          ('Mixed vegetable curry', 180, 5, 18, 9),
+        ]),
+        meal('s1', MealType.snack, day(1, 17, 0), [
+          ('Greek yogurt with berries', 190, 14, 22, 4),
+        ]),
+        meal('l1', MealType.lunch, day(1, 13, 15), [
+          ('Rajma chawal', 520, 18, 86, 9),
+          ('Cucumber salad', 45, 2, 8, 0.5),
+        ]),
+        meal('b1', MealType.breakfast, day(1, 8, 30), [
+          ('Masala oats', 310, 11, 48, 7),
+          ('Boiled eggs', 140, 12, 1, 10),
+        ]),
+        meal('d2', MealType.dinner, day(2, 20, 30), [
+          ('Chicken biryani', 640, 32, 72, 22),
+        ]),
+      ]),
+    );
+    await pumpReadmePage(tester, const MealLogHistoryPage());
+    await captureReadmeShot(tester, 'meal_history');
+  }, skip: !readmeShots);
 
   testWidgets('fits a small phone at the largest text size', (tester) async {
     repo.results.add(() async => Right(_meals));

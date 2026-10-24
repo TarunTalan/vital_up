@@ -22,6 +22,7 @@ import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 final _writeShots = Platform.environment['HOME_SHOTS'] == '1';
 
@@ -91,6 +92,28 @@ void main() {
       ),
     ),
   };
+
+  for (final name in ['sleep', 'weight']) {
+    testWidgets('readme: ${name}_sheet', (tester) async {
+      // A night that has ended, whatever the hour the shots run at.
+      final woke = now.hour < 7 ? now.day - 1 : now.day;
+      final sheet = name == 'weight'
+          ? sheets[name]!()
+          : SleepLogSheet(
+              goalMinutes: 8 * 60,
+              initial: SleepSessionInfo(
+                bedTime: DateTime(now.year, now.month, woke - 1, 23, 15),
+                wakeTime: DateTime(now.year, now.month, woke, 6, 40),
+                duration: const Duration(hours: 7, minutes: 25),
+                source: SleepDataSource.manual,
+              ),
+            );
+      await tester.runAsync(loadAllFonts);
+      await pumpPage(tester, _host(sheet), size: kReadmePhone);
+      await tester.pumpAndSettle();
+      await captureReadmeShot(tester, '${name}_sheet');
+    }, skip: !readmeShots);
+  }
 
   for (final MapEntry(key: name, value: sheet) in sheets.entries) {
     for (final c in _cases) {

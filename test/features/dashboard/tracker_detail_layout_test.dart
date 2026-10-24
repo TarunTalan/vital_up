@@ -16,10 +16,13 @@ import 'package:vital_up/core/widgets/tracker/log_history_card.dart';
 import 'package:vital_up/core/widgets/tracker/tracker_metric.dart';
 import 'package:vital_up/features/dashboard/domain/entities/trend_series.dart';
 import 'package:vital_up/features/dashboard/presentation/cubit/trend_cubit.dart';
+import 'package:vital_up/features/dashboard/presentation/pages/water_trends_page.dart';
+import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_detail_scaffold.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/trend_widgets.dart';
 
 import '../../helpers/pump_app.dart';
+import '../../helpers/readme_shots.dart';
 
 final _writeShots = Platform.environment['HOME_SHOTS'] == '1';
 
@@ -94,8 +97,7 @@ void main() {
         dateOf: (log) => log.at,
         logBuilder: card,
         allLogs: () async => logs,
-        daySummary: (day) =>
-            '${day.fold<int>(0, (s, l) => s + l.ml)} ml',
+        daySummary: (day) => '${day.fold<int>(0, (s, l) => s + l.ml)} ml',
         headerAction: AppHeaderAction(
           tooltip: 'Guide',
           icon: const Icon(Icons.spa_rounded),
@@ -107,8 +109,7 @@ void main() {
   );
 
   for (final c in _cases) {
-    final name =
-        '${c.width.toInt()}_${c.scale}_${c.dark ? 'dark' : 'light'}';
+    final name = '${c.width.toInt()}_${c.scale}_${c.dark ? 'dark' : 'light'}';
     testWidgets('detail and history pages fit: $name', (tester) async {
       await tester.runAsync(loadAllFonts);
       await pumpPage(
@@ -149,6 +150,72 @@ void main() {
     });
   }
 
+  testWidgets('readme: water', (tester) async {
+    // Today's drinks through the afternoon and a week mostly near the goal.
+    final drinks = <_Log>[
+      for (final (h, m, ml) in [
+        (15, 40, 500),
+        (13, 10, 250),
+        (11, 5, 250),
+        (8, 30, 250),
+      ])
+        (at: DateTime(today.year, today.month, today.day, h, m), ml: ml),
+    ];
+    final week = TrendSeries([
+      for (final (i, ml) in [
+        (6, 2250.0),
+        (5, 2600.0),
+        (4, 1900.0),
+        (3, 2500.0),
+        (2, 2750.0),
+        (1, 2300.0),
+        (0, 1250.0),
+      ])
+        DailyPoint(DateTime(today.year, today.month, today.day - i), ml),
+    ], goal: 2500);
+    String time(DateTime t) {
+      final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
+      final m = t.minute.toString().padLeft(2, '0');
+      return '$h:$m ${t.hour < 12 ? 'AM' : 'PM'}';
+    }
+
+    await pumpReadmePage(
+      tester,
+      BlocProvider(
+        create: (_) =>
+            TrendCubit<_Log>((_) async => TrendData(week, drinks))..load(),
+        child: TrackerDetailScaffold<_Log>(
+          metric: TrackerMetric.water,
+          noun: 'water',
+          format: WaterTrendsPage.formatMl,
+          goalLabel: (_) => 'Daily goal · 2.5 L',
+          onEditGoal: () {},
+          insights: (_) => const [
+            TrackerInsight(
+              Icons.local_drink_rounded,
+              '1.25 L to go today, about 5 glasses.',
+            ),
+          ],
+          dateOf: (log) => log.at,
+          logBuilder: (context, log) => LogHistoryCard(
+            icon: const Icon(Icons.local_drink_rounded),
+            color: TrackerMetric.water.color,
+            title: log.ml >= 500 ? 'Bottle' : 'Glass',
+            subtitle: time(log.at),
+            value: WaterTrendsPage.formatMl(log.ml.toDouble()),
+            deleteNoun: 'drink',
+            onDelete: () {},
+          ),
+          allLogs: () async => drinks,
+          daySummary: (day) =>
+              WaterTrendsPage.formatMl(day.fold<double>(0, (s, l) => s + l.ml)),
+          onLog: () {},
+        ),
+      ),
+    );
+    await captureReadmeShot(tester, 'water');
+  }, skip: !readmeShots);
+
   testWidgets('a long trend title keeps the toggle beside or under it', (
     tester,
   ) async {
@@ -184,9 +251,6 @@ void main() {
     // The toggle never overlaps the title.
     final title = tester.getRect(find.text(TrendRange.month.caption));
     final toggle = tester.getRect(find.text(TrendRange.week.label));
-    expect(
-      title.right <= toggle.left || title.bottom <= toggle.top,
-      isTrue,
-    );
+    expect(title.right <= toggle.left || title.bottom <= toggle.top, isTrue);
   });
 }
