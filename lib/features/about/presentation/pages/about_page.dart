@@ -475,7 +475,8 @@ class _FeatureHighlights extends StatelessWidget {
       color: AppColors.success,
       title: 'Offline First & Health Sync',
       desc:
-          'Offline-first local storage with Health Connect and Supabase cloud sync.',
+          "Works offline, imports from your phone's health app and backs up "
+          'to the cloud.',
     ),
   ];
 

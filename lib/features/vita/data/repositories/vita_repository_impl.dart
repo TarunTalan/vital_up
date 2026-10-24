@@ -4,7 +4,6 @@ import 'package:vital_up/features/diet_plan/domain/entities/meal_plan.dart';
 import 'package:vital_up/features/vita/data/datasources/vita_local_datasource.dart';
 import 'package:vital_up/features/vita/data/datasources/vita_remote_datasource.dart';
 import 'package:vital_up/features/vita/data/services/health_snapshot_builder.dart';
-import 'package:vital_up/features/vita/data/services/health_vitals_service.dart';
 import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
 import 'package:vital_up/features/vita/domain/entities/health_snapshot.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
@@ -19,7 +18,6 @@ class VitaRepositoryImpl implements VitaRepository {
   final VitaRemoteDataSource _remote;
   final VitaLocalDataSource _local;
   final HealthSnapshotBuilder _snapshots;
-  final HealthVitalsService _vitals;
   final SupabaseClient _supabase;
   final StressEstimator _stress;
   final HealthAnalysisBuilder _analysis;
@@ -35,7 +33,6 @@ class VitaRepositoryImpl implements VitaRepository {
     required this._remote,
     required this._local,
     required this._snapshots,
-    required this._vitals,
     required this._supabase,
     required this._consent,
     this._stress = const StressEstimator(),
@@ -130,12 +127,9 @@ class VitaRepositoryImpl implements VitaRepository {
     final snapshot = await _snapshots.build();
     final report = _computeStress(snapshot);
     await _local.writeScore(_userId, snapshot.takenAt, report.score);
-    final canConnect =
-        await _vitals.isAvailable() && !snapshot.vitals.connected;
     final cached = _local.readInsights(_userId);
     return report.copyWith(
       tip: _isToday(cached?.date) ? cached?.stressTip : null,
-      canConnectWearable: canConnect,
     );
   }
 
@@ -154,9 +148,6 @@ class VitaRepositoryImpl implements VitaRepository {
   @override
   List<StressCheckIn> getStressCheckIns() =>
       _local.readCheckIns(_userId)..sort((a, b) => a.date.compareTo(b.date));
-
-  @override
-  Future<bool> connectWearable() => _vitals.connect();
 
   @override
   Future<VitaDailyInsights?> getDailyInsights() {
@@ -196,7 +187,7 @@ class VitaRepositoryImpl implements VitaRepository {
     final snapshot = (await _snapshots.build()).forAi(
       includeHealthConnect: includeHealthConnect,
     );
-    // Saved scores may have been computed from Health Connect vitals.
+    // Saved scores may have been computed from Health Connect data.
     return (
       snapshot,
       _computeStress(snapshot, useSavedScores: includeHealthConnect),

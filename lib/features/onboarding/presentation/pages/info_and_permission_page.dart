@@ -17,6 +17,7 @@ import 'package:vital_up/features/reminders/data/reminders_service.dart';
 import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// Step 7: what VitalUp keeps and never does, and the user's choices.
 /// The analytics and health sync switches are the real settings (shown as
@@ -171,7 +172,8 @@ class _PrivacyStepState extends State<PrivacyStep> with OnboardingStepState {
                     icon: Icons.sync_rounded,
                     iconColor: v.success,
                     title: 'Health sync',
-                    subtitle: 'Import weight and workouts from Health Connect',
+                    subtitle:
+                        'Import weight and workouts from $healthStoreName',
                     trailing: Switch(
                       value: settings?.healthSyncEnabled ?? false,
                       onChanged: settings == null || _connecting

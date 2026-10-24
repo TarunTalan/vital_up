@@ -78,14 +78,6 @@ void main() {
       importedWorkoutsThisWeek: 1,
       importedDistanceThisWeekKm: 5,
       importedActiveMinutesThisWeek: 30,
-      vitals: const VitalsSnapshot(
-        connected: true,
-        restingHeartRate: 58,
-        hrvMs: 45,
-        spo2Percent: 97,
-        systolic: 120,
-        diastolic: 80,
-      ),
     );
 
     test('with the opt-in, everything is sent', () {

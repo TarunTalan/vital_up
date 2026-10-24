@@ -21,6 +21,7 @@ import 'package:vital_up/features/health_sync/health_import_service.dart';
 import 'package:vital_up/features/settings/domain/entities/settings_entity.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:vital_up/features/settings/presentation/cubit/settings_state.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// How the app behaves: appearance, units, notifications, connected apps,
 /// privacy and about. Account and health items live under Profile.
@@ -206,7 +207,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.sync_rounded,
                     iconColor: v.success,
                     title: 'Health sync',
-                    subtitle: 'Health Connect / Apple Health',
+                    subtitle: healthStoreName,
                     trailing: Switch(
                       value: s.healthSyncEnabled,
                       onChanged: (on) => _setHealthSync(s, on),

@@ -21,6 +21,7 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_ed
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_log_sheets.dart';
 import 'package:vital_up/features/home_widget/home_widget_service.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// Sleep: last night vs the nightly goal, the nightly trend, recovery
 /// figures and every night logged or synced.
@@ -127,7 +128,7 @@ class SleepTrendsPage extends StatelessWidget {
               color: metric.color,
               title: 'Sleep',
               subtitle: switch (night.source) {
-                SleepDataSource.healthStore => 'Health Connect',
+                SleepDataSource.healthStore => healthStoreName,
                 SleepDataSource.phone => 'Phone estimate',
                 SleepDataSource.manual => 'Logged by you',
               },
@@ -136,11 +137,11 @@ class SleepTrendsPage extends StatelessWidget {
               onDelete: night.source == SleepDataSource.healthStore
                   ? null
                   : () => deleteTrackerLog(
-                        context,
-                        cubit,
-                        night,
-                        () => sl<SleepService>().deleteSleep(night),
-                      ),
+                      context,
+                      cubit,
+                      night,
+                      () => sl<SleepService>().deleteSleep(night),
+                    ),
               figures: [
                 LogFigure(time.format(night.bedTime), 'Bedtime'),
                 LogFigure(time.format(night.wakeTime), 'Woke up'),

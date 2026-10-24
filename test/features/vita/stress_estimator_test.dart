@@ -14,7 +14,6 @@ HealthSnapshot _snapshot({
   int mealsWeek = 0,
   int mealDays = 0,
   int? steps,
-  VitalsSnapshot vitals = const VitalsSnapshot(),
   ProfileSnapshot profile = const ProfileSnapshot(),
 }) => HealthSnapshot(
   takenAt: DateTime(2026, 10, 1, hour),
@@ -27,7 +26,6 @@ HealthSnapshot _snapshot({
   mealsThisWeek: mealsWeek,
   daysWithMealsThisWeek: mealDays,
   stepsToday: steps,
-  vitals: vitals,
 );
 
 void main() {
@@ -99,21 +97,6 @@ void main() {
       expect(report.level, StressLevel.high);
     });
 
-    test('HRV well below baseline raises the wearable score', () {
-      final vitals = const VitalsSnapshot(hrvMs: 30, hrvBaselineMs: 50);
-      expect(estimator.wearableScore(vitals), greaterThan(65));
-      final report = estimator.estimate(snapshot: _snapshot(vitals: vitals));
-      expect(report.source, StressSource.wearable);
-      expect(
-        report.triggers.map((t) => t.name),
-        contains('Lower heart-rate variability'),
-      );
-    });
-
-    test('wearable score is null without a baseline', () {
-      expect(estimator.wearableScore(const VitalsSnapshot(hrvMs: 40)), isNull);
-    });
-
     test('trend compares with yesterday', () {
       expect(estimator.trendText(60, 40), 'Higher than yesterday');
       expect(estimator.trendText(40, 60), 'Lower than yesterday');
@@ -141,8 +124,11 @@ void main() {
         avgCaloriesPerDay: 1840,
         sleepLastNightHours: 6.2,
         stepsToday: 7240,
-        vitals: const VitalsSnapshot(avgHeartRate: 72, spo2Percent: 98),
-        profile: const ProfileSnapshot(medicines: 'Metformin'),
+        profile: const ProfileSnapshot(
+          medicines: 'Metformin',
+          bloodPressureTop: 120,
+          bloodPressureBottom: 80,
+        ),
       );
       final rows = builder.build(
         snapshot,
@@ -154,7 +140,7 @@ void main() {
         byKind[HealthSignalKind.diet],
         'Tracked 18 meals · Avg 1840 cal/day',
       );
-      expect(byKind[HealthSignalKind.metrics], 'HR avg 72bpm · SpO2 98%');
+      expect(byKind[HealthSignalKind.metrics], 'From your profile: BP 120/80');
       expect(byKind[HealthSignalKind.sleep], '6.2h last night');
       expect(byKind[HealthSignalKind.activity], '7,240 steps today');
       expect(

@@ -16,6 +16,7 @@ import 'package:vital_up/features/dashboard/presentation/widgets/tracker_goal_ed
 import 'package:vital_up/features/dashboard/presentation/widgets/tracker_insights.dart';
 import 'package:vital_up/features/weight/data/weight_service.dart';
 import 'package:vital_up/features/weight/presentation/weight_entry_sheet.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 const _metric = TrackerMetric.weight;
 
@@ -169,7 +170,7 @@ class WeightTrendsPage extends StatelessWidget {
                   title: 'Weight',
                   subtitle:
                       '${DateFormat.jm().format(log.timestamp)} · '
-                      '${log.source == 'health' ? 'Health Connect' : 'Logged by you'}',
+                      '${log.source == 'health' ? healthStoreName : 'Logged by you'}',
                   value: unit.format(log.weightKg),
                   deleteNoun: 'weigh-in',
                   onDelete: () => deleteTrackerLog(

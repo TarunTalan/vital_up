@@ -1,14 +1,13 @@
 import 'package:vital_up/features/vita/domain/entities/health_snapshot.dart';
 import 'package:vital_up/features/vita/domain/entities/vita_insights.dart';
 
-/// Today's stress score (0 calm – 100 very stressed) from, in order of
-/// trust: the user's check-in, wearable HRV / resting heart rate against
-/// their own baseline, and lifestyle triggers (sleep, screen time, meals,
-/// hydration, activity). Pure and deterministic so it can be unit-tested.
+/// Today's stress score (0 calm – 100 very stressed) from the user's
+/// check-in and lifestyle triggers (sleep, screen time, meals, hydration,
+/// activity). Pure and deterministic so it can be unit-tested.
 class StressEstimator {
   const StressEstimator();
 
-  /// Score with no check-in, no wearable and no triggers.
+  /// Score with no check-in and no triggers.
   static const int baseline = 15;
 
   StressReport estimate({
@@ -20,20 +19,13 @@ class StressEstimator {
     final proxy =
         (baseline + triggers.fold<int>(0, (sum, t) => sum + t.severity.weight))
             .clamp(0, 100);
-    final physio = wearableScore(snapshot.vitals);
     final self = checkIn == null ? null : (checkIn.level - 1) * 25;
 
     final int score;
     final StressSource source;
-    if (self != null && physio != null) {
-      score = (0.6 * self + 0.4 * physio).round();
-      source = StressSource.checkInAndWearable;
-    } else if (self != null) {
+    if (self != null) {
       score = (0.7 * self + 0.3 * proxy).round();
       source = StressSource.checkIn;
-    } else if (physio != null) {
-      score = (0.6 * physio + 0.4 * proxy).round();
-      source = StressSource.wearable;
     } else {
       score = proxy;
       source = StressSource.estimated;
@@ -48,22 +40,6 @@ class StressEstimator {
       triggers: triggers,
       todayCheckIn: checkIn,
     );
-  }
-
-  /// HRV below / resting HR above the user's own 7-day baseline raises the
-  /// score. Null when there's no wearable data to compare.
-  int? wearableScore(VitalsSnapshot v) {
-    final parts = <double>[];
-    if (v.hrvMs != null && v.hrvBaselineMs != null && v.hrvBaselineMs! > 0) {
-      final drop = 1 - v.hrvMs! / v.hrvBaselineMs!; // +0.2 = 20% below normal
-      parts.add((50 + drop * 150).clamp(0, 100).toDouble());
-    }
-    if (v.restingHeartRate != null && v.restingHeartRateBaseline != null) {
-      final rise = v.restingHeartRate! - v.restingHeartRateBaseline!;
-      parts.add((50 + rise * 6).clamp(0, 100).toDouble());
-    }
-    if (parts.isEmpty) return null;
-    return (parts.reduce((a, b) => a + b) / parts.length).round();
   }
 
   List<StressTrigger> detectTriggers(HealthSnapshot s) {
@@ -135,31 +111,6 @@ class StressEstimator {
         const StressTrigger(
           name: 'Low activity',
           severity: TriggerSeverity.low,
-        ),
-      );
-    }
-
-    final v = s.vitals;
-    if (v.hrvMs != null && v.hrvBaselineMs != null && v.hrvBaselineMs! > 0) {
-      final drop = 1 - v.hrvMs! / v.hrvBaselineMs!;
-      if (drop >= 0.15) {
-        triggers.add(
-          StressTrigger(
-            name: 'Lower heart-rate variability',
-            severity: drop >= 0.3
-                ? TriggerSeverity.high
-                : TriggerSeverity.medium,
-          ),
-        );
-      }
-    }
-    if (v.restingHeartRate != null &&
-        v.restingHeartRateBaseline != null &&
-        v.restingHeartRate! - v.restingHeartRateBaseline! >= 5) {
-      triggers.add(
-        const StressTrigger(
-          name: 'Raised resting heart rate',
-          severity: TriggerSeverity.medium,
         ),
       );
     }

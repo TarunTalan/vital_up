@@ -705,7 +705,6 @@ Future<void> initDependencies() async {
       remote: VitaRemoteDataSource(sl<SupabaseClient>(), sl<AiQuotaService>()),
       local: VitaLocalDataSource(sl<SharedPreferences>()),
       snapshots: sl<HealthSnapshotBuilder>(),
-      vitals: sl<HealthVitalsService>(),
       supabase: sl<SupabaseClient>(),
       consent: sl<VitaAiConsent>(),
       events: sl<HabitEvents>(),

@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 /// Everything Vita knows about the user right now, gathered from on-device
 /// data (meal logs, sleep, water, screen time, activity, Health Connect /
-/// Apple Health vitals, onboarding profile, active diet plan).
+/// Apple Health steps and sleep, onboarding profile, active diet plan).
 ///
 /// Every field is optional: absent means "no data", never zero.
 class HealthSnapshot {
@@ -38,9 +38,6 @@ class HealthSnapshot {
   final int workoutsThisWeek;
   final double distanceThisWeekKm;
   final int activeMinutesThisWeek;
-
-  // Vitals (wearable via Health Connect / Apple Health)
-  final VitalsSnapshot vitals;
 
   // Active diet plan meal lines ("Breakfast · 420 kcal · Poha, Chai").
   final List<String> dietPlanMeals;
@@ -84,7 +81,6 @@ class HealthSnapshot {
     this.workoutsThisWeek = 0,
     this.distanceThisWeekKm = 0,
     this.activeMinutesThisWeek = 0,
-    this.vitals = const VitalsSnapshot(),
     this.dietPlanMeals = const [],
     this.stepsFromHealthConnect = false,
     this.workoutStepsToday,
@@ -98,7 +94,7 @@ class HealthSnapshot {
   });
 
   /// What may be sent to the AI. Without the user's Health Connect opt-in,
-  /// vitals, Health Connect steps and sleep, and imported workouts are left
+  /// Health Connect steps and sleep, and imported workouts are left
   /// out; only data logged in this app remains.
   HealthSnapshot forAi({required bool includeHealthConnect}) {
     if (includeHealthConnect) return this;
@@ -172,7 +168,6 @@ class HealthSnapshot {
       ),
       'activeMinutesLast7Days': activeMinutesThisWeek,
     },
-    'vitals': vitals.toJson(),
     'activeDietPlan': dietPlanMeals,
   });
 }
@@ -227,48 +222,6 @@ class ProfileSnapshot {
     'activityLevel': activityLevel,
     if (bloodPressureTop != null && bloodPressureBottom != null)
       'selfReportedBloodPressure': '$bloodPressureTop/$bloodPressureBottom',
-  };
-}
-
-class VitalsSnapshot {
-  final bool connected;
-  final int? avgHeartRate;
-  final int? restingHeartRate;
-  final int? restingHeartRateBaseline;
-  final double? hrvMs;
-  final double? hrvBaselineMs;
-  final int? spo2Percent;
-  final int? systolic;
-  final int? diastolic;
-
-  const VitalsSnapshot({
-    this.connected = false,
-    this.avgHeartRate,
-    this.restingHeartRate,
-    this.restingHeartRateBaseline,
-    this.hrvMs,
-    this.hrvBaselineMs,
-    this.spo2Percent,
-    this.systolic,
-    this.diastolic,
-  });
-
-  bool get hasAny =>
-      avgHeartRate != null ||
-      restingHeartRate != null ||
-      hrvMs != null ||
-      spo2Percent != null ||
-      systolic != null;
-
-  Map<String, dynamic> toJson() => {
-    'avgHeartRateBpm': avgHeartRate,
-    'restingHeartRateBpm': restingHeartRate,
-    'restingHeartRateBaselineBpm': restingHeartRateBaseline,
-    'hrvMs': hrvMs?.round(),
-    'hrvBaselineMs': hrvBaselineMs?.round(),
-    'spo2Percent': spo2Percent,
-    if (systolic != null && diastolic != null)
-      'bloodPressure': '$systolic/$diastolic',
   };
 }
 

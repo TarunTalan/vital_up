@@ -53,7 +53,7 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>VitalUp uses Face ID to unlock the app when app lock is on.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>VitalUp reads your steps, workouts, weight, sleep, heart rate, heart rate variability, blood oxygen and blood pressure from Apple Health to show your progress and give personal insights. VitalUp never writes to Apple Health.</string>
+	<string>VitalUp reads your steps, workouts, weight and sleep from Apple Health to show your progress. VitalUp never writes to Apple Health.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>VitalUp uses your location to map your route and measure distance and pace during walks, runs and rides, and to download maps of your area for offline use.</string>
 	<key>NSMotionUsageDescription</key>

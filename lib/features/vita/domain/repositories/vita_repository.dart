@@ -66,9 +66,6 @@ abstract class VitaRepository {
   /// Saved check-ins (last 90 days), oldest first.
   List<StressCheckIn> getStressCheckIns();
 
-  /// Asks for Health Connect / Apple Health heart data permissions.
-  Future<bool> connectWearable();
-
   /// AI headline / stress tip / diet note, fetched at most once a day and
   /// cached; returns the last cached copy (or null) when offline.
   Future<VitaDailyInsights?> getDailyInsights();

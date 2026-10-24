@@ -71,14 +71,19 @@ class HealthImportService {
               HealthConnectSdkStatus.sdkAvailable) {
         return false;
       }
-      // Health Connect grants each type on its own: ask for sleep in the
-      // same screen, or Home's sleep card would prompt again right after.
-      final asked = [...types, ...SleepService.healthTypes];
+      // Health Connect grants each type on its own: ask for sleep and steps
+      // in the same screen, or Home's sleep card would prompt again right
+      // after (steps are only read, never asked for, anywhere else).
+      final asked = [
+        ...types,
+        ...SleepService.healthTypes,
+        HealthDataType.STEPS,
+      ];
       await _health.requestAuthorization(
         asked,
         permissions: List.filled(asked.length, HealthDataAccess.READ),
       );
-      // Sync needs weight and workouts; sleep may be left unticked.
+      // Sync needs weight and workouts; sleep and steps may be left unticked.
       final granted =
           await _health.hasPermissions(
             types,

@@ -122,7 +122,6 @@ class _FakeVita implements VitaRepository {
       ),
     ],
     tip: 'Try four slow breaths before bed tonight.',
-    canConnectWearable: true,
   );
 
   @override
@@ -133,9 +132,6 @@ class _FakeVita implements VitaRepository {
 
   @override
   List<StressCheckIn> getStressCheckIns() => const [];
-
-  @override
-  Future<bool> connectWearable() async => false;
 
   @override
   Future<VitaDailyInsights?> getDailyInsights() async => null;
@@ -402,14 +398,13 @@ void main() {
     expect(find.text('Based on 3 areas you track'), findsOneWidget);
   });
 
-  testWidgets('stress guide fits with triggers, tip and watch card', (
-    tester,
-  ) async {
+  testWidgets('stress guide fits with triggers and tip', (tester) async {
     await _register();
     await _expectFits(tester, () => const VitaStressGuidePage());
     expect(find.text('Moderate stress'), findsOneWidget);
     expect(find.text('Possible triggers today'), findsOneWidget);
-    expect(find.text('Connect watch data'), findsOneWidget);
+    // Heart data isn't read (Play minimum scope): no watch card.
+    expect(find.text('Connect watch data'), findsNothing);
   });
 
   testWidgets('diet plan: fits, and a swap from the options sheet is saved', (

@@ -88,25 +88,6 @@ class HealthAnalysisBuilder {
   }
 
   HealthSignal? _metrics(HealthSnapshot s) {
-    final v = s.vitals;
-    final parts = <String>[
-      if (v.avgHeartRate != null)
-        'HR avg ${v.avgHeartRate}bpm'
-      else if (v.restingHeartRate != null)
-        'Resting HR ${v.restingHeartRate}bpm',
-      if (v.systolic != null && v.diastolic != null)
-        'BP ${v.systolic}/${v.diastolic}',
-      if (v.spo2Percent != null) 'SpO2 ${v.spo2Percent}%',
-      if (v.hrvMs != null) 'HRV ${v.hrvMs!.round()}ms',
-    ];
-    if (parts.isNotEmpty) {
-      return HealthSignal(
-        kind: HealthSignalKind.metrics,
-        title: 'Health metrics',
-        summary: parts.take(3).join(' · '),
-        dataPoints: parts.length,
-      );
-    }
     final p = s.profile;
     if (p.bloodPressureTop != null && p.bloodPressureBottom != null) {
       return HealthSignal(

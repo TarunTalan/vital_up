@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +19,7 @@ import '../cubit/sleep_state.dart';
 import '../cubit/trend_cubit.dart';
 import 'dashboard_card_header.dart';
 import 'tracker_log_sheets.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 const _metric = TrackerMetric.sleep;
 
@@ -193,16 +192,14 @@ class SleepCard extends StatelessWidget {
               _SleepOption(
                 _SleepChoice.connect,
                 Icons.health_and_safety_rounded,
-                Platform.isIOS
-                    ? 'Connect Apple Health'
-                    : 'Connect Health Connect',
+                'Connect $healthStoreName',
                 'Bring in sleep from your watch or other apps',
               ),
             if (offerHealthConnect)
-              const _SleepOption(
+              _SleepOption(
                 _SleepChoice.healthConnect,
                 Icons.health_and_safety_rounded,
-                'Sync with Health Connect',
+                'Sync with $healthStoreName',
                 'Bring in sleep from your watch or other apps',
               ),
           ],

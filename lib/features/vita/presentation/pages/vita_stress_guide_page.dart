@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:vital_up/core/di/injection_container.dart';
 import 'package:vital_up/core/theme/app_theme.dart';
 import 'package:vital_up/core/utils/smooth_ui_helper.dart';
-import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_card.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
@@ -14,9 +13,8 @@ import 'package:vital_up/features/vita/presentation/widgets/vita_insight_card.da
 import 'package:vital_up/features/vita/presentation/widgets/vita_page_body.dart';
 
 /// Today's stress estimate, the check-in, Vita's tip and what may be
-/// adding stress. The score is worked out on the device from the check-in,
-/// watch HRV / resting heart rate and lifestyle triggers; only the tip
-/// comes from the AI.
+/// adding stress. The score is worked out on the device from the check-in
+/// and lifestyle triggers; only the tip comes from the AI.
 class VitaStressGuidePage extends StatefulWidget {
   const VitaStressGuidePage({super.key});
 
@@ -33,7 +31,6 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
       _repository.getStressReport().timeout(const Duration(seconds: 60));
   late final Future<VitaDailyInsights?> _insights = _repository
       .getDailyInsights();
-  bool _connecting = false;
   bool _checkingIn = false;
 
   // Block body: an arrow body would hand setState the Future and throw.
@@ -58,27 +55,6 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
       _checkingIn = false;
     }
     if (mounted) _reload();
-  }
-
-  Future<void> _connectWearable() async {
-    if (_connecting) return;
-    setState(() => _connecting = true);
-    var granted = false;
-    try {
-      granted = await _repository.connectWearable();
-    } catch (e) {
-      debugPrint('Wearable connect failed: $e');
-    }
-    if (!mounted) return;
-    setState(() => _connecting = false);
-    if (granted) {
-      _reload();
-    } else {
-      showErrorSnackBar(
-        context,
-        'No heart data access. Allow it in Health settings.',
-      );
-    }
   }
 
   @override
@@ -110,13 +86,6 @@ class _VitaStressGuidePageState extends State<VitaStressGuidePage> {
             ),
             const SizedBox(height: AppDimens.cardGap),
             _TriggersCard(triggers: report.triggers),
-            if (report.canConnectWearable) ...[
-              const SizedBox(height: AppDimens.cardGap),
-              _ConnectWearableCard(
-                loading: _connecting,
-                onConnect: _connectWearable,
-              ),
-            ],
             const SizedBox(height: AppDimens.sectionGap),
             const AppInfoNote(
               message:
@@ -260,44 +229,6 @@ class _TriggersCard extends StatelessWidget {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ConnectWearableCard extends StatelessWidget {
-  final bool loading;
-  final VoidCallback onConnect;
-
-  const _ConnectWearableCard({required this.loading, required this.onConnect});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'More accurate with a watch',
-            style: context.text.titleSmall?.copyWith(
-              color: context.colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space4),
-          Text(
-            'Vita can read heart rate variability and resting heart rate '
-            'from Health Connect to estimate stress.',
-            style: context.text.bodyMedium?.copyWith(
-              color: context.vColors.grayText,
-            ),
-          ),
-          const SizedBox(height: AppDimens.space12),
-          AppSecondaryButton(
-            label: 'Connect watch data',
-            isLoading: loading,
-            onTap: onConnect,
-          ),
         ],
       ),
     );

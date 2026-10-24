@@ -13,7 +13,7 @@ enum SupportCategory {
     description: 'Suggest a new capability or improvement.',
   ),
   healthSync(
-    label: 'Health Connect & Sync',
+    label: 'Health sync',
     icon: Icons.sync_rounded,
     description: 'Issues syncing with Health Connect or Apple Health.',
   ),

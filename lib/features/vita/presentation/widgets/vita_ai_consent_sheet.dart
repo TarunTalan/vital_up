@@ -7,6 +7,7 @@ import 'package:vital_up/core/utils/smooth_ui_helper.dart';
 import 'package:vital_up/core/widgets/app_buttons.dart';
 import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// True when the AI may be used: accepted before, or accepted now. Call it
 /// before anything that sends data to Vita or the diet plan generator.
@@ -100,10 +101,8 @@ class _VitaAiConsentSheetState extends State<_VitaAiConsentSheet> {
             ),
             AppListTile(
               icon: Icons.monitor_heart_outlined,
-              title: 'Include Health Connect readings',
-              subtitle:
-                  'Heart rate, HRV, blood oxygen, blood pressure, '
-                  'steps and sleep',
+              title: 'Include $healthStoreName readings',
+              subtitle: 'Steps, sleep and imported workouts',
               trailing: Switch(
                 value: _healthConnect,
                 onChanged: _saving

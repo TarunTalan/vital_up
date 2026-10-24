@@ -8,6 +8,7 @@ import 'package:vital_up/core/widgets/app_list_group.dart';
 import 'package:vital_up/core/widgets/app_page_header.dart';
 import 'package:vital_up/core/widgets/app_scaffold.dart';
 import 'package:vital_up/features/vita/data/services/vita_ai_consent.dart';
+import 'package:vital_up/core/utils/health_store.dart';
 
 /// Settings > Privacy & security > AI coach data: what Vita and AI plans
 /// send and to whom, with switches that save at once. The first-use
@@ -79,10 +80,8 @@ class _VitaAiDataPageState extends State<VitaAiDataPage> {
               ),
               AppListTile(
                 icon: Icons.monitor_heart_outlined,
-                title: 'Include Health Connect readings',
-                subtitle:
-                    'Heart rate, HRV, blood oxygen, blood pressure, steps '
-                    'and sleep',
+                title: 'Include $healthStoreName readings',
+                subtitle: 'Steps, sleep and imported workouts',
                 trailing: Switch(
                   value: _consent.includeHealthConnect,
                   // Only with sharing on: never sent without it.

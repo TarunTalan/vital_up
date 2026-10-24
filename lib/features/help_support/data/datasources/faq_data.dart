@@ -35,8 +35,8 @@ const List<FaqItem> kFaqDatabase = [
     answer:
         'Vita is the AI coach in the Vita tab. Ask it about food, sleep, '
         'stress, activity or how to use the app.\n'
-        '• Vita sees nothing until you agree, and Health Connect readings '
-        'only if you allow them.\n'
+        '• Vita sees nothing until you agree, and Health Connect or Apple '
+        'Health readings only if you allow them.\n'
         '• Change this any time in Settings > Privacy & security > AI coach '
         'data.\n'
         '• Free accounts get 15 chats a day, Pro 150.',
@@ -181,7 +181,7 @@ const List<FaqItem> kFaqDatabase = [
     answer:
         'The sleep score (0-100) mostly reflects how long you slept: 7 to 9 '
         'hours scores best. When your watch records sleep stages through '
-        'Health Connect, deep and REM sleep count too.',
+        'Health Connect or Apple Health, deep and REM sleep count too.',
     tags: ['sleep score', 'score', 'deep', 'rem', 'stages'],
     actionLabel: 'Sleep history',
     actionRoute: 'sleep-trends',
@@ -207,16 +207,16 @@ const List<FaqItem> kFaqDatabase = [
   FaqItem(
     id: 'snc_1',
     category: FaqCategory.sync,
-    question: 'How do I connect my watch or Health Connect?',
+    question: 'How do I connect my watch, Health Connect or Apple Health?',
     answer:
-        '• Install Health Connect (Android) and open Settings > Connected > '
-        'Health sync.\n'
+        '• Android needs the Health Connect app; on iPhone, Apple Health is '
+        'built in. Then open Settings > Connected > Health sync.\n'
         '• Turn it on and allow the data you want to share. VitalUp only '
         'reads it.\n'
         '• Weight, workouts and sleep come in when you open the app, at most '
         'once an hour.\n'
         "• If something is missing, open your watch's app first so it "
-        'updates Health Connect.',
+        'updates Health Connect or Apple Health.',
     tags: [
       'health connect',
       'apple health',

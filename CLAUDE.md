@@ -758,8 +758,9 @@ Route names are GoRouter `name`s.
   exercise type: `workoutTypeFor` maps gym/yoga/sports, others -> other) when
   Settings > Health Sync is on, at most hourly, on resume, idempotent (pref
   `health_import_last`). `connect()` also asks for sleep
-  (`SleepService.healthTypes`) in the same screen: Health Connect grants
-  per type, so Home's sleep card would otherwise prompt again.
+  (`SleepService.healthTypes`) and steps in the same screen: Health Connect
+  grants per type, so Home's sleep card would otherwise prompt again, and
+  it's the only place steps are asked for.
 - **food_scanner:** Scan tab, `food-scan`, `meal-log-history`.
   `FoodScanBloc` (photo, barcode, search, edit, label OCR, custom food),
   `MealLogBloc`. Isar `MealLogCache`, `OfflineFood` (synced from
@@ -826,14 +827,21 @@ Route names are GoRouter `name`s.
   15 / Pro 150 and insights 3 / Pro 20 a day. `HealthSnapshotBuilder` computes numbers on device
   (profile from `ProfileRepository` first, onboarding answers as fallback);
   `StressEstimator` is pure. Stress check-ins: levels 1 very calm to 5 very
-  stressed. `HealthVitalsService` only prompts from `connect()`.
+  stressed. `HealthVitalsService` reads steps and sleep only and never
+  prompts. No heart rate / HRV / SpO2 / blood pressure (Oct 25: Play
+  rejected HeartRate and HeartRateVariabilityRmssd under the Health
+  Connect minimum-scope policy since no screen showed them; the stress
+  score is check-in + lifestyle triggers, the "Connect watch data" card
+  is gone). `test/android_manifest_test.dart` pins the allowed
+  `android.permission.health.*` set: add a type only with a feature that
+  displays it, plus the Play declaration and privacy.html.
   AI consent (`VitaAiConsent`, prefs `vita_ai_consent_v1_<uid>`,
   `vita_ai_health_connect_v1_<uid>`; `ensureVitaAiConsent` shows a short
   first-use sheet; Settings > Privacy & security opens the `ai-coach-data`
   page (`VitaAiDataPage`: switches that save at once, what's sent, who
   gets it)): nothing
   goes to vita-chat or generate-diet-plan before the user accepts, and
-  `HealthSnapshot.forAi` drops Health Connect vitals, steps, sleep and
+  `HealthSnapshot.forAi` drops Health Connect steps, sleep and
   imported workouts unless "Include Health Connect readings" is on.
   Quota messages show the reset time from `core/utils/quota_reset.dart`
   (server days are IST).
@@ -1333,7 +1341,11 @@ Route names are GoRouter `name`s.
   only (`ScreenTimeService.isSupported`, `TrackerMetric.isAvailable`:
   Home row, My goals, FAQ hidden on iOS; `hasPermission` false without a
   channel call); iOS later = Family Controls entitlement + a
-  DeviceActivityReport extension (figures never reach Dart).
+  DeviceActivityReport extension (figures never reach Dart). UI text
+  names the health store with `healthStoreName` (`core/utils/
+  health_store.dart`: Apple Health on iOS, Health Connect on Android);
+  the FAQ names both. `privacy.html` covers Apple Health (`#apple-health`)
+  and iPhone permissions (`#iphone-permissions`).
 - Fixed Oct 20: widgets redraw just after midnight (`WidgetMidnight.kt`,
   inexact alarm re-armed on every widget update, plus TIME_SET /
   TIMEZONE_CHANGED); water / mood / sleep logged from widgets or
@@ -1388,7 +1400,8 @@ Route names are GoRouter `name`s.
 - `PermissionsRationaleActivity` (+ `ViewPermissionUsageActivity` alias):
   Health Connect privacy policy link.
 - Permissions are minimal on purpose (Play review): no background location,
-  no battery-optimisation exemption, Health Connect read-only; unused library permissions
+  no battery-optimisation exemption, Health Connect read-only (steps, sleep,
+  weight, exercise, distance, total calories); unused library permissions
   (`RECORD_AUDIO`, `WRITE_EXTERNAL_STORAGE`, `AD_ID`) stripped via `tools:node="remove"`.
   `data_extraction_rules.xml` excludes internal databases and preferences from cloud backup
   and device-to-device transfers. Widget buttons carry a private `action_token`. Usage Access

@@ -76,9 +76,7 @@ enum StressLevel {
 
 /// What today's stress score is based on, most to least reliable.
 enum StressSource {
-  checkInAndWearable('From your check-in and watch data'),
   checkIn("From today's check-in"),
-  wearable('From your watch heart data'),
   estimated('Estimated from your sleep, activity, meals and screen time');
 
   final String description;
@@ -203,9 +201,6 @@ class StressReport extends Equatable {
   /// AI technique tip; null offline / before first fetch.
   final String? tip;
 
-  /// Whether wearable heart data could be connected for better accuracy.
-  final bool canConnectWearable;
-
   const StressReport({
     required this.score,
     required this.level,
@@ -214,20 +209,17 @@ class StressReport extends Equatable {
     required this.triggers,
     this.todayCheckIn,
     this.tip,
-    this.canConnectWearable = false,
   });
 
-  StressReport copyWith({String? tip, bool? canConnectWearable}) =>
-      StressReport(
-        score: score,
-        level: level,
-        source: source,
-        trend: trend,
-        triggers: triggers,
-        todayCheckIn: todayCheckIn,
-        tip: tip ?? this.tip,
-        canConnectWearable: canConnectWearable ?? this.canConnectWearable,
-      );
+  StressReport copyWith({String? tip}) => StressReport(
+    score: score,
+    level: level,
+    source: source,
+    trend: trend,
+    triggers: triggers,
+    todayCheckIn: todayCheckIn,
+    tip: tip ?? this.tip,
+  );
 
   @override
   List<Object?> get props => [
@@ -238,7 +230,6 @@ class StressReport extends Equatable {
     triggers,
     todayCheckIn,
     tip,
-    canConnectWearable,
   ];
 }
 
