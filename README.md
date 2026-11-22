@@ -48,8 +48,8 @@ They are rendered from the app's own widgets by the test suite (see
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/home.png" width="240" alt="Home, light theme"/></td>
-    <td align="center"><img src="docs/screenshots/home_dark.png" width="240" alt="Home, dark theme"/></td>
+    <td align="center"><img src="docs/screenshots/home.jpg" width="240" alt="Home, light theme"/></td>
+    <td align="center"><img src="docs/screenshots/home_dark.jpg" width="240" alt="Home, dark theme"/></td>
     <td align="center"><img src="docs/screenshots/water.png" width="240" alt="Water detail page"/></td>
   </tr>
   <tr>
@@ -63,8 +63,8 @@ They are rendered from the app's own widgets by the test suite (see
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/sleep_sheet.png" width="240" alt="Log sleep sheet"/></td>
-    <td align="center"><img src="docs/screenshots/weight_sheet.png" width="240" alt="Log weight sheet"/></td>
+    <td align="center"><img src="docs/screenshots/sleep_sheet.jpg" width="240" alt="Log sleep sheet"/></td>
+    <td align="center"><img src="docs/screenshots/weight_sheet.jpg" width="240" alt="Log weight sheet"/></td>
     <td align="center"><img src="docs/screenshots/meal_history.png" width="240" alt="Meal history"/></td>
   </tr>
   <tr>

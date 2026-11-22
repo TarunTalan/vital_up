@@ -26,6 +26,7 @@ jobs:
     env:
       SYMBOLS_DIR: build/app/outputs/symbols
       HAVE_FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -47,9 +48,9 @@ jobs:
           cache: true
 
       - name: Set up Shorebird
-        uses: shorebirdtech/shorebird-action@v0
+        uses: shorebirdtech/setup-shorebird@v1
         with:
-          shorebird-token: ${{ secrets.SHOREBIRD_TOKEN }}
+          cache: true
 
       - name: Write release secrets
         env:
