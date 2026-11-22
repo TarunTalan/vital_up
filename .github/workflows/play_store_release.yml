@@ -50,6 +50,7 @@ jobs:
       USE_SHOREBIRD: ${{ github.event_name == 'push' || inputs.use_shorebird }}
       HAVE_PLAY_KEY: ${{ secrets.PLAY_STORE_JSON_KEY != '' }}
       HAVE_FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -82,9 +83,9 @@ jobs:
 
       - name: Set up Shorebird
         if: env.USE_SHOREBIRD == 'true'
-        uses: shorebirdtech/shorebird-action@v0
+        uses: shorebirdtech/setup-shorebird@v1
         with:
-          shorebird-token: ${{ secrets.SHOREBIRD_TOKEN }}
+          cache: true
 
       # A release must never fall back to .env.example or the debug signing key.
       - name: Write release secrets
