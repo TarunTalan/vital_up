@@ -29,6 +29,11 @@ on:
         required: false
         default: true
         type: boolean
+      upload_to_play:
+        description: 'Upload bundle to Google Play Console'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -172,21 +177,6 @@ jobs:
           npx --yes firebase-tools crashlytics:symbols:upload --app="$APP_ID" "$SYMBOLS_DIR"
 
       # =======================================================================
-      # Optional: Upload to Google Play Console
-      # (the very first AAB must be uploaded by hand in the Play Console)
-      # =======================================================================
-      - name: Upload to Google Play Console
-        if: env.HAVE_PLAY_KEY == 'true'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
-          packageName: com.vitalup.app
-          releaseFiles: ${{ env.AAB_PATH }}
-          track: ${{ inputs.track || 'internal' }}
-          status: ${{ inputs.release_status || 'draft' }}
-          mappingFile: build/app/outputs/mapping/release/mapping.txt
-
-      # =======================================================================
       # GitHub Release Tagging
       # =======================================================================
       - name: Create GitHub Release
@@ -195,3 +185,19 @@ jobs:
         with:
           files: ${{ env.AAB_PATH }}
           generate_release_notes: true
+
+      # =======================================================================
+      # Optional: Upload to Google Play Console
+      # Only runs on manual trigger when explicitly requested.
+      # =======================================================================
+      - name: Upload to Google Play Console
+        if: env.HAVE_PLAY_KEY == 'true' && github.event_name == 'workflow_dispatch' && inputs.upload_to_play == true
+        continue-on-error: true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.vitalup.app
+          releaseFiles: ${{ env.AAB_PATH }}
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.release_status || 'draft' }}
+          mappingFile: build/app/outputs/mapping/release/mapping.txt
