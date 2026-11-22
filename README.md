@@ -4,7 +4,7 @@
 
 # VitalUp
 
-**One calm place for your daily health: activity, nutrition, water, sleep, mood and weight, with an AI coach and a friendly Arena.**
+**Production-ready Flutter health & fitness app built with Clean Architecture, BLoC, and offline-first sync (Isar + Supabase). Features an AI food vision scanner (Gemini/Groq), Vita AI health coach, real-time activity tracking, and interactive Android home widgets.**
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=flat-square&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?style=flat-square&logo=dart&logoColor=white)](https://dart.dev)
